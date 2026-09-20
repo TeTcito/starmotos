@@ -9,18 +9,7 @@ import {
   Clock,
   CheckCircle2,
   FileCheck,
-  AlertTriangle,
-  X,
-  Camera,
-  History,
-  ShieldCheck,
   Wrench,
-  ChevronRight,
-  Maximize2,
-  MapPin,
-  MessageCircle,
-  Fuel,
-  Gauge,
   Check,
 } from 'lucide-react';
 
@@ -55,25 +44,24 @@ export const CustomerPortal: React.FC = () => {
     toastMessage,
   } = portal;
 
-  // Si no está autenticado, renderizar página independiente de Login
   if (!isAuthenticated) {
     return <LoginView onLoginSuccess={login} />;
   }
 
-  // Título de la sección activa
+  // Títulos cortos y limpios para la barra superior
   const sectionTitles: Record<ActiveSection, string> = {
-    perfil: 'Mi Perfil & Mantenimientos Programados',
-    orden_activa: 'Seguimiento de Orden de Trabajo Activa',
-    inspeccion: 'Inspección 360° de Recepción & Firma',
-    historial: 'Historial de Mantenimientos & Facturación',
-    garantias: 'Pólizas & Garantías Activas',
+    perfil: 'Perfil & Mantenimiento',
+    orden_activa: 'Orden Activa',
+    inspeccion: 'Inspección 360°',
+    historial: 'Historial',
+    garantias: 'Garantías',
   };
 
   const isQuotationPending = activeOrder.quotation.status === 'pendiente_aprobacion';
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* 1. Navbar Superior con botón hamburguesa */}
+      {/* 1. Navbar con auto-ocultado al scrolear */}
       <Navbar
         onToggleSidebar={() => setIsSidebarOpen(true)}
         profile={profile}
@@ -94,9 +82,9 @@ export const CustomerPortal: React.FC = () => {
       />
 
       {/* 3. Contenido Principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
         {/* ========================================================================= */}
-        {/* PESTAÑA 1 (PRINCIPAL): INFORMACIÓN DEL CLIENTE (PERFIL) & MANTENIMIENTOS */}
+        {/* PESTAÑA 1 (PRINCIPAL): PERFIL & MANTENIMIENTO                             */}
         {/* ========================================================================= */}
         {activeSection === 'perfil' && (
           <ClientProfileView
@@ -111,65 +99,63 @@ export const CustomerPortal: React.FC = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* PESTAÑA 2: ORDEN DE TRABAJO ACTIVA & APROBACIÓN DE PRESUPUESTO            */}
+        {/* PESTAÑA 2: ORDEN ACTIVA                                                   */}
         {/* ========================================================================= */}
         {activeSection === 'orden_activa' && (
-          <div className="space-y-6 animate-fade-in pb-12">
-            {/* Header de la OT */}
-            <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-4 animate-fade-in pb-10">
+            {/* Resumen OT */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-red-500 uppercase tracking-wide">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-bold text-red-500 uppercase">
                     {motorcycle.brand} {motorcycle.model}
                   </span>
                   <span className="text-xs text-zinc-400 font-mono">({motorcycle.plate})</span>
                 </div>
-                <h2 className="text-lg font-black text-white flex items-center gap-2">
-                  <span>Orden de Trabajo:</span>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>OT:</span>
                   <span className="font-mono text-blue-400">{activeOrder.otNumber}</span>
                 </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Ingreso: {activeOrder.entryDate} • Entrega estimada: <strong className="text-white">{activeOrder.estimatedDelivery}</strong>
+                <p className="text-xs text-zinc-400">
+                  Entrega estimada: <strong className="text-white">{activeOrder.estimatedDelivery}</strong>
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-extrabold uppercase px-3 py-1.5 rounded-xl ${
-                  isQuotationPending
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
-                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                }`}>
-                  {isQuotationPending ? 'Presupuesto Pendiente' : 'En Reparación'}
-                </span>
-              </div>
+              <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-lg self-start sm:self-center ${
+                isQuotationPending
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              }`}>
+                {isQuotationPending ? 'Cotización Pendiente' : 'En Reparación'}
+              </span>
             </div>
 
-            {/* Stepper de 7 Fases */}
-            <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-4">
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+            {/* Stepper de Fases */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-blue-400" />
-                <span>Progreso de la Moto en Taller</span>
+                <span>Progreso</span>
               </h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {activeOrder.steps.map((step, idx) => (
                   <div
                     key={step.id}
-                    className={`rounded-2xl p-3 border transition-all ${
+                    className={`rounded-xl p-2.5 border transition-all ${
                       step.current
-                        ? 'bg-blue-600/15 border-blue-500 shadow-lg shadow-blue-500/10'
+                        ? 'bg-blue-600/15 border-blue-500'
                         : step.completed
-                        ? 'bg-zinc-950/80 border-zinc-800'
-                        : 'bg-zinc-950/30 border-zinc-900 opacity-50'
+                        ? 'bg-zinc-950 border-zinc-800'
+                        : 'bg-zinc-950/40 border-zinc-900 opacity-50'
                     }`}
                   >
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[10px] font-mono text-zinc-500">0{idx + 1}</span>
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
+                      <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] ${
                         step.completed
                           ? 'bg-emerald-500 text-zinc-950 font-bold'
                           : step.current
-                          ? 'bg-blue-600 text-white font-bold animate-pulse'
+                          ? 'bg-blue-600 text-white font-bold'
                           : 'bg-zinc-800 text-zinc-500'
                       }`}>
                         {step.completed ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : idx + 1}
@@ -178,91 +164,68 @@ export const CustomerPortal: React.FC = () => {
                     <h4 className={`text-xs font-bold truncate ${step.current ? 'text-white' : 'text-zinc-300'}`}>
                       {step.shortLabel}
                     </h4>
-                    <span className="text-[9px] text-zinc-500 block truncate mt-0.5 font-mono">
-                      {step.timestamp || 'Pendiente'}
-                    </span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Presupuesto y Botón de Aprobación */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Desglose de Repuestos y Servicios */}
-              <div className="lg:col-span-2 bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-4">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+            {/* Cotización */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 bg-zinc-900 rounded-2xl p-4 border border-zinc-800 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                   <Wrench className="w-4 h-4 text-red-500" />
-                  <span>Detalle de Cotización #{activeOrder.quotation.quotationNumber}</span>
+                  <span>Repuestos y Mano de Obra</span>
                 </h3>
 
-                {/* Repuestos */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Repuestos y Fluidos Requeridos:
-                  </span>
-                  <div className="space-y-1.5">
-                    {activeOrder.quotation.parts.map((p) => (
-                      <div key={p.code} className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
-                        <div>
-                          <span className="font-bold text-white block">{p.description}</span>
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            {p.brand} • Cant: {p.quantity} × ${p.unitPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <span className="font-mono font-bold text-white">${p.subtotal.toFixed(2)}</span>
+                <div className="space-y-1.5">
+                  {activeOrder.quotation.parts.map((p) => (
+                    <div key={p.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-medium text-white block">{p.description}</span>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {p.brand} • {p.quantity} × ${p.unitPrice.toFixed(2)}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mano de Obra */}
-                <div className="space-y-2 pt-2 border-t border-zinc-800">
-                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Mano de Obra Certificada:
-                  </span>
-                  <div className="space-y-1.5">
-                    {activeOrder.quotation.services.map((s) => (
-                      <div key={s.code} className="bg-zinc-950/70 p-3 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
-                        <div>
-                          <span className="font-bold text-white block">{s.description}</span>
-                          <span className="text-[10px] text-zinc-500">{s.hours} horas técnicas estándar</span>
-                        </div>
-                        <span className="font-mono font-bold text-white">${s.subtotal.toFixed(2)}</span>
+                      <span className="font-mono font-bold text-white">${p.subtotal.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  {activeOrder.quotation.services.map((s) => (
+                    <div key={s.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-medium text-white block">{s.description}</span>
+                        <span className="text-[10px] text-zinc-500">{s.hours} horas</span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="font-mono font-bold text-white">${s.subtotal.toFixed(2)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Total y Acción */}
-              <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl flex flex-col justify-between space-y-4">
-                <div className="space-y-3 text-xs">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-300">
-                    Liquidación SRI (IVA 15%)
+              <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex flex-col justify-between space-y-3">
+                <div className="space-y-2 text-xs">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                    Total Proforma (IVA 15%)
                   </h3>
 
-                  <div className="space-y-2 pt-2 border-t border-zinc-800 text-zinc-400">
+                  <div className="space-y-1.5 pt-2 border-t border-zinc-800 text-zinc-400">
                     <div className="flex justify-between">
-                      <span>Subtotal Repuestos:</span>
-                      <span className="font-mono text-zinc-200">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Subtotal Mano de Obra:</span>
-                      <span className="font-mono text-zinc-200">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
+                      <span>Subtotal:</span>
+                      <span className="font-mono text-zinc-200">${activeOrder.quotation.subtotal.toFixed(2)}</span>
                     </div>
                     {activeOrder.quotation.discount > 0 && (
                       <div className="flex justify-between text-emerald-400">
-                        <span>Descuento Cliente:</span>
+                        <span>Descuento:</span>
                         <span className="font-mono">-${activeOrder.quotation.discount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span>IVA Ecuador (15%):</span>
+                      <span>IVA 15%:</span>
                       <span className="font-mono text-zinc-200">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
                     </div>
-                    <div className="pt-2 border-t border-zinc-800 flex justify-between text-base font-extrabold text-white">
-                      <span>Total a Pagar:</span>
-                      <span className="font-mono text-blue-400">${activeOrder.quotation.total.toFixed(2)} USD</span>
+                    <div className="pt-2 border-t border-zinc-800 flex justify-between font-bold text-sm text-white">
+                      <span>Total:</span>
+                      <span className="font-mono text-blue-400 text-base">${activeOrder.quotation.total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -270,16 +233,15 @@ export const CustomerPortal: React.FC = () => {
                 {isQuotationPending ? (
                   <button
                     onClick={() => setIsApprovalModalOpen(true)}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-2.5 px-3 rounded-xl shadow transition flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Aprobar Presupuesto (${activeOrder.quotation.total.toFixed(2)})</span>
+                    <span>Aprobar Presupuesto</span>
                   </button>
                 ) : (
-                  <div className="bg-emerald-950/40 border border-emerald-500/40 p-3 rounded-xl text-center text-xs text-emerald-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
-                    <span className="font-bold block">Presupuesto Aprobado</span>
-                    <span className="text-[10px] text-zinc-400 font-mono">{activeOrder.quotation.approvedAt}</span>
+                  <div className="bg-emerald-950/40 border border-emerald-500/30 p-2.5 rounded-xl text-center text-xs text-emerald-300 font-bold flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Presupuesto Aprobado</span>
                   </div>
                 )}
               </div>
@@ -291,60 +253,54 @@ export const CustomerPortal: React.FC = () => {
         {/* PESTAÑA 3: INSPECCIÓN 360°                                                */}
         {/* ========================================================================= */}
         {activeSection === 'inspeccion' && (
-          <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-              <div>
-                <h2 className="text-base font-black text-white">Inspección 360° de Recepción</h2>
-                <p className="text-xs text-zinc-400">Fotografías oficiales, estado visual y firma de conformidad</p>
-              </div>
+          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-4 animate-fade-in pb-8">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <h2 className="text-sm sm:text-base font-bold text-white">Inspección 360° de Recepción</h2>
               <span className="text-xs font-mono text-zinc-400">{inspection.receptionDate}</span>
             </div>
 
-            {/* Grid de 5 Fotos */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
               {[
                 { title: 'Frontal', url: inspection.photos.frontal },
                 { title: 'Lateral Izq.', url: inspection.photos.lateralIzq },
                 { title: 'Lateral Der.', url: inspection.photos.lateralDer },
                 { title: 'Trasera', url: inspection.photos.trasera },
-                { title: 'Tablero & Odómetro', url: inspection.photos.tablero },
+                { title: 'Tablero', url: inspection.photos.tablero },
               ].map((p, i) => (
                 <div
                   key={i}
-                  onClick={() => setActivePhotoModal({ url: p.url, title: p.title, subtitle: 'Registro Fotográfico Oficial' })}
-                  className="group relative rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 aspect-square cursor-pointer hover:border-blue-500 transition"
+                  onClick={() => setActivePhotoModal({ url: p.url, title: p.title })}
+                  className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 aspect-square cursor-pointer hover:border-blue-500 transition"
                 >
                   <img src={p.url} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5">
-                    <span className="text-[11px] font-bold text-white">{p.title}</span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2">
+                    <span className="text-[10px] font-bold text-white">{p.title}</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Daños Previos y Firma */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="bg-zinc-950/70 p-4 rounded-2xl border border-zinc-850 space-y-2">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                  Daños Previos al Ingreso:
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
+                <span className="font-bold text-amber-400 uppercase text-[11px] block">
+                  Daños Previos al Ingreso
                 </span>
                 {inspection.damages.map((dmg) => (
-                  <div key={dmg.id} className="text-xs text-zinc-300 border-b border-zinc-850 pb-2 last:border-0">
-                    <span className="font-bold text-white">{dmg.zone}</span> - <span className="text-amber-400">{dmg.damageType}</span>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">{dmg.advisorNotes}</p>
+                  <div key={dmg.id} className="text-zinc-300 border-b border-zinc-850 pb-1.5 last:border-0">
+                    <span className="font-bold text-white">{dmg.zone}</span>: {dmg.damageType}
                   </div>
                 ))}
               </div>
 
-              <div className="bg-zinc-950/70 p-4 rounded-2xl border border-zinc-850 flex flex-col justify-between">
-                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider block mb-2">
-                  Firma Digital del Cliente en Check-in:
+              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 flex flex-col justify-between text-xs">
+                <span className="font-bold text-zinc-300 uppercase text-[11px] block mb-1">
+                  Firma de Recepción
                 </span>
-                <div className="bg-white rounded-xl p-3 flex items-center justify-center">
-                  <img src={inspection.signature.signatureUrl} alt="Firma" className="h-14 object-contain" />
+                <div className="bg-white rounded-lg p-2 flex items-center justify-center">
+                  <img src={inspection.signature.signatureUrl} alt="Firma" className="h-10 object-contain" />
                 </div>
-                <p className="text-[10px] text-zinc-500 text-center font-mono mt-2">
-                  Firmado por {inspection.signature.clientName} (C.I: {inspection.signature.identificationId})
+                <p className="text-[10px] text-zinc-500 text-center font-mono mt-1">
+                  {inspection.signature.clientName} ({inspection.signature.identificationId})
                 </p>
               </div>
             </div>
@@ -355,31 +311,26 @@ export const CustomerPortal: React.FC = () => {
         {/* PESTAÑA 4: HISTORIAL                                                      */}
         {/* ========================================================================= */}
         {activeSection === 'historial' && (
-          <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-4 animate-fade-in">
-            <h2 className="text-base font-black text-white border-b border-zinc-800 pb-3">
-              Historial Oficial de Mantenimientos
+          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
+            <h2 className="text-sm sm:text-base font-bold text-white pb-2 border-b border-zinc-800">
+              Historial de Mantenimientos
             </h2>
 
             {history.map((record) => (
-              <div key={record.id} className="bg-zinc-950/80 p-4 rounded-2xl border border-zinc-850 space-y-2">
-                <div className="flex justify-between items-start text-xs border-b border-zinc-850 pb-2">
+              <div key={record.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
+                <div className="flex justify-between items-center border-b border-zinc-850 pb-1.5">
                   <div>
-                    <span className="font-extrabold text-white text-sm">{record.date}</span>
-                    <span className="text-blue-400 font-mono block">{record.mileage.toLocaleString()} KM</span>
+                    <span className="font-bold text-white">{record.date}</span>
+                    <span className="text-blue-400 font-mono text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
                   </div>
-                  <div className="text-right">
-                    <span className="font-bold text-emerald-400 font-mono text-sm">${record.totalPaid.toFixed(2)}</span>
-                    <span className="text-[10px] text-zinc-500 block font-mono">{record.invoiceNumber}</span>
-                  </div>
+                  <span className="font-bold text-emerald-400 font-mono">${record.totalPaid.toFixed(2)}</span>
                 </div>
-                <div className="text-xs text-zinc-400">
-                  <span className="font-medium text-zinc-300">{record.branchName}</span> • Técnico: {record.technicianName}
+                <div className="text-[11px] text-zinc-400">
+                  {record.branchName} • Mecánico: {record.technicianName}
                 </div>
-                <ul className="list-disc list-inside text-[11px] text-zinc-300 space-y-0.5 bg-zinc-900/40 p-2.5 rounded-xl">
-                  {record.workSummary.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
-                </ul>
+                <div className="text-[11px] text-zinc-300">
+                  {record.workSummary.join(' • ')}
+                </div>
               </div>
             ))}
           </div>
@@ -389,23 +340,23 @@ export const CustomerPortal: React.FC = () => {
         {/* PESTAÑA 5: GARANTÍAS                                                      */}
         {/* ========================================================================= */}
         {activeSection === 'garantias' && (
-          <div className="bg-zinc-900/90 rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-4 animate-fade-in">
-            <h2 className="text-base font-black text-white border-b border-zinc-800 pb-3">
-              Garantías y Pólizas Vigentes
+          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
+            <h2 className="text-sm sm:text-base font-bold text-white pb-2 border-b border-zinc-800">
+              Garantías Vigentes
             </h2>
 
             {warranties.map((war) => (
-              <div key={war.id} className="bg-zinc-950/80 p-4 rounded-2xl border border-zinc-850 space-y-2 text-xs">
+              <div key={war.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-extrabold text-white text-sm">{war.title}</h3>
-                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <h3 className="font-bold text-white">{war.title}</h3>
+                  <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                     Vigente
                   </span>
                 </div>
-                <p className="text-zinc-300 text-[11px]">{war.coverage}</p>
-                <div className="flex gap-4 text-[11px] text-zinc-400 font-mono pt-1">
-                  <span>Vencimiento: <strong className="text-white">{war.expirationDate}</strong></span>
-                  <span>Límite: <strong className="text-white">{war.kmLimit.toLocaleString()} km</strong></span>
+                <p className="text-zinc-400 text-[11px]">{war.coverage}</p>
+                <div className="flex gap-4 text-[10px] text-zinc-500 font-mono pt-1">
+                  <span>Vence: <strong className="text-zinc-300">{war.expirationDate}</strong></span>
+                  <span>Límite: <strong className="text-zinc-300">{war.kmLimit.toLocaleString()} km</strong></span>
                 </div>
               </div>
             ))}
@@ -413,29 +364,27 @@ export const CustomerPortal: React.FC = () => {
         )}
       </main>
 
-      {/* ================= MODAL: APROBACIÓN DE PRESUPUESTO ================= */}
+      {/* MODAL: APROBACIÓN DE PRESUPUESTO */}
       {isApprovalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
-                  <FileCheck className="w-5 h-5" />
-                </div>
-                <h3 className="text-sm font-extrabold text-white">Autorizar Presupuesto</h3>
+                <FileCheck className="w-4 h-4 text-blue-400" />
+                <h3 className="text-xs font-bold text-white">Autorizar Presupuesto</h3>
               </div>
               <button
                 onClick={() => setIsApprovalModalOpen(false)}
-                className="text-zinc-400 hover:text-white text-lg font-bold"
+                className="text-zinc-400 hover:text-white text-base font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
-              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-850 space-y-2">
+            <div className="p-4 space-y-3 text-xs">
+              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 space-y-1.5">
                 <div className="flex justify-between text-zinc-400">
-                  <span>Repuestos y Fluidos:</span>
+                  <span>Repuestos:</span>
                   <span className="font-mono text-white">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-zinc-400">
@@ -443,24 +392,20 @@ export const CustomerPortal: React.FC = () => {
                   <span className="font-mono text-white">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-zinc-400">
-                  <span>IVA Ecuador (15%):</span>
+                  <span>IVA 15%:</span>
                   <span className="font-mono text-white">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="pt-2 border-t border-zinc-800 flex justify-between font-bold text-sm text-white">
-                  <span>Monto Total:</span>
-                  <span className="font-mono text-blue-400 text-base">${activeOrder.quotation.total.toFixed(2)} USD</span>
+                <div className="pt-1.5 border-t border-zinc-800 flex justify-between font-bold text-white">
+                  <span>Total:</span>
+                  <span className="font-mono text-blue-400">${activeOrder.quotation.total.toFixed(2)} USD</span>
                 </div>
               </div>
 
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Al confirmar, autorizas a StarMotos a iniciar el montaje de repuestos y ejecución de los trabajos mecánicos.
-              </p>
-
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800"
+                  className="flex-1 py-2 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800"
                 >
                   Cancelar
                 </button>
@@ -468,9 +413,9 @@ export const CustomerPortal: React.FC = () => {
                   type="button"
                   onClick={approveQuotation}
                   disabled={isApproving}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold shadow-lg shadow-blue-600/30"
+                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
                 >
-                  {isApproving ? 'Procesando...' : 'Confirmar y Aprobar'}
+                  {isApproving ? 'Procesando...' : 'Aprobar'}
                 </button>
               </div>
             </div>
@@ -478,7 +423,7 @@ export const CustomerPortal: React.FC = () => {
         </div>
       )}
 
-      {/* ================= MODAL: VISOR DE FOTOS ================= */}
+      {/* MODAL: VISOR DE FOTOS */}
       {activePhotoModal && (
         <div
           onClick={() => setActivePhotoModal(null)}
@@ -486,9 +431,9 @@ export const CustomerPortal: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-zinc-900 border border-zinc-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl"
+            className="relative bg-zinc-900 border border-zinc-800 rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl"
           >
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+            <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
               <h4 className="text-xs font-bold text-white">{activePhotoModal.title}</h4>
               <button
                 onClick={() => setActivePhotoModal(null)}
@@ -497,23 +442,18 @@ export const CustomerPortal: React.FC = () => {
                 ✕
               </button>
             </div>
-            <div className="p-2 bg-black flex items-center justify-center max-h-[70vh]">
-              <img src={activePhotoModal.url} alt={activePhotoModal.title} className="max-h-[65vh] object-contain rounded-xl" />
+            <div className="p-2 bg-black flex items-center justify-center max-h-[65vh]">
+              <img src={activePhotoModal.url} alt={activePhotoModal.title} className="max-h-[60vh] object-contain rounded-lg" />
             </div>
           </div>
         </div>
       )}
 
-      {/* ================= TOAST NOTIFICATION ================= */}
+      {/* TOAST NOTIFICATION */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 max-w-sm bg-zinc-900 border border-blue-500/50 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-in">
-          <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div className="text-xs">
-            <span className="font-extrabold text-blue-400 block">StarMotos Portal</span>
-            <p className="text-zinc-200">{toastMessage.text}</p>
-          </div>
+        <div className="fixed top-5 right-5 z-50 max-w-xs bg-zinc-900 border border-blue-500/40 text-white px-3.5 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 animate-slide-in text-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <p className="text-zinc-200">{toastMessage.text}</p>
         </div>
       )}
     </div>

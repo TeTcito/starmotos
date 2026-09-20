@@ -59,95 +59,93 @@ export const MaintenancesView: React.FC<Props> = ({
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 animate-fade-in pb-12">
-      {/* Indicador de Aceite y Agendar Cita */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-blue-400" />
-            <h2 className="text-base font-bold text-white">
-              Mantenimientos Programados
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-1.5 px-3 rounded-xl shadow transition flex items-center gap-1.5 active:scale-98 cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>Agendar Cita</span>
-          </button>
+      {/* Encabezado sin contenedor externo */}
+      <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-blue-400" />
+          <h2 className="text-base font-bold text-white">
+            Mantenimientos Programados
+          </h2>
         </div>
 
-        {/* Tarjeta de Vida de Aceite */}
-        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-[10px] text-zinc-400 uppercase font-bold block">
-              Próximo Cambio de Aceite
-            </span>
-            <span className="text-sm font-bold text-white">
-              Restan ~{kmRemainingOil.toLocaleString()} KM
-            </span>
-            <span className="text-[10px] text-zinc-500 block font-mono">
-              (Odómetro actual: {motorcycle.currentKm.toLocaleString()} km)
-            </span>
-          </div>
+        <button
+          type="button"
+          onClick={() => setIsScheduleModalOpen(true)}
+          className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-1.5 px-3 rounded-xl shadow transition flex items-center gap-1.5 active:scale-98 cursor-pointer"
+        >
+          <PlusCircle className="w-3.5 h-3.5" />
+          <span>Agendar Cita</span>
+        </button>
+      </div>
 
-          <div className="w-full sm:w-48 space-y-1">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-zinc-400">Vida restante:</span>
-              <span className="font-bold text-white">{oilHealthPercentage}%</span>
-            </div>
-            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  oilHealthPercentage > 40
-                    ? 'bg-emerald-500'
-                    : oilHealthPercentage > 15
-                    ? 'bg-amber-500'
-                    : 'bg-red-500'
-                }`}
-                style={{ width: `${oilHealthPercentage}%` }}
-              />
-            </div>
-          </div>
+      {/* Tarjeta de Vida de Aceite */}
+      <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span className="text-[10px] text-zinc-400 uppercase font-bold block">
+            Próximo Cambio de Aceite
+          </span>
+          <span className="text-sm font-bold text-white">
+            Restan ~{kmRemainingOil.toLocaleString()} KM
+          </span>
+          <span className="text-[10px] text-zinc-500 block font-mono">
+            (Odómetro actual: {motorcycle.currentKm.toLocaleString()} km)
+          </span>
         </div>
 
-        {/* Lista de Citas y Mantenimientos */}
-        <div className="space-y-3 pt-2">
-          {scheduledMaintenances.map((maint) => (
+        <div className="w-full sm:w-48 space-y-1">
+          <div className="flex justify-between text-xs font-mono">
+            <span className="text-zinc-400">Vida restante:</span>
+            <span className="font-bold text-white">{oilHealthPercentage}%</span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
             <div
-              key={maint.id}
-              className="bg-zinc-950 p-4 rounded-xl border border-zinc-850 space-y-2"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h4 className="text-xs font-bold text-white">{maint.serviceTitle}</h4>
-                  <span className="text-[10px] text-blue-400 font-mono">
-                    Recomendado a los {maint.recommendedKm.toLocaleString()} KM
-                  </span>
-                </div>
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-                  {maint.status}
-                </span>
-              </div>
-
-              <div className="text-xs text-zinc-300 flex flex-col sm:flex-row sm:justify-between gap-1 border-t border-zinc-850 pt-2">
-                <span>
-                  <strong>Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
-                </span>
-                <span>
-                  <strong>Sucursal:</strong> {maint.branchName.replace('StarMotos ', '')}
-                </span>
-              </div>
-
-              <div className="text-[11px] text-zinc-400">
-                {maint.tasks.join(' • ')}
-              </div>
-            </div>
-          ))}
+              className={`h-full rounded-full transition-all ${
+                oilHealthPercentage > 40
+                  ? 'bg-emerald-500'
+                  : oilHealthPercentage > 15
+                  ? 'bg-amber-500'
+                  : 'bg-red-500'
+              }`}
+              style={{ width: `${oilHealthPercentage}%` }}
+            />
+          </div>
         </div>
-      </section>
+      </div>
+
+      {/* Lista de Citas y Mantenimientos */}
+      <div className="space-y-3">
+        {scheduledMaintenances.map((maint) => (
+          <div
+            key={maint.id}
+            className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-2"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold text-white">{maint.serviceTitle}</h4>
+                <span className="text-[10px] text-blue-400 font-mono">
+                  Recomendado a los {maint.recommendedKm.toLocaleString()} KM
+                </span>
+              </div>
+              <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                {maint.status}
+              </span>
+            </div>
+
+            <div className="text-xs text-zinc-300 flex flex-col sm:flex-row sm:justify-between gap-1 border-t border-zinc-800 pt-2">
+              <span>
+                <strong>Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
+              </span>
+              <span>
+                <strong>Sucursal:</strong> {maint.branchName.replace('StarMotos ', '')}
+              </span>
+            </div>
+
+            <div className="text-[11px] text-zinc-400">
+              {maint.tasks.join(' • ')}
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Modal Agendar Cita */}
       {isScheduleModalOpen && (

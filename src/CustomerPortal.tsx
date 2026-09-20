@@ -13,6 +13,9 @@ import {
   FileCheck,
   Wrench,
   Check,
+  ShieldCheck,
+  History,
+  Sparkles,
 } from 'lucide-react';
 
 export const CustomerPortal: React.FC = () => {
@@ -123,26 +126,14 @@ export const CustomerPortal: React.FC = () => {
         {/* SECCIÓN: ORDEN ACTIVA                                                     */}
         {/* ========================================================================= */}
         {activeSection === 'orden_activa' && (
-          <div className="space-y-4 animate-fade-in pb-10">
-            {/* Resumen OT */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-bold text-red-500 uppercase">
-                    {motorcycle.brand} {motorcycle.model}
-                  </span>
-                  <span className="text-xs text-zinc-400 font-mono">({motorcycle.plate})</span>
-                </div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>OT:</span>
-                  <span className="font-mono text-blue-400">{activeOrder.otNumber}</span>
-                </h2>
-                <p className="text-xs text-zinc-400">
-                  Entrega estimada: <strong className="text-white">{activeOrder.estimatedDelivery}</strong>
-                </p>
+          <div className="max-w-3xl mx-auto space-y-4 animate-fade-in pb-12">
+            {/* Header sin contenedor */}
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-400" />
+                <h2 className="text-base font-bold text-white">Orden de Trabajo</h2>
               </div>
-
-              <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-lg self-start sm:self-center ${
+              <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-lg ${
                 isQuotationPending
                   ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -151,11 +142,30 @@ export const CustomerPortal: React.FC = () => {
               </span>
             </div>
 
+            {/* Resumen OT */}
+            <div className="bg-zinc-900 rounded-xl p-3.5 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-bold text-red-500 uppercase">
+                    {motorcycle.brand} {motorcycle.model}
+                  </span>
+                  <span className="text-xs text-zinc-400 font-mono">({motorcycle.plate})</span>
+                </div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>OT:</span>
+                  <span className="font-mono text-blue-400">{activeOrder.otNumber}</span>
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Entrega estimada: <strong className="text-white">{activeOrder.estimatedDelivery}</strong>
+                </p>
+              </div>
+            </div>
+
             {/* Stepper de Fases */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span>Progreso</span>
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-blue-400" />
+                <span>Progreso del Taller</span>
               </h3>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -166,8 +176,8 @@ export const CustomerPortal: React.FC = () => {
                       step.current
                         ? 'bg-blue-600/15 border-blue-500'
                         : step.completed
-                        ? 'bg-zinc-950 border-zinc-800'
-                        : 'bg-zinc-950/40 border-zinc-900 opacity-50'
+                        ? 'bg-zinc-900 border-zinc-800'
+                        : 'bg-zinc-900/40 border-zinc-900 opacity-50'
                     }`}
                   >
                     <div className="flex justify-between items-center mb-1">
@@ -191,16 +201,16 @@ export const CustomerPortal: React.FC = () => {
             </div>
 
             {/* Cotización */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 bg-zinc-900 rounded-2xl p-4 border border-zinc-800 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                  <Wrench className="w-4 h-4 text-red-500" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <div className="md:col-span-2 space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-red-500" />
                   <span>Repuestos y Mano de Obra</span>
                 </h3>
 
                 <div className="space-y-1.5">
                   {activeOrder.quotation.parts.map((p) => (
-                    <div key={p.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-855 flex justify-between items-center text-xs">
+                    <div key={p.code} className="bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-medium text-white block">{p.description}</span>
                         <span className="text-[10px] text-zinc-500 font-mono">
@@ -211,7 +221,7 @@ export const CustomerPortal: React.FC = () => {
                     </div>
                   ))}
                   {activeOrder.quotation.services.map((s) => (
-                    <div key={s.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-855 flex justify-between items-center text-xs">
+                    <div key={s.code} className="bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-medium text-white block">{s.description}</span>
                         <span className="text-[10px] text-zinc-500">{s.hours} horas</span>
@@ -223,7 +233,7 @@ export const CustomerPortal: React.FC = () => {
               </div>
 
               {/* Total y Acción */}
-              <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800 flex flex-col justify-between space-y-3">
+              <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col justify-between space-y-3">
                 <div className="space-y-2 text-xs">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
                     Total Proforma (IVA 15%)
@@ -274,9 +284,12 @@ export const CustomerPortal: React.FC = () => {
         {/* SECCIÓN: INSPECCIÓN 360°                                                  */}
         {/* ========================================================================= */}
         {activeSection === 'inspeccion' && (
-          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-4 animate-fade-in pb-8">
+          <div className="max-w-3xl mx-auto space-y-4 animate-fade-in pb-12">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <h2 className="text-sm sm:text-base font-bold text-white">Inspección 360° de Recepción</h2>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+                <h2 className="text-base font-bold text-white">Inspección 360° de Recepción</h2>
+              </div>
               <span className="text-xs font-mono text-zinc-400">{inspection.receptionDate}</span>
             </div>
 
@@ -291,7 +304,7 @@ export const CustomerPortal: React.FC = () => {
                 <div
                   key={i}
                   onClick={() => setActivePhotoModal({ url: p.url, title: p.title })}
-                  className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 aspect-square cursor-pointer hover:border-blue-500 transition"
+                  className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 aspect-square cursor-pointer hover:border-blue-500 transition"
                 >
                   <img src={p.url} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2">
@@ -302,18 +315,18 @@ export const CustomerPortal: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
+              <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 space-y-1.5 text-xs">
                 <span className="font-bold text-amber-400 uppercase text-[11px] block">
                   Daños Previos al Ingreso
                 </span>
                 {inspection.damages.map((dmg) => (
-                  <div key={dmg.id} className="text-zinc-300 border-b border-zinc-850 pb-1.5 last:border-0">
+                  <div key={dmg.id} className="text-zinc-300 border-b border-zinc-800 pb-1.5 last:border-0">
                     <span className="font-bold text-white">{dmg.zone}</span>: {dmg.damageType}
                   </div>
                 ))}
               </div>
 
-              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 flex flex-col justify-between text-xs">
+              <div className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 flex flex-col justify-between text-xs">
                 <span className="font-bold text-zinc-300 uppercase text-[11px] block mb-1">
                   Firma de Recepción
                 </span>
@@ -332,28 +345,33 @@ export const CustomerPortal: React.FC = () => {
         {/* SECCIÓN: HISTORIAL                                                        */}
         {/* ========================================================================= */}
         {activeSection === 'historial' && (
-          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
-            <h2 className="text-sm sm:text-base font-bold text-white pb-2 border-b border-zinc-800">
-              Historial de Mantenimientos
-            </h2>
+          <div className="max-w-3xl mx-auto space-y-4 animate-fade-in pb-12">
+            <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
+              <History className="w-5 h-5 text-blue-400" />
+              <h2 className="text-base font-bold text-white">
+                Historial de Mantenimientos
+              </h2>
+            </div>
 
-            {history.map((record) => (
-              <div key={record.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
-                <div className="flex justify-between items-center border-b border-zinc-850 pb-1.5">
-                  <div>
-                    <span className="font-bold text-white">{record.date}</span>
-                    <span className="text-blue-400 font-mono text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+            <div className="space-y-3">
+              {history.map((record) => (
+                <div key={record.id} className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center border-b border-zinc-800 pb-1.5">
+                    <div>
+                      <span className="font-bold text-white">{record.date}</span>
+                      <span className="text-blue-400 font-mono text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+                    </div>
+                    <span className="font-bold text-emerald-400 font-mono">${record.totalPaid.toFixed(2)}</span>
                   </div>
-                  <span className="font-bold text-emerald-400 font-mono">${record.totalPaid.toFixed(2)}</span>
+                  <div className="text-[11px] text-zinc-400">
+                    {record.branchName} • Mecánico: {record.technicianName}
+                  </div>
+                  <div className="text-[11px] text-zinc-300">
+                    {record.workSummary.join(' • ')}
+                  </div>
                 </div>
-                <div className="text-[11px] text-zinc-400">
-                  {record.branchName} • Mecánico: {record.technicianName}
-                </div>
-                <div className="text-[11px] text-zinc-300">
-                  {record.workSummary.join(' • ')}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -361,26 +379,31 @@ export const CustomerPortal: React.FC = () => {
         {/* SECCIÓN: GARANTÍAS                                                        */}
         {/* ========================================================================= */}
         {activeSection === 'garantias' && (
-          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
-            <h2 className="text-sm sm:text-base font-bold text-white pb-2 border-b border-zinc-800">
-              Garantías Vigentes
-            </h2>
+          <div className="max-w-3xl mx-auto space-y-4 animate-fade-in pb-12">
+            <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
+              <Sparkles className="w-5 h-5 text-blue-400" />
+              <h2 className="text-base font-bold text-white">
+                Garantías Vigentes
+              </h2>
+            </div>
 
-            {warranties.map((war) => (
-              <div key={war.id} className="bg-zinc-950 p-3.5 rounded-xl border border-zinc-850 space-y-1.5 text-xs">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-white">{war.title}</h3>
-                  <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    Vigente
-                  </span>
+            <div className="space-y-3">
+              {warranties.map((war) => (
+                <div key={war.id} className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-white">{war.title}</h3>
+                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      Vigente
+                    </span>
+                  </div>
+                  <p className="text-zinc-400 text-[11px]">{war.coverage}</p>
+                  <div className="flex gap-4 text-[10px] text-zinc-500 font-mono pt-1">
+                    <span>Vence: <strong className="text-zinc-300">{war.expirationDate}</strong></span>
+                    <span>Límite: <strong className="text-zinc-300">{war.kmLimit.toLocaleString()} km</strong></span>
+                  </div>
                 </div>
-                <p className="text-zinc-400 text-[11px]">{war.coverage}</p>
-                <div className="flex gap-4 text-[10px] text-zinc-500 font-mono pt-1">
-                  <span>Vence: <strong className="text-zinc-300">{war.expirationDate}</strong></span>
-                  <span>Límite: <strong className="text-zinc-300">{war.kmLimit.toLocaleString()} km</strong></span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </main>

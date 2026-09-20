@@ -5,6 +5,8 @@ import { LoginView } from './components/LoginView';
 import { Navbar } from './components/Navbar';
 import { SidebarDrawer, ActiveSection } from './components/SidebarDrawer';
 import { ClientProfileView } from './components/ClientProfileView';
+import { MotorcycleView } from './components/MotorcycleView';
+import { MaintenancesView } from './components/MaintenancesView';
 import {
   Clock,
   CheckCircle2,
@@ -50,7 +52,9 @@ export const CustomerPortal: React.FC = () => {
 
   // Títulos cortos y limpios para la barra superior
   const sectionTitles: Record<ActiveSection, string> = {
-    perfil: 'Perfil & Mantenimiento',
+    perfil: 'Perfil',
+    mi_moto: 'Mi Moto',
+    mantenimientos: 'Mantenimientos',
     orden_activa: 'Orden Activa',
     inspeccion: 'Inspección 360°',
     historial: 'Historial',
@@ -61,7 +65,7 @@ export const CustomerPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* 1. Navbar con auto-ocultado al scrolear */}
+      {/* 1. Navbar con auto-ocultado en scroll */}
       <Navbar
         onToggleSidebar={() => setIsSidebarOpen(true)}
         profile={profile}
@@ -82,24 +86,41 @@ export const CustomerPortal: React.FC = () => {
       />
 
       {/* 3. Contenido Principal */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-5">
         {/* ========================================================================= */}
-        {/* PESTAÑA 1 (PRINCIPAL): PERFIL & MANTENIMIENTO                             */}
+        {/* VISTA INICIAL: SOLO EL PERFIL DEL CLIENTE                                 */}
         {/* ========================================================================= */}
         {activeSection === 'perfil' && (
           <ClientProfileView
             profile={profile}
             onUpdateProfile={updateProfile}
+          />
+        )}
+
+        {/* ========================================================================= */}
+        {/* SECCIÓN MI MOTO: FICHA TÉCNICA Y DATOS PARA EL TALLER                     */}
+        {/* ========================================================================= */}
+        {activeSection === 'mi_moto' && (
+          <MotorcycleView
             motorcycle={motorcycle}
             onUpdateMotorcycle={updateMotorcycle}
+          />
+        )}
+
+        {/* ========================================================================= */}
+        {/* SECCIÓN MANTENIMIENTOS: PRÓXIMOS SERVICIOS & AGENDAR CITA                 */}
+        {/* ========================================================================= */}
+        {activeSection === 'mantenimientos' && (
+          <MaintenancesView
             scheduledMaintenances={scheduledMaintenances}
             onScheduleNewMaintenance={addScheduledMaintenance}
+            motorcycle={motorcycle}
             branches={branches}
           />
         )}
 
         {/* ========================================================================= */}
-        {/* PESTAÑA 2: ORDEN ACTIVA                                                   */}
+        {/* SECCIÓN: ORDEN ACTIVA                                                     */}
         {/* ========================================================================= */}
         {activeSection === 'orden_activa' && (
           <div className="space-y-4 animate-fade-in pb-10">
@@ -179,7 +200,7 @@ export const CustomerPortal: React.FC = () => {
 
                 <div className="space-y-1.5">
                   {activeOrder.quotation.parts.map((p) => (
-                    <div key={p.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
+                    <div key={p.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-855 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-medium text-white block">{p.description}</span>
                         <span className="text-[10px] text-zinc-500 font-mono">
@@ -190,7 +211,7 @@ export const CustomerPortal: React.FC = () => {
                     </div>
                   ))}
                   {activeOrder.quotation.services.map((s) => (
-                    <div key={s.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-850 flex justify-between items-center text-xs">
+                    <div key={s.code} className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-855 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-medium text-white block">{s.description}</span>
                         <span className="text-[10px] text-zinc-500">{s.hours} horas</span>
@@ -250,7 +271,7 @@ export const CustomerPortal: React.FC = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* PESTAÑA 3: INSPECCIÓN 360°                                                */}
+        {/* SECCIÓN: INSPECCIÓN 360°                                                  */}
         {/* ========================================================================= */}
         {activeSection === 'inspeccion' && (
           <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-4 animate-fade-in pb-8">
@@ -308,7 +329,7 @@ export const CustomerPortal: React.FC = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* PESTAÑA 4: HISTORIAL                                                      */}
+        {/* SECCIÓN: HISTORIAL                                                        */}
         {/* ========================================================================= */}
         {activeSection === 'historial' && (
           <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
@@ -337,7 +358,7 @@ export const CustomerPortal: React.FC = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* PESTAÑA 5: GARANTÍAS                                                      */}
+        {/* SECCIÓN: GARANTÍAS                                                        */}
         {/* ========================================================================= */}
         {activeSection === 'garantias' && (
           <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 space-y-3 animate-fade-in pb-8">
@@ -375,7 +396,7 @@ export const CustomerPortal: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsApprovalModalOpen(false)}
-                className="text-zinc-400 hover:text-white text-base font-bold"
+                className="text-zinc-400 hover:text-white text-base font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -405,7 +426,7 @@ export const CustomerPortal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="flex-1 py-2 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800"
+                  className="flex-1 py-2 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -413,7 +434,7 @@ export const CustomerPortal: React.FC = () => {
                   type="button"
                   onClick={approveQuotation}
                   disabled={isApproving}
-                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer"
                 >
                   {isApproving ? 'Procesando...' : 'Aprobar'}
                 </button>
@@ -437,7 +458,7 @@ export const CustomerPortal: React.FC = () => {
               <h4 className="text-xs font-bold text-white">{activePhotoModal.title}</h4>
               <button
                 onClick={() => setActivePhotoModal(null)}
-                className="text-zinc-400 hover:text-white"
+                className="text-zinc-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>

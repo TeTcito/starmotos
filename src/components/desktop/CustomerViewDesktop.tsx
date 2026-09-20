@@ -139,7 +139,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   };
 
   return (
-    <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="flex h-screen w-full bg-white text-zinc-900 overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* ========================================================================= */}
       {/* 1. BARRA LATERAL IZQUIERDA FIJA PERMANENTE (SIN BOTÓN DE HAMBURGUESA)      */}
       {/* ========================================================================= */}
@@ -155,8 +155,9 @@ export const CustomerViewDesktop: React.FC<Props> = ({
               />
             </div>
             <div>
-              <span className="text-sm font-black tracking-wider uppercase text-white block leading-none">
-                STAR<span className="text-red-500">MOTOS</span>
+              <span className="text-sm font-black tracking-wider uppercase block leading-none">
+                <span className="text-blue-500">STAR</span>
+                <span className="text-red-500">MOTOS</span>
               </span>
               <span className="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">
                 Portal de Clientes
@@ -247,36 +248,36 @@ export const CustomerViewDesktop: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* 2. ÁREA PRINCIPAL DERECHA (HEADER + CONTENIDO CON CAMPOS PROPORCIONALES)    */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        {/* Header Superior Escritorio */}
-        <header className="h-16 shrink-0 border-b border-zinc-850 bg-zinc-950/90 backdrop-blur-md px-8 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-zinc-500 font-mono">StarMotos /</span>
-            <h1 className="text-base font-bold text-white tracking-tight">
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 bg-white">
+        {/* Header Superior Escritorio (Color apastelado suave tipo agua) */}
+        <header className="h-16 shrink-0 border-b border-[#cdebee] bg-[#edf9fa]/95 backdrop-blur-md px-8 flex items-center justify-between z-10 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs text-cyan-800/80 font-mono font-medium">StarMotos /</span>
+            <h1 className="text-base font-bold text-cyan-950 tracking-tight">
               {sectionTitles[activeSection]}
             </h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3.5">
             {/* Botón WhatsApp Taller */}
             <button
               onClick={handleWhatsAppAdvisor}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-bold transition shadow-xs cursor-pointer"
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4 text-emerald-600" />
               <span>Contactar Asesor</span>
             </button>
 
             {/* Sucursal actual */}
-            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#cdebee] text-xs text-cyan-950 font-medium shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-blue-600" />
               <span>{activeBranch.name}</span>
             </div>
           </div>
         </header>
 
-        {/* Canvas de Contenido con Campos Proporcionales que ocupan el espacio de izquierda a derecha */}
-        <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full">
+        {/* Canvas de Contenido con Fondo Blanco y Campos Proporcionales */}
+        <main className="flex-1 overflow-y-auto px-8 lg:px-12 py-8 w-full bg-white">
           <div className="max-w-6xl w-full mx-auto">
             {activeSection === 'perfil' && (
               <ProfileDesktop profile={profile} onUpdateProfile={updateProfile} />
@@ -323,38 +324,38 @@ export const CustomerViewDesktop: React.FC<Props> = ({
 
       {/* Modal Aprobación Presupuesto Escritorio */}
       {isApprovalModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
+            <div className="p-5 border-b border-zinc-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <FileCheck className="w-5 h-5 text-blue-400" />
-                <h3 className="text-sm font-bold text-white">Autorizar Presupuesto de Reparación</h3>
+                <FileCheck className="w-5 h-5 text-blue-600" />
+                <h3 className="text-sm font-bold text-zinc-900">Autorizar Presupuesto de Reparación</h3>
               </div>
               <button
                 onClick={() => setIsApprovalModalOpen(false)}
-                className="text-zinc-400 hover:text-white text-base font-bold cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 text-base font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-5 space-y-4 text-xs">
-              <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-850 space-y-2">
-                <div className="flex justify-between text-zinc-400 text-sm">
+              <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-2">
+                <div className="flex justify-between text-zinc-600 text-sm">
                   <span>Repuestos OEM:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-400 text-sm">
+                <div className="flex justify-between text-zinc-600 text-sm">
                   <span>Mano de Obra Certificada:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-400 text-sm">
+                <div className="flex justify-between text-zinc-600 text-sm">
                   <span>IVA 15%:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="pt-2 border-t border-zinc-800 flex justify-between font-bold text-white text-base">
+                <div className="pt-2 border-t border-zinc-200 flex justify-between font-bold text-zinc-900 text-base">
                   <span>Total Autorizado:</span>
-                  <span className="font-mono text-blue-400 text-lg">${activeOrder.quotation.total.toFixed(2)} USD</span>
+                  <span className="font-mono text-blue-600 text-lg">${activeOrder.quotation.total.toFixed(2)} USD</span>
                 </div>
               </div>
 
@@ -362,7 +363,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 text-sm cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 text-sm cursor-pointer transition"
                 >
                   Cancelar
                 </button>
@@ -370,7 +371,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                   type="button"
                   onClick={approveQuotation}
                   disabled={isApproving}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm cursor-pointer shadow-md shadow-blue-600/20 transition"
                 >
                   {isApproving ? 'Autorizando...' : 'Aprobar Presupuesto'}
                 </button>
@@ -384,22 +385,22 @@ export const CustomerViewDesktop: React.FC<Props> = ({
       {activePhotoModal && (
         <div
           onClick={() => setActivePhotoModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-zinc-900 border border-zinc-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl"
+            className="relative bg-white border border-zinc-200 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl"
           >
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h4 className="text-sm font-bold text-white">{activePhotoModal.title}</h4>
+            <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
+              <h4 className="text-sm font-bold text-zinc-900">{activePhotoModal.title}</h4>
               <button
                 onClick={() => setActivePhotoModal(null)}
-                className="text-zinc-400 hover:text-white cursor-pointer text-lg font-bold"
+                className="text-zinc-400 hover:text-zinc-700 cursor-pointer text-lg font-bold"
               >
                 ✕
               </button>
             </div>
-            <div className="p-4 bg-black flex items-center justify-center max-h-[75vh]">
+            <div className="p-4 bg-zinc-950 flex items-center justify-center max-h-[75vh]">
               <img src={activePhotoModal.url} alt={activePhotoModal.title} className="max-h-[70vh] object-contain rounded-xl" />
             </div>
           </div>

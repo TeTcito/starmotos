@@ -83,7 +83,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased">
+    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased">
       {/* 1. Navbar Móvil con botón hamburguesa y auto-hide */}
       <Navbar
         onToggleSidebar={() => setIsSidebarOpen(true)}
@@ -149,38 +149,38 @@ export const CustomerViewMobile: React.FC<Props> = ({
 
       {/* Modal Aprobación Presupuesto Móvil */}
       {isApprovalModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up">
+            <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-400" />
-                <h3 className="text-xs font-bold text-white">Autorizar Presupuesto</h3>
+                <FileCheck className="w-4 h-4 text-blue-600" />
+                <h3 className="text-xs font-bold text-zinc-900">Autorizar Presupuesto</h3>
               </div>
               <button
                 onClick={() => setIsApprovalModalOpen(false)}
-                className="text-zinc-400 hover:text-white text-base font-bold cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 text-base font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-4 space-y-3 text-xs">
-              <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-850 space-y-1.5">
-                <div className="flex justify-between text-zinc-400">
+              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1.5">
+                <div className="flex justify-between text-zinc-600">
                   <span>Repuestos:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-600">
                   <span>Mano de Obra:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-600">
                   <span>IVA 15%:</span>
-                  <span className="font-mono text-white">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
+                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="pt-1.5 border-t border-zinc-800 flex justify-between font-bold text-white">
+                <div className="pt-1.5 border-t border-zinc-200 flex justify-between font-bold text-zinc-900">
                   <span>Total:</span>
-                  <span className="font-mono text-blue-400">${activeOrder.quotation.total.toFixed(2)} USD</span>
+                  <span className="font-mono text-blue-600 font-bold">${activeOrder.quotation.total.toFixed(2)} USD</span>
                 </div>
               </div>
 
@@ -188,7 +188,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="flex-1 py-2 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 cursor-pointer"
+                  className="flex-1 py-2 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -196,7 +196,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
                   type="button"
                   onClick={approveQuotation}
                   disabled={isApproving}
-                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer"
+                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow transition"
                 >
                   {isApproving ? 'Procesando...' : 'Aprobar'}
                 </button>
@@ -210,22 +210,22 @@ export const CustomerViewMobile: React.FC<Props> = ({
       {activePhotoModal && (
         <div
           onClick={() => setActivePhotoModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl"
+            className="relative bg-white border border-zinc-200 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl"
           >
-            <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
-              <h4 className="text-xs font-bold text-white">{activePhotoModal.title}</h4>
+            <div className="p-3 border-b border-zinc-200 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-zinc-900">{activePhotoModal.title}</h4>
               <button
                 onClick={() => setActivePhotoModal(null)}
-                className="text-zinc-400 hover:text-white cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <div className="p-2 bg-black flex items-center justify-center max-h-[60vh]">
+            <div className="p-2 bg-zinc-950 flex items-center justify-center max-h-[60vh]">
               <img src={activePhotoModal.url} alt={activePhotoModal.title} className="max-h-[55vh] object-contain rounded-lg" />
             </div>
           </div>

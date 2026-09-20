@@ -59,15 +59,15 @@ export const MaintenancesDesktop: React.FC<Props> = ({
   return (
     <div className="w-full space-y-6 animate-fade-in pb-16">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+      <div className="flex items-center justify-between pb-4 border-b border-zinc-200">
         <div>
           <div className="flex items-center gap-2.5">
-            <Calendar className="w-6 h-6 text-blue-400" />
-            <h2 className="text-xl font-bold text-white tracking-tight">
+            <Calendar className="w-6 h-6 text-blue-600" />
+            <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
               Mantenimientos Programados y Citas
             </h2>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-zinc-500 mt-1">
             Control predictivo de salud de lubricante y agendamiento directo en cualquiera de nuestras sucursales
           </p>
         </div>
@@ -75,7 +75,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
         <button
           type="button"
           onClick={() => setIsScheduleModalOpen(true)}
-          className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm py-2.5 px-5 rounded-xl shadow-lg shadow-red-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
+          className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-red-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
         >
           <PlusCircle className="w-4 h-4" />
           <span>Agendar Nueva Cita</span>
@@ -83,16 +83,16 @@ export const MaintenancesDesktop: React.FC<Props> = ({
       </div>
 
       {/* Tarjeta de Vida de Aceite Panorámica */}
-      <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 flex items-center justify-between gap-6 w-full">
+      <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between gap-6 w-full">
         <div>
-          <span className="text-xs text-zinc-400 uppercase font-bold tracking-wider block">
+          <span className="text-xs text-zinc-600 uppercase font-bold tracking-wider block">
             Salud y Vida Útil del Aceite de Motor
           </span>
           <div className="flex items-baseline gap-3 mt-1">
-            <span className="text-2xl font-black text-white">
+            <span className="text-2xl font-black text-zinc-900">
               Restan ~{kmRemainingOil.toLocaleString()} KM
             </span>
-            <span className="text-xs text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-500 font-mono">
               (Odómetro actual: {motorcycle.currentKm.toLocaleString()} km • Intervalo: {motorcycle.oilChangeIntervalKm.toLocaleString()} km)
             </span>
           </div>
@@ -100,14 +100,14 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
         <div className="w-80 space-y-2">
           <div className="flex justify-between text-xs font-mono">
-            <span className="text-zinc-400">Vida restante calculada:</span>
+            <span className="text-zinc-600">Vida restante calculada:</span>
             <span className={`font-bold ${
-              oilHealthPercentage > 40 ? 'text-emerald-400' : oilHealthPercentage > 15 ? 'text-amber-400' : 'text-red-400'
+              oilHealthPercentage > 40 ? 'text-emerald-700' : oilHealthPercentage > 15 ? 'text-amber-700' : 'text-red-700'
             }`}>
               {oilHealthPercentage}%
             </span>
           </div>
-          <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-zinc-200 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 oilHealthPercentage > 40
@@ -124,7 +124,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
       {/* Lista de Citas en Grid de 2 Columnas Anchas */}
       <div className="space-y-4">
-        <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">
+        <h3 className="text-sm font-bold text-zinc-700 uppercase tracking-wider">
           Citas y Mantenimientos Registrados
         </h3>
 
@@ -132,31 +132,31 @@ export const MaintenancesDesktop: React.FC<Props> = ({
           {scheduledMaintenances.map((maint) => (
             <div
               key={maint.id}
-              className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 space-y-3 hover:border-zinc-700 transition"
+              className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3 hover:border-zinc-300 transition"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-bold text-white">{maint.serviceTitle}</h4>
-                  <span className="text-xs text-blue-400 font-mono">
+                  <h4 className="text-sm font-bold text-zinc-900">{maint.serviceTitle}</h4>
+                  <span className="text-xs text-blue-600 font-mono font-medium">
                     Recomendado a los {maint.recommendedKm.toLocaleString()} KM
                   </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                   {maint.status}
                 </span>
               </div>
 
-              <div className="text-xs text-zinc-300 flex items-center justify-between border-t border-zinc-800 pt-3">
+              <div className="text-xs text-zinc-600 flex items-center justify-between border-t border-zinc-100 pt-3">
                 <span>
-                  <strong>Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
+                  <strong className="text-zinc-800">Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
                 </span>
                 <span>
-                  <strong>Sucursal:</strong> {maint.branchName}
+                  <strong className="text-zinc-800">Sucursal:</strong> {maint.branchName}
                 </span>
               </div>
 
-              <div className="text-xs text-zinc-400 pt-1">
-                <strong>Tareas:</strong> {maint.tasks.join(' • ')}
+              <div className="text-xs text-zinc-500 pt-1">
+                <strong className="text-zinc-700">Tareas:</strong> {maint.tasks.join(' • ')}
               </div>
             </div>
           ))}
@@ -165,16 +165,16 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
       {/* Modal Agendar Cita */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
+            <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-red-500" />
-                <h3 className="text-sm font-bold text-white">Agendar Cita en StarMotos</h3>
+                <Calendar className="w-5 h-5 text-red-600" />
+                <h3 className="text-sm font-bold text-zinc-900">Agendar Cita en StarMotos</h3>
               </div>
               <button
                 onClick={() => setIsScheduleModalOpen(false)}
-                className="text-zinc-400 hover:text-white"
+                className="text-zinc-400 hover:text-zinc-700"
               >
                 ✕
               </button>
@@ -182,13 +182,13 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
             <form onSubmit={handleConfirmSchedule} className="p-5 space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-zinc-300 mb-1.5">
+                <label className="block font-semibold text-zinc-700 mb-1.5">
                   Servicio Requerido
                 </label>
                 <select
                   value={selectedServiceTitle}
                   onChange={(e) => setSelectedServiceTitle(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs cursor-pointer"
+                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs cursor-pointer focus:border-blue-600"
                 >
                   <option value="Mantenimiento Preventivo (Aceite y Filtros)">
                     Mantenimiento Preventivo (Aceite + Filtro + Cadena)
@@ -206,13 +206,13 @@ export const MaintenancesDesktop: React.FC<Props> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-zinc-300 mb-1.5">
+                <label className="block font-semibold text-zinc-700 mb-1.5">
                   Sucursal StarMotos
                 </label>
                 <select
                   value={selectedBranchId}
                   onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs cursor-pointer"
+                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs cursor-pointer focus:border-blue-600"
                 >
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -224,7 +224,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-zinc-300 mb-1.5">
+                  <label className="block font-semibold text-zinc-700 mb-1.5">
                     Fecha deseada
                   </label>
                   <input
@@ -232,17 +232,17 @@ export const MaintenancesDesktop: React.FC<Props> = ({
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
                     required
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs font-mono"
+                    className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs font-mono focus:border-blue-600"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-zinc-300 mb-1.5">
+                  <label className="block font-semibold text-zinc-700 mb-1.5">
                     Hora disponible
                   </label>
                   <select
                     value={scheduleTime}
                     onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs font-mono cursor-pointer"
+                    className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs font-mono cursor-pointer focus:border-blue-600"
                   >
                     <option value="08:30">08:30 AM</option>
                     <option value="09:30">09:30 AM</option>
@@ -254,7 +254,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-zinc-300 mb-1.5">
+                <label className="block font-semibold text-zinc-700 mb-1.5">
                   Observaciones adicionales
                 </label>
                 <textarea
@@ -262,7 +262,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
                   onChange={(e) => setScheduleNotes(e.target.value)}
                   rows={2}
                   placeholder="Detalles o síntomas para el mecánico..."
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-2.5 text-xs placeholder:text-zinc-600"
+                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs placeholder:text-zinc-400 focus:border-blue-600"
                 />
               </div>
 
@@ -270,13 +270,13 @@ export const MaintenancesDesktop: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setIsScheduleModalOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800"
+                  className="flex-1 py-2.5 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-md shadow-red-600/20"
                 >
                   Confirmar Cita
                 </button>

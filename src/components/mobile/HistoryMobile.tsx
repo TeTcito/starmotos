@@ -10,27 +10,27 @@ interface Props {
 export const HistoryMobile: React.FC<Props> = ({ history }) => {
   return (
     <div className="space-y-4 animate-fade-in pb-12">
-      <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
-        <History className="w-5 h-5 text-blue-400" />
-        <h2 className="text-base font-bold text-white">
+      <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
+        <History className="w-5 h-5 text-blue-600" />
+        <h2 className="text-base font-bold text-zinc-900">
           Historial
         </h2>
       </div>
 
       <div className="space-y-3">
         {history.map((record) => (
-          <div key={record.id} className="bg-zinc-900 p-3.5 rounded-xl border border-zinc-800 space-y-1.5 text-xs">
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-1.5">
+          <div key={record.id} className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm space-y-1.5 text-xs">
+            <div className="flex justify-between items-center border-b border-zinc-100 pb-1.5">
               <div>
-                <span className="font-bold text-white">{record.date}</span>
-                <span className="text-blue-400 font-mono text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+                <span className="font-bold text-zinc-900">{record.date}</span>
+                <span className="text-blue-600 font-mono font-medium text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
               </div>
-              <span className="font-bold text-emerald-400 font-mono">${record.totalPaid.toFixed(2)}</span>
+              <span className="font-bold text-emerald-700 font-mono">${record.totalPaid.toFixed(2)}</span>
             </div>
-            <div className="text-[11px] text-zinc-400">
+            <div className="text-[11px] text-zinc-500">
               {record.branchName} • Mecánico: {record.technicianName}
             </div>
-            <div className="text-[11px] text-zinc-300">
+            <div className="text-[11px] text-zinc-600">
               {record.workSummary.join(' • ')}
             </div>
           </div>

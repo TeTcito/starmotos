@@ -46,7 +46,7 @@ export const CustomerPortal: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Renderizado condicional: Escritorio vs Móvil según arquitectura solicitada */}
       {isDesktop ? (
         <CustomerViewDesktop

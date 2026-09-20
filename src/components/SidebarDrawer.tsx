@@ -115,8 +115,8 @@ export const SidebarDrawer: React.FC<Props> = ({
                 className="w-full h-full object-cover rounded-full bg-white"
               />
             </div>
-            <span className="text-xs font-black tracking-wider uppercase text-white">
-              STAR<span className="text-red-500">MOTOS</span>
+            <span className="text-xs font-black tracking-wider uppercase">
+              <span className="text-blue-500">STAR</span><span className="text-red-500">MOTOS</span>
             </span>
           </div>
 

@@ -5,9 +5,13 @@ import {
   Gauge,
   Fuel,
   ShieldCheck,
-  AlertTriangle,
   Save,
   CheckCircle2,
+  Bike,
+  Calendar,
+  Zap,
+  Palette,
+  Hash,
 } from 'lucide-react';
 import { MotorcycleClientData } from '../types/customer';
 
@@ -46,31 +50,146 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
         )}
       </div>
 
-      {/* Encabezado del Vehículo */}
-      <div className="flex items-center gap-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-        <div className="flex flex-col items-center bg-white text-zinc-950 px-2 py-0.5 rounded border border-zinc-300 font-mono shrink-0">
-          <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.2">
-            <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
-            <span>EC</span>
-          </div>
-          <span className="text-xs font-black tracking-wide leading-tight mt-0.5">
-            {motoForm.plate}
-          </span>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-bold text-white">
-            {motoForm.brand} {motoForm.model} ({motoForm.year})
-          </h3>
-          <p className="text-[11px] text-zinc-400 font-mono">
-            {motoForm.displacement} • {motoForm.color} • VIN: {motoForm.vin}
-          </p>
-        </div>
-      </div>
-
-      {/* Formulario */}
       <form onSubmit={handleSave} className="space-y-4">
+        {/* Primera Sección: Placa de la Moto */}
+        <div className="flex items-center justify-between gap-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center bg-white text-zinc-950 px-2.5 py-0.5 rounded border border-zinc-300 font-mono shrink-0 shadow-sm">
+              <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.2">
+                <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
+                <span>EC</span>
+              </div>
+              <span className="text-xs font-black tracking-wide leading-tight mt-0.5">
+                {motoForm.plate || 'S/P'}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-white">
+                Placa del Vehículo
+              </label>
+              <span className="text-[10px] text-zinc-400">
+                Identificación oficial ANT
+              </span>
+            </div>
+          </div>
+
+          <div className="w-32 sm:w-40">
+            <input
+              type="text"
+              value={motoForm.plate}
+              onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
+              placeholder="PBX-8492"
+              className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 text-white rounded-xl px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider text-center"
+            />
+          </div>
+        </div>
+
+        {/* Campos Independientes de la Motocicleta */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Marca */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Marca
+            </label>
+            <div className="relative">
+              <Bike className="w-3.5 h-3.5 absolute left-3 top-3 text-red-400" />
+              <input
+                type="text"
+                value={motoForm.brand}
+                onChange={(e) => setMotoForm({ ...motoForm, brand: e.target.value })}
+                placeholder="Ej. Benelli, Yamaha, Honda..."
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Modelo */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Modelo
+            </label>
+            <div className="relative">
+              <Bike className="w-3.5 h-3.5 absolute left-3 top-3 text-blue-400" />
+              <input
+                type="text"
+                value={motoForm.model}
+                onChange={(e) => setMotoForm({ ...motoForm, model: e.target.value })}
+                placeholder="Ej. TRK 502X ABS, FZ-25..."
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Año */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Año de Fabricación
+            </label>
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 absolute left-3 top-3 text-amber-400" />
+              <input
+                type="number"
+                value={motoForm.year}
+                onChange={(e) => setMotoForm({ ...motoForm, year: Number(e.target.value) })}
+                placeholder="2024"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Cilindraje */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Cilindraje
+            </label>
+            <div className="relative">
+              <Zap className="w-3.5 h-3.5 absolute left-3 top-3 text-yellow-400" />
+              <input
+                type="text"
+                value={motoForm.displacement}
+                onChange={(e) => setMotoForm({ ...motoForm, displacement: e.target.value })}
+                placeholder="Ej. 500 cc, 250 cc..."
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Color
+            </label>
+            <div className="relative">
+              <Palette className="w-3.5 h-3.5 absolute left-3 top-3 text-purple-400" />
+              <input
+                type="text"
+                value={motoForm.color}
+                onChange={(e) => setMotoForm({ ...motoForm, color: e.target.value })}
+                placeholder="Ej. Gris Antracita / Rojo Racing..."
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Número de Chasis / VIN */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Número de Chasis / VIN
+            </label>
+            <div className="relative">
+              <Hash className="w-3.5 h-3.5 absolute left-3 top-3 text-emerald-400" />
+              <input
+                type="text"
+                value={motoForm.vin}
+                onChange={(e) => setMotoForm({ ...motoForm, vin: e.target.value.toUpperCase() })}
+                placeholder="VIN (17 caracteres)"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono uppercase"
+              />
+            </div>
+          </div>
+
+          {/* Kilometraje Actual */}
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1">
               Kilometraje Actual
@@ -86,6 +205,7 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
             </div>
           </div>
 
+          {/* Aceite Habitual */}
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1">
               Aceite Habitual
@@ -106,6 +226,7 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
             </div>
           </div>
 
+          {/* Preferencia Repuestos */}
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-zinc-300 mb-1">
               Preferencia Repuestos
@@ -123,6 +244,7 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
             </div>
           </div>
 
+          {/* Síntomas o Fallas Detectadas */}
           <div className="sm:col-span-2">
             <label className="block text-xs font-medium text-amber-400 mb-1">
               Síntomas o Fallas Detectadas
@@ -137,12 +259,12 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t border-zinc-800">
+        <div className="flex justify-end pt-3 border-t border-zinc-800">
           <button
             type="submit"
-            className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2 px-4 rounded-xl shadow transition flex items-center gap-1.5 active:scale-98 cursor-pointer"
+            className="bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2 px-5 rounded-xl shadow transition flex items-center gap-1.5 active:scale-98 cursor-pointer"
           >
-            <Save className="w-3.5 h-3.5" />
+            <Save className="w-4 h-4" />
             <span>Guardar Ficha</span>
           </button>
         </div>

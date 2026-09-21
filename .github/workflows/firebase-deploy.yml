@@ -29,7 +29,12 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          npx --yes firebase-tools deploy --only hosting --project starmotos-portal --token "$FIREBASE_TOKEN" --non-interactive 2>&1 | tee deploy.log
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::El secret FIREBASE_TOKEN está VACÍO o no existe en GitHub Repository Secrets."
+            exit 1
+          fi
+          echo "::notice::Token detectado correctamente con longitud: ${#FIREBASE_TOKEN}"
+          npx --yes firebase-tools deploy --only hosting --project starmotos-portal --non-interactive 2>&1 | tee deploy.log
           echo "### Firebase Deploy Log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat deploy.log >> $GITHUB_STEP_SUMMARY

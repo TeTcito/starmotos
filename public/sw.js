@@ -1,8 +1,10 @@
-const CACHE_NAME = 'starmotos-v1';
+const CACHE_NAME = 'starmotos-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/starmotos-logo.jpg',
+  '/pwa-192.png',
+  '/pwa-512.png',
   '/manifest.json'
 ];
 

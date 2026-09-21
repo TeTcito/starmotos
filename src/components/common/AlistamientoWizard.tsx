@@ -20,6 +20,7 @@ import {
   Trash2,
   Check,
   Upload,
+  Lock,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -119,8 +120,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     createdAt: '',
   });
 
-  const [isSearchingSri, setIsSearchingSri] = useState(false);
-  const [sriFeedback, setSriFeedback] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{
     title: string;
     fields: string[];
@@ -167,20 +168,120 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   }, [recentRecords, searchTerm]);
 
-  // Auto-llenado con SRI
-  const handleSearchSri = (idToSearch?: string) => {
+  // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
+  const clientHistoricalRecords = useMemo(() => {
+    const cedula = formData.cedulaRuc.trim().toLowerCase();
+    const chasis = formData.chasis.trim().toLowerCase();
+    const placa = formData.placa.trim().toLowerCase();
+
+    if (!cedula && !chasis && !placa) return [];
+
+    return recentRecords.filter((rec) => {
+      if (formData.id && rec.id === formData.id) return false;
+      const matchCedula = !!cedula && rec.cedulaRuc.trim().toLowerCase() === cedula;
+      const matchChasis = !!chasis && rec.chasis.trim().toLowerCase() === chasis;
+      const matchPlaca =
+        !!placa &&
+        placa !== 'en trámite' &&
+        placa !== 's/p' &&
+        rec.placa.trim().toLowerCase() === placa;
+
+      return matchCedula || matchChasis || matchPlaca;
+    });
+  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, recentRecords]);
+
+  // 1. Si ya se realizó alistamiento PDI previamente para este cliente/moto, opción bloqueada
+  const isPdiBlocked = useMemo(() => {
+    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('alistamiento_pdi'));
+  }, [clientHistoricalRecords]);
+
+  // 2. Si ya se realizó engrasado previamente para este cliente/moto, opción bloqueada
+  const isEngrasadoBlocked = useMemo(() => {
+    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('engrasado'));
+  }, [clientHistoricalRecords]);
+
+  // Sincronizar dinámicamente qué servicios pueden estar marcados
+  useEffect(() => {
+    setFormData((prev) => {
+      let updated = [...prev.serviciosRealizados];
+      let changed = false;
+
+      // Si PDI está bloqueado, no puede estar marcado
+      if (isPdiBlocked && updated.includes('alistamiento_pdi')) {
+        updated = updated.filter((s) => s !== 'alistamiento_pdi');
+        changed = true;
+      }
+      // Si Engrasado está bloqueado, no puede estar marcado
+      if (isEngrasadoBlocked && updated.includes('engrasado')) {
+        updated = updated.filter((s) => s !== 'engrasado');
+        changed = true;
+      }
+
+      // Si ambos están completados/bloqueados, mantenimiento se queda marcado y lo demás desmarcado
+      if (isPdiBlocked && isEngrasadoBlocked) {
+        if (!updated.includes('mantenimiento') || updated.length > 1) {
+          updated = ['mantenimiento'];
+          changed = true;
+        }
+      } else if (updated.length === 0) {
+        // Siempre asegurar al menos una opción activa
+        updated = ['mantenimiento'];
+        changed = true;
+      }
+
+      if (!changed) return prev;
+
+      return {
+        ...prev,
+        serviciosRealizados: updated,
+      };
+    });
+  }, [isPdiBlocked, isEngrasadoBlocked]);
+
+  // Consultar Cédula o RUC (busca en registros existentes o padrón público)
+  const handleConsultar = (idToSearch?: string) => {
     const cleanId = (idToSearch || formData.cedulaRuc).trim();
     if (!cleanId) return;
 
-    setIsSearchingSri(true);
-    setSriFeedback(null);
+    setIsSearching(true);
+    setSearchFeedback(null);
 
+    // 1. Primero verificar si ya existe en el historial local de alistamientos
+    const existingRec = recentRecords.find(
+      (r) =>
+        r.cedulaRuc.trim().toLowerCase() === cleanId.toLowerCase() ||
+        (r.chasis && r.chasis.trim().toUpperCase() === cleanId.toUpperCase())
+    );
+
+    if (existingRec) {
+      setIsSearching(false);
+      setFormData((prev) => ({
+        ...prev,
+        cedulaRuc: existingRec.cedulaRuc,
+        nombres: existingRec.nombres,
+        apellidos: existingRec.apellidos,
+        celular1: existingRec.celular1 || prev.celular1,
+        celular2: existingRec.celular2 || prev.celular2,
+        email: existingRec.email || prev.email,
+        direccion: existingRec.direccion || prev.direccion,
+        origen: existingRec.origen || prev.origen,
+        motoPreviaId: existingRec.chasis || existingRec.placa,
+        chasis: existingRec.chasis || prev.chasis,
+        placa: existingRec.placa || prev.placa,
+        modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
+        kilometraje: existingRec.kilometraje ? existingRec.kilometraje + 500 : prev.kilometraje,
+      }));
+      setSearchFeedback(`✓ Cliente registrado encontrado: ${existingRec.nombres} ${existingRec.apellidos}`);
+      return;
+    }
+
+    // 2. Si es cliente nuevo en el taller, consultar padrón
     setTimeout(() => {
-      const sriData = querySriMock(cleanId);
-      setIsSearchingSri(false);
+      const padronData = querySriMock(cleanId);
+      setIsSearching(false);
 
-      if (sriData) {
-        const parts = sriData.razonSocial.split(' ');
+      if (padronData) {
+        const parts = padronData.razonSocial.split(' ');
         let nombres = '';
         let apellidos = '';
 
@@ -194,7 +295,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
           apellidos = parts[0];
           nombres = parts[1];
         } else {
-          nombres = sriData.razonSocial;
+          nombres = padronData.razonSocial;
           apellidos = '';
         }
 
@@ -203,14 +304,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
           cedulaRuc: cleanId,
           nombres: nombres || prev.nombres,
           apellidos: apellidos || prev.apellidos,
-          direccion: sriData.address || prev.direccion,
-          email: sriData.email || prev.email,
+          direccion: padronData.address || prev.direccion,
+          email: padronData.email || prev.email,
         }));
-        setSriFeedback(`✓ Datos verificados con el SRI: ${sriData.razonSocial}`);
+        setSearchFeedback(`✓ Datos verificados: ${padronData.razonSocial}`);
       } else {
-        setSriFeedback(`Información: No registrado en base SRI local. Ingrese los datos manualmente.`);
+        setSearchFeedback(`Información: No registrado en el padrón local. Ingrese los datos manualmente.`);
       }
-    }, 400);
+    }, 350);
   };
 
   // Iniciar nuevo alistamiento con o sin cédula previa
@@ -251,13 +352,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
       fotos: [],
       createdAt: '',
     });
-    setSriFeedback(null);
+    setSearchFeedback(null);
     setValidationAlert(null);
     setMobileStep(1);
     setEffectiveViewMode('form');
 
     if (cedula && cedula.length >= 10) {
-      handleSearchSri(cedula);
+      handleConsultar(cedula);
     }
   };
 
@@ -298,14 +399,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
       fotos: [],
       createdAt: '',
     });
-    setSriFeedback(`✓ Datos de ${record.nombres} ${record.apellidos} y moto precargados.`);
+    setSearchFeedback(`✓ Datos de ${record.nombres} ${record.apellidos} y moto precargados.`);
     setValidationAlert(null);
     setMobileStep(1);
     setEffectiveViewMode('form');
   };
 
-  // Servicios toggle (Solo 3 permitidos: alistamiento_pdi, engrasado, mantenimiento)
+  // Servicios toggle (con bloqueo si ya se realizaron previamente)
   const toggleServicio = (servicio: ServiceActionType) => {
+    if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
+    if (servicio === 'engrasado' && isEngrasadoBlocked) return;
+
+    // Si ambos ya están completados/bloqueados, mantenimiento se queda marcado fijo
+    if (isPdiBlocked && isEngrasadoBlocked && servicio === 'mantenimiento') {
+      return;
+    }
+
     setFormData((prev) => {
       const exists = prev.serviciosRealizados.includes(servicio);
       if (exists) {
@@ -480,7 +589,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     // Volver al listado y limpiar formulario
     setEffectiveViewMode('list');
     setSearchTerm('');
-    setSriFeedback(null);
+    setSearchFeedback(null);
   };
 
   return (
@@ -569,7 +678,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
-                  <span>Registrar nuevo con C.I. {searchTerm} (SRI)</span>
+                  <span>Registrar nuevo con C.I. {searchTerm}</span>
                 </button>
               </div>
             )}
@@ -763,7 +872,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </div>
                     <div>
                       <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
-                      <p className="text-[11px] text-zinc-400">Verificación SRI y contacto</p>
+                      <p className="text-[11px] text-zinc-400">Verificación y contacto</p>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
@@ -784,27 +893,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          handleSearchSri();
+                          handleConsultar();
                         }
                       }}
-                      placeholder="Ej: 2350999252"
+                      placeholder="Ej: 2350999252 o RUC..."
                       className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
                     <button
                       type="button"
-                      onClick={() => handleSearchSri()}
-                      disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                      title="Consultar SRI Ecuador"
+                      onClick={() => handleConsultar()}
+                      disabled={isSearching || !formData.cedulaRuc.trim()}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                      title="Consultar número de Cédula o RUC"
                     >
                       <Search className="w-3.5 h-3.5" />
-                      <span>{isSearchingSri ? 'SRI...' : 'SRI'}</span>
+                      <span>{isSearching ? 'Consultando...' : 'Consultar'}</span>
                     </button>
                   </div>
-                  {sriFeedback && (
+                  {searchFeedback && (
                     <p className="text-[11px] text-blue-800 font-medium leading-tight">
-                      {sriFeedback}
+                      {searchFeedback}
                     </p>
                   )}
                 </div>
@@ -1049,30 +1158,69 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </span>
                 </div>
 
-                {/* ¿Qué se realizó? (Solo los 3 originales: Alistamiento PDI, Engrasado, Mantenimiento) */}
+                {/* ¿Qué se realizó? (Alistamiento PDI, Engrasado, Mantenimiento con bloqueo por historial) */}
                 <div>
-                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                    ¿Qué se realizó? *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      ¿Qué se realizó? *
+                    </label>
+                    {isPdiBlocked && isEngrasadoBlocked && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        PDI & Engrasado previos
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
-                      { id: 'alistamiento_pdi', label: 'Alistamiento PDI' },
-                      { id: 'engrasado', label: 'Engrasado' },
-                      { id: 'mantenimiento', label: 'Mantenimiento' },
+                      {
+                        id: 'alistamiento_pdi' as ServiceActionType,
+                        label: 'Alistamiento PDI',
+                        isBlocked: isPdiBlocked,
+                      },
+                      {
+                        id: 'engrasado' as ServiceActionType,
+                        label: 'Engrasado',
+                        isBlocked: isEngrasadoBlocked,
+                      },
+                      {
+                        id: 'mantenimiento' as ServiceActionType,
+                        label: 'Mantenimiento',
+                        isBlocked: false,
+                      },
                     ].map((srv) => {
-                      const isSelected = formData.serviciosRealizados.includes(srv.id as ServiceActionType);
+                      const isSelected = formData.serviciosRealizados.includes(srv.id);
+
+                      if (srv.isBlocked) {
+                        return (
+                          <div
+                            key={srv.id}
+                            title="Servicio ya completado previamente para este cliente / motocicleta"
+                            className="px-2 py-2 rounded-xl text-[11px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Lock className="w-3 h-3 text-zinc-400" />
+                              <span className="line-through opacity-70 truncate">{srv.label}</span>
+                            </div>
+                            <span className="text-[9px] font-semibold text-zinc-400">Ya realizado</span>
+                          </div>
+                        );
+                      }
+
                       return (
                         <button
                           key={srv.id}
                           type="button"
-                          onClick={() => toggleServicio(srv.id as ServiceActionType)}
-                          className={`px-2 py-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer truncate ${
+                          onClick={() => toggleServicio(srv.id)}
+                          className={`px-2 py-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
                             isSelected
                               ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                               : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
                           }`}
                         >
-                          {srv.label}
+                          <span className="truncate">{srv.label}</span>
+                          {isPdiBlocked && isEngrasadoBlocked && srv.id === 'mantenimiento' && (
+                            <span className="text-[9px] font-bold text-blue-200">Requerido</span>
+                          )}
                         </button>
                       );
                     })}
@@ -1207,7 +1355,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                      N° Factura SRI
+                      N° Factura
                     </label>
                     <input
                       type="text"
@@ -1398,19 +1546,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="text"
                       value={formData.cedulaRuc}
                       onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
-                      placeholder="Ej: 2350999252"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleConsultar();
+                        }
+                      }}
+                      placeholder="Ej: 2350999252 o RUC"
                       className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
                     />
                     <button
                       type="button"
-                      onClick={() => handleSearchSri()}
-                      disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer"
+                      onClick={() => handleConsultar()}
+                      disabled={isSearching || !formData.cedulaRuc.trim()}
+                      className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                      title="Consultar número de Cédula o RUC"
                     >
-                      {isSearchingSri ? '...' : 'SRI'}
+                      <Search className="w-3 h-3" />
+                      <span>{isSearching ? '...' : 'Consultar'}</span>
                     </button>
                   </div>
-                  {sriFeedback && <p className="text-[11px] text-blue-800 font-medium">{sriFeedback}</p>}
+                  {searchFeedback && <p className="text-[11px] text-blue-800 font-medium">{searchFeedback}</p>}
                 </div>
 
                 <div>
@@ -1594,6 +1750,75 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                   <h3 className="text-sm font-black text-zinc-900">Paso 3: Servicio & Cobro</h3>
                   <span className="text-[10px] font-bold text-emerald-600">3 de 3</span>
+                </div>
+
+                {/* ¿Qué se realizó? Móvil */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      ¿Qué se realizó? *
+                    </label>
+                    {isPdiBlocked && isEngrasadoBlocked && (
+                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        PDI & Engrasado previos
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      {
+                        id: 'alistamiento_pdi' as ServiceActionType,
+                        label: 'Alistamiento PDI',
+                        isBlocked: isPdiBlocked,
+                      },
+                      {
+                        id: 'engrasado' as ServiceActionType,
+                        label: 'Engrasado',
+                        isBlocked: isEngrasadoBlocked,
+                      },
+                      {
+                        id: 'mantenimiento' as ServiceActionType,
+                        label: 'Mantenimiento',
+                        isBlocked: false,
+                      },
+                    ].map((srv) => {
+                      const isSelected = formData.serviciosRealizados.includes(srv.id);
+
+                      if (srv.isBlocked) {
+                        return (
+                          <div
+                            key={srv.id}
+                            title="Servicio ya completado previamente"
+                            className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Lock className="w-3 h-3 text-zinc-400" />
+                              <span className="line-through opacity-70 truncate">{srv.label}</span>
+                            </div>
+                            <span className="text-[8px] font-semibold text-zinc-400">Ya realizado</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => toggleServicio(srv.id)}
+                          className={`px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          <span className="truncate">{srv.label}</span>
+                          {isPdiBlocked && isEngrasadoBlocked && srv.id === 'mantenimiento' && (
+                            <span className="text-[8px] font-bold text-blue-200">Requerido</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>

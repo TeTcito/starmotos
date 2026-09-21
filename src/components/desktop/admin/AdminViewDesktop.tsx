@@ -101,7 +101,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
     },
     {
       id: 'alistamiento',
-      label: 'Alistamiento (SRI)',
+      label: 'Alistamiento & PDI',
       icon: <UserCheck className="w-4 h-4" />,
       badge: 'Nuevo',
     },
@@ -132,7 +132,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
 
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control Operativo de Talleres & Sucursales',
-    alistamiento: 'Alistamiento de Clientes y Motos (Consulta SRI)',
+    alistamiento: 'Alistamiento de Clientes y Motocicletas',
     tecnicos: 'Gestión y Despacho del Equipo Técnico',
     garantias_admin: 'Gestión y Auditoría de Garantías',
     facturacion: 'Facturación Electrónica SRI',

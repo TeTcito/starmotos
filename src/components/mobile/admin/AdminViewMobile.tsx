@@ -95,7 +95,7 @@ export const AdminViewMobile: React.FC<Props> = ({
 
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'talleres', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'alistamiento', label: 'Alistamiento SRI', icon: <UserCheck className="w-4 h-4" /> },
+    { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
     { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" /> },
     { id: 'facturacion', label: 'Facturación', icon: <Receipt className="w-4 h-4" /> },
@@ -104,7 +104,7 @@ export const AdminViewMobile: React.FC<Props> = ({
 
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control de Talleres',
-    alistamiento: 'Alistamiento SRI',
+    alistamiento: 'Alistamiento & PDI',
     tecnicos: 'Equipo Técnico',
     garantias_admin: 'Garantías & Pólizas',
     facturacion: 'Facturación SRI',

@@ -13,6 +13,7 @@ import {
   XCircle,
   X,
   Users,
+  Bell,
 } from 'lucide-react';
 import {
   GaranteSection,
@@ -21,12 +22,15 @@ import {
   AlistamientoFullRecord,
   TallerClient,
   Workshop,
+  SystemAlert,
 } from '../../../types/customer';
 import { SolicitudesGaranteDesktop } from './SolicitudesGaranteDesktop';
 import { HistorialGarantiasDesktop } from './HistorialGarantiasDesktop';
 import { ReportesGaranteDesktop } from './ReportesGaranteDesktop';
 import { PerfilGaranteDesktop } from './PerfilGaranteDesktop';
 import { ClientesModule } from '../../common/ClientesModule';
+import { AlertasDesktop } from '../admin/AlertasDesktop';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: GaranteSection;
@@ -50,6 +54,9 @@ interface Props {
   onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
   onApproveWarranty: (idOverride?: string, notesOverride?: string) => void;
   onRejectWarranty: (idOverride?: string, reasonOverride?: string) => void;
+  alerts: SystemAlert[];
+  onMarkAlertAsRead: (id: string) => void;
+  onMarkAllAlertsAsRead: () => void;
 }
 
 export const GaranteViewDesktop: React.FC<Props> = ({
@@ -74,6 +81,9 @@ export const GaranteViewDesktop: React.FC<Props> = ({
   onOpenDecisionModal,
   onApproveWarranty,
   onRejectWarranty,
+  alerts,
+  onMarkAlertAsRead,
+  onMarkAllAlertsAsRead,
 }) => {
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -102,6 +112,12 @@ export const GaranteViewDesktop: React.FC<Props> = ({
       label: 'Ficha de Marca',
       icon: <Building2 className="w-4 h-4" />,
     },
+    {
+      id: 'alertas_garante',
+      label: 'Alertas & Eventos',
+      icon: <Bell className="w-4 h-4" />,
+      badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
+    },
   ];
 
   const sectionTitles: Record<GaranteSection, string> = {
@@ -110,6 +126,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
     historial_garantias: 'Historial Consolidado de Garantías Emitidas',
     reportes_garante: 'Indicadores Técnicos & Tasa de Reclamos',
     perfil_garante: 'Información Institucional del Garante Oficial',
+    alertas_garante: 'Auditoría de Alertas & Eventos del Garante',
   };
 
   return (
@@ -137,9 +154,20 @@ export const GaranteViewDesktop: React.FC<Props> = ({
             </h1>
           </div>
 
-          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Auditoría Oficial Benelli & CFMOTO</span>
+          <div className="flex items-center gap-3.5 shrink-0">
+            <NotificationsPopover
+              role="garante"
+              alerts={alerts}
+              warranties={warranties}
+              onViewAll={() => setActiveSection('alertas_garante')}
+              onMarkAlertAsRead={onMarkAlertAsRead}
+              onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            />
+
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Auditoría Oficial Benelli & CFMOTO</span>
+            </div>
           </div>
         </div>
       </header>
@@ -257,6 +285,15 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               <ReportesGaranteDesktop warranties={warranties} />
             )}
             {activeSection === 'perfil_garante' && <PerfilGaranteDesktop profile={profile} />}
+            {activeSection === 'alertas_garante' && (
+              <AlertasDesktop
+                alerts={alerts}
+                onMarkAsRead={onMarkAlertAsRead}
+                onMarkAllAsRead={onMarkAllAlertsAsRead}
+                title="Auditoría de Alertas & Eventos del Garante"
+                subtitle="Registro de solicitudes ingresadas, validaciones y dictámenes técnicos de garantías Benelli & CFMOTO."
+              />
+            )}
           </div>
         </main>
       </div>

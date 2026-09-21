@@ -37,6 +37,7 @@ export const TALLER_SECTIONS: TallerSection[] = [
   'clientes_taller',
   'tecnicos',
   'inventario',
+  'alertas_taller',
 ];
 
 const getSectionFromHash = (): TallerSection => {
@@ -62,6 +63,7 @@ export function useTallerPortal() {
   const [technicians, setTechnicians] = useState<Technician[]>(getStoredTechnicians);
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
+  const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Sincronización entre ventanas o localStorage
@@ -72,12 +74,14 @@ export function useTallerPortal() {
     const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
+    const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
 
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
     window.addEventListener('starmotos_technicians_updated', handleTechsUpdate);
     window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+    window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -85,7 +89,24 @@ export function useTallerPortal() {
       window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
       window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+      window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
     };
+  }, []);
+
+  const markAlertAsRead = useCallback((id: string) => {
+    setAlerts((prev) => {
+      const updated = prev.map((a) => (a.id === id ? { ...a, read: true } : a));
+      saveStoredAlerts(updated);
+      return updated;
+    });
+  }, []);
+
+  const markAllAlertsAsRead = useCallback(() => {
+    setAlerts((prev) => {
+      const updated = prev.map((a) => ({ ...a, read: true }));
+      saveStoredAlerts(updated);
+      return updated;
+    });
   }, []);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -331,6 +352,9 @@ export function useTallerPortal() {
     newWarrantyForm,
     setNewWarrantyForm,
     createWarrantyRequest,
+    alerts,
+    markAlertAsRead,
+    markAllAlertsAsRead,
     toastMessage,
     showToast,
   };

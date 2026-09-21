@@ -34,6 +34,7 @@ import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
 import { AlertasDesktop } from './AlertasDesktop';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: AdminSection;
@@ -192,18 +193,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 <span>Regresar al Listado</span>
               </button>
             )}
-            <button
-              onClick={() => setActiveSection('alertas')}
-              className="relative p-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-blue-100 hover:text-white transition cursor-pointer"
-              title="Notificaciones"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadAlertsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shadow-xs">
-                  {unreadAlertsCount}
-                </span>
-              )}
-            </button>
+            <NotificationsPopover
+              role="admin"
+              alerts={alerts}
+              warranties={warranties}
+              onViewAll={() => setActiveSection('alertas')}
+              onMarkAlertAsRead={onMarkAlertAsRead}
+              onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            />
 
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

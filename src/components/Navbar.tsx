@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, MapPin, LogOut } from 'lucide-react';
 import { WhatsAppIcon } from './WhatsAppIcon';
-import { ClientProfile, Branch } from '../types/customer';
+import { ClientProfile, Branch, WorkOrder, WarrantyItem, MaintenanceRecord } from '../types/customer';
+import { NotificationsPopover } from './common/NotificationsPopover';
 
 interface Props {
   onToggleSidebar: () => void;
@@ -10,6 +11,10 @@ interface Props {
   activeBranch: Branch;
   onLogout: () => void;
   activeSectionTitle: string;
+  activeOrder?: WorkOrder;
+  warranties?: WarrantyItem[];
+  history?: MaintenanceRecord[];
+  onNavigateToEvents?: () => void;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -18,6 +23,10 @@ export const Navbar: React.FC<Props> = ({
   activeBranch,
   onLogout,
   activeSectionTitle,
+  activeOrder,
+  warranties,
+  history,
+  onNavigateToEvents,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -77,8 +86,18 @@ export const Navbar: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Lado Derecho: WhatsApp, Sucursal y Salir */}
+        {/* Lado Derecho: WhatsApp, Notificaciones, Sucursal y Salir */}
         <div className="flex items-center gap-2">
+          {onNavigateToEvents && (
+            <NotificationsPopover
+              role="cliente"
+              customerActiveOrder={activeOrder}
+              customerWarranties={warranties}
+              customerHistory={history}
+              onViewAll={onNavigateToEvents}
+            />
+          )}
+
           <div className="hidden md:flex items-center gap-1.5 bg-blue-800 border border-blue-600 px-2.5 py-1 rounded-lg text-xs text-blue-100 font-medium shadow-xs">
             <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
             <span className="truncate max-w-[140px]">{activeBranch.name.replace('StarMotos ', '')}</span>

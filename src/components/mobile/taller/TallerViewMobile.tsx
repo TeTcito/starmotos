@@ -9,6 +9,7 @@ import {
   Package,
   LogOut,
   UserCheck,
+  Bell,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -20,6 +21,7 @@ import {
   Technician,
   AlistamientoFullRecord,
   Workshop,
+  SystemAlert,
 } from '../../../types/customer';
 import { OrdenesTallerMobile } from './OrdenesTallerMobile';
 import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobile';
@@ -28,6 +30,8 @@ import { InventarioMobile } from './InventarioMobile';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
 import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosMobile } from '../common/TecnicosMobile';
+import { AlertasMobile } from '../admin/AlertasMobile';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: TallerSection;
@@ -48,6 +52,9 @@ interface Props {
   newWarrantyForm: any;
   setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
   onCreateWarrantyRequest: () => boolean;
+  alerts: SystemAlert[];
+  onMarkAlertAsRead: (id: string) => void;
+  onMarkAllAlertsAsRead: () => void;
 }
 
 export const TallerViewMobile: React.FC<Props> = ({
@@ -69,6 +76,9 @@ export const TallerViewMobile: React.FC<Props> = ({
   newWarrantyForm,
   setNewWarrantyForm,
   onCreateWarrantyRequest,
+  alerts,
+  onMarkAlertAsRead,
+  onMarkAllAlertsAsRead,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeWorkshopId, setActiveWorkshopId] = useState<string>(() => {
@@ -87,6 +97,12 @@ export const TallerViewMobile: React.FC<Props> = ({
     { id: 'clientes_taller', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Users className="w-4 h-4" /> },
     { id: 'inventario', label: 'Inventario', icon: <Package className="w-4 h-4" /> },
+    {
+      id: 'alertas_taller',
+      label: 'Alertas & Eventos',
+      icon: <Bell className="w-4 h-4" />,
+      badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
+    },
   ];
 
   const sectionTitles: Record<TallerSection, string> = {
@@ -96,6 +112,7 @@ export const TallerViewMobile: React.FC<Props> = ({
     clientes_taller: 'Clientes Taller',
     tecnicos: 'Equipo Técnico',
     inventario: 'Inventario Repuestos',
+    alertas_taller: 'Alertas & Eventos',
   };
 
   return (
@@ -120,9 +137,23 @@ export const TallerViewMobile: React.FC<Props> = ({
           </span>
         </div>
 
-        <span className="text-xs font-bold text-white truncate max-w-[130px]">
-          {sectionTitles[activeSection]}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-white truncate max-w-[110px]">
+            {sectionTitles[activeSection]}
+          </span>
+          <NotificationsPopover
+            role="taller"
+            alerts={alerts}
+            warranties={warranties}
+            orders={orders}
+            onViewAll={() => {
+              setActiveSection('alertas_taller');
+              setDrawerOpen(false);
+            }}
+            onMarkAlertAsRead={onMarkAlertAsRead}
+            onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+          />
+        </div>
       </header>
 
       {drawerOpen && (
@@ -254,6 +285,13 @@ export const TallerViewMobile: React.FC<Props> = ({
           />
         )}
         {activeSection === 'inventario' && <InventarioMobile inventory={inventory} />}
+        {activeSection === 'alertas_taller' && (
+          <AlertasMobile
+            alerts={alerts}
+            onMarkAsRead={onMarkAlertAsRead}
+            onMarkAllAsRead={onMarkAllAlertsAsRead}
+          />
+        )}
       </main>
     </div>
   );

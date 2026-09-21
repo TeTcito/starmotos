@@ -11,6 +11,7 @@ import {
   Sparkles,
   UserCheck,
   ArrowLeft,
+  Bell,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -22,6 +23,7 @@ import {
   Technician,
   AlistamientoFullRecord,
   Workshop,
+  SystemAlert,
 } from '../../../types/customer';
 import { OrdenesTallerDesktop } from './OrdenesTallerDesktop';
 import { SolicitudesGarantiaTallerDesktop } from './SolicitudesGarantiaTallerDesktop';
@@ -30,6 +32,8 @@ import { InventarioDesktop } from './InventarioDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
 import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosDesktop } from '../common/TecnicosDesktop';
+import { AlertasDesktop } from '../admin/AlertasDesktop';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: TallerSection;
@@ -50,6 +54,9 @@ interface Props {
   newWarrantyForm: any;
   setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
   onCreateWarrantyRequest: () => boolean;
+  alerts: SystemAlert[];
+  onMarkAlertAsRead: (id: string) => void;
+  onMarkAllAlertsAsRead: () => void;
 }
 
 export const TallerViewDesktop: React.FC<Props> = ({
@@ -71,6 +78,9 @@ export const TallerViewDesktop: React.FC<Props> = ({
   newWarrantyForm,
   setNewWarrantyForm,
   onCreateWarrantyRequest,
+  alerts,
+  onMarkAlertAsRead,
+  onMarkAllAlertsAsRead,
 }) => {
   const [activeWorkshopId, setActiveWorkshopId] = React.useState<string>(() => {
     return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
@@ -121,6 +131,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
       label: 'Inventario / Repuestos',
       icon: <Package className="w-4 h-4" />,
     },
+    {
+      id: 'alertas_taller',
+      label: 'Alertas & Eventos',
+      icon: <Bell className="w-4 h-4" />,
+      badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
+    },
   ];
 
   const sectionTitles: Record<TallerSection, string> = {
@@ -130,6 +146,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
     clientes_taller: 'Fichero de Clientes de la Sucursal',
     tecnicos: 'Equipo de Mecánicos y Técnicos de la Sucursal',
     inventario: 'Inventario de Repuestos y Lubricantes',
+    alertas_taller: 'Centro de Notificaciones & Alertas del Taller',
   };
 
   return (
@@ -157,16 +174,33 @@ export const TallerViewDesktop: React.FC<Props> = ({
             </h1>
           </div>
 
-          {activeSection === 'alistamiento_taller' && alistamientoViewMode === 'form' && (
-            <button
-              type="button"
-              onClick={() => setAlistamientoViewMode('list')}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-800 hover:bg-blue-900 border border-blue-400 text-xs text-white font-bold shadow-xs transition-all cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Regresar al Listado</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3.5 shrink-0">
+            {activeSection === 'alistamiento_taller' && alistamientoViewMode === 'form' && (
+              <button
+                type="button"
+                onClick={() => setAlistamientoViewMode('list')}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-800 hover:bg-blue-900 border border-blue-400 text-xs text-white font-bold shadow-xs transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Regresar al Listado</span>
+              </button>
+            )}
+
+            <NotificationsPopover
+              role="taller"
+              alerts={alerts}
+              warranties={warranties}
+              orders={orders}
+              onViewAll={() => setActiveSection('alertas_taller')}
+              onMarkAlertAsRead={onMarkAlertAsRead}
+              onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            />
+
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{currentWs.name}</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -343,6 +377,15 @@ export const TallerViewDesktop: React.FC<Props> = ({
               />
             )}
             {activeSection === 'inventario' && <InventarioDesktop inventory={inventory} />}
+            {activeSection === 'alertas_taller' && (
+              <AlertasDesktop
+                alerts={alerts}
+                onMarkAsRead={onMarkAlertAsRead}
+                onMarkAllAsRead={onMarkAllAlertsAsRead}
+                title="Centro de Notificaciones & Alertas del Taller"
+                subtitle={`Registro en vivo de eventos operacionales, órdenes y garantías para ${currentWs.name}.`}
+              />
+            )}
           </div>
         </main>
       </div>

@@ -25,6 +25,7 @@ export const GARANTE_SECTIONS: GaranteSection[] = [
   'clientes_garante',
   'reportes_garante',
   'perfil_garante',
+  'alertas_garante',
 ];
 
 const getSectionFromHash = (): GaranteSection => {
@@ -46,6 +47,7 @@ export function useGarantePortal() {
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
   const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
+  const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
   const [profile, setProfile] = useState<GaranteProfile>(INITIAL_GARANTE_PROFILE);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -62,18 +64,37 @@ export function useGarantePortal() {
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
+    const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
 
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+    window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
       window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+      window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
     };
+  }, []);
+
+  const markAlertAsRead = useCallback((id: string) => {
+    setAlerts((prev) => {
+      const updated = prev.map((a) => (a.id === id ? { ...a, read: true } : a));
+      saveStoredAlerts(updated);
+      return updated;
+    });
+  }, []);
+
+  const markAllAlertsAsRead = useCallback(() => {
+    setAlerts((prev) => {
+      const updated = prev.map((a) => ({ ...a, read: true }));
+      saveStoredAlerts(updated);
+      return updated;
+    });
   }, []);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -230,6 +251,9 @@ export function useGarantePortal() {
     workshops,
     profile,
     setProfile,
+    alerts,
+    markAlertAsRead,
+    markAllAlertsAsRead,
     toastMessage,
     showToast,
     // Modal y acciones

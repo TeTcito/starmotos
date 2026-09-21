@@ -32,6 +32,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     newWarrantyForm,
     setNewWarrantyForm,
     createWarrantyRequest,
+    alerts,
+    markAlertAsRead,
+    markAllAlertsAsRead,
     toastMessage,
   } = portal;
 
@@ -57,6 +60,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           newWarrantyForm={newWarrantyForm}
           setNewWarrantyForm={setNewWarrantyForm}
           onCreateWarrantyRequest={createWarrantyRequest}
+          alerts={alerts}
+          onMarkAlertAsRead={markAlertAsRead}
+          onMarkAllAlertsAsRead={markAllAlertsAsRead}
         />
       ) : (
         <TallerViewMobile
@@ -78,6 +84,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           newWarrantyForm={newWarrantyForm}
           setNewWarrantyForm={setNewWarrantyForm}
           onCreateWarrantyRequest={createWarrantyRequest}
+          alerts={alerts}
+          onMarkAlertAsRead={markAlertAsRead}
+          onMarkAllAlertsAsRead={markAllAlertsAsRead}
         />
       )}
 

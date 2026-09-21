@@ -15,12 +15,16 @@ interface Props {
   alerts: SystemAlert[];
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
+  title?: string;
+  subtitle?: string;
 }
 
 export const AlertasDesktop: React.FC<Props> = ({
   alerts,
   onMarkAsRead,
   onMarkAllAsRead,
+  title = 'Centro de Notificaciones & Alertas en Vivo',
+  subtitle = 'Registro cronológico de eventos operacionales, cambios de estado y aprobaciones.',
 }) => {
   const getIcon = (type: SystemAlert['type']) => {
     switch (type) {
@@ -46,10 +50,10 @@ export const AlertasDesktop: React.FC<Props> = ({
         <div>
           <h2 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
             <Bell className="w-6 h-6 text-blue-600" />
-            <span>Centro de Notificaciones & Alertas en Vivo</span>
+            <span>{title}</span>
           </h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Registro cronológico de eventos operacionales, cambios de estado y aprobaciones.
+            {subtitle}
           </p>
         </div>
 

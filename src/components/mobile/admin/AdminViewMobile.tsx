@@ -34,6 +34,7 @@ import { TecnicosMobile } from '../common/TecnicosMobile';
 import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: AdminSection;
@@ -139,9 +140,22 @@ export const AdminViewMobile: React.FC<Props> = ({
           <span className="text-[9px] text-blue-200 uppercase font-mono font-bold hidden sm:inline">Matriz</span>
         </div>
 
-        <span className="text-xs font-bold text-white truncate max-w-[150px]">
-          {sectionTitles[activeSection]}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-white truncate max-w-[130px]">
+            {sectionTitles[activeSection]}
+          </span>
+          <NotificationsPopover
+            role="admin"
+            alerts={alerts}
+            warranties={warranties}
+            onViewAll={() => {
+              setActiveSection('alertas');
+              setDrawerOpen(false);
+            }}
+            onMarkAlertAsRead={onMarkAlertAsRead}
+            onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+          />
+        </div>
       </header>
 
       {/* Drawer Móvil */}

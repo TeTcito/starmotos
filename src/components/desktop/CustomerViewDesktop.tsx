@@ -26,6 +26,7 @@ import { ActiveOrderDesktop } from './ActiveOrderDesktop';
 import { HistoryDesktop } from './HistoryDesktop';
 import { WarrantiesDesktop } from './WarrantiesDesktop';
 import { ModalPortal } from '../common/ModalPortal';
+import { NotificationsPopover } from '../common/NotificationsPopover';
 import {
   ClientProfile,
   MotorcycleClientData,
@@ -172,6 +173,15 @@ export const CustomerViewDesktop: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-3.5 shrink-0">
+            {/* Botón de Notificaciones (Casos y Eventos) */}
+            <NotificationsPopover
+              role="cliente"
+              customerActiveOrder={activeOrder}
+              customerWarranties={warranties}
+              customerHistory={history}
+              onViewAll={() => setActiveSection('eventos')}
+            />
+
             {/* Botón WhatsApp Taller */}
             <button
               onClick={handleWhatsAppAdvisor}

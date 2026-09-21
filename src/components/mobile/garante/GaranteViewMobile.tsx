@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   XCircle,
   Users,
+  Bell,
 } from 'lucide-react';
 import {
   GaranteSection,
@@ -19,12 +20,15 @@ import {
   AlistamientoFullRecord,
   TallerClient,
   Workshop,
+  SystemAlert,
 } from '../../../types/customer';
 import { SolicitudesGaranteMobile } from './SolicitudesGaranteMobile';
 import { HistorialGarantiasMobile } from './HistorialGarantiasMobile';
 import { ReportesGaranteMobile } from './ReportesGaranteMobile';
 import { PerfilGaranteMobile } from './PerfilGaranteMobile';
 import { ClientesModule } from '../../common/ClientesModule';
+import { AlertasMobile } from '../admin/AlertasMobile';
+import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
   activeSection: GaranteSection;
@@ -48,6 +52,9 @@ interface Props {
   onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
   onApproveWarranty: () => void;
   onRejectWarranty: () => void;
+  alerts: SystemAlert[];
+  onMarkAlertAsRead: (id: string) => void;
+  onMarkAllAlertsAsRead: () => void;
 }
 
 export const GaranteViewMobile: React.FC<Props> = ({
@@ -72,6 +79,9 @@ export const GaranteViewMobile: React.FC<Props> = ({
   onOpenDecisionModal,
   onApproveWarranty,
   onRejectWarranty,
+  alerts,
+  onMarkAlertAsRead,
+  onMarkAllAlertsAsRead,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -81,6 +91,12 @@ export const GaranteViewMobile: React.FC<Props> = ({
     { id: 'historial_garantias', label: 'Historial', icon: <History className="w-4 h-4" /> },
     { id: 'reportes_garante', label: 'Reportes', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'perfil_garante', label: 'Ficha Marca', icon: <Building2 className="w-4 h-4" /> },
+    {
+      id: 'alertas_garante',
+      label: 'Alertas & Eventos',
+      icon: <Bell className="w-4 h-4" />,
+      badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
+    },
   ];
 
   const sectionTitles: Record<GaranteSection, string> = {
@@ -89,6 +105,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
     historial_garantias: 'Historial Dictámenes',
     reportes_garante: 'Reportes Técnicos',
     perfil_garante: 'Ficha de Marca',
+    alertas_garante: 'Alertas & Eventos',
   };
 
   return (
@@ -111,9 +128,22 @@ export const GaranteViewMobile: React.FC<Props> = ({
           <span className="text-[9px] text-purple-200 uppercase font-mono font-bold hidden sm:inline">Garante</span>
         </div>
 
-        <span className="text-xs font-bold text-white truncate max-w-[150px]">
-          {sectionTitles[activeSection]}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-white truncate max-w-[110px]">
+            {sectionTitles[activeSection]}
+          </span>
+          <NotificationsPopover
+            role="garante"
+            alerts={alerts}
+            warranties={warranties}
+            onViewAll={() => {
+              setActiveSection('alertas_garante');
+              setDrawerOpen(false);
+            }}
+            onMarkAlertAsRead={onMarkAlertAsRead}
+            onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+          />
+        </div>
       </header>
 
       {drawerOpen && (
@@ -190,6 +220,13 @@ export const GaranteViewMobile: React.FC<Props> = ({
           <ReportesGaranteMobile warranties={warranties} />
         )}
         {activeSection === 'perfil_garante' && <PerfilGaranteMobile profile={profile} />}
+        {activeSection === 'alertas_garante' && (
+          <AlertasMobile
+            alerts={alerts}
+            onMarkAsRead={onMarkAlertAsRead}
+            onMarkAllAsRead={onMarkAllAlertsAsRead}
+          />
+        )}
       </main>
 
       {/* Modal Decisión Móvil */}

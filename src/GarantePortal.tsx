@@ -35,6 +35,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
     openDecisionModal,
     approveWarranty,
     rejectWarranty,
+    alerts,
+    markAlertAsRead,
+    markAllAlertsAsRead,
     toastMessage,
   } = portal;
 
@@ -63,6 +66,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           onOpenDecisionModal={openDecisionModal}
           onApproveWarranty={approveWarranty}
           onRejectWarranty={rejectWarranty}
+          alerts={alerts}
+          onMarkAlertAsRead={markAlertAsRead}
+          onMarkAllAlertsAsRead={markAllAlertsAsRead}
         />
       ) : (
         <GaranteViewMobile
@@ -87,6 +93,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           onOpenDecisionModal={openDecisionModal}
           onApproveWarranty={approveWarranty}
           onRejectWarranty={rejectWarranty}
+          alerts={alerts}
+          onMarkAlertAsRead={markAlertAsRead}
+          onMarkAllAlertsAsRead={markAllAlertsAsRead}
         />
       )}
 

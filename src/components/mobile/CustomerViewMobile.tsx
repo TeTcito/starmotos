@@ -87,6 +87,10 @@ export const CustomerViewMobile: React.FC<Props> = ({
         activeBranch={activeBranch}
         onLogout={logout}
         activeSectionTitle={sectionTitles[activeSection]}
+        activeOrder={activeOrder}
+        warranties={warranties}
+        history={history}
+        onNavigateToEvents={() => setActiveSection('eventos')}
       />
 
       {/* 2. Drawer Lateral Desplegable Móvil */}

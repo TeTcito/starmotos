@@ -276,14 +276,16 @@ export type TallerSection =
   | 'solicitudes_garantia'
   | 'clientes_taller'
   | 'tecnicos'
-  | 'inventario';
+  | 'inventario'
+  | 'alertas_taller';
 
 export type GaranteSection =
   | 'solicitudes_garante'
   | 'historial_garantias'
   | 'clientes_garante'
   | 'reportes_garante'
-  | 'perfil_garante';
+  | 'perfil_garante'
+  | 'alertas_garante';
 
 // --- Flujo de Garantías (Máquina de Estados) ---
 export type WarrantyRequestStatus =

@@ -1,5 +1,5 @@
 // src/components/common/AlistamientoWizard.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Search,
@@ -19,6 +19,7 @@ import {
   Printer,
   Trash2,
   Check,
+  Upload,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -65,6 +66,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setInternalViewMode(mode);
     onViewModeChange?.(mode);
   };
+
+  // Referencia para selector de archivos del computador/dispositivo
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Búsqueda en el listado
   const [searchTerm, setSearchTerm] = useState('');
@@ -319,19 +323,26 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   };
 
-  // Subir foto simulada
-  const handleAddMockPhoto = () => {
-    const mockPhotos = [
-      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1609630875171-b1321377ee65?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1449426468159-d96dbf08f19f?auto=format&fit=crop&w=600&q=80',
-    ];
-    const randomPhoto = mockPhotos[formData.fotos.length % mockPhotos.length];
-    setFormData((prev) => ({
-      ...prev,
-      fotos: [...prev.fotos, randomPhoto],
-    }));
+  // Subir archivos reales desde el computador o dispositivo
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setFormData((prev) => ({
+            ...prev,
+            fotos: [...prev.fotos, event.target!.result as string],
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Resetear valor para permitir seleccionar el mismo archivo si se desea
+    e.target.value = '';
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -474,8 +485,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
+      {/* Input oculto para subir archivos reales de imágenes */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,*/*"
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* ========================================================================= */}
-      {/* 1. VISTA: LISTADO EN TARJETAS SEMICUADRADAS / CUADRADAS                   */}
+      {/* 1. VISTA: LISTADO EN TARJETAS COMPACTAS (SIN CONTENEDORES INTERNOS)       */}
       {/* ========================================================================= */}
       {currentViewMode === 'list' && (
         <div className="space-y-4 animate-fade-in">
@@ -554,53 +575,43 @@ export const AlistamientoWizard: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Grid de Tarjetas Cuadradas / Semicuadradas */}
+          {/* Grid de Tarjetas Compactas (Sin contenedores adentro) */}
           {filteredRecords.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
               {filteredRecords.map((record) => {
                 const isPdi = record.serviciosRealizados.includes('alistamiento_pdi');
                 return (
                   <div
                     key={record.id}
-                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden group min-h-[350px]"
+                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between relative overflow-hidden group"
                   >
-                    {/* Borde superior acentuado */}
+                    {/* Borde superior decorativo */}
                     <div
-                      className={`absolute top-0 left-0 right-0 h-1.5 ${
+                      className={`absolute top-0 left-0 right-0 h-1 ${
                         isPdi ? 'bg-blue-600' : 'bg-emerald-600'
                       }`}
                     />
 
-                    {/* Contenido Principal de la Tarjeta */}
-                    <div className="space-y-3.5 pt-1">
+                    {/* Contenido Texto Directo (Sin contenedores anidados) */}
+                    <div className="space-y-2.5 pt-0.5">
                       {/* Cabecera de la Tarjeta */}
-                      <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-3">
-                        <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-bold border border-zinc-200 text-[11px]">
-                            <Building2 className="w-3 h-3 text-zinc-500" />
-                            <span className="truncate max-w-[170px]">{record.sede}</span>
+                      <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-zinc-100">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-700 truncate max-w-[150px]">
+                          <Building2 className="w-3 h-3 text-zinc-400 shrink-0" />
+                          <span className="truncate">{record.sede}</span>
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                            COMPLETADO
                           </span>
-                          <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" />
-                            <span>{record.fechaServicio}</span>
-                            <span>•</span>
-                            <span className="font-mono text-[10px]">{record.numeroTicket || record.id}</span>
-                          </div>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-black text-[10px] inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>COMPLETADO</span>
-                          </span>
-                          <div className="font-black text-sm text-zinc-900 mt-1">
+                          <span className="font-black text-xs text-zinc-900">
                             ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
-                          </div>
+                          </span>
                         </div>
                       </div>
 
-                      {/* Bloque 1: Cliente */}
-                      <div className="bg-blue-50/40 border border-blue-100/80 rounded-xl p-3 space-y-1">
+                      {/* Bloque 1: Cliente (Texto directo) */}
+                      <div className="space-y-0.5">
                         <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1">
                           <UserCheck className="w-3 h-3" />
                           <span>Cliente</span>
@@ -608,42 +619,42 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         <div className="font-bold text-zinc-900 text-sm truncate">
                           {record.nombres} {record.apellidos}
                         </div>
-                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between gap-2">
+                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between">
                           <span>C.I: <strong>{record.cedulaRuc}</strong></span>
-                          {record.celular1 && <span>Tel: {record.celular1}</span>}
+                          {record.celular1 && <span className="text-zinc-500">Tel: {record.celular1}</span>}
                         </div>
                         <div className="text-[11px] text-zinc-400 truncate">
                           Origen: <span className="text-zinc-600 font-medium">{record.origen}</span>
                         </div>
                       </div>
 
-                      {/* Bloque 2: Motocicleta (Solo datos del vehículo) */}
-                      <div className="bg-red-50/40 border border-red-100/80 rounded-xl p-3 space-y-1">
+                      {/* Bloque 2: Motocicleta (Texto directo) */}
+                      <div className="space-y-0.5 pt-1.5 border-t border-zinc-100">
                         <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1">
                           <Bike className="w-3 h-3" />
                           <span>Motocicleta</span>
                         </div>
-                        <div className="font-bold text-zinc-900 text-xs sm:text-sm truncate">
+                        <div className="font-bold text-zinc-800 text-xs truncate">
                           {record.modeloMarca || 'Modelo no especificado'}
                         </div>
-                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between gap-2">
-                          <span className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 rounded font-black text-zinc-800 text-[10px]">
+                        <div className="text-zinc-600 text-[11px] font-mono flex items-center justify-between">
+                          <span className="px-1.5 py-0.2 bg-zinc-100 rounded font-bold text-zinc-800 text-[10px]">
                             {record.placa ? record.placa : 'SIN PLACA'}
                           </span>
-                          <span>Km: <strong className="text-zinc-900">{record.kilometraje || 0}</strong></span>
+                          <span>Km: <strong className="text-zinc-800">{record.kilometraje || 0}</strong></span>
                         </div>
-                        <div className="text-[11px] text-zinc-400 truncate">
+                        <div className="text-[10px] text-zinc-400 truncate">
                           VIN: <span className="font-mono text-zinc-600">{record.chasis ? record.chasis.substring(0, 15) + '...' : 'S/N'}</span>
                         </div>
                       </div>
 
-                      {/* Bloque 3: Servicio, Aceite & Técnico */}
-                      <div className="space-y-1.5 text-xs">
+                      {/* Bloque 3: Servicio (Texto directo) */}
+                      <div className="space-y-1 pt-1.5 border-t border-zinc-100 text-[11px]">
                         <div className="flex flex-wrap gap-1">
                           {record.serviciosRealizados.map((srv) => (
                             <span
                               key={srv}
-                              className="px-2 py-0.5 bg-zinc-100 text-zinc-700 border border-zinc-200 rounded text-[10px] font-bold"
+                              className="px-1.5 py-0.2 bg-zinc-100 text-zinc-700 rounded text-[10px] font-bold"
                             >
                               {srv === 'alistamiento_pdi'
                                 ? 'ALISTAMIENTO PDI'
@@ -653,31 +664,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </span>
                           ))}
                         </div>
-                        <div className="text-zinc-600 text-[11px] flex items-center justify-between">
-                          <span>Aceite: <strong>{record.aceite === 'sin_aceite' ? 'Sin Aceite' : `Con Aceite (${record.nivelAceite || 'Óptimo'})`}</strong></span>
-                          <span>Próx: <strong>{record.proximoMantenimientoKm || 1000} km</strong></span>
-                        </div>
-                        <div className="text-zinc-500 text-[11px] flex items-center justify-between pt-0.5">
-                          <span>Técnico: <strong className="text-zinc-800">{record.tecnicoResponsable}</strong></span>
+                        <div className="text-zinc-500 text-[10px] flex items-center justify-between">
+                          <span>Téc: <strong className="text-zinc-700">{record.tecnicoResponsable}</strong></span>
                           <span>{record.metodoPago || 'Efectivo'}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Botones de Acción de la Tarjeta */}
-                    <div className="pt-3 mt-3 border-t border-zinc-100 flex items-center gap-2">
+                    {/* Botones de Acción */}
+                    <div className="pt-2 mt-2.5 border-t border-zinc-100 flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setSelectedRecordForDetail(record)}
-                        className="flex-1 py-2 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 py-1.5 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
-                        <Eye className="w-3.5 h-3.5 text-zinc-500" />
+                        <Eye className="w-3.5 h-3.5" />
                         <span>Ver Ficha</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleNewServiceForExisting(record)}
-                        className="flex-1 py-2 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 py-1.5 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
                         title="Crear nuevo mantenimiento subsecuente con este cliente"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -1119,7 +1126,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <select
                         value={formData.aceite}
                         onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
-                        className="w-full px-2.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
                         <option value="con_aceite">Con Aceite</option>
                         <option value="sin_aceite">Sin Aceite</option>
@@ -1130,7 +1137,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <select
                         value={formData.nivelAceite || 'optimo'}
                         onChange={(e) => setFormData({ ...formData, nivelAceite: e.target.value })}
-                        className="w-full px-2.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
                         <option value="optimo">Nivel Óptimo</option>
                         <option value="alto">Nivel Alto</option>
@@ -1143,7 +1150,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <select
                         value={formData.tipoAceite || '4T Mineral 20W50'}
                         onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
-                        className="w-full px-2.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
                         <option value="4T Mineral 20W50">20W50 Mineral</option>
                         <option value="4T Semi 10W40">10W40 Semi</option>
@@ -1262,48 +1269,62 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                {/* Inspección Visual (Fotos de Evidencia de Entrega) */}
+                {/* Inspección Visual (Fotos reales de Evidencia de Entrega) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold uppercase text-zinc-700">
                       Inspección Visual (Fotos de Entrega)
                     </label>
                     <button
                       type="button"
-                      onClick={handleAddMockPhoto}
+                      onClick={() => fileInputRef.current?.click()}
                       className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
                     >
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>+ Foto</span>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Subir Fotos</span>
                     </button>
                   </div>
 
                   {formData.fotos.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {formData.fotos.map((fUrl, idx) => (
-                        <div
-                          key={idx}
-                          className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group"
-                        >
-                          <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePhoto(idx)}
-                            className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {formData.fotos.map((fUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group bg-black/5"
                           >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
+                            <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(idx)}
+                              className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                              title="Eliminar foto"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-1.5 border border-dashed border-emerald-400 hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar más fotos desde este dispositivo</span>
+                      </button>
                     </div>
                   ) : (
                     <div
-                      onClick={handleAddMockPhoto}
-                      className="border border-dashed border-zinc-300 hover:border-emerald-400 rounded-xl p-2.5 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-emerald-50/40"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border border-dashed border-zinc-300 hover:border-emerald-500 rounded-xl p-3 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-emerald-50/50"
                     >
-                      <Camera className="w-4 h-4 text-zinc-400 mx-auto mb-0.5" />
-                      <span className="text-[11px] text-zinc-500 font-medium">
-                        Clic para adjuntar fotos de evidencia de entrega
+                      <Camera className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+                      <span className="text-xs text-zinc-700 font-bold block">
+                        Subir fotos desde este dispositivo o computadora
+                      </span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">
+                        PNG, JPG, JPEG, WEBP o cualquier formato
                       </span>
                     </div>
                   )}
@@ -1638,6 +1659,51 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </div>
                 </div>
 
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Fotos de Entrega
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-bold text-emerald-600 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Subir Foto</span>
+                    </button>
+                  </div>
+                  {formData.fotos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {formData.fotos.map((url, i) => (
+                        <div key={i} className="relative aspect-video rounded-lg overflow-hidden border">
+                          <img src={url} alt="Foto" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(i)}
+                            className="absolute top-0.5 right-0.5 bg-black/70 text-white p-0.5 rounded"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Observaciones
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                    placeholder="Notas mecánicas..."
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium resize-none"
+                  />
+                </div>
+
                 <div className="pt-2 flex gap-2">
                   <button
                     type="button"
@@ -1903,7 +1969,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
       {/* ========================================================================= */}
       {/* 5. MODAL: AGREGAR NUEVO ORIGEN / ALMACÉN                                   */}
-      {/* ========================================================================= */}
       {showAddOriginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in">

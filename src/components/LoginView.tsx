@@ -141,7 +141,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row overflow-x-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
+    <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-white flex flex-col lg:flex-row overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* ========================================================================= */}
       {/* LADO IZQUIERDO (2/3 DEL ANCHO): IMAGEN HERO A PANTALLA COMPLETA (DESKTOP)  */}
       {/* ========================================================================= */}
@@ -171,37 +171,37 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       {/* ========================================================================= */}
       {/* LADO DERECHO (1/3 EN DESKTOP, PANTALLA COMPLETA EN MÓVIL): FORMULARIO       */}
       {/* ========================================================================= */}
-      <div className="w-full lg:w-1/3 min-h-screen lg:min-h-full flex items-center justify-center bg-white p-5 sm:p-8 lg:p-10 overflow-y-auto">
-        <div className="w-full max-w-md py-4">
+      <div className="w-full lg:w-1/3 h-full flex flex-col justify-center items-center bg-white px-4 py-3 sm:p-8 lg:p-10 overflow-y-auto">
+        <div className="w-full max-w-md my-auto py-1 sm:py-4">
           {/* Encabezado: Logo, Nombre del Taller y Título Elegante StarMotos */}
-          <div className="mb-6 text-center">
+          <div className="mb-3 sm:mb-6 text-center">
             {/* Logo Oficial de StarMotos */}
-            <div className="inline-flex p-1.5 rounded-full bg-gradient-to-tr from-blue-600 via-white to-red-600 shadow-md mb-2.5">
+            <div className="inline-flex p-1 sm:p-1.5 rounded-full bg-gradient-to-tr from-blue-600 via-white to-red-600 shadow-md mb-1.5 sm:mb-2.5">
               <img
                 src="/starmotos-logo.jpg"
                 alt="Logo StarMotos"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover bg-white"
+                className="w-14 h-14 sm:w-20 sm:h-20 rounded-full object-cover bg-white"
               />
             </div>
 
             {/* Nombre del Taller */}
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="h-px w-6 bg-gradient-to-r from-transparent to-blue-400" />
-              <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
+            <div className="flex items-center justify-center gap-2 mb-0.5 sm:mb-1">
+              <span className="h-px w-5 sm:w-6 bg-gradient-to-r from-transparent to-blue-400" />
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
                 Taller Mecánico Especializado
               </span>
-              <span className="h-px w-6 bg-gradient-to-l from-transparent to-red-400" />
+              <span className="h-px w-5 sm:w-6 bg-gradient-to-l from-transparent to-red-400" />
             </div>
 
             {/* Título Elegante y Original StarMotos */}
-            <h1 className="text-3xl sm:text-4xl font-black tracking-wider uppercase">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-wider uppercase">
               <span className="text-blue-600 drop-shadow-sm">STAR</span>
               <span className="text-red-600 drop-shadow-sm">MOTOS</span>
             </h1>
 
             {/* Subtítulo con toggle a Registrarse */}
             {!isRegisterMode ? (
-              <p className="text-xs sm:text-sm text-zinc-600 mt-1.5">
+              <p className="text-xs sm:text-sm text-zinc-600 mt-1 sm:mt-1.5">
                 ¿No tienes una cuenta aún?{' '}
                 <button
                   type="button"
@@ -216,7 +216,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 </button>
               </p>
             ) : (
-              <p className="text-xs sm:text-sm text-zinc-600 mt-1.5 flex items-center justify-center gap-1.5">
+              <p className="text-xs sm:text-sm text-zinc-600 mt-1 sm:mt-1.5 flex items-center justify-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -235,14 +235,14 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
           {/* Mensajes de Alerta */}
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-center gap-2 animate-shake">
+            <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-center gap-2 animate-shake">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2 animate-fade-in">
+            <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 font-bold flex items-center gap-2 animate-fade-in">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{successMessage}</span>
             </div>
@@ -252,10 +252,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           {/* MODO 1: FORMULARIO DE INICIO DE SESIÓN                                */}
           {/* ===================================================================== */}
           {!isRegisterMode ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-2 sm:space-y-4">
               {/* Correo Electrónico o Cédula */}
               <div>
-                <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1 sm:mb-1.5">
                   Correo Electrónico o Cédula
                 </label>
                 <input
@@ -264,14 +264,14 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   value={loginData.identifier}
                   onChange={handleLoginChange}
                   placeholder="Ejemplo: correo electrónico de ejemplo (o C.I.)"
-                  className="w-full px-4 py-3 bg-white border border-zinc-400 hover:border-zinc-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-700 font-normal text-sm placeholder:text-zinc-400 placeholder:font-normal rounded-xl transition-all"
+                  className="w-full px-3.5 py-2 sm:py-3 bg-white border border-zinc-400 hover:border-zinc-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-700 font-normal text-xs sm:text-sm placeholder:text-zinc-400 placeholder:font-normal rounded-xl transition-all"
                   required
                 />
               </div>
 
               {/* Contraseña */}
               <div>
-                <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1 sm:mb-1.5">
                   Contraseña
                 </label>
                 <div className="relative">
@@ -281,26 +281,26 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     value={loginData.password}
                     onChange={handleLoginChange}
                     placeholder="Ejemplo: ••••••••"
-                    className="w-full px-4 py-3 pr-12 bg-white border border-zinc-400 hover:border-zinc-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-700 font-normal text-sm placeholder:text-zinc-400 placeholder:font-normal rounded-xl transition-all"
+                    className="w-full px-3.5 py-2 sm:py-3 pr-10 bg-white border border-zinc-400 hover:border-zinc-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-700 font-normal text-xs sm:text-sm placeholder:text-zinc-400 placeholder:font-normal rounded-xl transition-all"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-zinc-100 rounded-full transition cursor-pointer text-zinc-500 hover:text-zinc-700"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 sm:p-1.5 hover:bg-zinc-100 rounded-full transition cursor-pointer text-zinc-500 hover:text-zinc-700"
                     title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                   >
                     {showPassword ? (
-                      <EyeOff className="w-5 h-5 text-zinc-600" />
+                      <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-600" />
                     ) : (
-                      <Eye className="w-5 h-5 text-zinc-600" />
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-600" />
                     )}
                   </button>
                 </div>
               </div>
 
               {/* Fila Recordarme + Olvidaste contraseña */}
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between pt-0.5 sm:pt-1">
                 <label htmlFor="rememberMe" className="flex items-center space-x-2 text-xs sm:text-sm text-zinc-700 cursor-pointer select-none font-medium">
                   <input
                     type="checkbox"
@@ -308,7 +308,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     name="rememberMe"
                     checked={loginData.rememberMe}
                     onChange={handleLoginChange}
-                    className="w-4 h-4 bg-white border border-zinc-400 rounded cursor-pointer accent-blue-600"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white border border-zinc-400 rounded cursor-pointer accent-blue-600"
                   />
                   <span>Recordarme</span>
                 </label>
@@ -325,7 +325,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 px-4 rounded-xl font-bold transition-all shadow-md shadow-blue-600/20 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 text-sm mt-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 sm:py-3.5 px-4 rounded-xl font-bold transition-all shadow-md shadow-blue-600/20 active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 text-xs sm:text-sm mt-1 sm:mt-2"
               >
                 {isLoading ? (
                   <>
@@ -337,8 +337,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 )}
               </button>
 
-              {/* Enlace inferior: ¿No tienes cuenta? Registrarte */}
-              <div className="text-center pt-2 text-xs sm:text-sm text-zinc-600">
+              {/* Enlace inferior (visible en pantallas grandes) */}
+              <div className="hidden sm:block text-center pt-1 text-xs sm:text-sm text-zinc-600">
                 ¿No tienes cuenta?{' '}
                 <button
                   type="button"
@@ -353,24 +353,24 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               </div>
 
               {/* Divisor */}
-              <div className="relative my-4">
+              <div className="relative my-2 sm:my-4">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-zinc-300"></div>
+                  <div className="w-full border-t border-zinc-200 sm:border-zinc-300"></div>
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-white text-zinc-500 font-medium">o continuar con</span>
+                  <span className="px-2.5 sm:px-3 bg-white text-zinc-400 sm:text-zinc-500 font-medium text-[11px] sm:text-xs">o continuar con</span>
                 </div>
               </div>
 
               {/* Botones de Acción: Google y Acceso Demo */}
-              <div className="grid grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
                 <button
                   type="button"
                   onClick={handleQuickFill}
-                  className="flex items-center justify-center px-4 py-2.5 bg-white border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-xl transition cursor-pointer text-zinc-700 font-semibold text-xs sm:text-sm shadow-xs"
+                  className="flex items-center justify-center px-3 py-2 sm:py-2.5 bg-white border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-xl transition cursor-pointer text-zinc-700 font-semibold text-xs sm:text-sm shadow-xs"
                 >
                   {/* Google SVG */}
-                  <svg className="w-4 h-4 mr-2 shrink-0" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -382,9 +382,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={handleQuickFill}
-                  className="flex items-center justify-center px-4 py-2.5 bg-white border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-xl transition cursor-pointer group text-zinc-700 font-semibold text-xs sm:text-sm shadow-xs"
+                  className="flex items-center justify-center px-3 py-2 sm:py-2.5 bg-white border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-xl transition cursor-pointer group text-zinc-700 font-semibold text-xs sm:text-sm shadow-xs"
                 >
-                  <Sparkles className="w-4 h-4 mr-1.5 text-blue-600 group-hover:scale-110 transition shrink-0" />
+                  <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-1.5 text-blue-600 group-hover:scale-110 transition shrink-0" />
                   <span>Acceso Demo</span>
                 </button>
               </div>

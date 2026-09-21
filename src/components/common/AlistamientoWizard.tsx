@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Calendar,
   Camera,
-  Image as ImageIcon,
   CheckCircle2,
   AlertCircle,
   X,
@@ -16,16 +15,11 @@ import {
   Building2,
   Bike,
   Wrench,
-  DollarSign,
   Eye,
   FileText,
-  Clock,
   Printer,
   Trash2,
   Check,
-  Phone,
-  Mail,
-  MapPin,
   Tag,
 } from 'lucide-react';
 import {
@@ -383,7 +377,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     if (!formData.cedulaRuc.trim()) missingStep1.push('Cédula/RUC');
     if (!formData.nombres.trim()) missingStep1.push('Nombres');
     if (!formData.apellidos.trim()) missingStep1.push('Apellidos');
-    if (!formData.celular1.trim()) missingStep1.push('Celular 1');
+    if (!formData.celular1.trim()) missingStep1.push('Celular Principal');
 
     // 2. Validar Paso 2: Moto
     const missingStep2: string[] = [];
@@ -394,7 +388,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     const missingStep3: string[] = [];
     if (!formData.tecnicoResponsable.trim()) missingStep3.push('Técnico responsable');
     if (!formData.serviciosRealizados || formData.serviciosRealizados.length === 0) {
-      missingStep3.push('Servicios realizados (¿Qué se hizo?)');
+      missingStep3.push('Servicios realizados');
     }
     if (formData.valorServicio === undefined || formData.valorServicio === null || isNaN(formData.valorServicio)) {
       missingStep3.push('Valor del servicio ($)');
@@ -402,7 +396,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     if (missingStep1.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en Paso 1: Cliente',
+        title: 'Faltan datos en Paso 1: Cliente',
         fields: missingStep1,
         stepTarget: 1,
       });
@@ -412,7 +406,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     if (missingStep2.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en Paso 2: Moto',
+        title: 'Faltan datos en Paso 2: Moto',
         fields: missingStep2,
         stepTarget: 2,
       });
@@ -422,7 +416,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     if (missingStep3.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en Paso 3: Servicio',
+        title: 'Faltan datos en Paso 3: Servicio',
         fields: missingStep3,
         stepTarget: 3,
       });
@@ -466,11 +460,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
   return (
     <div className="space-y-5">
       {/* ========================================================================= */}
-      {/* 1. VISTA: LISTADO HORIZONTAL DE ALISTAMIENTOS PREVIOS                     */}
+      {/* 1. VISTA: LISTADO EN TARJETAS SEMICUADRADAS / CUADRADAS                   */}
       {/* ========================================================================= */}
       {viewMode === 'list' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Header Superior con Buscador y Acción Principal */}
+          {/* Header Superior con Buscador y Botón Nuevo Alistamiento */}
           <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -478,12 +472,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <h2 className="text-lg sm:text-xl font-black text-zinc-900 tracking-tight">
                     Módulo de Alistamiento & Mantenimientos
                   </h2>
-                  <span className="px-2.5 py-0.5 text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
+                  <span className="px-2.5 py-0.5 text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
                     {recentRecords.length} Registros
                   </span>
                 </div>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Historial de alistamientos PDI, entregas técnicas y auditoría de clientes StarMotos.
+                  Historial de alistamientos PDI, auditoría técnica y entrega de motocicletas StarMotos.
                 </p>
               </div>
 
@@ -530,13 +524,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>
-                    No encontramos alistamientos con el criterio <strong className="font-mono">"{searchTerm}"</strong>.
+                    No encontramos alistamientos para <strong className="font-mono">"{searchTerm}"</strong>.
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
                   <span>Registrar nuevo con C.I. {searchTerm} (SRI)</span>
@@ -545,152 +539,127 @@ export const AlistamientoWizard: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Listado de Tarjetas Horizontales */}
+          {/* Grid de Tarjetas Cuadradas / Semicuadradas */}
           {filteredRecords.length > 0 ? (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredRecords.map((record) => {
                 const isPdi = record.serviciosRealizados.includes('alistamiento_pdi');
                 return (
                   <div
                     key={record.id}
-                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all relative overflow-hidden group"
+                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden group min-h-[340px]"
                   >
-                    {/* Borde izquierdo acentuado */}
+                    {/* Borde superior acentuado */}
                     <div
-                      className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                      className={`absolute top-0 left-0 right-0 h-1.5 ${
                         isPdi ? 'bg-blue-600' : 'bg-emerald-600'
                       }`}
                     />
 
-                    <div className="pl-2">
-                      {/* Fila Superior: Metadatos y Badges */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-100 text-[11px]">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-bold border border-zinc-200">
+                    {/* Contenido Principal de la Tarjeta */}
+                    <div className="space-y-3.5 pt-1">
+                      {/* Cabecera de la Tarjeta */}
+                      <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-3">
+                        <div className="space-y-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-bold border border-zinc-200 text-[11px]">
                             <Building2 className="w-3 h-3 text-zinc-500" />
-                            <span>{record.sede}</span>
+                            <span className="truncate max-w-[170px]">{record.sede}</span>
                           </span>
-
-                          <span className="inline-flex items-center gap-1 text-zinc-500">
-                            <Calendar className="w-3 h-3 text-zinc-400" />
+                          <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3" />
                             <span>{record.fechaServicio}</span>
-                          </span>
-
-                          <span className="font-mono text-zinc-400 text-[10px]">
-                            {record.numeroTicket || record.id}
-                          </span>
+                            <span>•</span>
+                            <span className="font-mono text-[10px]">{record.numeroTicket || record.id}</span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px] flex items-center gap-1">
+                        <div className="text-right shrink-0">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-black text-[10px] inline-flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>COMPLETADO</span>
                           </span>
-                          <span className="font-black text-xs text-zinc-900">
+                          <div className="font-black text-sm text-zinc-900 mt-1">
                             ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Cuerpo de la Tarjeta: 3 Bloques Simétricos */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 py-3 text-xs">
-                        {/* 1. Cliente */}
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1">
-                            <UserCheck className="w-3 h-3" />
-                            <span>Cliente</span>
-                          </div>
-                          <div className="font-bold text-zinc-900 text-sm truncate">
-                            {record.nombres} {record.apellidos}
-                          </div>
-                          <div className="text-zinc-600 flex items-center gap-2 font-mono text-[11px]">
-                            <span>C.I: {record.cedulaRuc}</span>
-                            {record.celular1 && <span>• Tel: {record.celular1}</span>}
-                          </div>
-                          <div className="text-[11px] text-zinc-400 truncate">
-                            Origen: <span className="text-zinc-600 font-medium">{record.origen}</span>
-                          </div>
-                        </div>
-
-                        {/* 2. Moto */}
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1">
-                            <Bike className="w-3 h-3" />
-                            <span>Motocicleta</span>
-                          </div>
-                          <div className="font-bold text-zinc-900 text-sm truncate">
-                            {record.modeloMarca || 'Modelo no especificado'}
-                          </div>
-                          <div className="text-zinc-600 flex items-center gap-2 font-mono text-[11px]">
-                            <span className="px-1.5 py-0.2 bg-zinc-100 border border-zinc-200 rounded font-black text-zinc-800">
-                              {record.placa ? record.placa : 'SIN PLACA'}
-                            </span>
-                            <span className="truncate">VIN: {record.chasis ? record.chasis.substring(0, 12) + '...' : 'S/N'}</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-500">
-                            Km: <span className="font-bold text-zinc-800">{record.kilometraje || 0} km</span>
-                            {record.aceite && record.aceite !== 'sin_aceite' && (
-                              <span className="ml-2 text-zinc-400">• Aceite: {record.aceite}</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 3. Servicio & Técnico */}
-                        <div className="space-y-1">
-                          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />
-                            <span>Servicio & Entrega</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {record.serviciosRealizados.map((srv) => (
-                              <span
-                                key={srv}
-                                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-bold"
-                              >
-                                {srv.replace('_', ' ').toUpperCase()}
-                              </span>
-                            ))}
-                          </div>
-                          <div className="text-zinc-600 text-[11px]">
-                            Técnico: <span className="font-bold text-zinc-800">{record.tecnicoResponsable}</span>
-                          </div>
-                          <div className="text-[11px] text-zinc-500 flex items-center gap-2">
-                            <span>Factura: {record.numeroFactura || 'Por emitir'}</span>
-                            <span>• {record.metodoPago || 'Efectivo'}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Barra Inferior de Acciones Rápidas */}
-                      <div className="pt-2 border-t border-zinc-100 flex items-center justify-between gap-2">
+                      {/* Bloque 1: Cliente */}
+                      <div className="bg-blue-50/40 border border-blue-100/80 rounded-xl p-3 space-y-1">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1">
+                          <UserCheck className="w-3 h-3" />
+                          <span>Cliente</span>
+                        </div>
+                        <div className="font-bold text-zinc-900 text-sm truncate">
+                          {record.nombres} {record.apellidos}
+                        </div>
+                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between gap-2">
+                          <span>C.I: <strong>{record.cedulaRuc}</strong></span>
+                          {record.celular1 && <span>Tel: {record.celular1}</span>}
+                        </div>
                         <div className="text-[11px] text-zinc-400 truncate">
-                          {record.observaciones ? (
-                            <span>Obs: <span className="text-zinc-600 italic">"{record.observaciones.substring(0, 65)}..."</span></span>
-                          ) : (
-                            <span>Alistamiento PDI sin observaciones mecánicas registradas.</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecordForDetail(record)}
-                            className="px-2.5 py-1.5 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 hover:border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-zinc-500" />
-                            <span>Ver Ficha</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleNewServiceForExisting(record)}
-                            className="px-2.5 py-1.5 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                            title="Crear nuevo mantenimiento subsecuente con este cliente"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Nuevo Servicio</span>
-                          </button>
+                          Origen: <span className="text-zinc-600 font-medium">{record.origen}</span>
                         </div>
                       </div>
+
+                      {/* Bloque 2: Motocicleta */}
+                      <div className="bg-red-50/40 border border-red-100/80 rounded-xl p-3 space-y-1">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1">
+                          <Bike className="w-3 h-3" />
+                          <span>Motocicleta</span>
+                        </div>
+                        <div className="font-bold text-zinc-900 text-xs sm:text-sm truncate">
+                          {record.modeloMarca || 'Modelo no especificado'}
+                        </div>
+                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between gap-2">
+                          <span className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 rounded font-black text-zinc-800 text-[10px]">
+                            {record.placa ? record.placa : 'SIN PLACA'}
+                          </span>
+                          <span>Km: <strong className="text-zinc-900">{record.kilometraje || 0}</strong></span>
+                        </div>
+                        <div className="text-[11px] text-zinc-400 truncate">
+                          VIN: <span className="font-mono text-zinc-600">{record.chasis ? record.chasis.substring(0, 15) + '...' : 'S/N'}</span>
+                        </div>
+                      </div>
+
+                      {/* Bloque 3: Servicio Técnico */}
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex flex-wrap gap-1">
+                          {record.serviciosRealizados.map((srv) => (
+                            <span
+                              key={srv}
+                              className="px-2 py-0.5 bg-zinc-100 text-zinc-700 border border-zinc-200 rounded text-[10px] font-bold"
+                            >
+                              {srv.replace('_', ' ').toUpperCase()}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-zinc-500 text-[11px] flex items-center justify-between">
+                          <span>Técnico: <strong className="text-zinc-800">{record.tecnicoResponsable}</strong></span>
+                          <span>{record.metodoPago || 'Efectivo'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botones de Acción de la Tarjeta */}
+                    <div className="pt-3 mt-3 border-t border-zinc-100 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecordForDetail(record)}
+                        className="flex-1 py-2 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 hover:border-blue-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-zinc-500" />
+                        <span>Ver Ficha</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleNewServiceForExisting(record)}
+                        className="flex-1 py-2 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Crear nuevo mantenimiento subsecuente con este cliente"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Nuevo Servicio</span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -721,47 +690,26 @@ export const AlistamientoWizard: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO                                     */}
+      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO (3 COLUMNAS LIMPIAS Y AMPLIAS)       */}
       {/* ========================================================================= */}
       {viewMode === 'form' && (
-        <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
-          {/* Header Superior del Formulario con Botón de Regreso */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setValidationAlert(null);
-                  setViewMode('list');
-                }}
-                className="px-3 py-1.5 text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Volver al Listado</span>
-              </button>
-              <div>
-                <h2 className="text-base sm:text-lg font-black text-zinc-900">
-                  Nuevo Registro de Alistamiento & PDI
-                </h2>
-                <p className="text-xs text-zinc-500">
-                  Sede: <span className="font-bold text-zinc-800">{formData.sede}</span> • Atendido por:{' '}
-                  <span className="font-bold text-zinc-800">{formData.atendidoPor}</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                <span>Guardar Alistamiento</span>
-              </button>
-            </div>
+        <form onSubmit={handleFinalSubmit} className="space-y-5 animate-fade-in">
+          {/* Header Superior Limpio: Solo Botón Volver */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setValidationAlert(null);
+                setViewMode('list');
+              }}
+              className="px-4 py-2 text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Volver al Listado</span>
+            </button>
           </div>
 
-          {/* ALERTA SUPERIOR DE VALIDACIÓN (SI FALTAN CAMPOS) */}
+          {/* ALERTA DE VALIDACIÓN (SI FALTAN CAMPOS) */}
           {validationAlert && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
               <div className="flex items-start gap-2.5">
@@ -769,7 +717,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <div>
                   <h4 className="text-xs font-bold text-red-900">{validationAlert.title}</h4>
                   <p className="text-[11px] text-red-700 mt-0.5">
-                    Por favor complete los campos obligatorios:{' '}
+                    Por favor complete los campos requeridos:{' '}
                     <span className="font-bold underline">{validationAlert.fields.join(', ')}</span>.
                   </p>
                 </div>
@@ -777,7 +725,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setValidationAlert(null)}
-                className="text-red-400 hover:text-red-700"
+                className="text-red-400 hover:text-red-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -785,70 +733,70 @@ export const AlistamientoWizard: React.FC<Props> = ({
           )}
 
           {/* ===================================================================== */}
-          {/* LAYOUT ESCRITORIO: 3 COLUMNAS SIMULTÁNEAS (CLIENTE | MOTO | SERVICIO) */}
+          {/* LAYOUT ESCRITORIO: 3 COLUMNAS SIMÉTRICAS, 1 CAMPO POR FILA           */}
           {/* ===================================================================== */}
-          <div className="hidden lg:grid lg:grid-cols-3 gap-5 items-start">
+          <div className="hidden lg:grid lg:grid-cols-3 gap-5 items-stretch">
             {/* ----------------------------------------------------------------- */}
             {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE                             */}
             {/* ----------------------------------------------------------------- */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
-                    1
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 font-black text-sm flex items-center justify-center border border-blue-200">
+                      1
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
+                      <p className="text-[11px] text-zinc-400">Verificación SRI y contacto</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
-                    <p className="text-[10px] text-zinc-400">Verificación SRI y contacto</p>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    Paso 1
+                  </span>
+                </div>
+
+                {/* 1. Cédula o RUC (Primerito) */}
+                <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200 space-y-2">
+                  <label className="block text-xs font-black uppercase text-blue-900">
+                    Cédula o RUC del Cliente *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.cedulaRuc}
+                      onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchSri();
+                        }
+                      }}
+                      placeholder="Ej: 2350999252"
+                      className="flex-1 px-3.5 py-2.5 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSearchSri()}
+                      disabled={isSearchingSri || !formData.cedulaRuc.trim()}
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                      title="Consultar SRI Ecuador"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span>{isSearchingSri ? 'SRI...' : 'SRI'}</span>
+                    </button>
                   </div>
+                  {sriFeedback && (
+                    <p className="text-[11px] text-blue-800 font-medium leading-tight">
+                      {sriFeedback}
+                    </p>
+                  )}
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  Paso 1
-                </span>
-              </div>
 
-              {/* CÉDULA / RUC (PRIMERITO) */}
-              <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-200/80 space-y-1.5">
-                <label className="block text-[11px] font-black uppercase text-blue-900">
-                  1. Cédula o RUC del Cliente *
-                </label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={formData.cedulaRuc}
-                    onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSearchSri();
-                      }
-                    }}
-                    placeholder="Ej: 2350999252"
-                    className="flex-1 px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSearchSri()}
-                    disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                    className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
-                    title="Consultar SRI Ecuador"
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                    <span>{isSearchingSri ? 'SRI...' : 'SRI'}</span>
-                  </button>
-                </div>
-                {sriFeedback && (
-                  <p className="text-[10px] text-blue-800 font-medium leading-tight">
-                    {sriFeedback}
-                  </p>
-                )}
-              </div>
-
-              {/* Nombres y Apellidos en 2 columnas compactas */}
-              <div className="grid grid-cols-2 gap-2">
+                {/* Nombres (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Nombres *
                   </label>
                   <input
@@ -856,12 +804,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     value={formData.nombres}
                     onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
                     placeholder="Ej: Felix Rafael"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
                 </div>
+
+                {/* Apellidos (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Apellidos *
                   </label>
                   <input
@@ -869,16 +819,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     value={formData.apellidos}
                     onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
                     placeholder="Ej: Gracia Guato"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
                 </div>
-              </div>
 
-              {/* Celulares en 2 columnas compactas */}
-              <div className="grid grid-cols-2 gap-2">
+                {/* Celular Principal (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Celular Principal *
                   </label>
                   <input
@@ -886,12 +834,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     value={formData.celular1}
                     onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
                     placeholder="Ej: 0982852456"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
                 </div>
+
+                {/* Celular Opcional (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Celular Opcional
                   </label>
                   <input
@@ -899,119 +849,113 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     value={formData.celular2}
                     onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
                     placeholder="Ej: 0991234567"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
-              </div>
 
-              {/* Email */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="ejemplo@starmotos.ec"
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 focus:bg-white"
-                />
-              </div>
-
-              {/* Dirección */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                  Dirección Domiciliaria
-                </label>
-                <input
-                  type="text"
-                  value={formData.direccion}
-                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                  placeholder="Av. Principal y Secundaria, Ciudad"
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 focus:bg-white"
-                />
-              </div>
-
-              {/* Origen / Concesionario con Botón "+ Agregar" */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
-                    Origen / Almacén *
+                {/* Correo Electrónico (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Correo Electrónico
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddOriginModal(true)}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>+ Nuevo Almacén</span>
-                  </button>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="ejemplo@starmotos.ec"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  />
                 </div>
-                <select
-                  value={formData.origen}
-                  onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                >
-                  {origins.map((orig) => (
-                    <option key={orig} value={orig}>
-                      {orig}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
-              {/* Sede y Atendido Por */}
-              <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-500">
-                <span>Atendido por: <strong className="text-zinc-800">{formData.atendidoPor}</strong></span>
-                <span>Sede: <strong className="text-zinc-800">{formData.sede}</strong></span>
+                {/* Dirección Domiciliaria (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Dirección Domiciliaria
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.direccion}
+                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                    placeholder="Av. Principal y Secundaria, Ciudad"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                </div>
+
+                {/* Origen / Almacén (1 por fila) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Origen / Almacén *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddOriginModal(true)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Nuevo Almacén</span>
+                    </button>
+                  </div>
+                  <select
+                    value={formData.origen}
+                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  >
+                    {origins.map((orig) => (
+                      <option key={orig} value={orig}>
+                        {orig}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
             {/* ----------------------------------------------------------------- */}
             {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTOCICLETA                      */}
             {/* ----------------------------------------------------------------- */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
-                    2
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 font-black text-sm flex items-center justify-center border border-red-200">
+                      2
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Datos de la Moto</h3>
+                      <p className="text-[11px] text-zinc-400">Identificación técnica del vehículo</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-zinc-900">Datos de la Moto</h3>
-                    <p className="text-[10px] text-zinc-400">Identificación técnica del vehículo</p>
-                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                    Paso 2
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                  Paso 2
-                </span>
-              </div>
 
-              {/* Modelo - Marca */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                  Modelo y Marca *
-                </label>
-                <input
-                  type="text"
-                  value={formData.modeloMarca}
-                  onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                  placeholder="Ej: Tundra r200 / Bajaj Pulsar NS 200"
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-red-600 focus:bg-white"
-                  required
-                />
-              </div>
-
-              {/* Placa y Chasis VIN */}
-              <div className="grid grid-cols-2 gap-2">
+                {/* Modelo y Marca (1 por fila) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] font-bold uppercase text-zinc-600">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Modelo y Marca *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.modeloMarca}
+                    onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                    placeholder="Ej: Tundra r200 / Bajaj Pulsar NS 200"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
+                    required
+                  />
+                </div>
+
+                {/* Placa (1 por fila) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
                       Placa
                     </label>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
-                      className="text-[9px] text-zinc-500 hover:text-zinc-800 underline"
+                      className="text-xs text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
                     >
                       En trámite
                     </button>
@@ -1021,28 +965,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     value={formData.placa}
                     onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
                     placeholder="Ej: KX284T"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
 
+                {/* Chasis (VIN) (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Chasis (VIN)
                   </label>
                   <input
                     type="text"
                     value={formData.chasis}
                     onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                    placeholder="LBBP57008..."
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                    placeholder="LBBP57008PA049182"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
-              </div>
 
-              {/* Kilometraje y Aceite */}
-              <div className="grid grid-cols-2 gap-2">
+                {/* Kilometraje Actual (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Kilometraje Actual
                   </label>
                   <div className="relative">
@@ -1053,24 +996,26 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         setFormData({ ...formData, kilometraje: parseInt(e.target.value) || 0 })
                       }
                       placeholder="0"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold outline-none focus:border-red-600 focus:bg-white"
+                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
                       KM
                     </span>
                   </div>
                 </div>
 
+                {/* Nivel / Tipo Aceite (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     Nivel / Tipo Aceite
                   </label>
                   <select
                     value={formData.aceite}
                     onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-red-600 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-red-600 focus:bg-white"
                   >
                     <option value="sin_aceite">Sin cambio de aceite</option>
+                    <option value="con_aceite">Con cambio de aceite estándar</option>
                     <option value="4T Mineral 20W50">4T Mineral 20W50</option>
                     <option value="4T Semi-Sintético 10W40">4T Semi-Sintético 10W40</option>
                     <option value="4T Sintético 10W50">4T Sintético 10W50</option>
@@ -1078,175 +1023,175 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <option value="Motul 5100 15W50">Motul 5100 15W50</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Próximo Mantenimiento Recomendado */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                  Próximo Mantenimiento Sugerido
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={formData.proximoMantenimientoKm || ''}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        proximoMantenimientoKm: parseInt(e.target.value) || 1000,
-                      })
-                    }
-                    placeholder="1000"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold outline-none focus:border-red-600 focus:bg-white"
-                  />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">
-                    KM
-                  </span>
-                </div>
-              </div>
-
-              {/* Registro Fotográfico Rápido */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
-                    Inspección Visual (Fotos)
+                {/* Próximo Mantenimiento Recomendado (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Próximo Mantenimiento Sugerido
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddMockPhoto}
-                    className="text-[10px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Camera className="w-3 h-3" />
-                    <span>+ Foto</span>
-                  </button>
-                </div>
-
-                {formData.fotos.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {formData.fotos.map((fUrl, idx) => (
-                      <div
-                        key={idx}
-                        className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group"
-                      >
-                        <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhoto(idx)}
-                          className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div
-                    onClick={handleAddMockPhoto}
-                    className="border border-dashed border-zinc-300 hover:border-red-400 rounded-xl p-3 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-red-50/40"
-                  >
-                    <Camera className="w-4 h-4 text-zinc-400 mx-auto mb-1" />
-                    <span className="text-[10px] text-zinc-500 font-medium">
-                      Clic para adjuntar fotos de entrega o estado inicial
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={formData.proximoMantenimientoKm || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          proximoMantenimientoKm: parseInt(e.target.value) || 1000,
+                        })
+                      }
+                      placeholder="1000"
+                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                      KM
                     </span>
                   </div>
-                )}
+                </div>
+
+                {/* Registro Fotográfico (1 por fila) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Inspección Visual (Fotos)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddMockPhoto}
+                      className="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Foto</span>
+                    </button>
+                  </div>
+
+                  {formData.fotos.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {formData.fotos.map((fUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="relative aspect-video rounded-xl overflow-hidden border border-zinc-200 group"
+                        >
+                          <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(idx)}
+                            className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      onClick={handleAddMockPhoto}
+                      className="border border-dashed border-zinc-300 hover:border-red-400 rounded-xl p-4 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-red-50/40"
+                    >
+                      <Camera className="w-5 h-5 text-zinc-400 mx-auto mb-1" />
+                      <span className="text-xs text-zinc-500 font-medium">
+                        Clic para adjuntar fotos de entrega o estado inicial
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* ----------------------------------------------------------------- */}
             {/* COLUMNA 3: PASO 3 - SERVICIO, TÉCNICO Y PAGO                       */}
             {/* ----------------------------------------------------------------- */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
-                    3
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 font-black text-sm flex items-center justify-center border border-emerald-200">
+                      3
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
+                      <p className="text-[11px] text-zinc-400">Acciones técnicas y facturación</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
-                    <p className="text-[10px] text-zinc-400">Acciones técnicas y facturación</p>
-                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Paso 3
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Paso 3
-                </span>
-              </div>
 
-              {/* ¿Qué se hizo? (Servicios realizados) */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1.5">
-                  ¿Qué se realizó? *
-                </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    { id: 'alistamiento_pdi', label: 'Alistamiento PDI' },
-                    { id: 'mantenimiento', label: 'Mantenimiento' },
-                    { id: 'cambio_aceite', label: 'Cambio Aceite' },
-                    { id: 'frenos', label: 'Revisión Frenos' },
-                    { id: 'engrasado', label: 'Engrasado & Ajuste' },
-                    { id: 'bateria', label: 'Batería / Eléctrico' },
-                  ].map((srv) => {
-                    const isSelected = formData.serviciosRealizados.includes(srv.id as ServiceActionType);
-                    return (
-                      <button
-                        key={srv.id}
-                        type="button"
-                        onClick={() => toggleServicio(srv.id as ServiceActionType)}
-                        className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                        }`}
-                      >
-                        <span>{srv.label}</span>
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Técnico Responsable con botón "+ Nuevo" */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
-                    Técnico Responsable *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddTechModal(true)}
-                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>+ Nuevo Técnico</span>
-                  </button>
-                </div>
-                <select
-                  value={formData.tecnicoResponsable}
-                  onChange={(e) => {
-                    const techName = e.target.value;
-                    const techObj = technicians.find((t) => t.name === techName);
-                    setFormData({
-                      ...formData,
-                      tecnicoResponsable: techName,
-                      tecnicoId: techObj?.id || 'tec-01',
-                    });
-                  }}
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
-                  required
-                >
-                  {technicians.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name} ({t.workshopName || 'Taller'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Valores $ y Cobro */}
-              <div className="grid grid-cols-2 gap-2 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-200">
+                {/* ¿Qué se hizo? */}
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
-                    Valor Servicio ($) *
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    ¿Qué se realizó? *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'alistamiento_pdi', label: 'Alistamiento PDI' },
+                      { id: 'mantenimiento', label: 'Mantenimiento' },
+                      { id: 'cambio_aceite', label: 'Cambio Aceite' },
+                      { id: 'frenos', label: 'Revisión Frenos' },
+                      { id: 'engrasado', label: 'Engrasado & Ajuste' },
+                      { id: 'bateria', label: 'Batería / Eléctrico' },
+                    ].map((srv) => {
+                      const isSelected = formData.serviciosRealizados.includes(srv.id as ServiceActionType);
+                      return (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => toggleServicio(srv.id as ServiceActionType)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border text-left flex items-center justify-between transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          <span>{srv.label}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Técnico Responsable (1 por fila) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Técnico Responsable *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTechModal(true)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Nuevo Técnico</span>
+                    </button>
+                  </div>
+                  <select
+                    value={formData.tecnicoResponsable}
+                    onChange={(e) => {
+                      const techName = e.target.value;
+                      const techObj = technicians.find((t) => t.name === techName);
+                      setFormData({
+                        ...formData,
+                        tecnicoResponsable: techName,
+                        tecnicoId: techObj?.id || 'tec-01',
+                      });
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    required
+                  >
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} ({t.workshopName || 'Taller'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Valor Servicio ($) (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-black uppercase text-emerald-900 mb-1.5">
+                    Valor del Servicio ($) *
                   </label>
                   <input
                     type="number"
@@ -1256,13 +1201,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       const val = parseFloat(e.target.value) || 0;
                       setFormData({ ...formData, valorServicio: val, montoPagado: val });
                     }}
-                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
                     required
                   />
                 </div>
 
+                {/* Método de Pago (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
+                  <label className="block text-xs font-black uppercase text-emerald-900 mb-1.5">
                     Método de Pago
                   </label>
                   <select
@@ -1273,58 +1219,80 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
                       })
                     }
-                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="Efectivo">Efectivo</option>
                     <option value="Transferencia">Transferencia</option>
-                    <option value="Tarjeta">Tarjeta Déb/Créd</option>
+                    <option value="Tarjeta">Tarjeta Débito / Crédito</option>
                     <option value="Crédito Directo">Crédito Directo</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Factura / Ticket */}
-              <div className="grid grid-cols-2 gap-2">
+                {/* N° Factura SRI (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     N° Factura SRI
                   </label>
                   <input
                     type="text"
                     value={formData.numeroFactura}
                     onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
-                    placeholder="001-002-..."
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    placeholder="001-002-0004521"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </div>
+
+                {/* N° Ticket Físico (1 por fila) */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
                     N° Ticket Físico
                   </label>
                   <input
                     type="text"
                     value={formData.numeroTicket}
                     onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
-                    placeholder="TCK-2026-..."
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    placeholder="TCK-2026-9921"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                  />
+                </div>
+
+                {/* Observaciones / Novedades (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Observaciones / Novedades
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                    placeholder="Detalles sobre entrega, torque de pernos, lubricación o novedades mecánicas..."
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-emerald-600 focus:bg-white resize-none"
                   />
                 </div>
               </div>
-
-              {/* Observaciones */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                  Observaciones / Novedades
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.observaciones}
-                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                  placeholder="Detalles sobre entrega, torque de pernos, lubricación o novedades mecánicas..."
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-emerald-600 focus:bg-white resize-none"
-                />
-              </div>
             </div>
+          </div>
+
+          {/* ===================================================================== */}
+          {/* BOTONES INFERIORES EN ESCRITORIO: SOLO CANCELAR O GUARDAR             */}
+          {/* ===================================================================== */}
+          <div className="hidden lg:flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setValidationAlert(null);
+                setViewMode('list');
+              }}
+              className="px-6 py-2.5 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-sm font-bold transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            >
+              Guardar
+            </button>
           </div>
 
           {/* ===================================================================== */}
@@ -1362,7 +1330,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
-                  <label className="block text-[11px] font-black uppercase text-blue-900">
+                  <label className="block text-xs font-black uppercase text-blue-900">
                     Cédula o RUC *
                   </label>
                   <div className="flex gap-1.5">
@@ -1377,61 +1345,61 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="button"
                       onClick={() => handleSearchSri()}
                       disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0"
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer"
                     >
                       {isSearchingSri ? '...' : 'SRI'}
                     </button>
                   </div>
-                  {sriFeedback && <p className="text-[10px] text-blue-800 font-medium">{sriFeedback}</p>}
+                  {sriFeedback && <p className="text-[11px] text-blue-800 font-medium">{sriFeedback}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Nombres *
                   </label>
                   <input
                     type="text"
                     value={formData.nombres}
                     onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
                     placeholder="Ej: Felix Rafael"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Apellidos *
                   </label>
                   <input
                     type="text"
                     value={formData.apellidos}
                     onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
                     placeholder="Ej: Gracia Guato"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Celular Principal *
                   </label>
                   <input
                     type="text"
                     value={formData.celular1}
                     onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium"
                     placeholder="0982852456"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Origen / Almacén *
                   </label>
                   <select
                     value={formData.origen}
                     onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
                   >
                     {origins.map((orig) => (
                       <option key={orig} value={orig}>
@@ -1441,13 +1409,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </select>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValidationAlert(null);
+                      setViewMode('list');
+                    }}
+                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
                   <button
                     type="button"
                     onClick={() => setMobileStep(2)}
-                    className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <span>Siguiente: Datos de la Moto</span>
+                    <span>Siguiente</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1463,7 +1441,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Modelo y Marca *
                   </label>
                   <input
@@ -1475,35 +1453,34 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                      Placa
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
-                      placeholder="KX284T"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
-                      Chasis (VIN)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.chasis}
-                      onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
-                      placeholder="LBBP57008..."
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Placa
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                    placeholder="KX284T"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Chasis (VIN)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.chasis}
+                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                    placeholder="LBBP57008..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Kilometraje Actual
                   </label>
                   <input
@@ -1521,16 +1498,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setMobileStep(1)}
-                    className="flex-1 py-2.5 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs"
+                    className="flex-1 py-2.5 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
                   >
                     Anterior
                   </button>
                   <button
                     type="button"
                     onClick={() => setMobileStep(3)}
-                    className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1"
+                    className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <span>Siguiente: Servicio</span>
+                    <span>Siguiente</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1546,7 +1523,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Técnico Responsable *
                   </label>
                   <select
@@ -1570,46 +1547,45 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
-                      Valor ($) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorServicio}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, valorServicio: val, montoPagado: val });
-                      }}
-                      className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
-                      Método
-                    </label>
-                    <select
-                      value={formData.metodoPago}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
-                        })
-                      }
-                      className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
-                    >
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Transferencia">Transferencia</option>
-                      <option value="Tarjeta">Tarjeta</option>
-                      <option value="Crédito Directo">Crédito</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-emerald-900 mb-1">
+                    Valor ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.valorServicio}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setFormData({ ...formData, valorServicio: val, montoPagado: val });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  <label className="block text-xs font-black uppercase text-emerald-900 mb-1">
+                    Método de Pago
+                  </label>
+                  <select
+                    value={formData.metodoPago}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Crédito Directo">Crédito Directo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Observaciones
                   </label>
                   <textarea
@@ -1624,47 +1600,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <div className="pt-2 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setMobileStep(2)}
-                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs"
+                    onClick={() => {
+                      setValidationAlert(null);
+                      setViewMode('list');
+                    }}
+                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
                   >
-                    Anterior
+                    Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20"
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Guardar Alistamiento</span>
+                    <span>Guardar</span>
                   </button>
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Barra de Guardado Inferior en Escritorio */}
-          <div className="hidden lg:flex items-center justify-between bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs">
-            <div className="text-xs text-zinc-500">
-              Revise que los datos de cliente, motocicleta y servicio técnico estén completos antes de guardar.
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setValidationAlert(null);
-                  setViewMode('list');
-                }}
-                className="px-4 py-2 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-              >
-                Cancelar y Volver
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                <span>Guardar Alistamiento Completo</span>
-              </button>
-            </div>
           </div>
         </form>
       )}
@@ -1693,7 +1646,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
               </div>
               <button
                 onClick={() => setSelectedRecordForDetail(null)}
-                className="text-zinc-400 hover:text-zinc-700 p-1"
+                className="text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1844,7 +1797,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <Wrench className="w-4 h-4 text-emerald-600" />
                 <span>Registrar Nuevo Técnico</span>
               </h3>
-              <button onClick={() => setShowAddTechModal(false)} className="text-zinc-400 hover:text-zinc-700">
+              <button onClick={() => setShowAddTechModal(false)} className="text-zinc-400 hover:text-zinc-700 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1921,7 +1874,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <Building2 className="w-4 h-4 text-blue-600" />
                 <span>Agregar Origen / Almacén</span>
               </h3>
-              <button onClick={() => setShowAddOriginModal(false)} className="text-zinc-400 hover:text-zinc-700">
+              <button onClick={() => setShowAddOriginModal(false)} className="text-zinc-400 hover:text-zinc-700 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>

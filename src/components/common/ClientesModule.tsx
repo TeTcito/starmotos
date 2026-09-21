@@ -25,6 +25,10 @@ import {
   DollarSign,
   Clock,
   Camera,
+  FileSpreadsheet,
+  Download,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -33,6 +37,77 @@ import {
   WarrantyRequest,
   UnifiedClient,
 } from '../../types/customer';
+
+export interface ClientRowData {
+  nombre: string;
+  apellido: string;
+  origen: string;
+  sede: string;
+  fecha: string;
+  servicio: string;
+  valor: number;
+  factura: string;
+  isPaid: boolean;
+  estado: 'iniciado' | 'pendiente' | 'referente';
+  observaciones: string;
+}
+
+export function getClientRowData(client: UnifiedClient): ClientRowData {
+  const rec = client.records[0];
+  const nombre = client.nombres || client.fullName.split(' ')[0] || 'Cliente';
+  const apellido = client.apellidos || client.fullName.split(' ').slice(1).join(' ') || '';
+  const origen = client.origin || rec?.origen || 'Almacén Oficial';
+  const sede = client.workshopName || rec?.sede || 'StarMotos Sede';
+  const fecha = client.lastVisitDate || rec?.fechaServicio || 'Reciente';
+
+  // Servicio realizado
+  let servicio = client.lastServiceType || 'Alistamiento';
+  if (rec?.serviciosRealizados && rec.serviciosRealizados.length > 0) {
+    const list: string[] = [];
+    if (rec.serviciosRealizados.includes('alistamiento_pdi')) list.push('Alistamiento PDI');
+    if (rec.serviciosRealizados.includes('engrasado')) list.push('Engrasado');
+    if (rec.serviciosRealizados.includes('mantenimiento')) list.push('Mantenimiento');
+    servicio = list.join(' + ') || 'Servicio';
+  }
+
+  // Valor
+  const valor = rec ? (rec.montoPagado || rec.valorServicio || 0) : (client.totalSpent || 35.0);
+
+  // Factura
+  const factura = rec?.numeroFactura || rec?.numeroTicket || `FAC-${client.cedulaRuc.slice(-4)}`;
+
+  // ¿Pagada?
+  const isPaid = rec
+    ? (rec.montoPagado ?? 0) >= (rec.valorServicio ?? 0) || !!rec.metodoPago
+    : true;
+
+  // Estado: iniciado | pendiente | referente
+  let estado: 'iniciado' | 'pendiente' | 'referente' = 'iniciado';
+  if (client.maintenanceCount >= 2 || (client.pdiCompleted && client.engrasadoCompleted)) {
+    estado = 'referente';
+  } else if (!isPaid || (!client.pdiCompleted && client.records.length === 0)) {
+    estado = 'pendiente';
+  } else {
+    estado = 'iniciado';
+  }
+
+  // Observaciones
+  const observaciones = rec?.observaciones || 'Registro en sistema StarMotos';
+
+  return {
+    nombre,
+    apellido,
+    origen,
+    sede,
+    fecha,
+    servicio,
+    valor,
+    factura,
+    isPaid,
+    estado,
+    observaciones,
+  };
+}
 
 interface Props {
   role: 'admin' | 'taller' | 'garante';
@@ -55,9 +130,12 @@ export const ClientesModule: React.FC<Props> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
-  const [activeFilterTab, setActiveFilterTab] = useState<'all' | 'pdi_ok' | 'warranties' | 'frequent'>('all');
+  const [activeFilterTab, setActiveFilterTab] = useState<
+    'all' | 'iniciado' | 'pendiente' | 'referente' | 'pagada' | 'pdi_ok' | 'warranties'
+  >('all');
   const [selectedClientForDetail, setSelectedClientForDetail] = useState<UnifiedClient | null>(null);
   const [copiedCedula, setCopiedCedula] = useState<string | null>(null);
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
 
   // Unificación de clientes entre fullAlistamientos y clients
   const unifiedClients = useMemo<UnifiedClient[]>(() => {
@@ -207,28 +285,71 @@ export const ClientesModule: React.FC<Props> = ({
       }
 
       // Filtro de Tabs
+      if (activeFilterTab === 'iniciado' && getClientRowData(client).estado !== 'iniciado') return false;
+      if (activeFilterTab === 'pendiente' && getClientRowData(client).estado !== 'pendiente') return false;
+      if (activeFilterTab === 'referente' && getClientRowData(client).estado !== 'referente') return false;
+      if (activeFilterTab === 'pagada' && !getClientRowData(client).isPaid) return false;
       if (activeFilterTab === 'pdi_ok' && !client.pdiCompleted) return false;
       if (activeFilterTab === 'warranties' && client.warrantiesCount === 0) return false;
-      if (activeFilterTab === 'frequent' && client.maintenanceCount < 2) return false;
 
-      // Buscador
+      // Buscador multi-campo
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
-        const matchName = client.fullName.toLowerCase().includes(term);
+        const data = getClientRowData(client);
+        const matchName = data.nombre.toLowerCase().includes(term);
+        const matchApellido = data.apellido.toLowerCase().includes(term);
         const matchCedula = client.cedulaRuc.toLowerCase().includes(term);
         const matchPhone = client.phone?.toLowerCase().includes(term);
+        const matchOrigen = data.origen.toLowerCase().includes(term);
+        const matchSede = data.sede.toLowerCase().includes(term);
+        const matchServicio = data.servicio.toLowerCase().includes(term);
+        const matchFactura = data.factura.toLowerCase().includes(term);
+        const matchObservaciones = data.observaciones.toLowerCase().includes(term);
         const matchMoto = client.motorcycles.some(
           (m) =>
             m.model.toLowerCase().includes(term) ||
             m.plate.toLowerCase().includes(term) ||
             m.chasis.toLowerCase().includes(term)
         );
-        return matchName || matchCedula || matchPhone || matchMoto;
+        return (
+          matchName ||
+          matchApellido ||
+          matchCedula ||
+          matchPhone ||
+          matchOrigen ||
+          matchSede ||
+          matchServicio ||
+          matchFactura ||
+          matchObservaciones ||
+          matchMoto
+        );
       }
 
       return true;
     });
   }, [unifiedClients, role, currentWorkshopId, selectedWorkshopFilter, activeFilterTab, searchTerm]);
+
+  // Conteos por estado para los tabs
+  const iniciadosCount = useMemo(
+    () => unifiedClients.filter((c) => getClientRowData(c).estado === 'iniciado').length,
+    [unifiedClients]
+  );
+  const pendientesCount = useMemo(
+    () => unifiedClients.filter((c) => getClientRowData(c).estado === 'pendiente').length,
+    [unifiedClients]
+  );
+  const referentesCount = useMemo(
+    () => unifiedClients.filter((c) => getClientRowData(c).estado === 'referente').length,
+    [unifiedClients]
+  );
+  const pagadasCount = useMemo(
+    () => unifiedClients.filter((c) => getClientRowData(c).isPaid).length,
+    [unifiedClients]
+  );
+  const pdiOkCount = useMemo(
+    () => unifiedClients.filter((c) => c.pdiCompleted).length,
+    [unifiedClients]
+  );
 
   // Métricas rápidas
   const totalMotos = useMemo(
@@ -240,9 +361,77 @@ export const ClientesModule: React.FC<Props> = ({
     [filteredClients]
   );
   const totalSpentAll = useMemo(
-    () => filteredClients.reduce((acc, c) => acc + c.totalSpent, 0),
+    () => filteredClients.reduce((acc, c) => acc + getClientRowData(c).valor, 0),
     [filteredClients]
   );
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleExportCsv = () => {
+    const headers = [
+      '#',
+      'Cédula/RUC',
+      'Nombre',
+      'Apellido',
+      'Origen',
+      'Sede',
+      'Fecha',
+      'Servicio',
+      'Valor ($)',
+      'Factura',
+      'Pagada',
+      'Estado',
+      'Observaciones',
+      'Teléfono',
+      'Motocicleta',
+      'Placa',
+      'Chasis'
+    ];
+
+    const rows = filteredClients.map((client, idx) => {
+      const data = getClientRowData(client);
+      const moto = client.motorcycles[0];
+      return [
+        idx + 1,
+        `"${client.cedulaRuc}"`,
+        `"${data.nombre}"`,
+        `"${data.apellido}"`,
+        `"${data.origen}"`,
+        `"${data.sede}"`,
+        `"${data.fecha}"`,
+        `"${data.servicio}"`,
+        data.valor.toFixed(2),
+        `"${data.factura}"`,
+        data.isPaid ? 'Pagada' : 'Pendiente',
+        data.estado.toUpperCase(),
+        `"${data.observaciones.replace(/"/g, '""')}"`,
+        `"${client.phone || ''}"`,
+        `"${moto?.model || ''}"`,
+        `"${moto?.plate || ''}"`,
+        `"${moto?.chasis || ''}"`,
+      ].join(';');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `clientes_starmotos_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleCopyCedula = (cedula: string) => {
     navigator.clipboard.writeText(cedula);
@@ -294,17 +483,29 @@ export const ClientesModule: React.FC<Props> = ({
             </p>
           </div>
 
-          {/* Botón rápido para registrar alistamiento */}
-          {onNavigateToAlistamiento && (
+          {/* Botones de acción Header */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => onNavigateToAlistamiento()}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+              onClick={handleExportCsv}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer shrink-0"
+              title="Descargar tabla en formato compatible con Microsoft Excel y Google Sheets"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ Nuevo Alistamiento</span>
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Exportar Excel</span>
             </button>
-          )}
+
+            {onNavigateToAlistamiento && (
+              <button
+                type="button"
+                onClick={() => onNavigateToAlistamiento()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nuevo Alistamiento</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Métricas Resumen */}
@@ -409,217 +610,326 @@ export const ClientesModule: React.FC<Props> = ({
           </button>
           <button
             type="button"
-            onClick={() => setActiveFilterTab('pdi_ok')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-              activeFilterTab === 'pdi_ok'
-                ? 'bg-emerald-600 text-white shadow-2xs'
+            onClick={() => setActiveFilterTab('iniciado')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              activeFilterTab === 'iniciado'
+                ? 'bg-blue-600 text-white shadow-2xs'
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            <CheckCircle2 className="w-3 h-3" />
-            <span>PDI Oficial Realizado ({unifiedClients.filter((c) => c.pdiCompleted).length})</span>
+            <span>🚀 Iniciados ({iniciadosCount})</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveFilterTab('warranties')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-              activeFilterTab === 'warranties'
+            onClick={() => setActiveFilterTab('pendiente')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              activeFilterTab === 'pendiente'
                 ? 'bg-amber-600 text-white shadow-2xs'
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            <ShieldCheck className="w-3 h-3" />
-            <span>Con Garantías ({unifiedClients.filter((c) => c.warrantiesCount > 0).length})</span>
+            <span>⏳ Pendientes ({pendientesCount})</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveFilterTab('frequent')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-              activeFilterTab === 'frequent'
+            onClick={() => setActiveFilterTab('referente')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              activeFilterTab === 'referente'
                 ? 'bg-purple-600 text-white shadow-2xs'
                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
             }`}
           >
-            <Clock className="w-3 h-3" />
-            <span>Clientes Frecuentes ({unifiedClients.filter((c) => c.maintenanceCount >= 2).length})</span>
+            <span>⭐ Referentes ({referentesCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilterTab('pagada')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              activeFilterTab === 'pagada'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Pagadas ({pagadasCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilterTab('pdi_ok')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+              activeFilterTab === 'pdi_ok'
+                ? 'bg-teal-600 text-white shadow-2xs'
+                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>PDI OK ({pdiOkCount})</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. GRID DE TARJETAS DE CLIENTES                                           */}
+      {/* 3. TABLA DE CLIENTES TIPO EXCEL (ANCHO COMPLETO)                         */}
       {/* ========================================================================= */}
       {filteredClients.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredClients.map((client) => {
-            const mainMoto = client.motorcycles[0];
-            const initials = client.fullName
-              .split(' ')
-              .map((n) => n[0])
-              .slice(0, 2)
-              .join('')
-              .toUpperCase();
+        <div className="w-full bg-white border border-zinc-200 rounded-2xl shadow-xs overflow-hidden">
+          {/* Barra de estado y utilidades de la tabla */}
+          <div className="bg-zinc-50 border-b border-zinc-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-zinc-700 flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>Libro de Clientes & Servicios</span>
+              </span>
+              <span className="text-[11px] font-mono text-zinc-500 bg-white px-2 py-0.5 rounded border border-zinc-200 font-semibold">
+                {filteredClients.length} registros
+              </span>
+            </div>
 
-            return (
-              <div
-                key={client.id}
-                className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs hover:shadow-md transition-all hover:border-blue-300 flex flex-col justify-between"
-              >
-                <div>
-                  {/* Cabecera Tarjeta: Avatar + Nombre + Sede */}
-                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-100">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
-                        {initials}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-zinc-900 leading-tight">
-                          {client.fullName}
-                        </h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[11px] font-mono font-bold text-zinc-600">
-                            C.I: {client.cedulaRuc}
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-zinc-500 hidden md:inline">
+                💡 Haga clic en <strong className="text-zinc-700">Ficha</strong> para inspección visual y fotos de la moto
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[1250px] text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-zinc-100 text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 sticky top-0 z-10 select-none">
+                  <th className="px-3 py-2.5 text-center w-12 text-zinc-500 font-mono">#</th>
+                  <th className="px-3.5 py-2.5 min-w-[140px]">Nombre</th>
+                  <th className="px-3.5 py-2.5 min-w-[140px]">Apellido</th>
+                  <th className="px-3.5 py-2.5 min-w-[150px]">Origen</th>
+                  <th className="px-3.5 py-2.5 min-w-[140px]">Sede</th>
+                  <th className="px-3.5 py-2.5 min-w-[100px] whitespace-nowrap">Fecha</th>
+                  <th className="px-3.5 py-2.5 min-w-[140px]">Servicio</th>
+                  <th className="px-3.5 py-2.5 min-w-[95px] text-right">Valor</th>
+                  <th className="px-3.5 py-2.5 min-w-[130px]">Factura</th>
+                  <th className="px-3.5 py-2.5 min-w-[105px] text-center">¿Pagada?</th>
+                  <th className="px-3.5 py-2.5 min-w-[110px] text-center">Estado</th>
+                  <th className="px-3.5 py-2.5 min-w-[220px]">Observaciones</th>
+                  <th className="px-3 py-2.5 min-w-[110px] text-center w-28">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 text-zinc-800">
+                {filteredClients.map((client, idx) => {
+                  const data = getClientRowData(client);
+                  const isExpanded = expandedRowIds.has(client.id);
+                  const otherRecords = client.records.slice(1);
+
+                  return (
+                    <React.Fragment key={client.id}>
+                      <tr className="hover:bg-blue-50/50 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40">
+                        {/* 1. # */}
+                        <td className="px-3 py-2.5 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
+                          {idx + 1}
+                        </td>
+
+                        {/* 2. Nombre */}
+                        <td className="px-3.5 py-2.5 font-semibold text-zinc-900">
+                          <div className="flex flex-col">
+                            <span className="truncate max-w-[150px]" title={data.nombre}>
+                              {data.nombre}
+                            </span>
+                            <span className="text-[10px] font-mono font-normal text-zinc-400">
+                              C.I. {client.cedulaRuc}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 3. Apellido */}
+                        <td className="px-3.5 py-2.5 font-medium text-zinc-800">
+                          <span className="truncate max-w-[150px] block" title={data.apellido}>
+                            {data.apellido || '—'}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyCedula(client.cedulaRuc)}
-                            className="text-zinc-400 hover:text-blue-600 cursor-pointer p-0.5"
-                            title="Copiar cédula"
-                          >
-                            {copiedCedula === client.cedulaRuc ? (
-                              <Check className="w-3 h-3 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
+                        </td>
+
+                        {/* 4. Origen */}
+                        <td className="px-3.5 py-2.5 text-zinc-600">
+                          <span className="truncate max-w-[160px] block" title={data.origen}>
+                            {data.origen}
+                          </span>
+                        </td>
+
+                        {/* 5. Sede */}
+                        <td className="px-3.5 py-2.5 text-zinc-700">
+                          <span className="inline-flex items-center text-[11px] font-medium bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded border border-zinc-200/80 truncate max-w-[150px]" title={data.sede}>
+                            {data.sede}
+                          </span>
+                        </td>
+
+                        {/* 6. Fecha */}
+                        <td className="px-3.5 py-2.5 whitespace-nowrap font-mono text-zinc-600 text-[11px]">
+                          {data.fecha}
+                        </td>
+
+                        {/* 7. Servicio */}
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 whitespace-nowrap">
+                              {data.servicio}
+                            </span>
+                            {otherRecords.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleRowExpand(client.id)}
+                                className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer"
+                                title="Ver historial anterior"
+                              >
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                <span>+{otherRecords.length}</span>
+                              </button>
                             )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                          </div>
+                        </td>
 
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 shrink-0">
-                      {client.workshopName}
+                        {/* 8. Valor */}
+                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-zinc-900 whitespace-nowrap">
+                          ${data.valor.toFixed(2)}
+                        </td>
+
+                        {/* 9. Factura */}
+                        <td className="px-3.5 py-2.5 font-mono font-medium text-zinc-700 whitespace-nowrap">
+                          {data.factura}
+                        </td>
+
+                        {/* 10. ¿Pagada? */}
+                        <td className="px-3.5 py-2.5 text-center">
+                          {data.isPaid ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Pagada</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Pendiente</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 11. Estado */}
+                        <td className="px-3.5 py-2.5 text-center">
+                          {data.estado === 'referente' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                              ⭐ Referente
+                            </span>
+                          )}
+                          {data.estado === 'pendiente' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                              ⏳ Pendiente
+                            </span>
+                          )}
+                          {data.estado === 'iniciado' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                              🚀 Iniciado
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 12. Observaciones */}
+                        <td className="px-3.5 py-2.5 text-zinc-600">
+                          <p className="line-clamp-2 max-w-xs text-[11px]" title={data.observaciones}>
+                            {data.observaciones}
+                          </p>
+                        </td>
+
+                        {/* 13. Acciones */}
+                        <td className="px-3 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedClientForDetail(client)}
+                              className="px-2 py-1 text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                              title="Ver Ficha y Motos del Cliente"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Ficha</span>
+                            </button>
+                            {client.phone && (
+                              <a
+                                href={getCleanWhatsappUrl(client.phone, client.fullName)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                                title="Contactar por WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            {onNavigateToAlistamiento && (
+                              <button
+                                type="button"
+                                onClick={() => onNavigateToAlistamiento(client.cedulaRuc)}
+                                className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                                title="Nuevo Servicio para este cliente"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Sub-filas expandibles con historial previo */}
+                      {isExpanded &&
+                        otherRecords.map((histRec, hIdx) => (
+                          <tr
+                            key={histRec.id || `hist-${hIdx}`}
+                            className="bg-blue-50/25 text-zinc-600 divide-x divide-blue-100/70 text-[11px]"
+                          >
+                            <td className="px-3 py-2 text-center font-mono text-zinc-400">↳</td>
+                            <td colSpan={2} className="px-3.5 py-2 pl-6 italic text-zinc-500">
+                              Servicio anterior de {data.nombre}
+                            </td>
+                            <td className="px-3.5 py-2 text-zinc-500">{histRec.origen || data.origen}</td>
+                            <td className="px-3.5 py-2 text-zinc-500">{histRec.sede}</td>
+                            <td className="px-3.5 py-2 font-mono whitespace-nowrap">{histRec.fechaServicio}</td>
+                            <td className="px-3.5 py-2">
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                                {histRec.serviciosRealizados?.join(' + ') || 'Mantenimiento'}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-2 text-right font-mono font-semibold text-zinc-700">
+                              ${(histRec.montoPagado || histRec.valorServicio || 0).toFixed(2)}
+                            </td>
+                            <td className="px-3.5 py-2 font-mono text-zinc-600">{histRec.numeroFactura}</td>
+                            <td className="px-3.5 py-2 text-center">
+                              <span className="text-[10px] font-bold text-emerald-700">✓ Pagada</span>
+                            </td>
+                            <td className="px-3.5 py-2 text-center">
+                              <span className="text-[10px] font-bold text-purple-700">Completado</span>
+                            </td>
+                            <td colSpan={2} className="px-3.5 py-2 italic text-zinc-500">
+                              {histRec.observaciones || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px]">
+                <tr className="divide-x divide-zinc-200">
+                  <td colSpan={7} className="px-3.5 py-2.5 text-right font-mono uppercase tracking-wider">
+                    Total Facturado ({filteredClients.length} registros):
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right font-mono text-emerald-700 font-black text-xs">
+                    ${filteredClients.reduce((sum, c) => sum + getClientRowData(c).valor, 0).toFixed(2)}
+                  </td>
+                  <td colSpan={5} className="px-3.5 py-2.5 text-zinc-600 font-normal">
+                    <span className="font-bold text-emerald-700">
+                      {filteredClients.filter((c) => getClientRowData(c).isPaid).length} pagadas
+                    </span>{' '}
+                    •{' '}
+                    <span className="font-bold text-amber-700">
+                      {filteredClients.filter((c) => !getClientRowData(c).isPaid).length} pendientes
                     </span>
-                  </div>
-
-                  {/* Datos de Contacto */}
-                  <div className="py-2.5 space-y-1.5 text-xs text-zinc-600">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-zinc-400" />
-                        <span className="font-mono">{client.phone || 'Sin número'}</span>
-                      </div>
-                      {client.phone && (
-                        <a
-                          href={getCleanWhatsappUrl(client.phone, client.fullName)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors"
-                          title="Contactar por WhatsApp"
-                        >
-                          <MessageCircle className="w-3 h-3" />
-                          <span>WhatsApp</span>
-                        </a>
-                      )}
-                    </div>
-
-                    {client.email && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate">
-                        <Mail className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                        <span className="truncate">{client.email}</span>
-                      </div>
-                    )}
-
-                    {client.address && (
-                      <div className="text-[10px] text-zinc-400 truncate">
-                        📍 {client.address}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Motocicleta Asociada */}
-                  {mainMoto && (
-                    <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/80 space-y-1 text-xs">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 font-bold text-zinc-800">
-                          <Bike className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{mainMoto.model}</span>
-                        </div>
-                        <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-zinc-200">
-                          {mainMoto.plate || 'S/P'}
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-zinc-500 truncate">
-                        VIN: {mainMoto.chasis || 'S/N'}
-                        {mainMoto.lastMileage ? ` • ${mainMoto.lastMileage} km` : ''}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Badges de Estados Técnicos */}
-                  <div className="flex flex-wrap gap-1.5 pt-3">
-                    {client.pdiCompleted ? (
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>PDI Oficial OK</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>PDI Pendiente</span>
-                      </span>
-                    )}
-
-                    {client.engrasadoCompleted && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
-                        Engrasado OK
-                      </span>
-                    )}
-
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700">
-                      {client.maintenanceCount} Mantenimientos
-                    </span>
-
-                    {client.warrantiesCount > 0 && (
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3" />
-                        <span>{client.warrantiesCount} Garantías</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Acciones al Pie de la Tarjeta */}
-                <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-zinc-400">
-                    Última visita: <strong className="text-zinc-700">{client.lastVisitDate}</strong>
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedClientForDetail(client)}
-                      className="px-2.5 py-1.5 text-xs font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>Ficha</span>
-                    </button>
-
-                    {onNavigateToAlistamiento && (
-                      <button
-                        type="button"
-                        onClick={() => onNavigateToAlistamiento(client.cedulaRuc)}
-                        className="px-2.5 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Crear nuevo servicio de alistamiento o mantenimiento"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Servicio</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center space-y-3">

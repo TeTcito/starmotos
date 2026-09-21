@@ -27,13 +27,20 @@ jobs:
 
       - name: Deploy to Firebase Hosting
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN || vars.FIREBASE_TOKEN }}
+          RAW_CREDENTIAL: ${{ secrets.FIREBASE_TOKEN || secrets.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL || vars.FIREBASE_TOKEN || vars.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL }}
         run: |
-          if [ -z "$FIREBASE_TOKEN" ]; then
-            echo "::error::El secret FIREBASE_TOKEN está VACÍO o no existe en GitHub Repository Secrets."
+          if [ -z "$RAW_CREDENTIAL" ]; then
+            echo "::error::No se encontró credencial en GitHub Secrets. Agrega FIREBASE_TOKEN o FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL en Repository secrets."
             exit 1
           fi
-          echo "::notice::Token detectado correctamente con longitud: ${#FIREBASE_TOKEN}"
+          if [[ "$RAW_CREDENTIAL" =~ ^\{ ]]; then
+            echo "::notice::Detectada Service Account JSON de Firebase."
+            echo "$RAW_CREDENTIAL" > "$RUNNER_TEMP/sa.json"
+            export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          else
+            echo "::notice::Detectado Token CI de Firebase."
+            export FIREBASE_TOKEN="$RAW_CREDENTIAL"
+          fi
           npx --yes firebase-tools deploy --only hosting --project starmotos-portal --non-interactive 2>&1 | tee deploy.log
           echo "### Firebase Deploy Log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

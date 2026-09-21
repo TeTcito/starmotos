@@ -1,0 +1,214 @@
+// src/hooks/useGarantePortal.ts
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import confetti from 'canvas-confetti';
+import {
+  GaranteSection,
+  WarrantyRequest,
+  GaranteProfile,
+  SystemAlert,
+} from '../types/customer';
+import {
+  getStoredWarranties,
+  saveStoredWarranties,
+  INITIAL_GARANTE_PROFILE,
+  saveStoredAlerts,
+  getStoredAlerts,
+} from '../data/mockMultiRoleData';
+
+export const GARANTE_SECTIONS: GaranteSection[] = [
+  'solicitudes_garante',
+  'historial_garantias',
+  'reportes_garante',
+  'perfil_garante',
+];
+
+const getSectionFromHash = (): GaranteSection => {
+  if (typeof window === 'undefined') return 'solicitudes_garante';
+  const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (GARANTE_SECTIONS.includes(cleanHash as GaranteSection)) {
+    return cleanHash as GaranteSection;
+  }
+  return 'solicitudes_garante';
+};
+
+export function useGarantePortal() {
+  const [activeSection, setActiveSectionState] = useState<GaranteSection>(getSectionFromHash);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const activeSectionRef = useRef<GaranteSection>(activeSection);
+  activeSectionRef.current = activeSection;
+
+  const [warranties, setWarranties] = useState<WarrantyRequest[]>(getStoredWarranties);
+  const [profile, setProfile] = useState<GaranteProfile>(INITIAL_GARANTE_PROFILE);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  // Modal de revisión de garantía
+  const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [actionType, setActionType] = useState<'aprobar' | 'rechazar'>('aprobar');
+
+  // Sincronización en vivo
+  useEffect(() => {
+    const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
+    window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
+    return () => window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
+  }, []);
+
+  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  }, []);
+
+  const setActiveSection = useCallback((newSection: GaranteSection, replace = false) => {
+    if (!GARANTE_SECTIONS.includes(newSection)) return;
+    setActiveSectionState((current) => {
+      if (current === newSection) return current;
+      const targetHash = `#${newSection}`;
+      if (replace) {
+        window.history.replaceState({ section: newSection }, '', targetHash);
+      } else {
+        window.history.pushState({ section: newSection }, '', targetHash);
+      }
+      return newSection;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const target = getSectionFromHash();
+      setActiveSectionState(target);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Solicitudes pendientes de decisión del Garante (enviada_garante)
+  const pendingRequests = useMemo(() => {
+    return warranties.filter((w) => w.status === 'enviada_garante');
+  }, [warranties]);
+
+  // Historial (aprobada, rechazada, completada)
+  const historyRequests = useMemo(() => {
+    return warranties.filter((w) => ['aprobada', 'rechazada', 'completada'].includes(w.status));
+  }, [warranties]);
+
+  // Abrir modal de decisión
+  const openDecisionModal = useCallback((warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => {
+    setSelectedWarranty(warranty);
+    setActionType(type);
+    setReviewNotes('');
+    setRejectionReason('');
+    setIsActionModalOpen(true);
+  }, []);
+
+  // Aprobar solicitud
+  const approveWarranty = useCallback(() => {
+    if (!selectedWarranty) return;
+
+    setWarranties((prev) => {
+      const updated = prev.map((w) =>
+        w.id === selectedWarranty.id
+          ? {
+              ...w,
+              status: 'aprobada' as const,
+              garanteNotes: reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.',
+              approvedAt: 'Hoy, Autorización Digital Garante',
+            }
+          : w
+      );
+      saveStoredWarranties(updated);
+      return updated;
+    });
+
+    // Registrar alerta para Matriz
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'garantia_aprobada',
+      title: 'Garantía Aprobada por Garante de Marca',
+      message: `El Garante oficial autorizó la cobertura de la solicitud ${selectedWarranty.requestNumber} (${selectedWarranty.motorcycleBrand} ${selectedWarranty.motorcycleModel}). Procede a Matriz.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: selectedWarranty.id,
+    };
+    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+
+    confetti({
+      particleCount: 75,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#16a34a', '#2563eb', '#ffffff'],
+    });
+
+    setIsActionModalOpen(false);
+    showToast(`Garantía ${selectedWarranty.requestNumber} APROBADA con éxito. Notificado a Matriz.`, 'success');
+  }, [selectedWarranty, reviewNotes, showToast]);
+
+  // Rechazar solicitud
+  const rejectWarranty = useCallback(() => {
+    if (!selectedWarranty) return;
+    if (!rejectionReason.trim()) {
+      showToast('Debe ingresar el motivo técnico del rechazo de la garantía.', 'error');
+      return;
+    }
+
+    setWarranties((prev) => {
+      const updated = prev.map((w) =>
+        w.id === selectedWarranty.id
+          ? {
+              ...w,
+              status: 'rechazada' as const,
+              garanteNotes: reviewNotes || 'Rechazado en auditoría de garantías.',
+              rejectedAt: 'Hoy, Dictamen Garante',
+              rejectionReason: rejectionReason.trim(),
+            }
+          : w
+      );
+      saveStoredWarranties(updated);
+      return updated;
+    });
+
+    // Alertar en el sistema
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'garantia_rechazada',
+      title: 'Garantía Rechazada por Garante de Marca',
+      message: `La solicitud ${selectedWarranty.requestNumber} fue rechazada: "${rejectionReason.trim()}".`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: selectedWarranty.id,
+    };
+    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+
+    setIsActionModalOpen(false);
+    showToast(`Garantía ${selectedWarranty.requestNumber} ha sido rechazada. Notificado a Matriz.`, 'info');
+  }, [selectedWarranty, rejectionReason, reviewNotes, showToast]);
+
+  return {
+    activeSection,
+    setActiveSection,
+    isSidebarOpen,
+    setIsSidebarOpen,
+    warranties,
+    pendingRequests,
+    historyRequests,
+    profile,
+    setProfile,
+    toastMessage,
+    showToast,
+    // Modal y acciones
+    selectedWarranty,
+    reviewNotes,
+    setReviewNotes,
+    rejectionReason,
+    setRejectionReason,
+    isActionModalOpen,
+    setIsActionModalOpen,
+    actionType,
+    openDecisionModal,
+    approveWarranty,
+    rejectWarranty,
+  };
+}

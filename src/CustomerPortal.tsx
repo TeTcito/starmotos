@@ -2,19 +2,19 @@
 import React from 'react';
 import { useCustomerPortal } from './hooks/useCustomerPortal';
 import { useIsDesktop } from './hooks/useIsDesktop';
-import { LoginView } from './components/LoginView';
 import { CustomerViewMobile } from './components/mobile/CustomerViewMobile';
 import { CustomerViewDesktop } from './components/desktop/CustomerViewDesktop';
 import { CheckCircle2 } from 'lucide-react';
 
-export const CustomerPortal: React.FC = () => {
+interface CustomerPortalProps {
+  onLogout: () => void;
+}
+
+export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
   const portal = useCustomerPortal();
   const isDesktop = useIsDesktop(1024); // Breakpoint 1024px (pantallas grandes vs móviles)
 
   const {
-    isAuthenticated,
-    login,
-    logout,
     activeSection,
     setActiveSection,
     isSidebarOpen,
@@ -37,11 +37,6 @@ export const CustomerPortal: React.FC = () => {
     toastMessage,
   } = portal;
 
-  // Si no está autenticado, renderizar la pantalla independiente de login
-  if (!isAuthenticated) {
-    return <LoginView onLoginSuccess={login} />;
-  }
-
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Renderizado condicional: Escritorio vs Móvil según arquitectura solicitada */}
@@ -60,7 +55,7 @@ export const CustomerPortal: React.FC = () => {
           activeBranch={activeBranch}
           activeSection={activeSection}
           setActiveSection={setActiveSection}
-          logout={logout}
+          logout={onLogout}
           isApprovalModalOpen={isApprovalModalOpen}
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
@@ -83,7 +78,7 @@ export const CustomerPortal: React.FC = () => {
           setActiveSection={setActiveSection}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
-          logout={logout}
+          logout={onLogout}
           isApprovalModalOpen={isApprovalModalOpen}
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}

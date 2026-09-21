@@ -1,0 +1,160 @@
+// src/components/mobile/taller/TallerViewMobile.tsx
+import React, { useState } from 'react';
+import {
+  Menu,
+  X,
+  Wrench,
+  ShieldAlert,
+  Users,
+  Package,
+  LogOut,
+} from 'lucide-react';
+import {
+  TallerSection,
+  TallerOrder,
+  WarrantyRequest,
+  TallerClient,
+  InventoryItem,
+  WorkOrderStatus,
+} from '../../../types/customer';
+import { OrdenesTallerMobile } from './OrdenesTallerMobile';
+import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobile';
+import { ClientesTallerMobile } from './ClientesTallerMobile';
+import { InventarioMobile } from './InventarioMobile';
+
+interface Props {
+  activeSection: TallerSection;
+  setActiveSection: (section: TallerSection) => void;
+  onLogout: () => void;
+  orders: TallerOrder[];
+  onUpdateOrderStatus: (orderId: string, nextStatus: WorkOrderStatus) => void;
+  warranties: WarrantyRequest[];
+  clients: TallerClient[];
+  inventory: InventoryItem[];
+  newWarrantyForm: any;
+  setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
+  onCreateWarrantyRequest: () => boolean;
+}
+
+export const TallerViewMobile: React.FC<Props> = ({
+  activeSection,
+  setActiveSection,
+  onLogout,
+  orders,
+  onUpdateOrderStatus,
+  warranties,
+  clients,
+  inventory,
+  newWarrantyForm,
+  setNewWarrantyForm,
+  onCreateWarrantyRequest,
+}) => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
+    { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
+    { id: 'solicitudes_garantia', label: 'Solicitudes Garantía', icon: <ShieldAlert className="w-4 h-4" /> },
+    { id: 'clientes_taller', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
+    { id: 'inventario', label: 'Inventario', icon: <Package className="w-4 h-4" /> },
+  ];
+
+  const sectionTitles: Record<TallerSection, string> = {
+    ordenes_taller: 'Órdenes en Taller',
+    solicitudes_garantia: 'Solicitudes Garantía',
+    clientes_taller: 'Clientes Taller',
+    inventario: 'Inventario Repuestos',
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased">
+      <header className="sticky top-0 z-40 bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="p-1.5 rounded-lg bg-blue-800 hover:bg-blue-900 text-white cursor-pointer"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div>
+            <span className="text-xs font-black tracking-wider uppercase block leading-none">
+              <span className="text-white">STAR</span>
+              <span className="text-red-400">MOTOS</span>
+            </span>
+            <span className="text-[9px] text-blue-200 uppercase font-mono">Jefe de Taller</span>
+          </div>
+        </div>
+
+        <span className="text-xs font-bold text-white truncate max-w-[150px]">
+          {sectionTitles[activeSection]}
+        </span>
+      </header>
+
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setDrawerOpen(false)} />
+          <aside className="relative w-72 max-w-[85vw] h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between shadow-2xl z-10 p-4">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-[#b8d1ea]">
+                <span className="text-xs font-bold text-zinc-900">Téc. David Carrera (Taller)</span>
+                <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <nav className="mt-4 space-y-1">
+                {menuItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      setDrawerOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left ${
+                      activeSection === item.id ? 'bg-blue-600 text-white shadow-xs' : 'text-zinc-800 hover:bg-white/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="pt-3 border-t border-[#b8d1ea]">
+              <button
+                onClick={onLogout}
+                className="w-full py-2 bg-white text-red-600 border border-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <main className="max-w-md mx-auto px-4 py-4">
+        {activeSection === 'ordenes_taller' && (
+          <OrdenesTallerMobile orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
+        )}
+        {activeSection === 'solicitudes_garantia' && (
+          <SolicitudesGarantiaTallerMobile
+            warranties={warranties}
+            newForm={newWarrantyForm}
+            setNewForm={setNewWarrantyForm}
+            onCreateRequest={onCreateWarrantyRequest}
+          />
+        )}
+        {activeSection === 'clientes_taller' && <ClientesTallerMobile clients={clients} />}
+        {activeSection === 'inventario' && <InventarioMobile inventory={inventory} />}
+      </main>
+    </div>
+  );
+};

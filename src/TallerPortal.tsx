@@ -1,0 +1,75 @@
+// src/TallerPortal.tsx
+import React from 'react';
+import { useTallerPortal } from './hooks/useTallerPortal';
+import { useIsDesktop } from './hooks/useIsDesktop';
+import { TallerViewDesktop } from './components/desktop/taller/TallerViewDesktop';
+import { TallerViewMobile } from './components/mobile/taller/TallerViewMobile';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+
+interface Props {
+  onLogout: () => void;
+}
+
+export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
+  const portal = useTallerPortal();
+  const isDesktop = useIsDesktop(1024);
+
+  const {
+    activeSection,
+    setActiveSection,
+    orders,
+    updateOrderStatus,
+    warranties,
+    clients,
+    inventory,
+    newWarrantyForm,
+    setNewWarrantyForm,
+    createWarrantyRequest,
+    toastMessage,
+  } = portal;
+
+  return (
+    <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      {isDesktop ? (
+        <TallerViewDesktop
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          onLogout={onLogout}
+          orders={orders}
+          onUpdateOrderStatus={updateOrderStatus}
+          warranties={warranties}
+          clients={clients}
+          inventory={inventory}
+          newWarrantyForm={newWarrantyForm}
+          setNewWarrantyForm={setNewWarrantyForm}
+          onCreateWarrantyRequest={createWarrantyRequest}
+        />
+      ) : (
+        <TallerViewMobile
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
+          onLogout={onLogout}
+          orders={orders}
+          onUpdateOrderStatus={updateOrderStatus}
+          warranties={warranties}
+          clients={clients}
+          inventory={inventory}
+          newWarrantyForm={newWarrantyForm}
+          setNewWarrantyForm={setNewWarrantyForm}
+          onCreateWarrantyRequest={createWarrantyRequest}
+        />
+      )}
+
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 max-w-sm bg-zinc-900 border border-blue-500/40 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-in text-xs">
+          {toastMessage.type === 'error' ? (
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          )}
+          <p className="text-zinc-200 font-medium">{toastMessage.text}</p>
+        </div>
+      )}
+    </div>
+  );
+};

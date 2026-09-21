@@ -251,3 +251,194 @@ export interface CustomerPortalData {
   history: MaintenanceRecord[];
   warranties: WarrantyItem[];
 }
+
+// ===================== SISTEMA MULTI-ROL =====================
+
+export type UserRole = 'cliente' | 'admin' | 'taller' | 'garante';
+
+// --- Secciones por rol ---
+export type AdminSection =
+  | 'talleres'
+  | 'alistamiento'
+  | 'garantias_admin'
+  | 'facturacion'
+  | 'alertas';
+
+export type TallerSection =
+  | 'ordenes_taller'
+  | 'solicitudes_garantia'
+  | 'clientes_taller'
+  | 'inventario';
+
+export type GaranteSection =
+  | 'solicitudes_garante'
+  | 'historial_garantias'
+  | 'reportes_garante'
+  | 'perfil_garante';
+
+// --- Flujo de Garantías (Máquina de Estados) ---
+export type WarrantyRequestStatus =
+  | 'creada'
+  | 'enviada_matriz'
+  | 'validada_matriz'
+  | 'enviada_garante'
+  | 'aprobada'
+  | 'rechazada'
+  | 'completada';
+
+export interface WarrantyRequest {
+  id: string;
+  requestNumber: string;
+  createdAt: string;
+  clientName: string;
+  clientIdNumber: string;
+  motorcycleBrand: string;
+  motorcycleModel: string;
+  motorcyclePlate: string;
+  motorcycleVin: string;
+  warrantyType: 'marca' | 'plus_taller' | 'gps';
+  issueDescription: string;
+  diagnosticPhotos: string[];
+  status: WarrantyRequestStatus;
+  tallerOrigin: string;
+  tallerOriginId: string;
+  matrizNotes?: string;
+  garanteNotes?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  estimatedCost?: number;
+  invoiceNumber?: string;
+}
+
+// --- Entidad Taller ---
+export interface Workshop {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  city: string;
+  phone: string;
+  manager: string;
+  status: 'operativo' | 'mantenimiento' | 'inactivo';
+  activeOrders: number;
+  completedToday: number;
+  pendingWarranties: number;
+  mechanics: number;
+}
+
+// --- Alistamiento (Wizard 3 Pasos) ---
+export interface AlistamientoClient {
+  idNumber: string;
+  fullName: string;
+  tipoContribuyente: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
+export interface AlistamientoMotorcycle {
+  brand: string;
+  model: string;
+  chassisNumber: string;
+  plate: string;
+  year: number;
+  color: string;
+}
+
+export type MaintenanceType = 'preventivo' | 'engrasado' | 'mantenimiento_completo';
+
+export interface AlistamientoService {
+  maintenanceType: MaintenanceType;
+  observations: string;
+  invoiceNumber: string;
+  cost: number;
+}
+
+// --- Alertas del Sistema ---
+export type AlertType =
+  | 'orden_creada'
+  | 'estado_cambiado'
+  | 'factura_emitida'
+  | 'garantia_aprobada'
+  | 'garantia_rechazada';
+
+export interface SystemAlert {
+  id: string;
+  type: AlertType;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  relatedId?: string;
+}
+
+// --- Factura Admin ---
+export interface AdminInvoice {
+  id: string;
+  invoiceNumber: string;
+  clientName: string;
+  clientIdNumber: string;
+  date: string;
+  subtotal: number;
+  iva: number;
+  total: number;
+  status: 'emitida' | 'anulada' | 'pendiente';
+  workshopName: string;
+}
+
+// --- Inventario Taller ---
+export interface InventoryItem {
+  id: string;
+  code: string;
+  name: string;
+  brand: string;
+  category: string;
+  stock: number;
+  minStock: number;
+  unitPrice: number;
+  lastRestocked: string;
+}
+
+// --- Cliente de Taller ---
+export interface TallerClient {
+  id: string;
+  fullName: string;
+  idNumber: string;
+  phone: string;
+  email: string;
+  motorcycleBrand: string;
+  motorcycleModel: string;
+  motorcyclePlate: string;
+  lastVisit: string;
+  totalVisits: number;
+}
+
+// --- Orden de Taller ---
+export interface TallerOrder {
+  id: string;
+  otNumber: string;
+  clientName: string;
+  clientIdNumber: string;
+  motorcycleInfo: string;
+  plate: string;
+  entryDate: string;
+  status: WorkOrderStatus;
+  mechanicName: string;
+  estimatedDelivery: string;
+  totalCost: number;
+}
+
+// --- Perfil Garante ---
+export interface GaranteProfile {
+  id: string;
+  companyName: string;
+  ruc: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  address: string;
+  brandsRepresented: string[];
+  contractStartDate: string;
+  contractEndDate: string;
+}

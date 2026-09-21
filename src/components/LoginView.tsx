@@ -8,9 +8,10 @@ import {
   CheckCircle2,
   Check,
 } from 'lucide-react';
+import { UserRole } from '../types/customer';
 
 interface Props {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (role: UserRole) => void;
 }
 
 export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
@@ -20,6 +21,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('cliente');
 
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -95,7 +97,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         loginData.password.length >= 4
       ) {
         setIsLoading(false);
-        onLoginSuccess();
+        onLoginSuccess(selectedRole);
       } else {
         setIsLoading(false);
         setErrorMessage('Credenciales no encontradas en el sistema.');
@@ -135,7 +137,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       setIsLoading(false);
       setSuccessMessage('¡Cuenta creada con éxito! Redirigiendo a tu portal...');
       setTimeout(() => {
-        onLoginSuccess();
+        onLoginSuccess(selectedRole);
       }, 700);
     }, 600);
   };
@@ -297,6 +299,23 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     )}
                   </button>
                 </div>
+              </div>
+
+              {/* Selector de Rol / Tipo de Acceso */}
+              <div>
+                <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1 sm:mb-1.5">
+                  Tipo de Acceso
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                  className="w-full px-3.5 py-2 sm:py-3 bg-white border border-zinc-400 hover:border-zinc-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-700 font-normal text-xs sm:text-sm rounded-xl transition-all appearance-none cursor-pointer"
+                >
+                  <option value="cliente">Cliente</option>
+                  <option value="admin">Administrador Matriz</option>
+                  <option value="taller">Jefe de Taller</option>
+                  <option value="garante">Garante / Marca</option>
+                </select>
               </div>
 
               {/* Fila Recordarme + Olvidaste contraseña */}

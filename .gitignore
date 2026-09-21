@@ -26,3 +26,4 @@ dist-ssr
 # Firebase
 .firebase/
 .firebaserc.bak
+.firebase_token.txt

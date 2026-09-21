@@ -89,7 +89,7 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
 
   // Estados del formulario
   const [selectedService, setSelectedService] = useState(AVAILABLE_SERVICES[0]);
-  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'matriz-quito');
+  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'matriz-la-mana');
   const [appointmentDate, setAppointmentDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);

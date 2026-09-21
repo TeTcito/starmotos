@@ -36,16 +36,26 @@ export const TalleresMobile: React.FC<Props> = ({ workshops }) => {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
                       {ws.code}
                     </span>
+                    {ws.province && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700">
+                        {ws.province}
+                      </span>
+                    )}
                     <h3 className="text-xs font-bold text-zinc-900">{ws.name}</h3>
                   </div>
                   <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-red-500 shrink-0" />
-                    <span className="truncate">{ws.address}</span>
+                    <span className="truncate">{ws.address}, {ws.city}</span>
                   </p>
+                  {ws.reference && (
+                    <p className="text-[10px] text-amber-800 bg-amber-50 rounded px-1.5 py-0.5 mt-1">
+                      📍 {ws.reference}
+                    </p>
+                  )}
                 </div>
 
                 <span

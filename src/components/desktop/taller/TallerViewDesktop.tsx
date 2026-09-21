@@ -70,8 +70,17 @@ export const TallerViewDesktop: React.FC<Props> = ({
   setNewWarrantyForm,
   onCreateWarrantyRequest,
 }) => {
+  const [activeWorkshopId, setActiveWorkshopId] = React.useState<string>(() => {
+    return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
+  });
+
+  const currentWs =
+    workshops.find((w) => w.id === activeWorkshopId) ||
+    workshops.find((w) => w.id === 'taller-quevedo') ||
+    workshops[0];
+
   const tallerTechs = technicians.filter(
-    (t) => t.workshopId === 'taller-norte' || t.workshopName.toLowerCase().includes('norte')
+    (t) => t.workshopId === currentWs.id || t.workshopName.toLowerCase().includes(currentWs.name.toLowerCase())
   );
 
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -139,7 +148,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
 
         <div className="flex-1 flex items-center justify-between pl-6 border-l border-blue-600/60 min-w-0">
           <div className="flex items-center gap-2 truncate">
-            <span className="text-xs text-blue-200 font-mono font-medium">Taller Express Norte /</span>
+            <span className="text-xs text-blue-200 font-mono font-medium truncate">{currentWs.name} /</span>
             <h1 className="text-sm lg:text-base font-bold text-white tracking-tight truncate">
               {sectionTitles[activeSection]}
             </h1>
@@ -147,7 +156,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
 
           <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Sucursal Norte — Bahías Activas</span>
+            <span>{currentWs.city} — Bahías Activas</span>
           </div>
         </div>
       </header>
@@ -155,6 +164,27 @@ export const TallerViewDesktop: React.FC<Props> = ({
       {/* 2. BODY */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         <aside className="w-72 shrink-0 h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between z-20 select-none shadow-xs">
+          {/* Selector de Sucursal Activa */}
+          <div className="shrink-0 p-3 bg-white/50 border-b border-[#b8d1ea]">
+            <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-950/80 block mb-1">
+              Sucursal Activa ({workshops.length} sedes):
+            </label>
+            <select
+              value={currentWs.id}
+              onChange={(e) => {
+                setActiveWorkshopId(e.target.value);
+                localStorage.setItem('starmotos_taller_active_ws', e.target.value);
+              }}
+              className="w-full text-xs font-bold bg-white border border-blue-400/80 rounded-xl px-2.5 py-1.5 text-zinc-900 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-600 focus:outline-none"
+            >
+              {workshops.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} — {w.province || w.city}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Info Jefe de Taller */}
           <div className="shrink-0 p-4 border-b border-[#b8d1ea] bg-white/40">
             <div className="flex items-center gap-3">
@@ -162,11 +192,11 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 TAL
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-xs font-bold text-zinc-900 truncate">Téc. David Carrera</h3>
-                <p className="text-[10px] text-zinc-600 font-mono">Jefe de Taller Norte</p>
+                <h3 className="text-xs font-bold text-zinc-900 truncate">{currentWs.manager}</h3>
+                <p className="text-[10px] text-zinc-600 font-mono truncate">{currentWs.code} • {currentWs.city}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                  <span className="text-[10px] text-indigo-900 font-bold">Mecánica Certificada</span>
+                  <span className="text-[10px] text-indigo-900 font-bold truncate">Bahía {currentWs.status}</span>
                 </div>
               </div>
             </div>
@@ -217,9 +247,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
             <div className="px-3 py-2 rounded-xl bg-white/70 border border-[#b8d1ea] text-xs text-zinc-700 shadow-xs">
               <div className="flex items-center gap-1.5 font-bold text-zinc-900">
                 <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                <span className="truncate">Taller Express Norte</span>
+                <span className="truncate">{currentWs.name}</span>
               </div>
-              <p className="truncate text-zinc-600 text-[11px] mt-0.5">Av. Galo Plaza Lasso N64-89</p>
+              <p className="truncate text-zinc-600 text-[11px] mt-0.5">{currentWs.address}</p>
+              {currentWs.reference && (
+                <p className="text-[10px] text-amber-800 truncate mt-0.5 font-medium">📍 {currentWs.reference}</p>
+              )}
             </div>
 
             <button
@@ -240,9 +273,9 @@ export const TallerViewDesktop: React.FC<Props> = ({
             )}
             {activeSection === 'alistamiento_taller' && (
               <AlistamientoWizard
-                defaultAtendidoPor="Téc. David Carrera"
-                defaultSede="StarMotos Express Norte"
-                defaultSedeId="taller-norte"
+                defaultAtendidoPor={currentWs.manager}
+                defaultSede={currentWs.name}
+                defaultSedeId={currentWs.id}
                 technicians={technicians}
                 origins={origins}
                 workshops={workshops}
@@ -265,7 +298,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 technicians={technicians}
                 workshops={workshops}
                 onAddTechnician={onAddTechnician}
-                currentWorkshopId="taller-norte"
+                currentWorkshopId={currentWs.id}
               />
             )}
             {activeSection === 'inventario' && <InventarioDesktop inventory={inventory} />}

@@ -32,7 +32,7 @@ export interface MotorcycleClientData {
   dailyUsageKm: number;     // Promedio de km por día
   reportedSymptoms: string; // Síntomas, ruidos o fallas reportadas para el taller
   preferredPartsQuality: 'originales_oem' | 'alternativos_premium';
-  preferredBranchId: string;// 'matriz-quito' | 'taller-norte'
+  preferredBranchId: string; // 'matriz-la-mana' | 'taller-quevedo'
   photoUrl: string;
 }
 
@@ -138,6 +138,10 @@ export interface Branch {
   email: string;
   schedule: string;
   googleMapsUrl: string;
+  province?: string;
+  canton?: string;
+  parroquia?: string;
+  reference?: string;
 }
 
 export interface Mechanic {
@@ -328,6 +332,14 @@ export interface Workshop {
   completedToday: number;
   pendingWarranties: number;
   mechanics: number;
+  province?: string;
+  canton?: string;
+  parroquia?: string;
+  reference?: string;
+  street?: string;
+  intersection?: string;
+  number?: string;
+  email?: string;
 }
 
 // --- Alistamiento (Wizard 3 Pasos Profesional) ---

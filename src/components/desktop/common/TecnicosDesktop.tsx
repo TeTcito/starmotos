@@ -40,7 +40,7 @@ export const TecnicosDesktop: React.FC<Props> = ({
     name: '',
     specialty: 'Diagnóstico Electrónico & PDI',
     phone: '',
-    workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-quito',
+    workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
   });
 
   const filtered = technicians.filter((tech) => {
@@ -72,7 +72,7 @@ export const TecnicosDesktop: React.FC<Props> = ({
       name: '',
       specialty: 'Diagnóstico Electrónico & PDI',
       phone: '',
-      workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-quito',
+      workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
     });
   };
 

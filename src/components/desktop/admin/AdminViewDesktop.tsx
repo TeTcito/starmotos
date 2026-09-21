@@ -182,7 +182,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
 
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Matriz Central Quito</span>
+              <span>Matriz La Maná (Cotopaxi)</span>
             </div>
           </div>
         </div>
@@ -199,8 +199,8 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 ADM
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-xs font-bold text-zinc-900 truncate">Ing. Mateo Enríquez</h3>
-                <p className="text-[10px] text-zinc-600 font-mono">Gerencia de Operaciones</p>
+                <h3 className="text-xs font-bold text-zinc-900 truncate">William Daniel Meza Chicaiza</h3>
+                <p className="text-[10px] text-zinc-600 font-mono">Gerente General StarMotos</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-blue-600" />
                   <span className="text-[10px] text-blue-900 font-bold">Admin Matriz</span>
@@ -254,9 +254,9 @@ export const AdminViewDesktop: React.FC<Props> = ({
             <div className="px-3 py-2 rounded-xl bg-white/70 border border-[#b8d1ea] text-xs text-zinc-700 shadow-xs">
               <div className="flex items-center gap-1.5 font-bold text-zinc-900">
                 <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                <span className="truncate">Sede Matriz Central</span>
+                <span className="truncate">StarMotos Matriz La Maná</span>
               </div>
-              <p className="truncate text-zinc-600 text-[11px] mt-0.5">Av. 10 de Agosto N31-154</p>
+              <p className="truncate text-zinc-600 text-[11px] mt-0.5">Jaime Roldós #1 y G. Albarracín</p>
             </div>
 
             <button
@@ -275,9 +275,9 @@ export const AdminViewDesktop: React.FC<Props> = ({
             {activeSection === 'talleres' && <TalleresDesktop workshops={workshops} />}
             {activeSection === 'alistamiento' && (
               <AlistamientoWizard
-                defaultAtendidoPor="Ing. Mateo Enríquez"
-                defaultSede="StarMotos Matriz Central"
-                defaultSedeId="matriz"
+                defaultAtendidoPor="William Daniel Meza (Gerente)"
+                defaultSede="StarMotos Matriz La Maná"
+                defaultSedeId="matriz-la-mana"
                 technicians={technicians}
                 origins={origins}
                 workshops={workshops}

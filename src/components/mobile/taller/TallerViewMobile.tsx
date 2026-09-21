@@ -70,6 +70,14 @@ export const TallerViewMobile: React.FC<Props> = ({
   onCreateWarrantyRequest,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeWorkshopId, setActiveWorkshopId] = useState<string>(() => {
+    return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
+  });
+
+  const currentWs =
+    workshops.find((w) => w.id === activeWorkshopId) ||
+    workshops.find((w) => w.id === 'taller-quevedo') ||
+    workshops[0];
 
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
@@ -106,10 +114,12 @@ export const TallerViewMobile: React.FC<Props> = ({
               className="h-5 w-auto object-contain"
             />
           </div>
-          <span className="text-[9px] text-blue-200 uppercase font-mono font-bold hidden sm:inline">Taller</span>
+          <span className="text-[9px] text-blue-200 uppercase font-mono font-bold truncate max-w-[110px]">
+            {currentWs.name.replace('StarMotos ', '')}
+          </span>
         </div>
 
-        <span className="text-xs font-bold text-white truncate max-w-[150px]">
+        <span className="text-xs font-bold text-white truncate max-w-[130px]">
           {sectionTitles[activeSection]}
         </span>
       </header>
@@ -120,10 +130,34 @@ export const TallerViewMobile: React.FC<Props> = ({
           <aside className="relative w-72 max-w-[85vw] h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between shadow-2xl z-10 p-4">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-[#b8d1ea]">
-                <span className="text-xs font-bold text-zinc-900">Téc. David Carrera (Taller)</span>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 truncate">{currentWs.manager}</h4>
+                  <p className="text-[10px] text-zinc-600 truncate">{currentWs.name}</p>
+                </div>
                 <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600">
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* Selector de Sucursal Móvil */}
+              <div className="mt-3 p-2.5 bg-white/70 rounded-xl border border-blue-200">
+                <span className="text-[9px] font-bold text-blue-900 uppercase block mb-1">
+                  Cambiar Sucursal ({workshops.length} sedes):
+                </span>
+                <select
+                  value={currentWs.id}
+                  onChange={(e) => {
+                    setActiveWorkshopId(e.target.value);
+                    localStorage.setItem('starmotos_taller_active_ws', e.target.value);
+                  }}
+                  className="w-full text-xs font-bold bg-white border border-blue-300 rounded-lg px-2 py-1 text-zinc-900"
+                >
+                  {workshops.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <nav className="mt-4 space-y-1">
@@ -152,7 +186,13 @@ export const TallerViewMobile: React.FC<Props> = ({
               </nav>
             </div>
 
-            <div className="pt-3 border-t border-[#b8d1ea]">
+            <div className="pt-3 border-t border-[#b8d1ea] space-y-2">
+              <div className="text-[10px] text-zinc-600 p-2 bg-white/50 rounded-lg">
+                <p className="font-bold text-zinc-800 truncate">{currentWs.address}</p>
+                {currentWs.reference && <p className="text-zinc-500 truncate mt-0.5">Ref: {currentWs.reference}</p>}
+                <p className="text-emerald-700 font-mono mt-0.5">{currentWs.phone}</p>
+              </div>
+
               <button
                 onClick={onLogout}
                 className="w-full py-2 bg-white text-red-600 border border-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
@@ -171,9 +211,9 @@ export const TallerViewMobile: React.FC<Props> = ({
         )}
         {activeSection === 'alistamiento_taller' && (
           <AlistamientoWizard
-            defaultAtendidoPor="Téc. David Carrera"
-            defaultSede="StarMotos Express Norte"
-            defaultSedeId="taller-norte"
+            defaultAtendidoPor={currentWs.manager}
+            defaultSede={currentWs.name}
+            defaultSedeId={currentWs.id}
             technicians={technicians}
             origins={origins}
             workshops={workshops}
@@ -196,7 +236,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             technicians={technicians}
             workshops={workshops}
             onAddTechnician={onAddTechnician}
-            currentWorkshopId="taller-norte"
+            currentWorkshopId={currentWs.id}
           />
         )}
         {activeSection === 'inventario' && <InventarioMobile inventory={inventory} />}

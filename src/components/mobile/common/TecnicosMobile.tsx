@@ -21,7 +21,7 @@ export const TecnicosMobile: React.FC<Props> = ({
     name: '',
     specialty: 'Mecánica Integral',
     phone: '',
-    workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-quito',
+    workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +41,7 @@ export const TecnicosMobile: React.FC<Props> = ({
       name: '',
       specialty: 'Mecánica Integral',
       phone: '',
-      workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-quito',
+      workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
     });
   };
 

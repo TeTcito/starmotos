@@ -199,9 +199,9 @@ export const AdminViewMobile: React.FC<Props> = ({
         {activeSection === 'talleres' && <TalleresMobile workshops={workshops} />}
         {activeSection === 'alistamiento' && (
           <AlistamientoWizard
-            defaultAtendidoPor="Ing. Mateo Enríquez"
-            defaultSede="StarMotos Matriz Central"
-            defaultSedeId="matriz"
+            defaultAtendidoPor="William Daniel Meza (Gerente)"
+            defaultSede="StarMotos Matriz La Maná"
+            defaultSedeId="matriz-la-mana"
             technicians={technicians}
             origins={origins}
             workshops={workshops}
@@ -215,7 +215,7 @@ export const AdminViewMobile: React.FC<Props> = ({
             technicians={technicians}
             workshops={workshops}
             onAddTechnician={onAddTechnician}
-            currentWorkshopId="matriz-quito"
+            currentWorkshopId="matriz-la-mana"
           />
         )}
         {activeSection === 'garantias_admin' && (

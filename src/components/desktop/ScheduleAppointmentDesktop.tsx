@@ -116,7 +116,7 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
   onBack,
 }) => {
   const [selectedService, setSelectedService] = useState<ServiceOption>(AVAILABLE_SERVICES[0]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-quito');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-la-mana');
   const [appointmentDate, setAppointmentDate] = useState<string>(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);

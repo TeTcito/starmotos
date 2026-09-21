@@ -23,7 +23,7 @@ export const MaintenancesView: React.FC<Props> = ({
   branches,
 }) => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'matriz-quito');
+  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'matriz-la-mana');
   const [selectedServiceTitle, setSelectedServiceTitle] = useState('Mantenimiento Preventivo (Aceite y Filtros)');
   const [scheduleDate, setScheduleDate] = useState('2026-09-25');
   const [scheduleTime, setScheduleTime] = useState('09:30');

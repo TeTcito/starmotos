@@ -16,34 +16,95 @@ import {
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
 
-// Sucursales StarMotos
+// Sucursales Oficiales StarMotos
 export const BRANCH_MATRIZ: Branch = {
-  id: 'matriz-quito',
-  name: 'StarMotos Matriz Central',
+  id: 'matriz-la-mana',
+  name: 'StarMotos Matriz La Maná',
   code: 'MAT-01',
-  address: 'Av. 10 de Agosto N31-154 y Mariana de Jesús',
-  city: 'Quito, Ecuador',
-  phone: '+593 93 931 6698',
+  address: 'Calle Jaime Roldós #1 y Gonzalo Albarracín',
+  city: 'La Maná, Cotopaxi',
+  province: 'Cotopaxi',
+  canton: 'La Maná',
+  parroquia: 'La Maná',
+  reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
+  phone: '0939316698 / 0939317809',
   whatsapp: '593939316698',
-  email: 'matriz@starmotos.ec',
+  email: 'starsmotor17@gmail.com',
+  schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 14:00',
+  googleMapsUrl: 'https://maps.google.com/?q=La+Mana+Cotopaxi+Ecuador',
+};
+
+export const BRANCH_QUEVEDO: Branch = {
+  id: 'taller-quevedo',
+  name: 'StarMotos Sucursal Quevedo',
+  code: 'SUC-05',
+  address: 'Décima Tercera entre Junior Guzmán y 12 de Octubre',
+  city: 'Quevedo, Los Ríos',
+  province: 'Los Ríos',
+  canton: 'Quevedo',
+  reference: 'Ingresa por lubricadora Don Lucho, al lado de Hostal Carmita',
+  phone: '0982852456 / 0939316698',
+  whatsapp: '593982852456',
+  email: 'starsmotor17@gmail.com',
   schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
-  googleMapsUrl: 'https://maps.google.com/?q=-0.1983,-78.4941',
+  googleMapsUrl: 'https://maps.google.com/?q=Quevedo+Ecuador',
 };
 
-export const BRANCH_NORTE: Branch = {
-  id: 'taller-norte',
-  name: 'StarMotos Taller Express Norte',
-  code: 'NOR-02',
-  address: 'Av. Galo Plaza Lasso N64-89 y De los Pinos',
-  city: 'Quito Norte, Ecuador',
-  phone: '+593 93 931 6698',
+export const BRANCH_BUENAFE: Branch = {
+  id: 'taller-buena-fe',
+  name: 'StarMotos Sucursal Buena Fe',
+  code: 'SUC-02',
+  address: 'Calle Arcadio Fuente S/N y 7 de Agosto',
+  city: 'Buena Fe, Los Ríos',
+  province: 'Los Ríos',
+  canton: 'Buena Fe',
+  reference: 'Vía al cementerio de Buena Fe',
+  phone: '0939316698',
   whatsapp: '593939316698',
-  email: 'norte@starmotos.ec',
+  email: 'starsmotor17@gmail.com',
   schedule: 'Lunes a Viernes: 08:00 - 17:30 | Sábados: 08:30 - 13:00',
-  googleMapsUrl: 'https://maps.google.com/?q=-0.1256,-78.4723',
+  googleMapsUrl: 'https://maps.google.com/?q=Buena+Fe+Los+Rios+Ecuador',
 };
 
-export const ALL_BRANCHES = [BRANCH_MATRIZ, BRANCH_NORTE];
+export const BRANCH_ELCARMEN: Branch = {
+  id: 'taller-el-carmen',
+  name: 'StarMotos Sucursal El Carmen',
+  code: 'SUC-04',
+  address: 'Urb. Barrio Naranjales, Calle Los Limones S/N y Av. Chone',
+  city: 'El Carmen, Manabí',
+  province: 'Manabí',
+  canton: 'El Carmen',
+  reference: 'Diagonal al SuperKia',
+  phone: '0939316698',
+  whatsapp: '593939316698',
+  email: 'starsmotor17@gmail.com',
+  schedule: 'Lunes a Viernes: 08:00 - 17:30 | Sábados: 08:30 - 13:00',
+  googleMapsUrl: 'https://maps.google.com/?q=El+Carmen+Manabi+Ecuador',
+};
+
+export const BRANCH_PORTOVIEJO: Branch = {
+  id: 'taller-portoviejo',
+  name: 'StarMotos Sucursal Portoviejo',
+  code: 'SUC-09',
+  address: 'Calle Pedro Gual S/N y Primero de Enero',
+  city: 'Portoviejo, Manabí',
+  province: 'Manabí',
+  canton: 'Portoviejo',
+  reference: 'Al lado de Almacén El Centinela Rulimán',
+  phone: '0939316698',
+  whatsapp: '593939316698',
+  email: 'starsmotor17@gmail.com',
+  schedule: 'Lunes a Viernes: 08:00 - 17:30 | Sábados: 08:30 - 13:00',
+  googleMapsUrl: 'https://maps.google.com/?q=Portoviejo+Manabi+Ecuador',
+};
+
+export const ALL_BRANCHES = [
+  BRANCH_MATRIZ,
+  BRANCH_QUEVEDO,
+  BRANCH_BUENAFE,
+  BRANCH_ELCARMEN,
+  BRANCH_PORTOVIEJO,
+];
 
 const INITIAL_PROFILE: ClientProfile = {
   id: 'cli-0089',
@@ -74,7 +135,7 @@ const INITIAL_MOTORCYCLE: MotorcycleClientData = {
   dailyUsageKm: 25,
   reportedSymptoms: 'Siento leve vibración en el tren delantero al pasar de 80 km/h y chillido ocasional en pastillas delanteras en clima frío.',
   preferredPartsQuality: 'originales_oem',
-  preferredBranchId: 'matriz-quito',
+  preferredBranchId: 'matriz-la-mana',
   photoUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
 };
 
@@ -86,8 +147,8 @@ const INITIAL_SCHEDULED_MAINTENANCES: ScheduledMaintenance[] = [
     recommendedDate: '25 Sep 2026',
     scheduledDate: '25 Sep 2026',
     scheduledTime: '09:00 AM',
-    branchName: 'StarMotos Matriz Central',
-    branchId: 'matriz-quito',
+    branchName: 'StarMotos Matriz La Maná',
+    branchId: 'matriz-la-mana',
     status: 'confirmada',
     estimatedCost: 75.0,
     tasks: ['Cambio de Aceite Motul 7100 10W-40', 'Filtro de Aceite OEM', 'Ajuste de Cadena Regina', 'Escáner Delphi'],
@@ -98,8 +159,8 @@ const INITIAL_SCHEDULED_MAINTENANCES: ScheduledMaintenance[] = [
     serviceTitle: 'Servicio Mayor 20,000 KM (Calibración Válvulas & Suspensión)',
     recommendedKm: 20000,
     recommendedDate: '15 Ene 2027',
-    branchName: 'StarMotos Matriz Central',
-    branchId: 'matriz-quito',
+    branchName: 'StarMotos Matriz La Maná',
+    branchId: 'matriz-la-mana',
     status: 'pendiente',
     estimatedCost: 140.0,
     tasks: ['Regulación de Válvulas por Pastillas', 'Cambio Aceite Horquilla Motul Fork Oil', 'Revisión Líquido Refrigerante'],

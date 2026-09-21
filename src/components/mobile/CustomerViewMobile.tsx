@@ -117,6 +117,13 @@ export const CustomerViewMobile: React.FC<Props> = ({
             branches={branches}
             scheduledMaintenances={scheduledMaintenances}
             onScheduleNewMaintenance={addScheduledMaintenance}
+            onBack={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                setActiveSection('mantenimientos');
+              }
+            }}
           />
         )}
 
@@ -134,6 +141,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
             onScheduleNewMaintenance={addScheduledMaintenance}
             motorcycle={motorcycle}
             branches={branches}
+            onNavigateToSchedule={() => setActiveSection('agendar_cita')}
           />
         )}
 

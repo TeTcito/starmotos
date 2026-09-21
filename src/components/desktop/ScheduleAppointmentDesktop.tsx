@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Send,
   CalendarCheck,
+  ArrowLeft,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../WhatsAppIcon';
 import {
@@ -30,6 +31,7 @@ interface Props {
   branches: Branch[];
   scheduledMaintenances: ScheduledMaintenance[];
   onScheduleNewMaintenance: (maintenance: ScheduledMaintenance) => void;
+  onBack?: () => void;
 }
 
 interface ServiceOption {
@@ -111,6 +113,7 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
   branches,
   scheduledMaintenances,
   onScheduleNewMaintenance,
+  onBack,
 }) => {
   const [selectedService, setSelectedService] = useState<ServiceOption>(AVAILABLE_SERVICES[0]);
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-quito');
@@ -155,9 +158,15 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
     setIsSuccess(true);
     setNotes('');
 
+    // Una vez terminado, regresar automáticamente al módulo anterior
     setTimeout(() => {
       setIsSuccess(false);
-    }, 6000);
+      if (onBack) {
+        onBack();
+      } else {
+        window.history.back();
+      }
+    }, 1300);
   };
 
   const subtotal = selectedService.estimatedPrice;
@@ -169,7 +178,19 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
       {/* 1. Encabezado */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="py-1.5 px-3 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900 transition flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-xs"
+                title="Regresar"
+              >
+                <ArrowLeft className="w-4 h-4 text-zinc-600" />
+                <span>Volver</span>
+              </button>
+            )}
+
             <div className="p-2 rounded-md bg-blue-50 border border-blue-200 text-blue-600">
               <CalendarPlus className="w-5 h-5" />
             </div>
@@ -188,7 +209,7 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
         {isSuccess && (
           <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-300 rounded-md text-emerald-800 text-xs font-bold animate-fade-in shadow-xs">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>¡Cita {successBookingId} agendada y confirmada con éxito!</span>
+            <span>¡Cita {successBookingId} agendada con éxito! Redirigiendo...</span>
           </div>
         )}
       </div>

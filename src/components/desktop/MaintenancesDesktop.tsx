@@ -1,58 +1,24 @@
 // src/components/desktop/MaintenancesDesktop.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Calendar,
   PlusCircle,
-  Clock,
-  MapPin,
-  CheckCircle2,
 } from 'lucide-react';
 import { ScheduledMaintenance, MotorcycleClientData, Branch } from '../../types/customer';
-import { ModalPortal } from '../common/ModalPortal';
 
 interface Props {
   scheduledMaintenances: ScheduledMaintenance[];
-  onScheduleNewMaintenance: (maintenance: ScheduledMaintenance) => void;
+  onScheduleNewMaintenance?: (maintenance: ScheduledMaintenance) => void;
   motorcycle: MotorcycleClientData;
   branches: Branch[];
+  onNavigateToSchedule: () => void;
 }
 
 export const MaintenancesDesktop: React.FC<Props> = ({
   scheduledMaintenances,
-  onScheduleNewMaintenance,
   motorcycle,
-  branches,
+  onNavigateToSchedule,
 }) => {
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'matriz-quito');
-  const [selectedServiceTitle, setSelectedServiceTitle] = useState('Mantenimiento Preventivo (Aceite y Filtros)');
-  const [scheduleDate, setScheduleDate] = useState('2026-09-25');
-  const [scheduleTime, setScheduleTime] = useState('09:30');
-  const [scheduleNotes, setScheduleNotes] = useState('');
-
-  const handleConfirmSchedule = (e: React.FormEvent) => {
-    e.preventDefault();
-    const branch = branches.find((b) => b.id === selectedBranchId) || branches[0];
-    const newMaint: ScheduledMaintenance = {
-      id: `maint-${Date.now()}`,
-      serviceTitle: selectedServiceTitle,
-      recommendedKm: motorcycle.currentKm + 1000,
-      recommendedDate: scheduleDate,
-      scheduledDate: scheduleDate,
-      scheduledTime: scheduleTime,
-      branchName: branch.name,
-      branchId: branch.id,
-      status: 'confirmada',
-      estimatedCost: 65.0,
-      tasks: ['Aceite Sintético Motul', 'Filtro de Aceite OEM', 'Tensión y Lubricación de Cadena', 'Chequeo General de Frenos'],
-      notes: scheduleNotes || 'Cita solicitada desde portal de escritorio.',
-    };
-
-    onScheduleNewMaintenance(newMaint);
-    setIsScheduleModalOpen(false);
-    setScheduleNotes('');
-  };
-
   const kmSinceLastOil = motorcycle.currentKm - motorcycle.lastOilChangeKm;
   const kmRemainingOil = Math.max(0, motorcycle.oilChangeIntervalKm - kmSinceLastOil);
   const oilHealthPercentage = Math.max(0, Math.min(100, Math.round((kmRemainingOil / motorcycle.oilChangeIntervalKm) * 100)));
@@ -75,7 +41,7 @@ export const MaintenancesDesktop: React.FC<Props> = ({
 
         <button
           type="button"
-          onClick={() => setIsScheduleModalOpen(true)}
+          onClick={onNavigateToSchedule}
           className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-red-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
         >
           <PlusCircle className="w-4 h-4" />
@@ -163,130 +129,6 @@ export const MaintenancesDesktop: React.FC<Props> = ({
           ))}
         </div>
       </div>
-
-      {/* Modal Agendar Cita */}
-      <ModalPortal
-        isOpen={isScheduleModalOpen}
-        onClose={() => setIsScheduleModalOpen(false)}
-        maxWidth="max-w-md"
-      >
-        <div className="p-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-red-600" />
-            <h3 className="text-sm font-bold text-zinc-900">Agendar Cita en StarMotos</h3>
-          </div>
-          <button
-            onClick={() => setIsScheduleModalOpen(false)}
-            className="text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer font-bold"
-            title="Cerrar"
-          >
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={handleConfirmSchedule} className="p-5 space-y-4 text-xs">
-          <div>
-            <label className="block font-semibold text-zinc-700 mb-1.5">
-              Servicio Requerido
-            </label>
-            <select
-              value={selectedServiceTitle}
-              onChange={(e) => setSelectedServiceTitle(e.target.value)}
-              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs cursor-pointer focus:border-blue-600"
-            >
-              <option value="Mantenimiento Preventivo (Aceite y Filtros)">
-                Mantenimiento Preventivo (Aceite + Filtro + Cadena)
-              </option>
-              <option value="Servicio Mayor / Afinamiento">
-                Servicio Mayor (Válvulas + Inyección + Bujías)
-              </option>
-              <option value="Revisión de Frenos">
-                Revisión de Frenos y Pastillas
-              </option>
-              <option value="Kit de Arrastre">
-                Cambio Kit de Arrastre
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-zinc-700 mb-1.5">
-              Sucursal StarMotos
-            </label>
-            <select
-              value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
-              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs cursor-pointer focus:border-blue-600"
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.address})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-zinc-700 mb-1.5">
-                Fecha deseada
-              </label>
-              <input
-                type="date"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-                required
-                className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs font-mono focus:border-blue-600"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-zinc-700 mb-1.5">
-                Hora disponible
-              </label>
-              <select
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs font-mono cursor-pointer focus:border-blue-600"
-              >
-                <option value="08:30">08:30 AM</option>
-                <option value="09:30">09:30 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="14:00">02:00 PM</option>
-                <option value="16:00">04:00 PM</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-zinc-700 mb-1.5">
-              Observaciones adicionales
-            </label>
-            <textarea
-              value={scheduleNotes}
-              onChange={(e) => setScheduleNotes(e.target.value)}
-              rows={2}
-              placeholder="Detalles o síntomas para el mecánico..."
-              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2.5 text-xs placeholder:text-zinc-400 focus:border-blue-600"
-            />
-          </div>
-
-          <div className="pt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={() => setIsScheduleModalOpen(false)}
-              className="flex-1 py-2.5 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 transition cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-md shadow-red-600/20 cursor-pointer"
-            >
-              Confirmar Cita
-            </button>
-          </div>
-        </form>
-      </ModalPortal>
     </div>
   );
 };

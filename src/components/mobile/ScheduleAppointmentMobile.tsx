@@ -11,6 +11,7 @@ import {
   History,
   Wrench,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../WhatsAppIcon';
 import {
@@ -26,6 +27,7 @@ interface Props {
   branches: Branch[];
   scheduledMaintenances: ScheduledMaintenance[];
   onScheduleNewMaintenance: (maintenance: ScheduledMaintenance) => void;
+  onBack?: () => void;
 }
 
 const AVAILABLE_SERVICES = [
@@ -80,6 +82,7 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
   branches,
   scheduledMaintenances,
   onScheduleNewMaintenance,
+  onBack,
 }) => {
   // Pestaña activa: formulario de reserva vs solo historial de citas
   const [activeTab, setActiveTab] = useState<'form' | 'historial'>('form');
@@ -136,9 +139,15 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
     setIsSuccess(true);
     setNotes('');
 
+    // Una vez terminado, regresar automáticamente al módulo anterior
     setTimeout(() => {
       setIsSuccess(false);
-    }, 5000);
+      if (onBack) {
+        onBack();
+      } else {
+        window.history.back();
+      }
+    }, 1300);
   };
 
   return (
@@ -147,7 +156,18 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
       {/* 1. ENCABEZADO CON BOTÓN 'HISTORIAL' A LA DERECHA */}
       {/* ========================================================================= */}
       <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-900 transition flex items-center justify-center cursor-pointer shrink-0"
+              title="Volver al punto anterior"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+
           <div className="p-2 rounded-md bg-blue-50 border border-blue-200 text-blue-600 shrink-0">
             {activeTab === 'historial' ? (
               <History className="w-5 h-5 text-blue-600" />
@@ -201,7 +221,7 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
         <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-md text-emerald-800 text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>¡Cita {successId} confirmada con éxito!</span>
+            <span>¡Cita {successId} reservada con éxito! Redirigiendo...</span>
           </div>
           <button
             type="button"

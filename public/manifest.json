@@ -27,5 +27,12 @@
   "theme_color": "#ffffff",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "scope": "/"
+  "scope": "/",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://starmotos-portal.web.app/manifest.json"
+    }
+  ],
+  "prefer_related_applications": false
 }

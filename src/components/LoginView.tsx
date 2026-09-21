@@ -143,33 +143,26 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row overflow-x-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* ========================================================================= */}
-      {/* LADO IZQUIERDO (2/3 DEL ANCHO): IMAGEN COMPLETA CON "BIENVENIDO" (DESKTOP) */}
+      {/* LADO IZQUIERDO (2/3 DEL ANCHO): IMAGEN HERO A PANTALLA COMPLETA (DESKTOP)  */}
       {/* ========================================================================= */}
-      <div className="hidden lg:flex relative lg:w-2/3 h-full min-h-screen items-center justify-center overflow-hidden shrink-0 bg-zinc-950 select-none">
-        {/* Fondo con desenfoque ambiental para que combine armónicamente */}
-        <img
-          src="/login-motorcycle-cliff.jpg"
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110 pointer-events-none"
-        />
-
-        {/* Imagen principal mostrada 100% COMPLETA sin ningún recorte */}
+      <div className="hidden lg:block relative lg:w-2/3 h-full min-h-screen overflow-hidden shrink-0 bg-zinc-950 select-none">
+        {/* Imagen ocupando el 100% del contenedor con encuadre perfecto hacia la moto */}
         <img
           src="/login-motorcycle-cliff.jpg"
           alt="StarMotos Aventura y Precisión en Ruta"
-          className="relative z-10 w-full h-full max-h-screen object-contain object-center p-3 xl:p-6 drop-shadow-2xl"
+          className="w-full h-full min-h-screen object-cover transition-transform duration-1000 ease-out hover:scale-105"
+          style={{ objectPosition: '72% 50%' }}
         />
 
-        {/* Gradiente sutil inferior */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none z-20" />
+        {/* Gradiente cinematográfico inferior para legibilidad del texto */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Texto "Bienvenido" sutil y elegante en la esquina inferior */}
-        <div className="absolute bottom-6 left-6 sm:bottom-10 sm:left-10 z-30 select-none pointer-events-none max-w-xl">
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
+        {/* Texto "Bienvenido" elegante sobre la imagen en la esquina inferior */}
+        <div className="absolute bottom-6 left-6 sm:bottom-12 sm:left-12 z-10 select-none pointer-events-none max-w-xl">
+          <h2 className="text-3xl sm:text-6xl font-black tracking-tight text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
             Bienvenido
           </h2>
-          <p className="text-xs sm:text-sm text-zinc-200 mt-1 font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-lg">
+          <p className="text-xs sm:text-base text-zinc-100 mt-1.5 sm:mt-2 font-medium leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)] max-w-lg">
             Portal oficial de seguimiento vehicular y servicio técnico de StarMotos.
           </p>
         </div>

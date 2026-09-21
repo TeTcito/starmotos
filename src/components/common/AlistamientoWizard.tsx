@@ -1,5 +1,5 @@
 // src/components/common/AlistamientoWizard.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Search,
@@ -17,6 +17,16 @@ import {
   Bike,
   Wrench,
   DollarSign,
+  Eye,
+  FileText,
+  Clock,
+  Printer,
+  Trash2,
+  Check,
+  Phone,
+  Mail,
+  MapPin,
+  Tag,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -51,7 +61,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
   onSaveRecord,
   recentRecords = [],
 }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Modo de visualización: 'list' (por defecto) o 'form' (cuando se crea un nuevo alistamiento)
+  const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
+
+  // Búsqueda en el listado
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Registro seleccionado para ver detalle en modal
+  const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<AlistamientoFullRecord | null>(null);
+
+  // Paso para vista móvil (1: Cliente, 2: Moto, 3: Servicio)
+  const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(1);
 
   // Fecha de hoy por defecto en formato YYYY-MM-DD
   const todayStr = new Date().toISOString().split('T')[0];
@@ -121,9 +141,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
     }));
   }, [defaultAtendidoPor, defaultSede, defaultSedeId]);
 
+  // Filtrado de alistamientos existentes
+  const filteredRecords = useMemo(() => {
+    if (!searchTerm.trim()) return recentRecords;
+    const term = searchTerm.toLowerCase().trim();
+    return recentRecords.filter((r) => {
+      const fullClient = `${r.nombres} ${r.apellidos}`.toLowerCase();
+      return (
+        r.cedulaRuc.toLowerCase().includes(term) ||
+        fullClient.includes(term) ||
+        r.placa.toLowerCase().includes(term) ||
+        r.chasis.toLowerCase().includes(term) ||
+        r.modeloMarca.toLowerCase().includes(term) ||
+        r.sede.toLowerCase().includes(term) ||
+        r.tecnicoResponsable.toLowerCase().includes(term)
+      );
+    });
+  }, [recentRecords, searchTerm]);
+
   // Auto-llenado con SRI
-  const handleSearchSri = () => {
-    const cleanId = formData.cedulaRuc.trim();
+  const handleSearchSri = (idToSearch?: string) => {
+    const cleanId = (idToSearch || formData.cedulaRuc).trim();
     if (!cleanId) return;
 
     setIsSearchingSri(true);
@@ -134,66 +172,159 @@ export const AlistamientoWizard: React.FC<Props> = ({
       setIsSearchingSri(false);
 
       if (sriData) {
-        // Separar nombres y apellidos si es posible
         const parts = sriData.razonSocial.split(' ');
         let nombres = '';
         let apellidos = '';
+
         if (parts.length >= 4) {
           apellidos = `${parts[0]} ${parts[1]}`;
           nombres = parts.slice(2).join(' ');
-        } else if (parts.length >= 2) {
+        } else if (parts.length === 3) {
+          apellidos = `${parts[0]} ${parts[1]}`;
+          nombres = parts[2];
+        } else if (parts.length === 2) {
           apellidos = parts[0];
-          nombres = parts.slice(1).join(' ');
+          nombres = parts[1];
         } else {
           nombres = sriData.razonSocial;
+          apellidos = '';
         }
 
         setFormData((prev) => ({
           ...prev,
-          nombres: nombres,
-          apellidos: apellidos,
+          cedulaRuc: cleanId,
+          nombres: nombres || prev.nombres,
+          apellidos: apellidos || prev.apellidos,
           direccion: sriData.address || prev.direccion,
-          email: prev.email || sriData.email,
-          celular1: prev.celular1 || sriData.phone,
+          email: sriData.email || prev.email,
         }));
-        setSriFeedback(`✓ Datos SRI recuperados: ${sriData.razonSocial}`);
+        setSriFeedback(`✓ Datos verificados con el SRI: ${sriData.razonSocial}`);
       } else {
-        setSriFeedback('Contribuyente no registrado en padrón. Complete manualmente.');
+        setSriFeedback(`Información: No registrado en base SRI local. Ingrese los datos manualmente.`);
       }
-    }, 500);
+    }, 400);
   };
 
-  // Toggle servicios en Paso 3
-  const toggleService = (service: ServiceActionType) => {
+  // Iniciar nuevo alistamiento con o sin cédula previa
+  const handleStartNewAlistamiento = (initialCedula?: string) => {
+    const cedula = initialCedula?.trim() || '';
+    setFormData({
+      id: '',
+      atendidoPor: defaultAtendidoPor,
+      sede: defaultSede,
+      sedeId: defaultSedeId,
+      fechaServicio: todayStr,
+      nombres: '',
+      apellidos: '',
+      cedulaRuc: cedula,
+      celular1: '',
+      celular2: '',
+      email: '',
+      direccion: '',
+      origen: origins[0] || 'almacen Tenso santo domingo',
+      motoPreviaId: '',
+      chasis: '',
+      placa: '',
+      modeloMarca: '',
+      serviciosRealizados: ['alistamiento_pdi'],
+      tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
+      tecnicoId: technicians[0]?.id || 'tec-01',
+      kilometraje: 0,
+      aceite: 'sin_aceite',
+      numeroFactura: '',
+      numeroTicket: '',
+      valorServicio: 35.0,
+      montoPagado: 35.0,
+      metodoPago: 'Efectivo',
+      observaciones: '',
+      proximoMantenimientoKm: 1000,
+      fotos: [],
+      createdAt: '',
+    });
+    setSriFeedback(null);
+    setValidationAlert(null);
+    setMobileStep(1);
+    setViewMode('form');
+
+    if (cedula && cedula.length >= 10) {
+      handleSearchSri(cedula);
+    }
+  };
+
+  // Reusar datos de un cliente existente para nuevo servicio
+  const handleNewServiceForExisting = (record: AlistamientoFullRecord) => {
+    setFormData({
+      id: '',
+      atendidoPor: defaultAtendidoPor,
+      sede: defaultSede,
+      sedeId: defaultSedeId,
+      fechaServicio: todayStr,
+      nombres: record.nombres,
+      apellidos: record.apellidos,
+      cedulaRuc: record.cedulaRuc,
+      celular1: record.celular1,
+      celular2: record.celular2 || '',
+      email: record.email || '',
+      direccion: record.direccion || '',
+      origen: record.origen,
+      motoPreviaId: record.chasis || record.placa,
+      chasis: record.chasis,
+      placa: record.placa,
+      modeloMarca: record.modeloMarca,
+      serviciosRealizados: ['mantenimiento'],
+      tecnicoResponsable: record.tecnicoResponsable || technicians[0]?.name || 'WILLIAM MEZA',
+      tecnicoId: record.tecnicoId || technicians[0]?.id || 'tec-01',
+      kilometraje: record.kilometraje ? record.kilometraje + 500 : 500,
+      aceite: 'sin_aceite',
+      numeroFactura: '',
+      numeroTicket: '',
+      valorServicio: 35.0,
+      montoPagado: 35.0,
+      metodoPago: 'Efectivo',
+      observaciones: `Mantenimiento preventivo subsecuente. Cliente previo ${record.cedulaRuc}.`,
+      proximoMantenimientoKm: (record.kilometraje || 0) + 1500,
+      fotos: [],
+      createdAt: '',
+    });
+    setSriFeedback(`✓ Datos del cliente ${record.nombres} ${record.apellidos} y moto precargados.`);
+    setValidationAlert(null);
+    setMobileStep(1);
+    setViewMode('form');
+  };
+
+  // Servicios toggle
+  const toggleServicio = (servicio: ServiceActionType) => {
     setFormData((prev) => {
-      const current = prev.serviciosRealizados;
-      if (current.includes(service)) {
-        if (current.length === 1) return prev; // Mantener al menos uno
-        return { ...prev, serviciosRealizados: current.filter((s) => s !== service) };
+      const exists = prev.serviciosRealizados.includes(servicio);
+      if (exists) {
+        return {
+          ...prev,
+          serviciosRealizados: prev.serviciosRealizados.filter((s) => s !== servicio),
+        };
       } else {
-        return { ...prev, serviciosRealizados: [...current, service] };
+        return {
+          ...prev,
+          serviciosRealizados: [...prev.serviciosRealizados, servicio],
+        };
       }
     });
   };
 
-  // Agregar foto demo o input
-  const handleAddPhoto = () => {
-    if (formData.fotos.length >= 7) return;
-    const samplePhotos = [
+  // Subir foto simulada
+  const handleAddMockPhoto = () => {
+    const mockPhotos = [
       'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1609630875171-b1321377ee65?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1449426468159-d96dbf08f19f?auto=format&fit=crop&w=600&q=80',
     ];
-    const randomPhoto = samplePhotos[formData.fotos.length % samplePhotos.length];
+    const randomPhoto = mockPhotos[formData.fotos.length % mockPhotos.length];
     setFormData((prev) => ({
       ...prev,
       fotos: [...prev.fotos, randomPhoto],
     }));
   };
 
-  // Eliminar foto
   const handleRemovePhoto = (index: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -243,7 +374,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setNewOriginInput('');
   };
 
-  // Envío final del registro con validación estricta y retorno automático
+  // Envío final del registro con validación estricta y retorno automático al listado
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -271,31 +402,31 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     if (missingStep1.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en el Paso 1: Cliente',
+        title: 'Faltan datos obligatorios en Paso 1: Cliente',
         fields: missingStep1,
         stepTarget: 1,
       });
-      setStep(1);
+      setMobileStep(1);
       return;
     }
 
     if (missingStep2.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en el Paso 2: Moto',
+        title: 'Faltan datos obligatorios en Paso 2: Moto',
         fields: missingStep2,
         stepTarget: 2,
       });
-      setStep(2);
+      setMobileStep(2);
       return;
     }
 
     if (missingStep3.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos obligatorios en el Paso 3: Servicio',
+        title: 'Faltan datos obligatorios en Paso 3: Servicio',
         fields: missingStep3,
         stepTarget: 3,
       });
-      setStep(3);
+      setMobileStep(3);
       return;
     }
 
@@ -320,898 +451,1398 @@ export const AlistamientoWizard: React.FC<Props> = ({
     onSaveRecord(fullRecord);
 
     confetti({
-      particleCount: 100,
-      spread: 70,
+      particleCount: 120,
+      spread: 75,
       origin: { y: 0.6 },
-      colors: ['#0f3299', '#d92525', '#10b981'],
+      colors: ['#0f3299', '#d92525', '#10b981', '#f59e0b'],
     });
 
-    // Resetear formulario
-    setStep(1);
-    setFormData({
-      id: '',
-      atendidoPor: defaultAtendidoPor,
-      sede: defaultSede,
-      sedeId: defaultSedeId,
-      fechaServicio: todayStr,
-      nombres: '',
-      apellidos: '',
-      cedulaRuc: '',
-      celular1: '',
-      celular2: '',
-      email: '',
-      direccion: '',
-      origen: origins[0] || 'almacen Tenso santo domingo',
-      motoPreviaId: '',
-      chasis: '',
-      placa: '',
-      modeloMarca: '',
-      serviciosRealizados: ['alistamiento_pdi'],
-      tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
-      tecnicoId: technicians[0]?.id || 'tec-01',
-      kilometraje: 0,
-      aceite: 'sin_aceite',
-      numeroFactura: '',
-      numeroTicket: '',
-      valorServicio: 35.0,
-      montoPagado: 35.0,
-      metodoPago: 'Efectivo',
-      observaciones: '',
-      proximoMantenimientoKm: 1000,
-      fotos: [],
-      createdAt: '',
-    });
+    // Volver al listado y limpiar formulario
+    setViewMode('list');
+    setSearchTerm('');
     setSriFeedback(null);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* ========================================================================= */}
-      {/* ALERTA SUPERIOR DE VALIDACIÓN (SI FALTAN CAMPOS)                          */}
+      {/* 1. VISTA: LISTADO HORIZONTAL DE ALISTAMIENTOS PREVIOS                     */}
       {/* ========================================================================= */}
-      {validationAlert && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
-          <div className="flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-xs font-bold text-red-900">{validationAlert.title}</h4>
-              <p className="text-[11px] text-red-700 mt-0.5">
-                Por favor complete los campos obligatorios: <span className="font-bold underline">{validationAlert.fields.join(', ')}</span>.
-              </p>
+      {viewMode === 'list' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Header Superior con Buscador y Acción Principal */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-black text-zinc-900 tracking-tight">
+                    Módulo de Alistamiento & Mantenimientos
+                  </h2>
+                  <span className="px-2.5 py-0.5 text-[11px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
+                    {recentRecords.length} Registros
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Historial de alistamientos PDI, entregas técnicas y auditoría de clientes StarMotos.
+                </p>
+              </div>
+
+              {/* Botón "+ Nuevo Alistamiento" */}
+              <button
+                type="button"
+                onClick={() => handleStartNewAlistamiento()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nuevo Alistamiento</span>
+              </button>
             </div>
+
+            {/* Barra de Búsqueda */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
+                    handleStartNewAlistamiento(searchTerm.trim());
+                  }
+                }}
+                placeholder="Buscar cliente por cédula/RUC, nombres, modelo de moto, placa o chasis..."
+                className="w-full pl-10 pr-10 py-2.5 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-xl text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Banner sugerencia si busca una cédula que no existe */}
+            {searchTerm.trim().length >= 8 && filteredRecords.length === 0 && (
+              <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-amber-900">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    No encontramos alistamientos con el criterio <strong className="font-mono">"{searchTerm}"</strong>.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Registrar nuevo con C.I. {searchTerm} (SRI)</span>
+                </button>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => setValidationAlert(null)}
-            className="p-1 text-red-400 hover:text-red-700 rounded-lg cursor-pointer transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* Listado de Tarjetas Horizontales */}
+          {filteredRecords.length > 0 ? (
+            <div className="space-y-2.5">
+              {filteredRecords.map((record) => {
+                const isPdi = record.serviciosRealizados.includes('alistamiento_pdi');
+                return (
+                  <div
+                    key={record.id}
+                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all relative overflow-hidden group"
+                  >
+                    {/* Borde izquierdo acentuado */}
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                        isPdi ? 'bg-blue-600' : 'bg-emerald-600'
+                      }`}
+                    />
+
+                    <div className="pl-2">
+                      {/* Fila Superior: Metadatos y Badges */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-zinc-100 text-[11px]">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 font-bold border border-zinc-200">
+                            <Building2 className="w-3 h-3 text-zinc-500" />
+                            <span>{record.sede}</span>
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 text-zinc-500">
+                            <Calendar className="w-3 h-3 text-zinc-400" />
+                            <span>{record.fechaServicio}</span>
+                          </span>
+
+                          <span className="font-mono text-zinc-400 text-[10px]">
+                            {record.numeroTicket || record.id}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px] flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>COMPLETADO</span>
+                          </span>
+                          <span className="font-black text-xs text-zinc-900">
+                            ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cuerpo de la Tarjeta: 3 Bloques Simétricos */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 py-3 text-xs">
+                        {/* 1. Cliente */}
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1">
+                            <UserCheck className="w-3 h-3" />
+                            <span>Cliente</span>
+                          </div>
+                          <div className="font-bold text-zinc-900 text-sm truncate">
+                            {record.nombres} {record.apellidos}
+                          </div>
+                          <div className="text-zinc-600 flex items-center gap-2 font-mono text-[11px]">
+                            <span>C.I: {record.cedulaRuc}</span>
+                            {record.celular1 && <span>• Tel: {record.celular1}</span>}
+                          </div>
+                          <div className="text-[11px] text-zinc-400 truncate">
+                            Origen: <span className="text-zinc-600 font-medium">{record.origen}</span>
+                          </div>
+                        </div>
+
+                        {/* 2. Moto */}
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1">
+                            <Bike className="w-3 h-3" />
+                            <span>Motocicleta</span>
+                          </div>
+                          <div className="font-bold text-zinc-900 text-sm truncate">
+                            {record.modeloMarca || 'Modelo no especificado'}
+                          </div>
+                          <div className="text-zinc-600 flex items-center gap-2 font-mono text-[11px]">
+                            <span className="px-1.5 py-0.2 bg-zinc-100 border border-zinc-200 rounded font-black text-zinc-800">
+                              {record.placa ? record.placa : 'SIN PLACA'}
+                            </span>
+                            <span className="truncate">VIN: {record.chasis ? record.chasis.substring(0, 12) + '...' : 'S/N'}</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-500">
+                            Km: <span className="font-bold text-zinc-800">{record.kilometraje || 0} km</span>
+                            {record.aceite && record.aceite !== 'sin_aceite' && (
+                              <span className="ml-2 text-zinc-400">• Aceite: {record.aceite}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3. Servicio & Técnico */}
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1">
+                            <Wrench className="w-3 h-3" />
+                            <span>Servicio & Entrega</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {record.serviciosRealizados.map((srv) => (
+                              <span
+                                key={srv}
+                                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-bold"
+                              >
+                                {srv.replace('_', ' ').toUpperCase()}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="text-zinc-600 text-[11px]">
+                            Técnico: <span className="font-bold text-zinc-800">{record.tecnicoResponsable}</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-500 flex items-center gap-2">
+                            <span>Factura: {record.numeroFactura || 'Por emitir'}</span>
+                            <span>• {record.metodoPago || 'Efectivo'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra Inferior de Acciones Rápidas */}
+                      <div className="pt-2 border-t border-zinc-100 flex items-center justify-between gap-2">
+                        <div className="text-[11px] text-zinc-400 truncate">
+                          {record.observaciones ? (
+                            <span>Obs: <span className="text-zinc-600 italic">"{record.observaciones.substring(0, 65)}..."</span></span>
+                          ) : (
+                            <span>Alistamiento PDI sin observaciones mecánicas registradas.</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRecordForDetail(record)}
+                            className="px-2.5 py-1.5 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 hover:border-blue-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>Ver Ficha</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleNewServiceForExisting(record)}
+                            className="px-2.5 py-1.5 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            title="Crear nuevo mantenimiento subsecuente con este cliente"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Nuevo Servicio</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <Bike className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900">No se encontraron alistamientos registrados</h3>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                {searchTerm
+                  ? 'Ningún registro coincide con los criterios de búsqueda especificados.'
+                  : 'Aún no hay alistamientos registrados en esta sede. Inicia el primer registro ahora.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleStartNewAlistamiento(searchTerm)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Registrar Primer Alistamiento</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 1. BARRA SUPERIOR DE PASOS (NAVEGACIÓN LIBRE ENTRE CLIENTE, MOTO Y SERVICIO) */}
+      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO                                     */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-3 gap-2.5 select-none">
-        {/* Paso 1 */}
-        <button
-          type="button"
-          onClick={() => {
-            setStep(1);
-            if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-          }}
-          className={`py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            step === 1
-              ? 'bg-[#0f3299] text-white shadow-md shadow-blue-900/20 ring-2 ring-blue-600/30'
-              : formData.cedulaRuc && formData.nombres
-              ? 'bg-[#d1fae5] text-[#065f46] border border-[#a7f3d0] hover:bg-[#bbf7d0]'
-              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
-          }`}
-        >
-          {formData.cedulaRuc && formData.nombres && (
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#059669] shrink-0" />
-          )}
-          <span>1. Cliente</span>
-        </button>
-
-        {/* Paso 2 */}
-        <button
-          type="button"
-          onClick={() => {
-            setStep(2);
-            if (validationAlert?.stepTarget === 2) setValidationAlert(null);
-          }}
-          className={`py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            step === 2
-              ? 'bg-[#0f3299] text-white shadow-md shadow-blue-900/20 ring-2 ring-blue-600/30'
-              : formData.modeloMarca
-              ? 'bg-[#d1fae5] text-[#065f46] border border-[#a7f3d0] hover:bg-[#bbf7d0]'
-              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
-          }`}
-        >
-          {formData.modeloMarca && (
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#059669] shrink-0" />
-          )}
-          <span>2. Moto</span>
-        </button>
-
-        {/* Paso 3 */}
-        <button
-          type="button"
-          onClick={() => {
-            setStep(3);
-            if (validationAlert?.stepTarget === 3) setValidationAlert(null);
-          }}
-          className={`py-2.5 px-3 rounded-xl text-xs font-bold text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            step === 3
-              ? 'bg-[#0f3299] text-white shadow-md shadow-blue-900/20 ring-2 ring-blue-600/30'
-              : formData.tecnicoResponsable && formData.valorServicio
-              ? 'bg-[#d1fae5] text-[#065f46] border border-[#a7f3d0] hover:bg-[#bbf7d0]'
-              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
-          }`}
-        >
-          {formData.tecnicoResponsable && formData.valorServicio && (
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#059669] shrink-0" />
-          )}
-          <span>3. Servicio</span>
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 2. FORMULARIO PASO A PASO (DISEÑO COMPACTO Y SIMÉTRICO)                    */}
-      {/* ========================================================================= */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-5 sm:p-6 shadow-xs">
-        {/* ===================== PASO 1: CLIENTE ===================== */}
-        {step === 1 && (
-          <div className="space-y-4">
-            {/* Bloque: Atención */}
-            <div>
-              <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider mb-2">
-                Atención
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Atendido por *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.atendidoPor}
-                    onChange={(e) => setFormData({ ...formData, atendidoPor: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Sede *
-                  </label>
-                  <select
-                    value={formData.sedeId}
-                    onChange={(e) => {
-                      const selectedWs = workshops.find((w) => w.id === e.target.value);
-                      setFormData({
-                        ...formData,
-                        sedeId: e.target.value,
-                        sede: selectedWs?.name || e.target.value,
-                      });
-                    }}
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none cursor-pointer"
-                  >
-                    {workshops.map((ws) => (
-                      <option key={ws.id} value={ws.id}>
-                        {ws.name.replace('StarMotos ', '')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Fecha del servicio *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.fechaServicio}
-                    onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none font-mono"
-                    required
-                  />
-                  <p className="text-[10px] text-zinc-400 mt-0.5">
-                    Por defecto hoy — cámbiala si es anterior.
-                  </p>
-                </div>
+      {viewMode === 'form' && (
+        <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
+          {/* Header Superior del Formulario con Botón de Regreso */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setValidationAlert(null);
+                  setViewMode('list');
+                }}
+                className="px-3 py-1.5 text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver al Listado</span>
+              </button>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-zinc-900">
+                  Nuevo Registro de Alistamiento & PDI
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  Sede: <span className="font-bold text-zinc-800">{formData.sede}</span> • Atendido por:{' '}
+                  <span className="font-bold text-zinc-800">{formData.atendidoPor}</span>
+                </p>
               </div>
             </div>
 
-            <hr className="border-zinc-100" />
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Guardar Alistamiento</span>
+              </button>
+            </div>
+          </div>
 
-            {/* Bloque: Datos del cliente */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
-                  Datos del cliente
-                </h3>
+          {/* ALERTA SUPERIOR DE VALIDACIÓN (SI FALTAN CAMPOS) */}
+          {validationAlert && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-bold text-red-900">{validationAlert.title}</h4>
+                  <p className="text-[11px] text-red-700 mt-0.5">
+                    Por favor complete los campos obligatorios:{' '}
+                    <span className="font-bold underline">{validationAlert.fields.join(', ')}</span>.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setValidationAlert(null)}
+                className="text-red-400 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* ===================================================================== */}
+          {/* LAYOUT ESCRITORIO: 3 COLUMNAS SIMULTÁNEAS (CLIENTE | MOTO | SERVICIO) */}
+          {/* ===================================================================== */}
+          <div className="hidden lg:grid lg:grid-cols-3 gap-5 items-start">
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE                             */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
+                    <p className="text-[10px] text-zinc-400">Verificación SRI y contacto</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Paso 1
+                </span>
+              </div>
+
+              {/* CÉDULA / RUC (PRIMERITO) */}
+              <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-200/80 space-y-1.5">
+                <label className="block text-[11px] font-black uppercase text-blue-900">
+                  1. Cédula o RUC del Cliente *
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={formData.cedulaRuc}
+                    onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchSri();
+                      }
+                    }}
+                    placeholder="Ej: 2350999252"
+                    className="flex-1 px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSearchSri()}
+                    disabled={isSearchingSri || !formData.cedulaRuc.trim()}
+                    className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                    title="Consultar SRI Ecuador"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span>{isSearchingSri ? 'SRI...' : 'SRI'}</span>
+                  </button>
+                </div>
                 {sriFeedback && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 truncate max-w-[280px]">
+                  <p className="text-[10px] text-blue-800 font-medium leading-tight">
                     {sriFeedback}
-                  </span>
+                  </p>
                 )}
               </div>
 
-              {/* FILA 1: CÉDULA / RUC PRIMERITO (CONSULTA SRI) + ORIGEN A LA PAR */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                {/* Cédula / RUC */}
+              {/* Nombres y Apellidos en 2 columnas compactas */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-bold text-zinc-800">
-                      Cédula / RUC * <span className="text-[10px] font-normal text-blue-600">(Consulta SRI automática)</span>
-                    </label>
-                  </div>
-                  <div className="relative flex items-center">
-                    <input
-                      type="text"
-                      value={formData.cedulaRuc}
-                      onChange={(e) => {
-                        setFormData({ ...formData, cedulaRuc: e.target.value });
-                        if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSearchSri();
-                        }
-                      }}
-                      placeholder="Ej: 2350999252 o 1712345678001"
-                      className="w-full px-3 py-1.5 pr-24 text-xs font-mono text-zinc-900 bg-blue-50/40 border border-blue-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none font-bold"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSearchSri}
-                      disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                      title="Consultar en padrón del SRI"
-                      className="absolute right-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-md text-[10px] font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
-                    >
-                      <Search className="w-3 h-3" />
-                      <span>{isSearchingSri ? 'Buscando...' : 'Consultar'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Origen (tipo de cliente) */}
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Origen (tipo de cliente)
-                  </label>
-                  <div className="flex gap-1.5">
-                    <select
-                      value={formData.origen}
-                      onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                      className="flex-1 px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none cursor-pointer"
-                    >
-                      {origins.map((orig) => (
-                        <option key={orig} value={orig}>
-                          {orig}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowAddOriginModal(true)}
-                      title="Agregar nuevo origen / almacén"
-                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition cursor-pointer flex items-center justify-center shrink-0"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* FILA 2: NOMBRES Y APELLIDOS EN COLUMNAS COMPACTAS Y EQUILIBRADAS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
                     Nombres *
                   </label>
                   <input
                     type="text"
                     value={formData.nombres}
-                    onChange={(e) => {
-                      setFormData({ ...formData, nombres: e.target.value });
-                      if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-                    }}
+                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
                     placeholder="Ej: Felix Rafael"
-                    className="w-full px-3 py-1.5 text-xs text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
                     Apellidos *
                   </label>
                   <input
                     type="text"
                     value={formData.apellidos}
-                    onChange={(e) => {
-                      setFormData({ ...formData, apellidos: e.target.value });
-                      if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-                    }}
+                    onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
                     placeholder="Ej: Gracia Guato"
-                    className="w-full px-3 py-1.5 text-xs text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
                 </div>
               </div>
 
-              {/* FILA 3: CELULAR 1 Y CELULAR 2 PAREJOS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {/* Celulares en 2 columnas compactas */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Celular 1 *
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.celular1}
-                    onChange={(e) => {
-                      setFormData({ ...formData, celular1: e.target.value });
-                      if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-                    }}
-                    placeholder="0982852456"
-                    className="w-full px-3 py-1.5 text-xs font-mono text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Celular 2 <span className="font-normal text-zinc-400">(Opcional)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.celular2}
-                    onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
-                    placeholder="Opcional"
-                    className="w-full px-3 py-1.5 text-xs font-mono text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* FILA 4: CORREO Y DIRECCIÓN PAREJOS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Correo electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="felix.graciag.r@gmail.com"
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Dirección de residencia
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Celular Principal *
                   </label>
                   <input
                     type="text"
-                    value={formData.direccion}
-                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    placeholder="Quevedo Av. Quito frente a la planta de agua"
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
+                    value={formData.celular1}
+                    onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                    placeholder="Ej: 0982852456"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Celular Opcional
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.celular2}
+                    onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
+                    placeholder="Ej: 0991234567"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Botón Continuar al paso 2 */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep(2);
-                  if (validationAlert?.stepTarget === 1) setValidationAlert(null);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#0f3299] hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md"
-              >
-                <span>Continuar a Datos de Moto</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ===================== PASO 2: MOTO ===================== */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider mb-2">
-                Datos de la moto
-              </h3>
-
-              {/* Selector de moto previa */}
-              <div className="mb-3">
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                  Moto de este cliente
+              {/* Email */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  Correo Electrónico
                 </label>
-                <select
-                  value={formData.motoPreviaId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'tundra-r200') {
-                      setFormData({
-                        ...formData,
-                        motoPreviaId: val,
-                        modeloMarca: 'Tundra r200',
-                        placa: 'KX284T',
-                        chasis: 'LBBP57008PA049182',
-                      });
-                    } else if (val === 'benelli-trk') {
-                      setFormData({
-                        ...formData,
-                        motoPreviaId: val,
-                        modeloMarca: 'Benelli TRK 502X ABS',
-                        placa: 'PBX-8492',
-                        chasis: 'LC6PC8901PA112390',
-                      });
-                    } else {
-                      setFormData({
-                        ...formData,
-                        motoPreviaId: '',
-                      });
-                    }
-                  }}
-                  className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none cursor-pointer"
-                >
-                  <option value="">Seleccione o registre una moto...</option>
-                  <option value="tundra-r200">Tundra r200 — Placa: KX284T</option>
-                  <option value="benelli-trk">Benelli TRK 502X — Placa: PBX-8492</option>
-                  <option value="nueva">+ Registrar Nueva Motocicleta</option>
-                </select>
-                <p className="text-[10px] text-zinc-400 mt-0.5">
-                  Si ya visitó antes con otra moto, selecciónala aquí para completar automáticamente.
-                </p>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="ejemplo@starmotos.ec"
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 focus:bg-white"
+                />
               </div>
 
-              {/* Campos Chasis, Placa, Modelo - Marca en 3 columnas simétricas */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Dirección */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  Dirección Domiciliaria
+                </label>
+                <input
+                  type="text"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                  placeholder="Av. Principal y Secundaria, Ciudad"
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 focus:bg-white"
+                />
+              </div>
+
+              {/* Origen / Concesionario con Botón "+ Agregar" */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
+                    Origen / Almacén *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddOriginModal(true)}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Nuevo Almacén</span>
+                  </button>
+                </div>
+                <select
+                  value={formData.origen}
+                  onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                >
+                  {origins.map((orig) => (
+                    <option key={orig} value={orig}>
+                      {orig}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sede y Atendido Por */}
+              <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-500">
+                <span>Atendido por: <strong className="text-zinc-800">{formData.atendidoPor}</strong></span>
+                <span>Sede: <strong className="text-zinc-800">{formData.sede}</strong></span>
+              </div>
+            </div>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTOCICLETA                      */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900">Datos de la Moto</h3>
+                    <p className="text-[10px] text-zinc-400">Identificación técnica del vehículo</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                  Paso 2
+                </span>
+              </div>
+
+              {/* Modelo - Marca */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  Modelo y Marca *
+                </label>
+                <input
+                  type="text"
+                  value={formData.modeloMarca}
+                  onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                  placeholder="Ej: Tundra r200 / Bajaj Pulsar NS 200"
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-red-600 focus:bg-white"
+                  required
+                />
+              </div>
+
+              {/* Placa y Chasis VIN */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-zinc-600">
+                      Placa
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                      className="text-[9px] text-zinc-500 hover:text-zinc-800 underline"
+                    >
+                      En trámite
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    placeholder="Ej: KX284T"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
                     Chasis (VIN)
                   </label>
                   <input
                     type="text"
                     value={formData.chasis}
                     onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                    placeholder="LBBP57008PA049182"
-                    className="w-full px-3 py-1.5 text-xs font-mono text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Placa *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.placa}
-                    onChange={(e) => {
-                      setFormData({ ...formData, placa: e.target.value.toUpperCase() });
-                      if (validationAlert?.stepTarget === 2) setValidationAlert(null);
-                    }}
-                    placeholder="KX284T"
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Modelo - Marca *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.modeloMarca}
-                    onChange={(e) => {
-                      setFormData({ ...formData, modeloMarca: e.target.value });
-                      if (validationAlert?.stepTarget === 2) setValidationAlert(null);
-                    }}
-                    placeholder="Tundra r200"
-                    className="w-full px-3 py-1.5 text-xs font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    required
+                    placeholder="LBBP57008..."
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Botones Atrás y Continuar al paso 3 */}
-            <div className="pt-2 flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="py-2.5 px-5 rounded-xl border border-zinc-300 text-zinc-700 font-bold text-xs flex items-center gap-1.5 hover:bg-zinc-50 transition cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Atrás</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setStep(3);
-                  if (validationAlert?.stepTarget === 2) setValidationAlert(null);
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-[#0f3299] hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md"
-              >
-                <span>Continuar a Servicio</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ===================== PASO 3: SERVICIO ===================== */}
-        {step === 3 && (
-          <form onSubmit={handleFinalSubmit} className="space-y-4">
-            <div>
-              <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider mb-2">
-                Datos del servicio
-              </h3>
-
-              {/* ¿Qué se hizo? (Pills seleccionables tipo captura) */}
-              <div className="mb-3.5">
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1.5">
-                  ¿Qué se hizo? *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleService('alistamiento_pdi')}
-                    className={`py-2 px-3 rounded-lg font-bold text-xs text-center border transition-all cursor-pointer ${
-                      formData.serviciosRealizados.includes('alistamiento_pdi')
-                        ? 'bg-[#0a2373] text-white border-[#0a2373] shadow-xs'
-                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    ALISTAMIENTO PDI
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleService('engrasado')}
-                    className={`py-2 px-3 rounded-lg font-bold text-xs text-center border transition-all cursor-pointer ${
-                      formData.serviciosRealizados.includes('engrasado')
-                        ? 'bg-[#0a2373] text-white border-[#0a2373] shadow-xs'
-                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    Engrasado
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleService('mantenimiento')}
-                    className={`py-2 px-3 rounded-lg font-bold text-xs text-center border transition-all cursor-pointer ${
-                      formData.serviciosRealizados.includes('mantenimiento')
-                        ? 'bg-[#0a2373] text-white border-[#0a2373] shadow-xs'
-                        : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'
-                    }`}
-                  >
-                    Mantenimiento
-                  </button>
-                </div>
-              </div>
-
-              {/* Técnico responsable con botón (+) */}
-              <div className="mb-3">
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                  Técnico responsable *
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={formData.tecnicoResponsable}
-                    onChange={(e) => {
-                      const selected = technicians.find((t) => t.name === e.target.value);
-                      setFormData({
-                        ...formData,
-                        tecnicoResponsable: e.target.value,
-                        tecnicoId: selected?.id || '',
-                      });
-                      if (validationAlert?.stepTarget === 3) setValidationAlert(null);
-                    }}
-                    className="flex-1 px-3 py-1.5 text-xs font-bold text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none cursor-pointer"
-                  >
-                    {technicians.map((tech) => (
-                      <option key={tech.id} value={tech.name}>
-                        {tech.name} — {tech.specialty} ({tech.workshopName.replace('StarMotos ', '')})
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowAddTechModal(true)}
-                    title="Registrar nuevo técnico"
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition cursor-pointer flex items-center justify-center shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Kilometraje y Aceite en 2 columnas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {/* Kilometraje y Aceite */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Kilometraje *
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Kilometraje Actual
                   </label>
                   <div className="relative">
                     <input
                       type="number"
                       value={formData.kilometraje || ''}
-                      onChange={(e) => setFormData({ ...formData, kilometraje: Number(e.target.value) })}
-                      placeholder="450"
-                      className="w-full px-3 py-1.5 pr-10 text-xs font-mono font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                      required
+                      onChange={(e) =>
+                        setFormData({ ...formData, kilometraje: parseInt(e.target.value) || 0 })
+                      }
+                      placeholder="0"
+                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold outline-none focus:border-red-600 focus:bg-white"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">
-                      km
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">
+                      KM
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Aceite *
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Nivel / Tipo Aceite
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, aceite: 'sin_aceite' })}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center justify-center gap-1.5 ${
-                        formData.aceite === 'sin_aceite'
-                          ? 'bg-[#0a2373] text-white border-[#0a2373] shadow-xs'
-                          : 'bg-zinc-50 text-zinc-600 border-zinc-300'
-                      }`}
-                    >
-                      <span>● Sin aceite</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, aceite: 'con_aceite' })}
-                      className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center justify-center gap-1.5 ${
-                        formData.aceite === 'con_aceite'
-                          ? 'bg-[#0a2373] text-white border-[#0a2373] shadow-xs'
-                          : 'bg-zinc-50 text-zinc-600 border-zinc-300'
-                      }`}
-                    >
-                      <span>● Con aceite</span>
-                    </button>
-                  </div>
+                  <select
+                    value={formData.aceite}
+                    onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-red-600 focus:bg-white"
+                  >
+                    <option value="sin_aceite">Sin cambio de aceite</option>
+                    <option value="4T Mineral 20W50">4T Mineral 20W50</option>
+                    <option value="4T Semi-Sintético 10W40">4T Semi-Sintético 10W40</option>
+                    <option value="4T Sintético 10W50">4T Sintético 10W50</option>
+                    <option value="Castrol Actevo 20W50">Castrol Actevo 20W50</option>
+                    <option value="Motul 5100 15W50">Motul 5100 15W50</option>
+                  </select>
                 </div>
               </div>
 
-              {/* N.° de factura y N.° de ticket */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {/* Próximo Mantenimiento Recomendado */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  Próximo Mantenimiento Sugerido
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={formData.proximoMantenimientoKm || ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        proximoMantenimientoKm: parseInt(e.target.value) || 1000,
+                      })
+                    }
+                    placeholder="1000"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold outline-none focus:border-red-600 focus:bg-white"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-zinc-400">
+                    KM
+                  </span>
+                </div>
+              </div>
+
+              {/* Registro Fotográfico Rápido */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
+                    Inspección Visual (Fotos)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddMockPhoto}
+                    className="text-[10px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>+ Foto</span>
+                  </button>
+                </div>
+
+                {formData.fotos.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {formData.fotos.map((fUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group"
+                      >
+                        <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(idx)}
+                          className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    onClick={handleAddMockPhoto}
+                    className="border border-dashed border-zinc-300 hover:border-red-400 rounded-xl p-3 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-red-50/40"
+                  >
+                    <Camera className="w-4 h-4 text-zinc-400 mx-auto mb-1" />
+                    <span className="text-[10px] text-zinc-500 font-medium">
+                      Clic para adjuntar fotos de entrega o estado inicial
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 3: PASO 3 - SERVICIO, TÉCNICO Y PAGO                       */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
+                    3
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
+                    <p className="text-[10px] text-zinc-400">Acciones técnicas y facturación</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Paso 3
+                </span>
+              </div>
+
+              {/* ¿Qué se hizo? (Servicios realizados) */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1.5">
+                  ¿Qué se realizó? *
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { id: 'alistamiento_pdi', label: 'Alistamiento PDI' },
+                    { id: 'mantenimiento', label: 'Mantenimiento' },
+                    { id: 'cambio_aceite', label: 'Cambio Aceite' },
+                    { id: 'frenos', label: 'Revisión Frenos' },
+                    { id: 'engrasado', label: 'Engrasado & Ajuste' },
+                    { id: 'bateria', label: 'Batería / Eléctrico' },
+                  ].map((srv) => {
+                    const isSelected = formData.serviciosRealizados.includes(srv.id as ServiceActionType);
+                    return (
+                      <button
+                        key={srv.id}
+                        type="button"
+                        onClick={() => toggleServicio(srv.id as ServiceActionType)}
+                        className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border text-left flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                        }`}
+                      >
+                        <span>{srv.label}</span>
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Técnico Responsable con botón "+ Nuevo" */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600">
+                    Técnico Responsable *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTechModal(true)}
+                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Nuevo Técnico</span>
+                  </button>
+                </div>
+                <select
+                  value={formData.tecnicoResponsable}
+                  onChange={(e) => {
+                    const techName = e.target.value;
+                    const techObj = technicians.find((t) => t.name === techName);
+                    setFormData({
+                      ...formData,
+                      tecnicoResponsable: techName,
+                      tecnicoId: techObj?.id || 'tec-01',
+                    });
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                  required
+                >
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} ({t.workshopName || 'Taller'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Valores $ y Cobro */}
+              <div className="grid grid-cols-2 gap-2 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-200">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    N.° de factura
+                  <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
+                    Valor Servicio ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.valorServicio}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setFormData({ ...formData, valorServicio: val, montoPagado: val });
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
+                    Método de Pago
+                  </label>
+                  <select
+                    value={formData.metodoPago}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
+                      })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta Déb/Créd</option>
+                    <option value="Crédito Directo">Crédito Directo</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Factura / Ticket */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    N° Factura SRI
                   </label>
                   <input
                     type="text"
                     value={formData.numeroFactura}
                     onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
-                    placeholder="005-001-0004521"
-                    className="w-full px-3 py-1.5 text-xs font-mono text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
+                    placeholder="001-002-..."
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    N.° de ticket
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    N° Ticket Físico
                   </label>
                   <input
                     type="text"
                     value={formData.numeroTicket}
                     onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
-                    placeholder="TCK-2026-9921"
-                    className="w-full px-3 py-1.5 text-xs font-mono text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
+                    placeholder="TCK-2026-..."
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Valor del servicio, Monto pagado, Método de pago */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Valor del servicio *
+              {/* Observaciones */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                  Observaciones / Novedades
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.observaciones}
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                  placeholder="Detalles sobre entrega, torque de pernos, lubricación o novedades mecánicas..."
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-emerald-600 focus:bg-white resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ===================================================================== */}
+          {/* LAYOUT MÓVIL: WIZARD SECUENCIAL EN 3 PASOS CON TABS                   */}
+          {/* ===================================================================== */}
+          <div className="block lg:hidden space-y-4">
+            {/* Tabs de Navegación Móvil */}
+            <div className="grid grid-cols-3 gap-1 bg-zinc-100 p-1 rounded-xl">
+              {[
+                { s: 1, label: '1. Cliente' },
+                { s: 2, label: '2. Moto' },
+                { s: 3, label: '3. Servicio' },
+              ].map((tab) => (
+                <button
+                  key={tab.s}
+                  type="button"
+                  onClick={() => setMobileStep(tab.s as 1 | 2 | 3)}
+                  className={`py-2 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    mobileStep === tab.s
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Contenido Paso 1 Móvil */}
+            {mobileStep === 1 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <h3 className="text-sm font-black text-zinc-900">Paso 1: Datos del Cliente</h3>
+                  <span className="text-[10px] font-bold text-blue-600">1 de 3</span>
+                </div>
+
+                <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
+                  <label className="block text-[11px] font-black uppercase text-blue-900">
+                    Cédula o RUC *
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">$</span>
+                  <div className="flex gap-1.5">
                     <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorServicio || ''}
-                      onChange={(e) => {
-                        setFormData({ ...formData, valorServicio: Number(e.target.value) });
-                        if (validationAlert?.stepTarget === 3) setValidationAlert(null);
-                      }}
-                      className="w-full pl-6 pr-3 py-1.5 text-xs font-mono font-bold text-blue-700 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                      required
+                      type="text"
+                      value={formData.cedulaRuc}
+                      onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
+                      placeholder="Ej: 2350999252"
+                      className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleSearchSri()}
+                      disabled={isSearchingSri || !formData.cedulaRuc.trim()}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0"
+                    >
+                      {isSearchingSri ? '...' : 'SRI'}
+                    </button>
                   </div>
+                  {sriFeedback && <p className="text-[10px] text-blue-800 font-medium">{sriFeedback}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Monto pagado
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Nombres *
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.montoPagado}
-                      onChange={(e) => setFormData({ ...formData, montoPagado: Number(e.target.value) })}
-                      className="w-full pl-6 pr-3 py-1.5 text-xs font-mono font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formData.nombres}
+                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Felix Rafael"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Método de pago
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Apellidos *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.apellidos}
+                    onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Gracia Guato"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Celular Principal *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.celular1}
+                    onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold"
+                    placeholder="0982852456"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Origen / Almacén *
                   </label>
                   <select
-                    value={formData.metodoPago}
-                    onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value as any })}
-                    className="w-full px-3 py-1.5 text-xs font-bold text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none cursor-pointer"
+                    value={formData.origen}
+                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
                   >
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Transferencia">Transferencia Bancaria</option>
-                    <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
-                    <option value="Mixto">Mixto</option>
+                    {origins.map((orig) => (
+                      <option key={orig} value={orig}>
+                        {orig}
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Observaciones y Próximo Mantenimiento en 2 columnas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(2)}
+                    className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span>Siguiente: Datos de la Moto</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Paso 2 Móvil */}
+            {mobileStep === 2 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <h3 className="text-sm font-black text-zinc-900">Paso 2: Datos de la Moto</h3>
+                  <span className="text-[10px] font-bold text-red-600">2 de 3</span>
+                </div>
+
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Modelo y Marca *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.modeloMarca}
+                    onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Tundra r200"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                      Placa
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.placa}
+                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                      placeholder="KX284T"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                      Chasis (VIN)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.chasis}
+                      onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                      placeholder="LBBP57008..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Kilometraje Actual
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.kilometraje || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, kilometraje: parseInt(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(1)}
+                    className="flex-1 py-2.5 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(3)}
+                    className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1"
+                  >
+                    <span>Siguiente: Servicio</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Paso 3 Móvil */}
+            {mobileStep === 3 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <h3 className="text-sm font-black text-zinc-900">Paso 3: Servicio & Cobro</h3>
+                  <span className="text-[10px] font-bold text-emerald-600">3 de 3</span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Técnico Responsable *
+                  </label>
+                  <select
+                    value={formData.tecnicoResponsable}
+                    onChange={(e) => {
+                      const techName = e.target.value;
+                      const techObj = technicians.find((t) => t.name === techName);
+                      setFormData({
+                        ...formData,
+                        tecnicoResponsable: techName,
+                        tecnicoId: techObj?.id || 'tec-01',
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                  >
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
+                      Valor ($) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.valorServicio}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setFormData({ ...formData, valorServicio: val, montoPagado: val });
+                      }}
+                      className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-emerald-900 mb-1">
+                      Método
+                    </label>
+                    <select
+                      value={formData.metodoPago}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
+                        })
+                      }
+                      className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                    >
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Transferencia">Transferencia</option>
+                      <option value="Tarjeta">Tarjeta</option>
+                      <option value="Crédito Directo">Crédito</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
                     Observaciones
                   </label>
                   <textarea
                     rows={2}
                     value={formData.observaciones}
                     onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                    placeholder="Detalla lo que se realizó en la motocicleta..."
-                    className="w-full px-3 py-1.5 text-xs text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none resize-none"
+                    placeholder="Notas mecánicas..."
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium resize-none"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Próximo Mantenimiento (km)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={formData.proximoMantenimientoKm || ''}
-                      onChange={(e) => setFormData({ ...formData, proximoMantenimientoKm: Number(e.target.value) })}
-                      placeholder="1000"
-                      className="w-full px-3 py-1.5 pr-10 text-xs font-mono font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-lg focus:bg-white focus:border-blue-600 outline-none"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">
-                      km
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fotos del servicio (Grilla de 7 fotos) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-bold text-zinc-700">
-                    Fotos del servicio
-                  </label>
-                  <span className="text-[10px] font-mono font-bold text-zinc-500">
-                    {formData.fotos.length} de 7 fotos
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 mb-2.5">
-                  {[0, 1, 2, 3, 4, 5, 6].map((idx) => {
-                    const photo = formData.fotos[idx];
-                    return (
-                      <div
-                        key={idx}
-                        className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50/50 flex flex-col items-center justify-center relative overflow-hidden group hover:border-blue-400 transition"
-                      >
-                        {photo ? (
-                          <>
-                            <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePhoto(idx)}
-                              className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition cursor-pointer"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </>
-                        ) : (
-                          <Camera className="w-4 h-4 text-zinc-400" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center gap-2">
+                <div className="pt-2 flex gap-2">
                   <button
                     type="button"
-                    onClick={handleAddPhoto}
-                    disabled={formData.fotos.length >= 7}
-                    className="px-3 py-1.5 rounded-lg bg-[#0f3299] hover:bg-blue-800 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    onClick={() => setMobileStep(2)}
+                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs"
                   >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Tomar foto</span>
+                    Anterior
                   </button>
-
                   <button
-                    type="button"
-                    onClick={handleAddPhoto}
-                    disabled={formData.fotos.length >= 7}
-                    className="px-3 py-1.5 rounded-lg border border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    type="submit"
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20"
                   >
-                    <ImageIcon className="w-3.5 h-3.5 text-zinc-500" />
-                    <span>Galería</span>
+                    <Check className="w-4 h-4" />
+                    <span>Guardar Alistamiento</span>
                   </button>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Barra de Guardado Inferior en Escritorio */}
+          <div className="hidden lg:flex items-center justify-between bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs">
+            <div className="text-xs text-zinc-500">
+              Revise que los datos de cliente, motocicleta y servicio técnico estén completos antes de guardar.
             </div>
-
-            {/* Botones de Finalizar */}
-            <div className="pt-2 flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setStep(2)}
-                className="py-2.5 px-5 rounded-xl border border-zinc-300 text-zinc-700 font-bold text-xs flex items-center gap-1.5 hover:bg-zinc-50 transition cursor-pointer"
+                onClick={() => {
+                  setValidationAlert(null);
+                  setViewMode('list');
+                }}
+                className="px-4 py-2 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Atrás</span>
+                Cancelar y Volver
               </button>
-
               <button
                 type="submit"
-                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md shadow-emerald-600/20"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Guardar Registro de Servicio Completo</span>
+                <Check className="w-4 h-4" />
+                <span>Guardar Alistamiento Completo</span>
               </button>
             </div>
-          </form>
-        )}
-      </div>
+          </div>
+        </form>
+      )}
 
       {/* ========================================================================= */}
-      {/* 3. MODAL: AGREGAR NUEVO TÉCNICO EN EL ACTO                                  */}
+      {/* 3. MODAL: DETALLE COMPLETO DE ALISTAMIENTO PREVIO                         */}
+      {/* ========================================================================= */}
+      {selectedRecordForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in max-h-[90vh] overflow-y-auto">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900">
+                    Ficha Técnica de Alistamiento
+                  </h3>
+                  <p className="text-[11px] text-zinc-500">
+                    ID: <span className="font-mono font-bold text-zinc-800">{selectedRecordForDetail.id}</span> • Sede:{' '}
+                    <span className="font-bold text-zinc-800">{selectedRecordForDetail.sede}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRecordForDetail(null)}
+                className="text-zinc-400 hover:text-zinc-700 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 3 Bloques de Información */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {/* Cliente */}
+              <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-1">
+                  <UserCheck className="w-3 h-3" />
+                  <span>Cliente</span>
+                </div>
+                <div className="font-bold text-zinc-900 text-sm">
+                  {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
+                </div>
+                <div className="text-zinc-600 font-mono text-[11px]">C.I: {selectedRecordForDetail.cedulaRuc}</div>
+                <div className="text-zinc-600 text-[11px]">Tel: {selectedRecordForDetail.celular1}</div>
+                {selectedRecordForDetail.email && (
+                  <div className="text-zinc-500 text-[10px] truncate">{selectedRecordForDetail.email}</div>
+                )}
+                {selectedRecordForDetail.direccion && (
+                  <div className="text-zinc-500 text-[10px]">{selectedRecordForDetail.direccion}</div>
+                )}
+                <div className="text-[10px] text-zinc-400 pt-1 border-t border-blue-100">
+                  Origen: <span className="font-medium text-zinc-700">{selectedRecordForDetail.origen}</span>
+                </div>
+              </div>
+
+              {/* Moto */}
+              <div className="bg-red-50/40 p-3 rounded-xl border border-red-100 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-red-800 flex items-center gap-1">
+                  <Bike className="w-3 h-3" />
+                  <span>Motocicleta</span>
+                </div>
+                <div className="font-bold text-zinc-900 text-sm">
+                  {selectedRecordForDetail.modeloMarca}
+                </div>
+                <div className="text-zinc-600 font-mono text-[11px]">
+                  Placa: <strong className="text-zinc-900">{selectedRecordForDetail.placa || 'SIN PLACA'}</strong>
+                </div>
+                <div className="text-zinc-600 font-mono text-[10px] truncate">
+                  VIN: {selectedRecordForDetail.chasis || 'S/N'}
+                </div>
+                <div className="text-zinc-600 text-[11px]">
+                  Km: <strong className="text-zinc-900">{selectedRecordForDetail.kilometraje} km</strong>
+                </div>
+                <div className="text-[10px] text-zinc-500 pt-1 border-t border-red-100">
+                  Aceite: <span className="font-medium text-zinc-700">{selectedRecordForDetail.aceite}</span>
+                </div>
+              </div>
+
+              {/* Servicio */}
+              <div className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-100 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                  <Wrench className="w-3 h-3" />
+                  <span>Servicio</span>
+                </div>
+                <div className="font-bold text-zinc-900 text-sm">
+                  ${(selectedRecordForDetail.montoPagado || selectedRecordForDetail.valorServicio).toFixed(2)}
+                </div>
+                <div className="text-zinc-600 text-[11px]">
+                  Método: <strong className="text-zinc-900">{selectedRecordForDetail.metodoPago}</strong>
+                </div>
+                <div className="text-zinc-600 text-[11px]">
+                  Técnico: <strong className="text-zinc-900">{selectedRecordForDetail.tecnicoResponsable}</strong>
+                </div>
+                <div className="text-zinc-600 text-[10px]">
+                  Factura: {selectedRecordForDetail.numeroFactura || 'N/A'}
+                </div>
+                <div className="text-zinc-600 text-[10px]">
+                  Ticket: {selectedRecordForDetail.numeroTicket || 'N/A'}
+                </div>
+              </div>
+            </div>
+
+            {/* Observaciones */}
+            <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 text-xs space-y-1">
+              <div className="font-bold text-zinc-700">Observaciones Técnicas:</div>
+              <p className="text-zinc-600 italic">
+                {selectedRecordForDetail.observaciones || 'Sin observaciones mecánicas registradas.'}
+              </p>
+            </div>
+
+            {/* Fotos si las hay */}
+            {selectedRecordForDetail.fotos && selectedRecordForDetail.fotos.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-bold text-zinc-700">Evidencia Fotográfica:</div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {selectedRecordForDetail.fotos.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt="Inspección"
+                      className="rounded-lg aspect-video object-cover border border-zinc-200"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Acciones del Modal */}
+            <div className="pt-3 border-t border-zinc-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Ficha</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleNewServiceForExisting(selectedRecordForDetail);
+                    setSelectedRecordForDetail(null);
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nuevo Servicio con este Cliente</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecordForDetail(null)}
+                  className="px-3 py-1.5 border border-zinc-300 text-zinc-700 rounded-xl text-xs font-bold hover:bg-zinc-50 cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. MODAL: AGREGAR NUEVO TÉCNICO AL TALLER                                 */}
       {/* ========================================================================= */}
       {showAddTechModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-blue-600" />
-                <span>Registrar Nuevo Técnico de Taller</span>
+                <Wrench className="w-4 h-4 text-emerald-600" />
+                <span>Registrar Nuevo Técnico</span>
               </h3>
               <button onClick={() => setShowAddTechModal(false)} className="text-zinc-400 hover:text-zinc-700">
                 <X className="w-4 h-4" />
@@ -1227,66 +1858,49 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   type="text"
                   value={newTechData.name}
                   onChange={(e) => setNewTechData({ ...newTechData, name: e.target.value })}
-                  placeholder="Ej: MARIO ANDRADE"
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-blue-600 font-bold"
+                  placeholder="Ej: CARLOS MENDOZA"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-emerald-600 font-bold uppercase"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
-                  Especialidad Técnica
+                  Especialidad
                 </label>
                 <input
                   type="text"
                   value={newTechData.specialty}
                   onChange={(e) => setNewTechData({ ...newTechData, specialty: e.target.value })}
-                  placeholder="Ej: Inyección Delphi, Motores 4T, PDI..."
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-blue-600"
+                  placeholder="Ej: Mecánica Rápida & Mantenimiento"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
-                  Teléfono / WhatsApp
+                  Teléfono / Celular
                 </label>
                 <input
-                  type="tel"
+                  type="text"
                   value={newTechData.phone}
                   onChange={(e) => setNewTechData({ ...newTechData, phone: e.target.value })}
-                  placeholder="0991234567"
-                  className="w-full px-3 py-2 font-mono bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-blue-600"
+                  placeholder="0990000000"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-emerald-600 font-mono"
                 />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
-                  Sede Asignada
-                </label>
-                <select
-                  value={newTechData.workshopId}
-                  onChange={(e) => setNewTechData({ ...newTechData, workshopId: e.target.value })}
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none cursor-pointer"
-                >
-                  {workshops.map((ws) => (
-                    <option key={ws.id} value={ws.id}>
-                      {ws.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddTechModal(false)}
-                  className="flex-1 py-2 border border-zinc-300 rounded-xl font-bold text-zinc-700"
+                  className="flex-1 py-2 border border-zinc-300 rounded-xl font-bold text-zinc-700 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs"
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-xs cursor-pointer"
                 >
                   Guardar Técnico
                 </button>
@@ -1297,7 +1911,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 4. MODAL: AGREGAR NUEVO ORIGEN / ALMACÉN                                   */}
+      {/* 5. MODAL: AGREGAR NUEVO ORIGEN / ALMACÉN                                   */}
       {/* ========================================================================= */}
       {showAddOriginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -1331,13 +1945,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddOriginModal(false)}
-                  className="flex-1 py-2 border border-zinc-300 rounded-xl font-bold text-zinc-700"
+                  className="flex-1 py-2 border border-zinc-300 rounded-xl font-bold text-zinc-700 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs"
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs cursor-pointer"
                 >
                   Agregar Origen
                 </button>

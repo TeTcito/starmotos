@@ -343,7 +343,13 @@ export interface Workshop {
 }
 
 // --- Alistamiento (Wizard 3 Pasos Profesional) ---
-export type ServiceActionType = 'alistamiento_pdi' | 'engrasado' | 'mantenimiento';
+export type ServiceActionType =
+  | 'alistamiento_pdi'
+  | 'engrasado'
+  | 'mantenimiento'
+  | 'cambio_aceite'
+  | 'frenos'
+  | 'bateria';
 
 export interface AlistamientoFullRecord {
   id: string;
@@ -373,12 +379,12 @@ export interface AlistamientoFullRecord {
   tecnicoResponsable: string;
   tecnicoId: string;
   kilometraje: number;
-  aceite: 'sin_aceite' | 'con_aceite';
+  aceite: 'sin_aceite' | 'con_aceite' | string;
   numeroFactura: string;
   numeroTicket: string;
   valorServicio: number;
   montoPagado: number;
-  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto';
+  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito Directo';
   observaciones: string;
   proximoMantenimientoKm: number;
   fotos: string[];

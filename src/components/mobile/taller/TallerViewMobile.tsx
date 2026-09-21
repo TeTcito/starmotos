@@ -220,6 +220,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             onAddTechnician={onAddTechnician}
             onAddOrigin={onAddOrigin}
             onSaveRecord={onSaveFullAlistamiento}
+            recentRecords={fullAlistamientos}
           />
         )}
         {activeSection === 'solicitudes_garantia' && (

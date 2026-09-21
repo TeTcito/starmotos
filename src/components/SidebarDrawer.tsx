@@ -125,17 +125,12 @@ export const SidebarDrawer: React.FC<Props> = ({
       >
         {/* Header - Fijo arriba */}
         <div className="shrink-0 p-3.5 border-b border-[#b8d1ea] flex items-center justify-between bg-blue-700 text-white">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full p-0.5 bg-gradient-to-tr from-blue-600 via-white to-red-600 shadow-sm flex items-center justify-center shrink-0">
-              <img
-                src="/starmotos-logo.jpg"
-                alt="StarMotos"
-                className="w-full h-full object-cover rounded-full bg-white"
-              />
-            </div>
-            <span className="text-xs font-black tracking-wider uppercase">
-              <span className="text-white">STAR</span><span className="text-red-400">MOTOS</span>
-            </span>
+          <div className="bg-white px-2.5 py-1 rounded-xl shadow-xs flex items-center justify-center">
+            <img
+              src="/logoheader.webp"
+              alt="StarMotos"
+              className="h-6 w-auto object-contain"
+            />
           </div>
 
           <button

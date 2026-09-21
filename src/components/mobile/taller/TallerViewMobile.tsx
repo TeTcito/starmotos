@@ -68,20 +68,21 @@ export const TallerViewMobile: React.FC<Props> = ({
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased">
       <header className="sticky top-0 z-40 bg-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setDrawerOpen(true)}
             className="p-1.5 rounded-lg bg-blue-800 hover:bg-blue-900 text-white cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div>
-            <span className="text-xs font-black tracking-wider uppercase block leading-none">
-              <span className="text-white">STAR</span>
-              <span className="text-red-400">MOTOS</span>
-            </span>
-            <span className="text-[9px] text-blue-200 uppercase font-mono">Jefe de Taller</span>
+          <div className="bg-white px-2 py-0.5 rounded-lg shadow-xs flex items-center justify-center shrink-0">
+            <img
+              src="/logoheader.webp"
+              alt="StarMotos"
+              className="h-5 w-auto object-contain"
+            />
           </div>
+          <span className="text-[9px] text-blue-200 uppercase font-mono font-bold hidden sm:inline">Taller</span>
         </div>
 
         <span className="text-xs font-bold text-white truncate max-w-[150px]">

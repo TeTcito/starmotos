@@ -64,22 +64,16 @@ export const Navbar: React.FC<Props> = ({
 
           {/* Logo StarMotos */}
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full p-0.5 bg-gradient-to-tr from-blue-600 via-white to-red-600 shadow-sm flex items-center justify-center shrink-0">
+            <div className="bg-white px-2 py-0.5 rounded-lg shadow-xs flex items-center justify-center shrink-0">
               <img
-                src="/starmotos-logo.jpg"
+                src="/logoheader.webp"
                 alt="StarMotos"
-                className="w-full h-full object-cover rounded-full bg-white"
+                className="h-5 sm:h-6 w-auto object-contain"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-black tracking-wider uppercase">
-                <span className="text-white">STAR</span>
-                <span className="text-red-400">MOTOS</span>
-              </span>
-              <span className="text-[10px] text-blue-200 font-medium border-l border-blue-500 pl-2 hidden sm:inline">
-                {activeSectionTitle}
-              </span>
-            </div>
+            <span className="text-[10px] text-blue-200 font-medium border-l border-blue-500 pl-2 hidden sm:inline">
+              {activeSectionTitle}
+            </span>
           </div>
         </div>
 

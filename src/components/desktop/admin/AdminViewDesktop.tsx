@@ -122,22 +122,16 @@ export const AdminViewDesktop: React.FC<Props> = ({
       <header className="h-16 shrink-0 w-full bg-blue-700 border-b border-blue-800 text-white shadow-md flex items-center justify-between px-6 z-30 select-none">
         {/* Lado Izquierdo con Logo */}
         <div className="w-72 shrink-0 flex items-center gap-3 pr-4">
-          <div className="w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-white via-blue-200 to-red-500 shadow-md flex items-center justify-center shrink-0">
+          <div className="bg-white px-3 py-1 rounded-xl shadow-xs flex items-center justify-center shrink-0">
             <img
-              src="/starmotos-logo.jpg"
+              src="/logoheader.webp"
               alt="StarMotos"
-              className="w-full h-full object-cover rounded-full bg-white"
+              className="h-7 w-auto object-contain"
             />
           </div>
-          <div>
-            <span className="text-sm font-black tracking-wider uppercase block leading-none">
-              <span className="text-white">STAR</span>
-              <span className="text-red-400">MOTOS</span>
-            </span>
-            <span className="text-[10px] text-blue-200 font-mono tracking-widest uppercase">
-              Administración Matriz
-            </span>
-          </div>
+          <span className="text-[10px] text-blue-200 font-mono tracking-widest uppercase font-bold">
+            Matriz Central
+          </span>
         </div>
 
         {/* Lado Derecho */}

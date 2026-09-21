@@ -24,19 +24,21 @@ jobs:
       - name: Build Project
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting (Service Account)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL != '' }}
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL }}'
           channelId: live
           projectId: starmotos-portal
-        continue-on-error: true
 
-      - name: Fallback Deploy using Firebase CLI Token
-        if: env.FIREBASE_TOKEN != ''
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only hosting
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      - name: Deploy to Firebase Hosting (CI Token)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL == '' && secrets.FIREBASE_TOKEN != '' }}
+        run: npx firebase-tools deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}"
+
+      - name: Check Deployment Credentials
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL == '' && secrets.FIREBASE_TOKEN == '' }}
+        run: |
+          echo "::error::Falta configurar la credencial en GitHub Secrets! Agrega FIREBASE_SERVICE_ACCOUNT_STARMOTOS_PORTAL o FIREBASE_TOKEN en Settings > Secrets and variables > Actions."
+          exit 1

@@ -1,134 +1,141 @@
 // src/components/desktop/garante/SolicitudesGaranteDesktop.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Inbox,
-  CheckCircle2,
-  XCircle,
   Clock,
-  ShieldCheck,
+  Search,
   Building2,
-  FileText,
-  DollarSign,
-  AlertTriangle,
 } from 'lucide-react';
 import { WarrantyRequest } from '../../../types/customer';
+import {
+  WarrantySquareCard,
+  WarrantyFormView,
+  getWarrantyStatusInfo,
+} from '../../common/WarrantyModule';
 
 interface Props {
   pendingRequests: WarrantyRequest[];
-  onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
+  onOpenDecisionModal?: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
+  onApproveWarranty?: (id: string, notes: string) => void;
+  onRejectWarranty?: (id: string, reason: string) => void;
 }
 
 export const SolicitudesGaranteDesktop: React.FC<Props> = ({
   pendingRequests,
-  onOpenDecisionModal,
+  onApproveWarranty,
+  onRejectWarranty,
 }) => {
+  const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filtrado reactivo de reclamos pendientes
+  const filteredRequests = pendingRequests.filter((w) => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return true;
+    return (
+      w.requestNumber.toLowerCase().includes(term) ||
+      w.clientName.toLowerCase().includes(term) ||
+      w.clientIdNumber.includes(term) ||
+      w.motorcycleBrand.toLowerCase().includes(term) ||
+      w.motorcycleModel.toLowerCase().includes(term) ||
+      w.motorcyclePlate.toLowerCase().includes(term) ||
+      w.tallerOrigin.toLowerCase().includes(term) ||
+      w.issueDescription.toLowerCase().includes(term)
+    );
+  });
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
-            <Inbox className="w-6 h-6 text-blue-600" />
-            <span>Auditoría de Garantías Recibidas (Desde Matriz Central)</span>
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Solicitudes validadas por el importador y red técnica StarMotos para dictamen oficial de marca.
-          </p>
-        </div>
-
-        <span className="text-xs font-bold text-blue-800 bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" />
-          <span>Pendientes por Dictaminar: {pendingRequests.length}</span>
-        </span>
-      </div>
-
-      {/* Lista de Solicitudes Pendientes */}
-      <div className="space-y-4">
-        {pendingRequests.length === 0 ? (
-          <div className="p-12 text-center bg-emerald-50/50 border border-emerald-200 rounded-2xl">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
-            <h3 className="text-sm font-bold text-emerald-900">¡Bandeja de Entrada al Día!</h3>
-            <p className="text-xs text-emerald-700 mt-1">
-              No hay solicitudes de garantía pendientes de dictamen en este momento.
-            </p>
-          </div>
-        ) : (
-          pendingRequests.map((req) => (
-            <div
-              key={req.id}
-              className="bg-white border-2 border-purple-200 hover:border-purple-400 rounded-2xl p-6 shadow-xs transition space-y-4"
-            >
-              {/* Encabezado de la solicitud */}
-              <div className="flex items-start justify-between">
+    <div className="space-y-5 animate-fade-in">
+      {/* 1. MODO: FICHA EN FORMATO FORMULARIO PARA DICTAMEN OFICIAL */}
+      {selectedWarranty ? (
+        <WarrantyFormView
+          warranty={selectedWarranty}
+          onBack={() => setSelectedWarranty(null)}
+          viewerRole="garante"
+          onApproveByGarante={(id, notes) => {
+            if (onApproveWarranty) onApproveWarranty(id, notes);
+            setSelectedWarranty(null);
+          }}
+          onRejectByGarante={(id, reason) => {
+            if (onRejectWarranty) onRejectWarranty(id, reason);
+            setSelectedWarranty(null);
+          }}
+        />
+      ) : (
+        /* 2. MODO: LISTADO EN TARJETAS CUADRADAS */
+        <div className="space-y-4">
+          {/* Header Superior */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded">
-                      {req.requestNumber}
-                    </span>
-                    <h3 className="text-base font-bold text-zinc-900">
-                      {req.motorcycleBrand} {req.motorcycleModel} — {req.clientName}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    VIN: <strong className="font-mono text-zinc-800">{req.motorcycleVin}</strong> • Placa: <strong className="font-mono text-zinc-800">{req.motorcyclePlate}</strong> • C.I: {req.clientIdNumber} • Taller Emisor: {req.tallerOrigin}
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                    Auditoría de Garantías de la Marca (Garante Oficial)
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Revisión técnica de solicitudes enviadas por Matriz. Abra la ficha tipo formulario para aceptar o denegar.
                   </p>
                 </div>
-
-                <div className="text-right">
-                  <span className="text-xs font-bold font-mono text-blue-700 block">
-                    Costo Reclamado: ${req.estimatedCost?.toFixed(2) || '0.00'} USD
-                  </span>
-                  <span className="text-[10px] text-zinc-400 font-mono">{req.createdAt}</span>
-                </div>
               </div>
 
-              {/* Descripción de la falla */}
-              <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-100 space-y-2 text-xs">
-                <div>
-                  <span className="text-[11px] font-bold uppercase text-zinc-500 block">Reclamo Técnico:</span>
-                  <p className="text-zinc-800 leading-relaxed font-medium mt-0.5">{req.issueDescription}</p>
-                </div>
-
-                {req.matrizNotes && (
-                  <div className="pt-2 border-t border-zinc-200">
-                    <span className="text-[11px] font-bold uppercase text-blue-700 block">
-                      Informe Técnico de Matriz Central:
-                    </span>
-                    <p className="text-blue-950 mt-0.5">{req.matrizNotes}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Botones de Dictamen */}
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-zinc-500 italic">
-                  * El dictamen emitido quedará sellado digitalmente y notificado de inmediato a Matriz.
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-purple-900 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200 flex items-center gap-1.5 shadow-2xs">
+                  <Clock className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Pendientes por Dictaminar: {pendingRequests.length}</span>
                 </span>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => onOpenDecisionModal(req, 'rechazar')}
-                    className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                  >
-                    <XCircle className="w-4 h-4 text-red-600" />
-                    <span>Rechazar Cobertura</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onOpenDecisionModal(req, 'aprobar')}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-emerald-600/20"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Aprobar Garantía de Fábrica</span>
-                  </button>
-                </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
+
+            {/* Barra de Búsqueda */}
+            <div className="pt-3 border-t border-zinc-100">
+              <div className="relative flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border border-zinc-300 focus-within:border-purple-600 rounded-xl px-3.5 py-2 transition-all">
+                <Search className="w-4 h-4 text-zinc-400 shrink-0 mr-2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar solicitudes pendientes por N° Solicitud, Cédula, Cliente, Placa o Taller..."
+                  className="w-full bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* GRID DE TARJETAS CUADRADAS */}
+          {filteredRequests.length === 0 ? (
+            <div className="text-center py-14 bg-emerald-50/40 border border-dashed border-emerald-300 rounded-2xl">
+              <Inbox className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-emerald-950">¡Bandeja de dictamen al día!</h3>
+              <p className="text-xs text-emerald-800 mt-1">
+                No hay solicitudes de garantía en estado "En Proceso" pendientes de resolución en este momento.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredRequests.map((req) => (
+                <WarrantySquareCard
+                  key={req.id}
+                  warranty={req}
+                  onClick={() => setSelectedWarranty(req)}
+                  viewerRole="garante"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

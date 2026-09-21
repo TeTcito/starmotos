@@ -27,6 +27,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     clients,
     toastMessage,
     validateWarrantyByMatriz,
+    rejectWarrantyByMatriz,
     sendWarrantyToGarante,
     completeWarrantyRepair,
     markAlertAsRead,
@@ -55,6 +56,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           workshops={workshops}
           warranties={warranties}
           onValidateWarranty={validateWarrantyByMatriz}
+          onRejectWarranty={rejectWarrantyByMatriz}
           onSendToGarante={sendWarrantyToGarante}
           onCompleteRepair={completeWarrantyRepair}
           alerts={alerts}

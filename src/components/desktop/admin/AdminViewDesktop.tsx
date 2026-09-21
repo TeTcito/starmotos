@@ -42,6 +42,7 @@ interface Props {
   workshops: Workshop[];
   warranties: WarrantyRequest[];
   onValidateWarranty: (id: string, notes: string) => void;
+  onRejectWarranty?: (id: string, reason: string) => void;
   onSendToGarante: (id: string, notes?: string) => void;
   onCompleteRepair: (id: string, invoiceNumber?: string) => void;
   alerts: SystemAlert[];
@@ -73,6 +74,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   workshops,
   warranties,
   onValidateWarranty,
+  onRejectWarranty,
   onSendToGarante,
   onCompleteRepair,
   alerts,
@@ -351,6 +353,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
               <GarantiasAdminDesktop
                 warranties={warranties}
                 onValidateWarranty={onValidateWarranty}
+                onRejectWarranty={onRejectWarranty}
                 onSendToGarante={onSendToGarante}
                 onCompleteRepair={onCompleteRepair}
               />

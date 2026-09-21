@@ -2,271 +2,303 @@
 import React, { useState } from 'react';
 import {
   ShieldCheck,
+  Search,
+  Filter,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Inbox,
   Sparkles,
   Navigation,
-  CheckCircle2,
-  Clock,
-  Send,
-  AlertCircle,
-  FileCheck2,
-  XCircle,
-  Filter,
-  Eye,
 } from 'lucide-react';
 import { WarrantyRequest } from '../../../types/customer';
+import {
+  WarrantySquareCard,
+  WarrantyFormView,
+  getWarrantyStatusInfo,
+} from '../../common/WarrantyModule';
 
 interface Props {
   warranties: WarrantyRequest[];
   onValidateWarranty: (id: string, notes: string) => void;
-  onSendToGarante: (id: string, notes?: string) => void;
-  onCompleteRepair: (id: string, invoiceNumber?: string) => void;
+  onRejectWarranty?: (id: string, reason: string) => void;
+  onSendToGarante?: (id: string, notes?: string) => void;
+  onCompleteRepair?: (id: string, invoiceNumber?: string) => void;
 }
 
 export const GarantiasAdminDesktop: React.FC<Props> = ({
   warranties,
   onValidateWarranty,
+  onRejectWarranty,
   onSendToGarante,
   onCompleteRepair,
 }) => {
-  const [activeTab, setActiveTab] = useState<'marca' | 'plus_taller' | 'gps'>('marca');
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
-  const [validationNote, setValidationNote] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'en_revision' | 'en_proceso' | 'aceptada' | 'denegada'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'marca' | 'plus_taller' | 'gps'>('all');
 
-  // Filtrar según el tab activo
-  const filteredWarranties = warranties.filter((w) => w.warrantyType === activeTab);
+  // Filtrado reactivo de solicitudes
+  const filteredWarranties = warranties.filter((w) => {
+    const sInfo = getWarrantyStatusInfo(w.status);
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : sInfo.canonical === statusFilter;
 
-  // Status badge helper
-  const renderStatusBadge = (status: WarrantyRequest['status']) => {
-    switch (status) {
-      case 'creada':
-        return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-700">Creada</span>;
-      case 'enviada_matriz':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
-            Pendiente Validación Matriz
-          </span>
-        );
-      case 'validada_matriz':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
-            Validada (Lista para Garante)
-          </span>
-        );
-      case 'enviada_garante':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
-            En Revisión Garante
-          </span>
-        );
-      case 'aprobada':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-            ✓ Aprobada por Garante
-          </span>
-        );
-      case 'rechazada':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
-            ✕ Rechazada
-          </span>
-        );
-      case 'completada':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-white">
-            ★ Reparación Completada
-          </span>
-        );
-    }
-  };
+    const matchesType = typeFilter === 'all' ? true : w.warrantyType === typeFilter;
+
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      w.requestNumber.toLowerCase().includes(term) ||
+      w.clientName.toLowerCase().includes(term) ||
+      w.clientIdNumber.includes(term) ||
+      w.motorcycleBrand.toLowerCase().includes(term) ||
+      w.motorcycleModel.toLowerCase().includes(term) ||
+      w.motorcyclePlate.toLowerCase().includes(term) ||
+      w.tallerOrigin.toLowerCase().includes(term) ||
+      w.issueDescription.toLowerCase().includes(term);
+
+    return matchesStatus && matchesType && matchesSearch;
+  });
+
+  // Métricas para cabecera
+  const countRevision = warranties.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'en_revision'
+  ).length;
+  const countProceso = warranties.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'en_proceso'
+  ).length;
+  const countAceptadas = warranties.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'aceptada'
+  ).length;
+  const countDenegadas = warranties.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'denegada'
+  ).length;
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-blue-600" />
-            <span>Gestión Centralizada de Garantías & Pólizas</span>
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Flujo de validación: Taller → Matriz Central → Garante Oficial de Marca → Ejecución técnica.
-          </p>
-        </div>
-
-        {/* Resumen */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-zinc-600 bg-zinc-100 px-3 py-1.5 rounded-xl border border-zinc-200">
-            Total Solicitudes: {warranties.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Selector de Sub-secciones (Tabs solicitados) */}
-      <div className="flex border-b border-zinc-200 gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('marca')}
-          className={`flex items-center gap-2 pb-3 px-4 font-bold text-xs border-b-2 transition cursor-pointer ${
-            activeTab === 'marca'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-zinc-500 hover:text-zinc-800'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Garantía Oficial de Marca</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800 font-mono">
-            {warranties.filter((w) => w.warrantyType === 'marca').length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('plus_taller')}
-          className={`flex items-center gap-2 pb-3 px-4 font-bold text-xs border-b-2 transition cursor-pointer ${
-            activeTab === 'plus_taller'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-zinc-500 hover:text-zinc-800'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Garantía Plus del Taller StarMotos</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-mono">
-            {warranties.filter((w) => w.warrantyType === 'plus_taller').length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('gps')}
-          className={`flex items-center gap-2 pb-3 px-4 font-bold text-xs border-b-2 transition cursor-pointer ${
-            activeTab === 'gps'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-zinc-500 hover:text-zinc-800'
-          }`}
-        >
-          <Navigation className="w-4 h-4" />
-          <span>Módulo GPS Satelital & Dispositivos</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-100 text-purple-800 font-mono">
-            {warranties.filter((w) => w.warrantyType === 'gps').length}
-          </span>
-        </button>
-      </div>
-
-      {/* Lista de Solicitudes */}
-      <div className="space-y-4">
-        {filteredWarranties.length === 0 ? (
-          <div className="text-center py-12 bg-zinc-50 border border-dashed border-zinc-300 rounded-2xl">
-            <p className="text-sm font-bold text-zinc-600">No hay solicitudes en esta categoría.</p>
-          </div>
-        ) : (
-          filteredWarranties.map((w) => (
-            <div
-              key={w.id}
-              className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs hover:border-blue-300 transition"
-            >
-              <div className="flex items-start justify-between">
+    <div className="space-y-5 animate-fade-in">
+      {/* 1. VISTA DE DETALLE: FICHA EN FORMATO FORMULARIO */}
+      {selectedWarranty ? (
+        <WarrantyFormView
+          warranty={selectedWarranty}
+          onBack={() => setSelectedWarranty(null)}
+          viewerRole="admin"
+          onValidateByMatriz={(id, notes) => {
+            onValidateWarranty(id, notes);
+            setSelectedWarranty(null);
+          }}
+          onRejectByMatriz={(id, reason) => {
+            if (onRejectWarranty) onRejectWarranty(id, reason);
+            setSelectedWarranty(null);
+          }}
+        />
+      ) : (
+        /* 2. VISTA DE LISTADO: TARJETAS CUADRADAS */
+        <div className="space-y-4">
+          {/* Cabecera Superior con Métricas */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                      {w.requestNumber}
-                    </span>
-                    <h3 className="text-sm font-bold text-zinc-900">
-                      {w.clientName} — {w.motorcycleBrand} {w.motorcycleModel} ({w.motorcyclePlate})
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Origen: <strong className="text-zinc-700">{w.tallerOrigin}</strong> • C.I: {w.clientIdNumber} • VIN: {w.motorcycleVin} • Fecha: {w.createdAt}
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                    Gestión Centralizada de Garantías (Matriz Central)
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Flujo de Control: Taller emite $\rightarrow$ Matriz revisa y pone En Proceso $\rightarrow$ Garante de Marca dictamina Aceptación o Denegación.
                   </p>
                 </div>
-
-                <div>{renderStatusBadge(w.status)}</div>
               </div>
 
-              {/* Descripción de la falla */}
-              <div className="mt-3 p-3 bg-zinc-50 rounded-xl border border-zinc-100 text-xs text-zinc-700">
-                <span className="font-bold text-zinc-900 block mb-0.5">Descripción del Reclamo Técnico:</span>
-                {w.issueDescription}
-              </div>
-
-              {/* Notas de Matriz o Garante si existen */}
-              {w.matrizNotes && (
-                <div className="mt-2 p-2.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-blue-900">
-                  <span className="font-bold block">Dictamen Matriz Central:</span>
-                  {w.matrizNotes}
-                </div>
-              )}
-
-              {w.garanteNotes && (
-                <div className="mt-2 p-2.5 bg-purple-50/70 rounded-xl border border-purple-100 text-xs text-purple-900">
-                  <span className="font-bold block">Resolución Oficial del Garante:</span>
-                  {w.garanteNotes}
-                </div>
-              )}
-
-              {w.rejectionReason && (
-                <div className="mt-2 p-2.5 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900">
-                  <span className="font-bold block">Causa de Rechazo:</span>
-                  {w.rejectionReason}
-                </div>
-              )}
-
-              {/* Acciones de Matriz según el estado */}
-              <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
-                <div className="text-xs text-zinc-500">
-                  {w.estimatedCost && (
-                    <span>
-                      Costo estimado: <strong className="text-zinc-900 font-mono">${w.estimatedCost.toFixed(2)} USD</strong>
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Si está enviada por taller -> Matriz la valida */}
-                  {w.status === 'enviada_matriz' && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onValidateWarranty(
-                          w.id,
-                          'Inspección y códigos de error verificados por Matriz. Procede a revisión de marca.'
-                        )
-                      }
-                      className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      <FileCheck2 className="w-3.5 h-3.5" />
-                      <span>Validar en Matriz</span>
-                    </button>
-                  )}
-
-                  {/* Si ya está validada -> Matriz la envía al Garante */}
-                  {w.status === 'validada_matriz' && (
-                    <button
-                      type="button"
-                      onClick={() => onSendToGarante(w.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Despachar a Garante Oficial</span>
-                    </button>
-                  )}
-
-                  {/* Si el Garante la aprobó -> Matriz procede a completar reparación */}
-                  {w.status === 'aprobada' && (
-                    <button
-                      type="button"
-                      onClick={() => onCompleteRepair(w.id)}
-                      className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Completar Reparación & Liquidar</span>
-                    </button>
-                  )}
-                </div>
+              {/* Indicadores Numéricos */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{countRevision} En Revisión</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{countProceso} En Proceso</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{countAceptadas} Aceptadas</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-red-50 text-red-800 border border-red-200 shadow-2xs flex items-center gap-1.5">
+                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span>{countDenegadas} Denegadas</span>
+                </span>
               </div>
             </div>
-          ))
-        )}
-      </div>
+
+            {/* Barra de Búsqueda y Filtros de Estado */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-zinc-100">
+              {/* Buscador */}
+              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border border-zinc-300 focus-within:border-blue-600 rounded-xl px-3.5 py-2 transition-all">
+                <Search className="w-4 h-4 text-zinc-400 shrink-0 mr-2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar por N° Solicitud, Cédula, Cliente, Placa, Taller o Falla..."
+                  className="w-full bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Filtros de Pestaña de Estado */}
+              <div className="flex items-center gap-1 overflow-x-auto bg-zinc-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    statusFilter === 'all'
+                      ? 'bg-white text-zinc-900 shadow-2xs'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  Todas ({warranties.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('en_revision')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'en_revision'
+                      ? 'bg-amber-500 text-white shadow-2xs'
+                      : 'text-amber-800 hover:bg-amber-100/50'
+                  }`}
+                >
+                  <span>En Revisión</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900">
+                    {countRevision}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('en_proceso')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'en_proceso'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-blue-800 hover:bg-blue-100/50'
+                  }`}
+                >
+                  <span>En Proceso</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-200 text-blue-900">
+                    {countProceso}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('aceptada')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'aceptada'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-emerald-800 hover:bg-emerald-100/50'
+                  }`}
+                >
+                  <span>Aceptadas</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-900">
+                    {countAceptadas}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('denegada')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'denegada'
+                      ? 'bg-red-600 text-white shadow-2xs'
+                      : 'text-red-800 hover:bg-red-100/50'
+                  }`}
+                >
+                  <span>Denegadas</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-red-200 text-red-900">
+                    {countDenegadas}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-filtro por Tipo de Póliza */}
+            <div className="flex items-center gap-2 pt-1 border-t border-zinc-100 text-xs">
+              <span className="font-bold text-zinc-500 uppercase text-[10px]">Tipo de Garantía:</span>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('all')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                  typeFilter === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                Todos los tipos
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('marca')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                  typeFilter === 'marca' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                Oficial Marca
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('plus_taller')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                  typeFilter === 'plus_taller' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                Plus Taller
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('gps')}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                  typeFilter === 'gps' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                }`}
+              >
+                GPS
+              </button>
+            </div>
+          </div>
+
+          {/* GRID DE TARJETAS CUADRADAS */}
+          {filteredWarranties.length === 0 ? (
+            <div className="text-center py-14 bg-zinc-50 border border-dashed border-zinc-300 rounded-2xl">
+              <Inbox className="w-10 h-10 text-zinc-400 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-zinc-700">No hay solicitudes con los filtros seleccionados</h3>
+              <p className="text-xs text-zinc-500 mt-1">
+                Ajuste los términos de búsqueda o cambie el estado seleccionado arriba.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredWarranties.map((w) => (
+                <WarrantySquareCard
+                  key={w.id}
+                  warranty={w}
+                  onClick={() => setSelectedWarranty(w)}
+                  viewerRole="admin"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -146,32 +146,41 @@ export function useTallerPortal() {
     estimatedCost: 80,
   });
 
-  const createWarrantyRequest = useCallback(() => {
-    if (!newWarrantyForm.clientName || !newWarrantyForm.issueDescription) {
-      showToast('Complete los campos obligatorios del reclamo.', 'error');
-      return false;
-    }
+  const createWarrantyRequest = useCallback((directReq?: WarrantyRequest) => {
+    let newReq: WarrantyRequest;
 
-    const newReq: WarrantyRequest = {
-      id: `gar-${Date.now()}`,
-      requestNumber: `GAR-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      createdAt: 'Hoy, Taller Express Norte',
-      clientName: newWarrantyForm.clientName,
-      clientIdNumber: newWarrantyForm.clientIdNumber || '1700000000',
-      motorcycleBrand: newWarrantyForm.motorcycleBrand,
-      motorcycleModel: newWarrantyForm.motorcycleModel,
-      motorcyclePlate: newWarrantyForm.motorcyclePlate || 'PBX-0000',
-      motorcycleVin: newWarrantyForm.motorcycleVin || 'VIN-EC-99881',
-      warrantyType: newWarrantyForm.warrantyType,
-      issueDescription: newWarrantyForm.issueDescription,
-      diagnosticPhotos: [
-        'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-      ],
-      status: 'enviada_matriz', // El taller la genera y viaja a Matriz
-      tallerOrigin: 'StarMotos Express Norte',
-      tallerOriginId: 'taller-norte',
-      estimatedCost: Number(newWarrantyForm.estimatedCost) || 60,
-    };
+    if (directReq) {
+      newReq = {
+        ...directReq,
+        status: 'en_revision',
+      };
+    } else {
+      if (!newWarrantyForm.clientName || !newWarrantyForm.issueDescription) {
+        showToast('Complete los campos obligatorios del reclamo.', 'error');
+        return false;
+      }
+
+      newReq = {
+        id: `gar-${Date.now()}`,
+        requestNumber: `GAR-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        createdAt: 'Hoy, Taller Express',
+        clientName: newWarrantyForm.clientName,
+        clientIdNumber: newWarrantyForm.clientIdNumber || '1700000000',
+        motorcycleBrand: newWarrantyForm.motorcycleBrand,
+        motorcycleModel: newWarrantyForm.motorcycleModel,
+        motorcyclePlate: newWarrantyForm.motorcyclePlate || 'PBX-0000',
+        motorcycleVin: newWarrantyForm.motorcycleVin || 'VIN-EC-99881',
+        warrantyType: newWarrantyForm.warrantyType,
+        issueDescription: newWarrantyForm.issueDescription,
+        diagnosticPhotos: [
+          'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+        ],
+        status: 'en_revision', // Nace En Revisión para Matriz
+        tallerOrigin: 'StarMotos Taller',
+        tallerOriginId: 'taller-principal',
+        estimatedCost: Number(newWarrantyForm.estimatedCost) || 60,
+      };
+    }
 
     setWarranties((prev) => {
       const updated = [newReq, ...prev];
@@ -184,7 +193,7 @@ export function useTallerPortal() {
       id: `alt-${Date.now()}`,
       type: 'estado_cambiado',
       title: 'Nueva Solicitud de Garantía desde Taller',
-      message: `${newReq.tallerOrigin} generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}. Esperando validación de Matriz.`,
+      message: `${newReq.tallerOrigin} generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}. Esperando revisión de Matriz.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: newReq.id,
@@ -197,9 +206,9 @@ export function useTallerPortal() {
       origin: { y: 0.6 },
     });
 
-    showToast(`Solicitud ${newReq.requestNumber} enviada a Matriz Central exitosamente.`, 'success');
+    showToast(`Solicitud ${newReq.requestNumber} enviada a Matriz Central (En Revisión).`, 'success');
 
-    // Resetear formulario
+    // Resetear formulario legacy
     setNewWarrantyForm({
       clientName: '',
       clientIdNumber: '',

@@ -316,6 +316,8 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 newForm={newWarrantyForm}
                 setNewForm={setNewWarrantyForm}
                 onCreateRequest={onCreateWarrantyRequest}
+                clients={clients}
+                currentWorkshop={currentWs}
               />
             )}
             {activeSection === 'clientes_taller' && (

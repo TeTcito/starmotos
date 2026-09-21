@@ -106,14 +106,18 @@ export function useGarantePortal() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Solicitudes pendientes de decisión del Garante (enviada_garante)
+  // Solicitudes pendientes de decisión del Garante (en_proceso, enviada_garante, etc.)
   const pendingRequests = useMemo(() => {
-    return warranties.filter((w) => w.status === 'enviada_garante');
+    return warranties.filter((w) =>
+      ['en_proceso', 'enviada_garante', 'validada_matriz'].includes(w.status)
+    );
   }, [warranties]);
 
-  // Historial (aprobada, rechazada, completada)
+  // Historial (aceptada, aprobada, denegada, rechazada, completada)
   const historyRequests = useMemo(() => {
-    return warranties.filter((w) => ['aprobada', 'rechazada', 'completada'].includes(w.status));
+    return warranties.filter((w) =>
+      ['aceptada', 'aprobada', 'denegada', 'rechazada', 'completada'].includes(w.status)
+    );
   }, [warranties]);
 
   // Abrir modal de decisión
@@ -126,17 +130,20 @@ export function useGarantePortal() {
   }, []);
 
   // Aprobar solicitud
-  const approveWarranty = useCallback(() => {
-    if (!selectedWarranty) return;
+  const approveWarranty = useCallback((idOverride?: string, notesOverride?: string) => {
+    const targetWarranty = idOverride ? warranties.find((w) => w.id === idOverride) : selectedWarranty;
+    if (!targetWarranty) return;
+
+    const finalNotes = notesOverride || reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.';
 
     setWarranties((prev) => {
       const updated = prev.map((w) =>
-        w.id === selectedWarranty.id
+        w.id === targetWarranty.id
           ? {
               ...w,
-              status: 'aprobada' as const,
-              garanteNotes: reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.',
-              approvedAt: 'Hoy, Autorización Digital Garante',
+              status: 'aceptada' as const,
+              garanteNotes: finalNotes,
+              approvedAt: 'Hoy, Autorización Digital Garante de Marca',
             }
           : w
       );
@@ -144,15 +151,15 @@ export function useGarantePortal() {
       return updated;
     });
 
-    // Registrar alerta para Matriz
+    // Registrar alerta para Matriz y Taller
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'garantia_aprobada',
       title: 'Garantía Aprobada por Garante de Marca',
-      message: `El Garante oficial autorizó la cobertura de la solicitud ${selectedWarranty.requestNumber} (${selectedWarranty.motorcycleBrand} ${selectedWarranty.motorcycleModel}). Procede a Matriz.`,
+      message: `El Garante oficial autorizó la cobertura de la solicitud ${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand} ${targetWarranty.motorcycleModel}). Procede a Matriz y Taller.`,
       timestamp: 'Ahora mismo',
       read: false,
-      relatedId: selectedWarranty.id,
+      relatedId: targetWarranty.id,
     };
     saveStoredAlerts([newAlert, ...getStoredAlerts()]);
 
@@ -164,26 +171,29 @@ export function useGarantePortal() {
     });
 
     setIsActionModalOpen(false);
-    showToast(`Garantía ${selectedWarranty.requestNumber} APROBADA con éxito. Notificado a Matriz.`, 'success');
-  }, [selectedWarranty, reviewNotes, showToast]);
+    showToast(`Garantía ${targetWarranty.requestNumber} ACEPTADA con éxito. Notificado a Matriz y Taller.`, 'success');
+  }, [selectedWarranty, reviewNotes, warranties, showToast]);
 
   // Rechazar solicitud
-  const rejectWarranty = useCallback(() => {
-    if (!selectedWarranty) return;
-    if (!rejectionReason.trim()) {
+  const rejectWarranty = useCallback((idOverride?: string, reasonOverride?: string) => {
+    const targetWarranty = idOverride ? warranties.find((w) => w.id === idOverride) : selectedWarranty;
+    if (!targetWarranty) return;
+
+    const finalReason = reasonOverride || rejectionReason.trim();
+    if (!finalReason) {
       showToast('Debe ingresar el motivo técnico del rechazo de la garantía.', 'error');
       return;
     }
 
     setWarranties((prev) => {
       const updated = prev.map((w) =>
-        w.id === selectedWarranty.id
+        w.id === targetWarranty.id
           ? {
               ...w,
-              status: 'rechazada' as const,
-              garanteNotes: reviewNotes || 'Rechazado en auditoría de garantías.',
-              rejectedAt: 'Hoy, Dictamen Garante',
-              rejectionReason: rejectionReason.trim(),
+              status: 'denegada' as const,
+              garanteNotes: reviewNotes || 'Rechazado en auditoría oficial de garantías de marca.',
+              rejectedAt: 'Hoy, Dictamen Garante Oficial',
+              rejectionReason: finalReason,
             }
           : w
       );
@@ -195,17 +205,17 @@ export function useGarantePortal() {
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'garantia_rechazada',
-      title: 'Garantía Rechazada por Garante de Marca',
-      message: `La solicitud ${selectedWarranty.requestNumber} fue rechazada: "${rejectionReason.trim()}".`,
+      title: 'Garantía Denegada por Garante de Marca',
+      message: `La solicitud ${targetWarranty.requestNumber} fue denegada por la Marca: "${finalReason}".`,
       timestamp: 'Ahora mismo',
       read: false,
-      relatedId: selectedWarranty.id,
+      relatedId: targetWarranty.id,
     };
     saveStoredAlerts([newAlert, ...getStoredAlerts()]);
 
     setIsActionModalOpen(false);
-    showToast(`Garantía ${selectedWarranty.requestNumber} ha sido rechazada. Notificado a Matriz.`, 'info');
-  }, [selectedWarranty, rejectionReason, reviewNotes, showToast]);
+    showToast(`Garantía ${targetWarranty.requestNumber} DENEGADA. Notificado a Matriz y Taller.`, 'error');
+  }, [selectedWarranty, rejectionReason, reviewNotes, warranties, showToast]);
 
   return {
     activeSection,

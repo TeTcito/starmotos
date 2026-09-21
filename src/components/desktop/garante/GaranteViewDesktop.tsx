@@ -48,8 +48,8 @@ interface Props {
   setIsActionModalOpen: (open: boolean) => void;
   actionType: 'aprobar' | 'rechazar';
   onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
-  onApproveWarranty: () => void;
-  onRejectWarranty: () => void;
+  onApproveWarranty: (idOverride?: string, notesOverride?: string) => void;
+  onRejectWarranty: (idOverride?: string, reasonOverride?: string) => void;
 }
 
 export const GaranteViewDesktop: React.FC<Props> = ({
@@ -237,6 +237,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               <SolicitudesGaranteDesktop
                 pendingRequests={pendingRequests}
                 onOpenDecisionModal={onOpenDecisionModal}
+                onApproveWarranty={onApproveWarranty}
+                onRejectWarranty={onRejectWarranty}
               />
             )}
             {activeSection === 'clientes_garante' && (
@@ -329,7 +331,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               {actionType === 'aprobar' ? (
                 <button
                   type="button"
-                  onClick={onApproveWarranty}
+                  onClick={() => onApproveWarranty()}
                   className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-sm"
                 >
                   Confirmar Aprobación
@@ -337,7 +339,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               ) : (
                 <button
                   type="button"
-                  onClick={onRejectWarranty}
+                  onClick={() => onRejectWarranty()}
                   className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-sm"
                 >
                   Confirmar Rechazo

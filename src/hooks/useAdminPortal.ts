@@ -125,14 +125,14 @@ export function useAdminPortal() {
 
   // ===================== FLUJO DE GARANTÍAS =====================
 
-  // Matriz valida la solicitud enviada por el taller
+  // Matriz valida y acepta la solicitud enviada por el taller (Pasa a En Proceso hacia Garante)
   const validateWarrantyByMatriz = useCallback((id: string, notes: string) => {
     setWarranties((prev) => {
       const updated = prev.map((w) =>
         w.id === id
           ? {
               ...w,
-              status: 'validada_matriz' as const,
+              status: 'en_proceso' as const,
               matrizNotes: notes,
             }
           : w
@@ -146,8 +146,8 @@ export function useAdminPortal() {
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'estado_cambiado',
-      title: 'Garantía Validada por Matriz',
-      message: `La solicitud ${targetW?.requestNumber || id} fue validada internamente y está lista para envío al Garante.`,
+      title: 'Garantía Aceptada por Matriz (En Proceso)',
+      message: `La solicitud ${targetW?.requestNumber || id} fue aceptada por Matriz y pasa a En Proceso hacia el Garante de Marca.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: id,
@@ -158,7 +158,43 @@ export function useAdminPortal() {
       return updatedAlerts;
     });
 
-    showToast('Solicitud de garantía validada correctamente por Matriz Central.', 'success');
+    showToast('Solicitud aceptada por Matriz. Puesta EN PROCESO para el Garante de Marca.', 'success');
+  }, [warranties, showToast]);
+
+  // Matriz deniega la solicitud
+  const rejectWarrantyByMatriz = useCallback((id: string, reason: string) => {
+    setWarranties((prev) => {
+      const updated = prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              status: 'denegada' as const,
+              rejectionReason: reason,
+              rejectedAt: 'Hoy, Matriz Central',
+            }
+          : w
+      );
+      saveStoredWarranties(updated);
+      return updated;
+    });
+
+    const targetW = warranties.find((w) => w.id === id);
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'garantia_rechazada',
+      title: 'Garantía Denegada por Matriz',
+      message: `La solicitud ${targetW?.requestNumber || id} fue denegada en revisión de Matriz.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: id,
+    };
+    setAlerts((prev) => {
+      const updatedAlerts = [newAlert, ...prev];
+      saveStoredAlerts(updatedAlerts);
+      return updatedAlerts;
+    });
+
+    showToast('Solicitud de garantía denegada en Matriz.', 'error');
   }, [warranties, showToast]);
 
   // Matriz envía la solicitud validada al Garante / Marca
@@ -499,6 +535,7 @@ export function useAdminPortal() {
     showToast,
     // Garantías
     validateWarrantyByMatriz,
+    rejectWarrantyByMatriz,
     sendWarrantyToGarante,
     completeWarrantyRepair,
     // Alertas

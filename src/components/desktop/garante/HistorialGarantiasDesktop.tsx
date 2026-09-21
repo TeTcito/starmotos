@@ -1,136 +1,170 @@
 // src/components/desktop/garante/HistorialGarantiasDesktop.tsx
 import React, { useState } from 'react';
-import { History, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
+import { History, Search, Inbox, CheckCircle2, XCircle } from 'lucide-react';
 import { WarrantyRequest } from '../../../types/customer';
+import {
+  WarrantySquareCard,
+  WarrantyFormView,
+  getWarrantyStatusInfo,
+} from '../../common/WarrantyModule';
 
 interface Props {
   historyRequests: WarrantyRequest[];
 }
 
 export const HistorialGarantiasDesktop: React.FC<Props> = ({ historyRequests }) => {
+  const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'aprobada' | 'rechazada' | 'completada'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'aceptada' | 'denegada'>('all');
 
   const filtered = historyRequests.filter((w) => {
+    const sInfo = getWarrantyStatusInfo(w.status);
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : sInfo.canonical === statusFilter;
+
+    const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
-      w.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.motorcycleModel.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' ? true : w.status === statusFilter;
+      !term ||
+      w.clientName.toLowerCase().includes(term) ||
+      w.requestNumber.toLowerCase().includes(term) ||
+      w.motorcycleModel.toLowerCase().includes(term) ||
+      w.motorcyclePlate.toLowerCase().includes(term) ||
+      w.tallerOrigin.toLowerCase().includes(term);
+
     return matchesSearch && matchesStatus;
   });
 
+  const countAceptadas = historyRequests.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'aceptada'
+  ).length;
+  const countDenegadas = historyRequests.filter(
+    (w) => getWarrantyStatusInfo(w.status).canonical === 'denegada'
+  ).length;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
-            <History className="w-6 h-6 text-blue-600" />
-            <span>Historial de Dictámenes Emitidos por la Marca</span>
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Registro auditable de garantías aprobadas, rechazadas y compensaciones técnicas.
-          </p>
-        </div>
-
-        <span className="text-xs font-bold text-zinc-600 bg-zinc-100 px-3 py-1.5 rounded-xl border border-zinc-200">
-          Dictaminadas: {historyRequests.length}
-        </span>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex gap-3">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar por cliente, solicitud o modelo de moto..."
-          className="flex-1 px-4 py-2 text-xs bg-zinc-50 border border-zinc-300 rounded-xl focus:bg-white focus:border-blue-600 outline-none"
+    <div className="space-y-5 animate-fade-in">
+      {/* 1. MODO: FICHA EN FORMATO FORMULARIO */}
+      {selectedWarranty ? (
+        <WarrantyFormView
+          warranty={selectedWarranty}
+          onBack={() => setSelectedWarranty(null)}
+          viewerRole="garante"
         />
-
-        <div className="flex gap-1 bg-zinc-100 p-1 rounded-xl text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-lg transition ${
-              statusFilter === 'all' ? 'bg-white shadow-xs text-zinc-900' : 'text-zinc-600'
-            }`}
-          >
-            Todas
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter('aprobada')}
-            className={`px-3 py-1.5 rounded-lg transition ${
-              statusFilter === 'aprobada' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600'
-            }`}
-          >
-            Aprobadas
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusFilter('rechazada')}
-            className={`px-3 py-1.5 rounded-lg transition ${
-              statusFilter === 'rechazada' ? 'bg-red-600 text-white shadow-xs' : 'text-zinc-600'
-            }`}
-          >
-            Rechazadas
-          </button>
-        </div>
-      </div>
-
-      {/* Lista */}
-      <div className="space-y-3">
-        {filtered.map((w) => {
-          const isAprobada = w.status === 'aprobada' || w.status === 'completada';
-          return (
-            <div
-              key={w.id}
-              className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between"
-            >
-              <div className="flex items-start justify-between">
+      ) : (
+        /* 2. MODO: LISTADO EN TARJETAS CUADRADAS */
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <History className="w-5 h-5" />
+                </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                      {w.requestNumber}
-                    </span>
-                    <h3 className="text-sm font-bold text-zinc-900">
-                      {w.motorcycleBrand} {w.motorcycleModel} — {w.clientName}
-                    </h3>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    C.I: {w.clientIdNumber} • Taller: {w.tallerOrigin} • Costo: ${w.estimatedCost?.toFixed(2)} USD
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                    Historial de Dictámenes Emitidos por la Marca
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Registro auditable de garantías aprobadas y denegadas con resolución oficial.
                   </p>
                 </div>
+              </div>
 
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
-                    isAprobada
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {isAprobada ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                  {isAprobada ? 'APROBADA' : 'RECHAZADA'}
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{countAceptadas} Aprobadas</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-red-50 text-red-800 border border-red-200 flex items-center gap-1.5 shadow-2xs">
+                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span>{countDenegadas} Denegadas</span>
                 </span>
               </div>
+            </div>
 
-              <div className="mt-3 p-3 bg-zinc-50 rounded-xl border border-zinc-100 text-xs">
-                <span className="font-bold text-zinc-700 block mb-0.5">Motivo Técnico Dictaminado:</span>
-                <p className="text-zinc-600">
-                  {w.garanteNotes || w.rejectionReason || 'Garantía auditada conforme a manual de servicio.'}
-                </p>
+            {/* Búsqueda y Filtros */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-zinc-100">
+              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border border-zinc-300 focus-within:border-blue-600 rounded-xl px-3.5 py-2 transition-all">
+                <Search className="w-4 h-4 text-zinc-400 shrink-0 mr-2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar en el historial por N° Solicitud, Cliente, Modelo o Taller..."
+                  className="w-full bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
 
-              <div className="mt-3 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-400 font-mono">
-                <span>Fecha Dictamen: {w.approvedAt || w.rejectedAt || 'Registrada'}</span>
-                <span>VIN: {w.motorcycleVin}</span>
+              <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === 'all'
+                      ? 'bg-white text-zinc-900 shadow-2xs'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  Todas ({historyRequests.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('aceptada')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === 'aceptada'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-emerald-800 hover:bg-emerald-100/50'
+                  }`}
+                >
+                  Aceptadas ({countAceptadas})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('denegada')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === 'denegada'
+                      ? 'bg-red-600 text-white shadow-2xs'
+                      : 'text-red-800 hover:bg-red-100/50'
+                  }`}
+                >
+                  Denegadas ({countDenegadas})
+                </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* GRID DE TARJETAS CUADRADAS */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-14 bg-zinc-50 border border-dashed border-zinc-300 rounded-2xl">
+              <Inbox className="w-10 h-10 text-zinc-400 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-zinc-700">No hay dictámenes en este filtro</h3>
+              <p className="text-xs text-zinc-500 mt-1">Modifique los términos de búsqueda.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filtered.map((w) => (
+                <WarrantySquareCard
+                  key={w.id}
+                  warranty={w}
+                  onClick={() => setSelectedWarranty(w)}
+                  viewerRole="garante"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

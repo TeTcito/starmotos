@@ -287,13 +287,17 @@ export type GaranteSection =
 
 // --- Flujo de Garantías (Máquina de Estados) ---
 export type WarrantyRequestStatus =
-  | 'creada'
+  | 'en_revision'
+  | 'en_proceso'
+  | 'aceptada'
+  | 'denegada'
   | 'enviada_matriz'
   | 'validada_matriz'
   | 'enviada_garante'
   | 'aprobada'
   | 'rechazada'
-  | 'completada';
+  | 'completada'
+  | 'creada';
 
 export interface WarrantyRequest {
   id: string;
@@ -301,16 +305,20 @@ export interface WarrantyRequest {
   createdAt: string;
   clientName: string;
   clientIdNumber: string;
+  clientPhone?: string;
   motorcycleBrand: string;
   motorcycleModel: string;
   motorcyclePlate: string;
   motorcycleVin: string;
+  motorcycleMileage?: number;
   warrantyType: 'marca' | 'plus_taller' | 'gps';
   issueDescription: string;
   diagnosticPhotos: string[];
   status: WarrantyRequestStatus;
   tallerOrigin: string;
   tallerOriginId: string;
+  partsRequired?: string;
+  mechanicDiagnosis?: string;
   matrizNotes?: string;
   garanteNotes?: string;
   approvedAt?: string;

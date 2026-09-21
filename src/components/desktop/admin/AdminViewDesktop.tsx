@@ -293,8 +293,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
         </aside>
 
         {/* CONTENIDO PRINCIPAL */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 w-full bg-white">
-          <div className="w-full">
+        <main
+          className={`flex-1 w-full bg-white ${
+            activeSection === 'clientes_admin'
+              ? 'overflow-hidden flex flex-col p-4'
+              : 'overflow-y-auto px-6 lg:px-8 py-6'
+          }`}
+        >
+          <div className={`w-full ${activeSection === 'clientes_admin' ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
             {activeSection === 'talleres' && <TalleresDesktop workshops={workshops} />}
             {activeSection === 'alistamiento' && (
               <AlistamientoWizard

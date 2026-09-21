@@ -452,46 +452,53 @@ export const ClientesModule: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
       {/* ========================================================================= */}
-      {/* 1. HEADER & MÉTRICAS                                                      */}
+      {/* 1. BARRA SUPERIOR COMPACTA: TÍTULO, MÉTRICAS & ACCIONES                   */}
       {/* ========================================================================= */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                <Users className="w-4 h-4" />
-              </div>
-              <h2 className="text-xl font-black text-zinc-900 tracking-tight">
-                {role === 'admin'
-                  ? 'Fichero Nacional de Clientes & Flota'
-                  : role === 'taller'
-                  ? 'Directorio de Clientes & Propietarios del Taller'
-                  : 'Clientes & Flota Oficial con Cobertura de Garantía'}
-              </h2>
-              <span className="px-2.5 py-0.5 text-xs font-black bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
+      <div className="bg-white border border-zinc-200 rounded-xl px-3.5 py-2 shadow-2xs space-y-2 shrink-0">
+        {/* Fila 1: Título + Métricas compactas + Botones */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+              <Users className="w-4 h-4" />
+            </div>
+            <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-tight whitespace-nowrap">
+              {role === 'admin'
+                ? 'Fichero de Clientes & Flota'
+                : role === 'taller'
+                ? 'Directorio de Clientes del Taller'
+                : 'Clientes & Flota con Garantía'}
+            </h2>
+
+            {/* Pills de métricas compactas */}
+            <div className="hidden sm:flex items-center gap-1.5 ml-1">
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-md whitespace-nowrap">
                 {filteredClients.length} Clientes
               </span>
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md whitespace-nowrap">
+                {totalMotos} Motos
+              </span>
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md whitespace-nowrap">
+                {totalPdiOk} PDI OK
+              </span>
+              <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-mono whitespace-nowrap">
+                {role === 'garante'
+                  ? `${filteredClients.reduce((acc, c) => acc + c.warrantiesCount, 0)} Garantías`
+                  : `$${totalSpentAll.toFixed(2)} Facturado`}
+              </span>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              {role === 'admin'
-                ? 'Control centralizado de propietarios, motocicletas asignadas, estado de alistamientos y facturación consolidada.'
-                : role === 'taller'
-                ? 'Historial de propietarios locales, contacto directo por WhatsApp y acceso rápido a alistamientos.'
-                : 'Auditoría de propietarios de unidades comercializadas, inspección PDI obligatoria y gestión de garantías.'}
-            </p>
           </div>
 
-          {/* Botones de acción Header */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Botones de acción */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer shrink-0"
               title="Descargar tabla en formato compatible con Microsoft Excel y Google Sheets"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Exportar Excel</span>
             </button>
 
@@ -499,92 +506,47 @@ export const ClientesModule: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => onNavigateToAlistamiento()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer shrink-0"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>+ Nuevo Alistamiento</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Métricas Resumen */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-100">
-          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/60">
-            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
-              Total Clientes
-            </span>
-            <span className="text-lg sm:text-xl font-black text-zinc-900 mt-0.5 block">
-              {filteredClients.length}
-            </span>
-          </div>
-
-          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/60">
-            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
-              Motos Registradas
-            </span>
-            <span className="text-lg sm:text-xl font-black text-blue-700 mt-0.5 block">
-              {totalMotos}
-            </span>
-          </div>
-
-          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/60">
-            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
-              Con Alistamiento PDI
-            </span>
-            <span className="text-lg sm:text-xl font-black text-emerald-700 mt-0.5 block">
-              {totalPdiOk}
-            </span>
-          </div>
-
-          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/60">
-            <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
-              {role === 'garante' ? 'Casos de Garantía' : 'Facturación Total'}
-            </span>
-            <span className="text-lg sm:text-xl font-black text-amber-700 mt-0.5 block font-mono">
-              {role === 'garante'
-                ? filteredClients.reduce((acc, c) => acc + c.warrantiesCount, 0)
-                : `$${totalSpentAll.toFixed(2)}`}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 2. BARRA DE BÚSQUEDA Y FILTROS                                            */}
-      {/* ========================================================================= */}
-      <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Input Buscador */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        {/* Fila 2: Buscador + Selector de sede + Chips de Filtro */}
+        <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-zinc-100">
+          {/* Buscador */}
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por cédula, nombre de cliente, placa, chasis (VIN) o teléfono..."
-              className="w-full pl-10 pr-10 py-2.5 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-xl text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium"
+              placeholder="Buscar cédula, nombre, placa, VIN..."
+              className="w-full pl-8 pr-7 py-1 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium h-7.5"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-0.5 cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Selector de Sede para Matriz */}
           {role === 'admin' && (
-            <div className="sm:w-64">
+            <div className="w-44 shrink-0">
               <select
                 value={selectedWorkshopFilter}
                 onChange={(e) => setSelectedWorkshopFilter(e.target.value)}
-                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs sm:text-sm font-semibold text-zinc-800 outline-none focus:border-blue-600"
+                className="w-full px-2 py-1 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 h-7.5"
               >
-                <option value="all">🏢 Todas las Sedes StarMotos</option>
+                <option value="all">🏢 Todas las Sedes</option>
                 {workshops.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} ({w.city})
@@ -593,122 +555,103 @@ export const ClientesModule: React.FC<Props> = ({
               </select>
             </div>
           )}
-        </div>
 
-        {/* Chips de Filtro Rápido */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('all')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 ${
-              activeFilterTab === 'all'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            Todos ({unifiedClients.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('iniciado')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-              activeFilterTab === 'iniciado'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            <span>🚀 Iniciados ({iniciadosCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('pendiente')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-              activeFilterTab === 'pendiente'
-                ? 'bg-amber-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            <span>⏳ Pendientes ({pendientesCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('referente')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-              activeFilterTab === 'referente'
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            <span>⭐ Referentes ({referentesCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('pagada')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-              activeFilterTab === 'pagada'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Pagadas ({pagadasCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveFilterTab('pdi_ok')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
-              activeFilterTab === 'pdi_ok'
-                ? 'bg-teal-600 text-white shadow-2xs'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>PDI OK ({pdiOkCount})</span>
-          </button>
+          {/* Chips de filtro */}
+          <div className="flex items-center gap-1 overflow-x-auto text-xs py-0.5">
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('all')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] ${
+                activeFilterTab === 'all'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              Todos ({unifiedClients.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('iniciado')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] ${
+                activeFilterTab === 'iniciado'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              🚀 Iniciados ({iniciadosCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('pendiente')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] ${
+                activeFilterTab === 'pendiente'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              ⏳ Pendientes ({pendientesCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('referente')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] ${
+                activeFilterTab === 'referente'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              ⭐ Referentes ({referentesCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('pagada')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] flex items-center gap-1 ${
+                activeFilterTab === 'pagada'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Pagadas ({pagadasCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveFilterTab('pdi_ok')}
+              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] flex items-center gap-1 ${
+                activeFilterTab === 'pdi_ok'
+                  ? 'bg-teal-600 text-white shadow-2xs'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              <span>PDI OK ({pdiOkCount})</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. TABLA DE CLIENTES TIPO EXCEL (ANCHO COMPLETO)                         */}
+      {/* 2. TABLA DE CLIENTES TIPO EXCEL (100% ANCHO, SCROLL INTERNO VERTICAL)    */}
       {/* ========================================================================= */}
       {filteredClients.length > 0 ? (
-        <div className="w-full bg-white border border-zinc-200 rounded-2xl shadow-xs overflow-hidden">
-          {/* Barra de estado y utilidades de la tabla */}
-          <div className="bg-zinc-50 border-b border-zinc-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-zinc-700 flex items-center gap-1.5">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                <span>Libro de Clientes & Servicios</span>
-              </span>
-              <span className="text-[11px] font-mono text-zinc-500 bg-white px-2 py-0.5 rounded border border-zinc-200 font-semibold">
-                {filteredClients.length} registros
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-zinc-500 hidden md:inline">
-                💡 Haga clic en <strong className="text-zinc-700">Ficha</strong> para inspección visual y fotos de la moto
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto w-full">
-            <table className="w-full min-w-[1250px] text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-zinc-100 text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 sticky top-0 z-10 select-none">
-                  <th className="px-3 py-2.5 text-center w-12 text-zinc-500 font-mono">#</th>
-                  <th className="px-3.5 py-2.5 min-w-[140px]">Nombre</th>
-                  <th className="px-3.5 py-2.5 min-w-[140px]">Apellido</th>
-                  <th className="px-3.5 py-2.5 min-w-[150px]">Origen</th>
-                  <th className="px-3.5 py-2.5 min-w-[140px]">Sede</th>
-                  <th className="px-3.5 py-2.5 min-w-[100px] whitespace-nowrap">Fecha</th>
-                  <th className="px-3.5 py-2.5 min-w-[140px]">Servicio</th>
-                  <th className="px-3.5 py-2.5 min-w-[95px] text-right">Valor</th>
-                  <th className="px-3.5 py-2.5 min-w-[130px]">Factura</th>
-                  <th className="px-3.5 py-2.5 min-w-[105px] text-center">¿Pagada?</th>
-                  <th className="px-3.5 py-2.5 min-w-[110px] text-center">Estado</th>
-                  <th className="px-3.5 py-2.5 min-w-[220px]">Observaciones</th>
-                  <th className="px-3 py-2.5 min-w-[110px] text-center w-28">Acciones</th>
+        <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
+            <table className="w-full table-fixed text-left text-xs border-collapse">
+              <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
+                <tr className="text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 select-none">
+                  <th className="w-[3%] px-1 py-2 text-center text-zinc-500 font-mono">#</th>
+                  <th className="w-[10.5%] px-2.5 py-2 truncate">Nombre</th>
+                  <th className="w-[10.5%] px-2.5 py-2 truncate">Apellido</th>
+                  <th className="w-[9%] px-2 py-2 truncate">Origen</th>
+                  <th className="w-[9%] px-2 py-2 truncate">Sede</th>
+                  <th className="w-[7.5%] px-1.5 py-2 text-center whitespace-nowrap">Fecha</th>
+                  <th className="w-[10.5%] px-2 py-2 truncate">Servicio</th>
+                  <th className="w-[6.5%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
+                  <th className="w-[8%] px-2 py-2 truncate">Factura</th>
+                  <th className="w-[6.5%] px-1.5 py-2 text-center whitespace-nowrap">¿Pagada?</th>
+                  <th className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap">Estado</th>
+                  <th className="w-[14%] px-2.5 py-2 truncate">Observaciones</th>
+                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 text-zinc-800">
@@ -721,62 +664,56 @@ export const ClientesModule: React.FC<Props> = ({
                     <React.Fragment key={client.id}>
                       <tr className="hover:bg-blue-50/50 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40">
                         {/* 1. # */}
-                        <td className="px-3 py-2.5 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
+                        <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
                           {idx + 1}
                         </td>
 
                         {/* 2. Nombre */}
-                        <td className="px-3.5 py-2.5 font-semibold text-zinc-900">
-                          <div className="flex flex-col">
-                            <span className="truncate max-w-[150px]" title={data.nombre}>
-                              {data.nombre}
-                            </span>
-                            <span className="text-[10px] font-mono font-normal text-zinc-400">
+                        <td className="px-2.5 py-2 text-zinc-900 truncate" title={`${data.nombre} (C.I. ${client.cedulaRuc})`}>
+                          <div className="flex flex-col truncate">
+                            <span className="font-bold truncate text-xs">{data.nombre}</span>
+                            <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
                               C.I. {client.cedulaRuc}
                             </span>
                           </div>
                         </td>
 
                         {/* 3. Apellido */}
-                        <td className="px-3.5 py-2.5 font-medium text-zinc-800">
-                          <span className="truncate max-w-[150px] block" title={data.apellido}>
-                            {data.apellido || '—'}
-                          </span>
+                        <td className="px-2.5 py-2 text-zinc-800 truncate" title={data.apellido}>
+                          <span className="font-semibold truncate block text-xs">{data.apellido || '—'}</span>
                         </td>
 
                         {/* 4. Origen */}
-                        <td className="px-3.5 py-2.5 text-zinc-600">
-                          <span className="truncate max-w-[160px] block" title={data.origen}>
-                            {data.origen}
-                          </span>
+                        <td className="px-2 py-2 text-zinc-600 truncate" title={data.origen}>
+                          <span className="truncate block text-xs">{data.origen}</span>
                         </td>
 
                         {/* 5. Sede */}
-                        <td className="px-3.5 py-2.5 text-zinc-700">
-                          <span className="inline-flex items-center text-[11px] font-medium bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded border border-zinc-200/80 truncate max-w-[150px]" title={data.sede}>
+                        <td className="px-2 py-2 text-zinc-700 truncate" title={data.sede}>
+                          <span className="inline-block text-[11px] font-medium bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded border border-zinc-200/80 truncate max-w-full">
                             {data.sede}
                           </span>
                         </td>
 
                         {/* 6. Fecha */}
-                        <td className="px-3.5 py-2.5 whitespace-nowrap font-mono text-zinc-600 text-[11px]">
+                        <td className="px-1.5 py-2 text-center whitespace-nowrap font-mono text-zinc-600 text-[11px]" title={data.fecha}>
                           {data.fecha}
                         </td>
 
                         {/* 7. Servicio */}
-                        <td className="px-3.5 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 whitespace-nowrap">
+                        <td className="px-2 py-2 truncate" title={data.servicio}>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="truncate px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
                               {data.servicio}
                             </span>
                             {otherRecords.length > 0 && (
                               <button
                                 type="button"
                                 onClick={() => toggleRowExpand(client.id)}
-                                className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 cursor-pointer"
+                                className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1 py-0.5 rounded border border-blue-200 cursor-pointer"
                                 title="Ver historial anterior"
                               >
-                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
                                 <span>+{otherRecords.length}</span>
                               </button>
                             )}
@@ -784,66 +721,66 @@ export const ClientesModule: React.FC<Props> = ({
                         </td>
 
                         {/* 8. Valor */}
-                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-zinc-900 whitespace-nowrap">
+                        <td className="px-2 py-2 text-right font-mono font-bold text-zinc-900 whitespace-nowrap text-xs">
                           ${data.valor.toFixed(2)}
                         </td>
 
                         {/* 9. Factura */}
-                        <td className="px-3.5 py-2.5 font-mono font-medium text-zinc-700 whitespace-nowrap">
-                          {data.factura}
+                        <td className="px-2 py-2 font-mono font-medium text-zinc-700 truncate text-[11px]" title={data.factura}>
+                          <span className="truncate block">{data.factura}</span>
                         </td>
 
                         {/* 10. ¿Pagada? */}
-                        <td className="px-3.5 py-2.5 text-center">
+                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
                           {data.isPaid ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                              <Check className="w-3 h-3 text-emerald-600" />
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <Check className="w-2.5 h-2.5 text-emerald-600" />
                               <span>Pagada</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
-                              <Clock className="w-3 h-3 text-amber-600" />
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock className="w-2.5 h-2.5 text-amber-600" />
                               <span>Pendiente</span>
                             </span>
                           )}
                         </td>
 
                         {/* 11. Estado */}
-                        <td className="px-3.5 py-2.5 text-center">
+                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
                           {data.estado === 'referente' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                               ⭐ Referente
                             </span>
                           )}
                           {data.estado === 'pendiente' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               ⏳ Pendiente
                             </span>
                           )}
                           {data.estado === 'iniciado' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                               🚀 Iniciado
                             </span>
                           )}
                         </td>
 
                         {/* 12. Observaciones */}
-                        <td className="px-3.5 py-2.5 text-zinc-600">
-                          <p className="line-clamp-2 max-w-xs text-[11px]" title={data.observaciones}>
+                        <td className="px-2.5 py-2 text-zinc-600 truncate" title={data.observaciones}>
+                          <span className="truncate block text-[11px]">
                             {data.observaciones}
-                          </p>
+                          </span>
                         </td>
 
                         {/* 13. Acciones */}
-                        <td className="px-3 py-2.5 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => setSelectedClientForDetail(client)}
-                              className="px-2 py-1 text-[11px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                              className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
                               title="Ver Ficha y Motos del Cliente"
                             >
-                              <Eye className="w-3 h-3" />
+                              <Eye className="w-3 h-3 text-zinc-600" />
                               <span>Ficha</span>
                             </button>
                             {client.phone && (
@@ -851,7 +788,7 @@ export const ClientesModule: React.FC<Props> = ({
                                 href={getCleanWhatsappUrl(client.phone, client.fullName)}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
+                                className="p-0.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
                                 title="Contactar por WhatsApp"
                               >
                                 <MessageCircle className="w-3.5 h-3.5" />
@@ -861,7 +798,7 @@ export const ClientesModule: React.FC<Props> = ({
                               <button
                                 type="button"
                                 onClick={() => onNavigateToAlistamiento(client.cedulaRuc)}
-                                className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                                className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                                 title="Nuevo Servicio para este cliente"
                               >
                                 <Plus className="w-3.5 h-3.5" />
@@ -878,29 +815,37 @@ export const ClientesModule: React.FC<Props> = ({
                             key={histRec.id || `hist-${hIdx}`}
                             className="bg-blue-50/25 text-zinc-600 divide-x divide-blue-100/70 text-[11px]"
                           >
-                            <td className="px-3 py-2 text-center font-mono text-zinc-400">↳</td>
-                            <td colSpan={2} className="px-3.5 py-2 pl-6 italic text-zinc-500">
+                            <td className="px-1 py-1.5 text-center font-mono text-zinc-400">↳</td>
+                            <td colSpan={2} className="px-2.5 py-1.5 pl-4 italic text-zinc-500 truncate" title={`Servicio anterior de ${data.nombre}`}>
                               Servicio anterior de {data.nombre}
                             </td>
-                            <td className="px-3.5 py-2 text-zinc-500">{histRec.origen || data.origen}</td>
-                            <td className="px-3.5 py-2 text-zinc-500">{histRec.sede}</td>
-                            <td className="px-3.5 py-2 font-mono whitespace-nowrap">{histRec.fechaServicio}</td>
-                            <td className="px-3.5 py-2">
-                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                            <td className="px-2 py-1.5 text-zinc-500 truncate" title={histRec.origen || data.origen}>
+                              {histRec.origen || data.origen}
+                            </td>
+                            <td className="px-2 py-1.5 text-zinc-500 truncate" title={histRec.sede}>
+                              {histRec.sede}
+                            </td>
+                            <td className="px-1.5 py-1.5 text-center font-mono whitespace-nowrap text-[10px]">
+                              {histRec.fechaServicio}
+                            </td>
+                            <td className="px-2 py-1.5 truncate" title={histRec.serviciosRealizados?.join(' + ') || 'Mantenimiento'}>
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200 truncate">
                                 {histRec.serviciosRealizados?.join(' + ') || 'Mantenimiento'}
                               </span>
                             </td>
-                            <td className="px-3.5 py-2 text-right font-mono font-semibold text-zinc-700">
+                            <td className="px-2 py-1.5 text-right font-mono font-semibold text-zinc-700 whitespace-nowrap text-[11px]">
                               ${(histRec.montoPagado || histRec.valorServicio || 0).toFixed(2)}
                             </td>
-                            <td className="px-3.5 py-2 font-mono text-zinc-600">{histRec.numeroFactura}</td>
-                            <td className="px-3.5 py-2 text-center">
+                            <td className="px-2 py-1.5 font-mono text-zinc-600 truncate text-[10px]" title={histRec.numeroFactura}>
+                              {histRec.numeroFactura}
+                            </td>
+                            <td className="px-1.5 py-1.5 text-center whitespace-nowrap">
                               <span className="text-[10px] font-bold text-emerald-700">✓ Pagada</span>
                             </td>
-                            <td className="px-3.5 py-2 text-center">
+                            <td className="px-1.5 py-1.5 text-center whitespace-nowrap">
                               <span className="text-[10px] font-bold text-purple-700">Completado</span>
                             </td>
-                            <td colSpan={2} className="px-3.5 py-2 italic text-zinc-500">
+                            <td colSpan={2} className="px-2.5 py-1.5 italic text-zinc-500 truncate" title={histRec.observaciones || '—'}>
                               {histRec.observaciones || '—'}
                             </td>
                           </tr>
@@ -909,15 +854,15 @@ export const ClientesModule: React.FC<Props> = ({
                   );
                 })}
               </tbody>
-              <tfoot className="bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px]">
+              <tfoot className="sticky bottom-0 bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px] shadow-xs z-10">
                 <tr className="divide-x divide-zinc-200">
-                  <td colSpan={7} className="px-3.5 py-2.5 text-right font-mono uppercase tracking-wider">
-                    Total Facturado ({filteredClients.length} registros):
+                  <td colSpan={7} className="px-3 py-2 text-right font-mono uppercase tracking-wider text-[11px]">
+                    Total ({filteredClients.length} registros):
                   </td>
-                  <td className="px-3.5 py-2.5 text-right font-mono text-emerald-700 font-black text-xs">
+                  <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
                     ${filteredClients.reduce((sum, c) => sum + getClientRowData(c).valor, 0).toFixed(2)}
                   </td>
-                  <td colSpan={5} className="px-3.5 py-2.5 text-zinc-600 font-normal">
+                  <td colSpan={5} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
                     <span className="font-bold text-emerald-700">
                       {filteredClients.filter((c) => getClientRowData(c).isPaid).length} pagadas
                     </span>{' '}
@@ -932,27 +877,29 @@ export const ClientesModule: React.FC<Props> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-12 text-center space-y-3">
-          <Users className="w-10 h-10 text-zinc-300 mx-auto" />
-          <h3 className="text-base font-bold text-zinc-800">
-            No se encontraron clientes con los filtros aplicados
-          </h3>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            Verifique la ortografía de la cédula o nombre, o cambie el filtro de sede para ver más resultados.
-          </p>
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm('');
-                setActiveFilterTab('all');
-                setSelectedWorkshopFilter('all');
-              }}
-              className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-xl cursor-pointer"
-            >
-              Restablecer Filtros
-            </button>
-          )}
+        <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-white border border-zinc-200 rounded-xl">
+          <div className="text-center space-y-2 max-w-sm">
+            <Users className="w-8 h-8 text-zinc-300 mx-auto" />
+            <h3 className="text-sm font-bold text-zinc-800">
+              No se encontraron clientes con los filtros aplicados
+            </h3>
+            <p className="text-xs text-zinc-500">
+              Verifique la ortografía de la cédula o nombre, o cambie el filtro de sede para ver más resultados.
+            </p>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setActiveFilterTab('all');
+                  setSelectedWorkshopFilter('all');
+                }}
+                className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg cursor-pointer"
+              >
+                Restablecer Filtros
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Sparkles,
   UserCheck,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -73,6 +74,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
   const [activeWorkshopId, setActiveWorkshopId] = React.useState<string>(() => {
     return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
   });
+  const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
 
   const currentWs =
     workshops.find((w) => w.id === activeWorkshopId) ||
@@ -154,10 +156,16 @@ export const TallerViewDesktop: React.FC<Props> = ({
             </h1>
           </div>
 
-          <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{currentWs.city} — Bahías Activas</span>
-          </div>
+          {activeSection === 'alistamiento_taller' && alistamientoViewMode === 'form' && (
+            <button
+              type="button"
+              onClick={() => setAlistamientoViewMode('list')}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-800 hover:bg-blue-900 border border-blue-400 text-xs text-white font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Regresar al Listado</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -283,6 +291,8 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 onAddOrigin={onAddOrigin}
                 onSaveRecord={onSaveFullAlistamiento}
                 recentRecords={fullAlistamientos}
+                viewMode={alistamientoViewMode}
+                onViewModeChange={setAlistamientoViewMode}
               />
             )}
             {activeSection === 'solicitudes_garantia' && (

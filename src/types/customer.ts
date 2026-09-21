@@ -346,10 +346,7 @@ export interface Workshop {
 export type ServiceActionType =
   | 'alistamiento_pdi'
   | 'engrasado'
-  | 'mantenimiento'
-  | 'cambio_aceite'
-  | 'frenos'
-  | 'bateria';
+  | 'mantenimiento';
 
 export interface AlistamientoFullRecord {
   id: string;
@@ -380,6 +377,8 @@ export interface AlistamientoFullRecord {
   tecnicoId: string;
   kilometraje: number;
   aceite: 'sin_aceite' | 'con_aceite' | string;
+  nivelAceite?: string;
+  tipoAceite?: string;
   numeroFactura: string;
   numeroTicket: string;
   valorServicio: number;

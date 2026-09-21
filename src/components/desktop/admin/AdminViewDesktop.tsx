@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Sparkles,
   Wrench,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -90,6 +91,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onSearchSri,
   onSubmitAlistamiento,
 }) => {
+  const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: 'talleres',
@@ -167,6 +169,16 @@ export const AdminViewDesktop: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-3.5 shrink-0">
+            {activeSection === 'alistamiento' && alistamientoViewMode === 'form' && (
+              <button
+                type="button"
+                onClick={() => setAlistamientoViewMode('list')}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-800 hover:bg-blue-900 border border-blue-400 text-xs text-white font-bold shadow-xs transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Regresar al Listado</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveSection('alertas')}
               className="relative p-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-blue-100 hover:text-white transition cursor-pointer"
@@ -285,6 +297,8 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 onAddOrigin={onAddOrigin}
                 onSaveRecord={onSaveFullAlistamiento}
                 recentRecords={fullAlistamientos}
+                viewMode={alistamientoViewMode}
+                onViewModeChange={setAlistamientoViewMode}
               />
             )}
             {activeSection === 'tecnicos' && (

@@ -18,6 +18,10 @@ import {
   Printer,
   MessageCircle,
   Upload,
+  UploadCloud,
+  Trash2,
+  ZoomIn,
+  Link as LinkIcon,
   Calendar,
   Building2,
   FileCheck2,
@@ -256,6 +260,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
 
   const handleMatrizApprove = () => {
     if (onValidateByMatriz) {
@@ -296,24 +301,24 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   };
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5 animate-fade-in">
+    <div className="w-full space-y-6 animate-fade-in">
       {/* Toast Notificación */}
       {toastMessage && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between animate-slide-in">
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs animate-slide-in">
           <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:text-emerald-900">
+          <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:text-emerald-900 text-base font-bold cursor-pointer">
             ✕
           </button>
         </div>
       )}
 
       {/* Cabecera del Formulario */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-zinc-200">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-zinc-200">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Volver a Solicitudes</span>
@@ -322,31 +327,31 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
 
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
-                Ficha Técnica de Garantía: {warranty.requestNumber}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-base sm:text-xl font-black text-zinc-900 tracking-tight">
+                Ficha Técnica de Garantía: <span className="font-mono text-blue-600">{warranty.requestNumber}</span>
               </h2>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1 ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
+                className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 shadow-2xs ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
               >
                 {statusInfo.icon}
                 <span>{statusInfo.label}</span>
               </span>
             </div>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
               Taller Emisor: <strong className="text-zinc-800">{warranty.tallerOrigin}</strong> • Fecha:{' '}
               <strong className="text-zinc-800">{warranty.createdAt}</strong>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5" />
+            <Printer className="w-4 h-4" />
             <span>Imprimir Ficha</span>
           </button>
 
@@ -357,9 +362,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               )},%20le%20escribimos%20de%20StarMotos%20sobre%20su%20solicitud%20de%20garantía%20${warranty.requestNumber}.`}
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
             >
-              <MessageCircle className="w-3.5 h-3.5" />
+              <MessageCircle className="w-4 h-4" />
               <span>WhatsApp Cliente</span>
             </a>
           )}
@@ -367,22 +372,23 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       </div>
 
       {/* Línea de Tiempo de Trazabilidad (3 Pasos: Taller -> Matriz -> Garante) */}
-      <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-4">
-        <h4 className="text-[11px] font-black uppercase text-zinc-500 tracking-wider mb-3">
-          Trazabilidad del Dictamen de Garantía
+      <div className="bg-white border border-zinc-200 shadow-sm rounded-2xl p-5">
+        <h4 className="text-xs font-black uppercase text-zinc-500 tracking-wider mb-4 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-blue-600" />
+          <span>Trazabilidad del Flujo de Garantía</span>
         </h4>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Paso 1: Taller */}
           <div
-            className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+            className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
               statusInfo.canonical !== 'en_revision'
-                ? 'bg-emerald-50/60 border-emerald-300 text-emerald-900'
-                : 'bg-white border-amber-300 text-zinc-900 shadow-2xs'
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
+                : 'bg-white border-amber-300 text-zinc-900 shadow-xs'
             }`}
           >
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
                 statusInfo.canonical !== 'en_revision'
                   ? 'bg-emerald-600 text-white'
                   : 'bg-amber-500 text-white animate-pulse'
@@ -390,9 +396,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             >
               1
             </div>
-            <div className="text-xs">
-              <span className="font-bold block">1. Emisión en Taller</span>
-              <p className="text-[11px] text-zinc-600 mt-0.5">
+            <div className="text-xs sm:text-sm">
+              <span className="font-bold block text-zinc-900">1. Emisión en Taller</span>
+              <p className="text-xs text-zinc-600 mt-0.5">
                 {warranty.tallerOrigin} reportó la falla técnica.
               </p>
             </div>
@@ -400,16 +406,16 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
           {/* Paso 2: Matriz */}
           <div
-            className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+            className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
               statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'aceptada'
-                ? 'bg-emerald-50/60 border-emerald-300 text-emerald-900'
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
                 : statusInfo.canonical === 'en_revision'
-                ? 'bg-amber-50/60 border-amber-300 text-amber-900'
-                : 'bg-white border-zinc-200 text-zinc-500'
+                ? 'bg-amber-50/70 border-amber-300 text-amber-900'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-500'
             }`}
           >
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
                 statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'aceptada'
                   ? 'bg-emerald-600 text-white'
                   : statusInfo.canonical === 'en_revision'
@@ -419,9 +425,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             >
               2
             </div>
-            <div className="text-xs">
-              <span className="font-bold block">2. Revisión Matriz Central</span>
-              <p className="text-[11px] text-zinc-600 mt-0.5">
+            <div className="text-xs sm:text-sm">
+              <span className="font-bold block text-zinc-900">2. Revisión Matriz Central</span>
+              <p className="text-xs text-zinc-600 mt-0.5">
                 {statusInfo.canonical === 'en_revision'
                   ? 'En revisión por el equipo técnico central.'
                   : 'Aceptada y despachada a la Marca.'}
@@ -431,18 +437,18 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
           {/* Paso 3: Garante Oficial */}
           <div
-            className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+            className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
               statusInfo.canonical === 'aceptada'
                 ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs'
                 : statusInfo.canonical === 'denegada'
                 ? 'bg-red-50 border-red-300 text-red-900'
                 : statusInfo.canonical === 'en_proceso'
                 ? 'bg-blue-50 border-blue-300 text-blue-900 animate-pulse'
-                : 'bg-white border-zinc-200 text-zinc-400'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-400'
             }`}
           >
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
                 statusInfo.canonical === 'aceptada'
                   ? 'bg-emerald-600 text-white'
                   : statusInfo.canonical === 'denegada'
@@ -454,9 +460,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             >
               3
             </div>
-            <div className="text-xs">
-              <span className="font-bold block">3. Dictamen Garante de Marca</span>
-              <p className="text-[11px] text-zinc-600 mt-0.5">
+            <div className="text-xs sm:text-sm">
+              <span className="font-bold block text-zinc-900">3. Dictamen Garante de Marca</span>
+              <p className="text-xs text-zinc-600 mt-0.5">
                 {statusInfo.canonical === 'aceptada'
                   ? '✓ Garantía Aceptada y Liquidada.'
                   : statusInfo.canonical === 'denegada'
@@ -468,163 +474,175 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
       </div>
 
-      {/* FORMULARIO ESTRUCTURADO EN 3 COLUMNAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* FORMULARIO ESTRUCTURADO EN 3 COLUMNAS SIMÉTRICAS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         {/* COLUMNA 1: CLIENTE Y SEDE */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <User className="w-4 h-4 text-blue-600" />
-            <span>1. Datos del Cliente & Sede</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4" />
+              </div>
+              <span>1. Datos del Cliente & Sede</span>
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Cédula o RUC</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.clientIdNumber}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 cursor-not-allowed outline-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Cédula o RUC</label>
+              <input
+                type="text"
+                readOnly
+                value={warranty.clientIdNumber}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono font-bold text-zinc-900 cursor-not-allowed outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Nombre Completo</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.clientName}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 cursor-not-allowed outline-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Nombre Completo</label>
+              <input
+                type="text"
+                readOnly
+                value={warranty.clientName}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Teléfono de Contacto</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.clientPhone || '0990000000'}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-800 cursor-not-allowed outline-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Teléfono de Contacto</label>
+              <input
+                type="text"
+                readOnly
+                value={warranty.clientPhone || '0990000000'}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Taller de Origen</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.tallerOrigin}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-800 cursor-not-allowed outline-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Taller de Origen</label>
+              <input
+                type="text"
+                readOnly
+                value={warranty.tallerOrigin}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-800 cursor-not-allowed outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Tipo de Póliza</label>
-            <div className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-800 uppercase">
-              {warranty.warrantyType === 'marca'
-                ? 'Garantía Oficial de Marca'
-                : warranty.warrantyType === 'plus_taller'
-                ? 'Garantía Plus StarMotos'
-                : 'GPS Satelital'}
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Tipo de Póliza</label>
+              <div className="h-11 sm:h-12 px-4 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm font-bold text-blue-800 uppercase flex items-center">
+                {warranty.warrantyType === 'marca'
+                  ? 'Garantía Oficial de Marca'
+                  : warranty.warrantyType === 'plus_taller'
+                  ? 'Garantía Plus StarMotos'
+                  : 'GPS Satelital'}
+              </div>
             </div>
           </div>
         </div>
 
         {/* COLUMNA 2: VEHÍCULO */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <Bike className="w-4 h-4 text-blue-600" />
-            <span>2. Motocicleta Registrada</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Bike className="w-4 h-4" />
+              </div>
+              <span>2. Motocicleta Registrada</span>
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Marca y Modelo</label>
-            <input
-              type="text"
-              readOnly
-              value={`${warranty.motorcycleBrand} ${warranty.motorcycleModel}`}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 cursor-not-allowed outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-bold text-zinc-600 mb-1">Placa</label>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca y Modelo</label>
               <input
                 type="text"
                 readOnly
-                value={warranty.motorcyclePlate || 'SIN PLACA'}
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-800 cursor-not-allowed outline-none"
+                value={`${warranty.motorcycleBrand} ${warranty.motorcycleModel}`}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Placa</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={warranty.motorcyclePlate || 'SIN PLACA'}
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono font-bold text-zinc-800 cursor-not-allowed outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Kilometraje</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`${warranty.motorcycleMileage || 12500} km`}
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-[10px] font-bold text-zinc-600 mb-1">Kilometraje</label>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">VIN / Chasis</label>
               <input
                 type="text"
                 readOnly
-                value={`${warranty.motorcycleMileage || 12500} km`}
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-800 cursor-not-allowed outline-none"
+                value={warranty.motorcycleVin}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">VIN / Chasis</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.motorcycleVin}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-800 cursor-not-allowed outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">N° Factura / Ticket</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.invoiceNumber || 'TCK-2026-GAR'}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-800 cursor-not-allowed outline-none"
-            />
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">N° Factura / Ticket</label>
+              <input
+                type="text"
+                readOnly
+                value={warranty.invoiceNumber || 'TCK-2026-GAR'}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+              />
+            </div>
           </div>
         </div>
 
         {/* COLUMNA 3: RECLAMO TÉCNICO & COSTO */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <Wrench className="w-4 h-4 text-blue-600" />
-            <span>3. Reclamo Técnico & Costo</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Wrench className="w-4 h-4" />
+              </div>
+              <span>3. Reclamo Técnico & Costo</span>
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Falla Reportada</label>
-            <textarea
-              rows={3}
-              readOnly
-              value={warranty.issueDescription}
-              className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 cursor-not-allowed outline-none resize-none leading-relaxed"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Falla Reportada</label>
+              <textarea
+                rows={3}
+                readOnly
+                value={warranty.issueDescription}
+                className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-900 cursor-not-allowed outline-none resize-none leading-relaxed"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-              Repuestos Comprometidos Requeridos
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={
-                warranty.partsRequired ||
-                'Kit de empaques, retenedores originales y sensor de presión Benelli'
-              }
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-800 cursor-not-allowed outline-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Repuestos Comprometidos Requeridos
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={
+                  warranty.partsRequired ||
+                  'Kit de empaques, retenedores originales y sensor de presión Benelli'
+                }
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-800 cursor-not-allowed outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 mb-1">Monto Estimado Reclamado</label>
-            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-black font-mono text-emerald-800">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-              <span>${(warranty.estimatedCost || 60).toFixed(2)} USD</span>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Monto Estimado Reclamado</label>
+              <div className="flex items-center gap-2 h-11 sm:h-12 px-4 bg-emerald-50 border border-emerald-200 rounded-xl text-base font-black font-mono text-emerald-800">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
+                <span>${(warranty.estimatedCost || 60).toFixed(2)} USD</span>
+              </div>
             </div>
           </div>
         </div>
@@ -632,27 +650,65 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
       {/* EVIDENCIAS FOTOGRÁFICAS */}
       {warranty.diagnosticPhotos && warranty.diagnosticPhotos.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-zinc-200 space-y-2">
-          <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
-            <Camera className="w-4 h-4 text-blue-600" />
-            <span>Inspección Visual del Daño ({warranty.diagnosticPhotos.length} Evidencias)</span>
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+            <h4 className="text-sm sm:text-base font-black text-zinc-900 tracking-tight flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Camera className="w-4 h-4" />
+              </div>
+              <span>Inspección Visual del Daño ({warranty.diagnosticPhotos.length} Evidencias Fotográficas)</span>
+            </h4>
+            <span className="text-xs text-zinc-500 hidden sm:inline">Haga clic sobre una imagen para ampliarla</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
             {warranty.diagnosticPhotos.map((url, i) => (
-              <a
+              <div
                 key={i}
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs"
+                onClick={() => setPreviewZoomImage(url)}
+                className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs cursor-pointer bg-zinc-100"
               >
                 <img
                   src={url}
                   alt={`Evidencia ${i + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-              </a>
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center text-zinc-900 shadow-xs">
+                    <ZoomIn className="w-4 h-4" />
+                  </div>
+                </div>
+                <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold">
+                  #{i + 1}
+                </span>
+              </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Zoom Modal */}
+      {previewZoomImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewZoomImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewZoomImage(null)}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-sm font-bold"
+            >
+              ✕
+            </button>
+            <img
+              src={previewZoomImage}
+              alt="Evidencia ampliada"
+              className="max-h-[85vh] w-auto object-contain mx-auto"
+            />
           </div>
         </div>
       )}
@@ -880,6 +936,10 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     photos: [] as string[],
   });
 
+  const [urlInput, setUrlInput] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
+
   // Selector rápido de cliente si existe
   const handleSelectClient = (c: TallerClient) => {
     setFormData((prev) => ({
@@ -893,7 +953,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     }));
   };
 
-  // Carga de imágenes reales
+  // Carga de imágenes desde archivos locales
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -911,6 +971,60 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       reader.readAsDataURL(file);
     });
     e.target.value = '';
+  };
+
+  // Drag & drop de imágenes
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setFormData((prev) => ({
+            ...prev,
+            photos: [...prev.photos, event.target!.result as string],
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Pegar imágenes con Ctrl + V
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              setFormData((prev) => ({
+                ...prev,
+                photos: [...prev.photos, event.target!.result as string],
+              }));
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+
+  // Agregar imagen por URL
+  const handleAddImageUrl = () => {
+    if (!urlInput.trim()) return;
+    setFormData((prev) => ({
+      ...prev,
+      photos: [...prev.photos, urlInput.trim()],
+    }));
+    setUrlInput('');
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -959,7 +1073,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="bg-white border-2 border-blue-400 rounded-2xl p-5 sm:p-6 shadow-md space-y-5 animate-slide-in"
+      onPaste={handlePaste}
+      className="w-full space-y-6 animate-slide-in"
     >
       <input
         ref={fileInputRef}
@@ -970,22 +1085,37 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         className="hidden"
       />
 
-      {/* Cabecera */}
-      <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
-        <div>
-          <h2 className="text-base sm:text-lg font-black text-zinc-900 flex items-center gap-2">
-            <Send className="w-5 h-5 text-blue-600" />
-            <span>Emitir Nueva Solicitud de Garantía (Formato Formulario)</span>
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            La solicitud viajará a <strong>Matriz Central</strong> en estado <strong>En Revisión</strong>.
-          </p>
+      {/* Cabecera del Formulario */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-zinc-200">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Volver</span>
+          </button>
+
+          <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
+
+          <div>
+            <h2 className="text-base sm:text-xl font-black text-zinc-900 flex items-center gap-2.5 tracking-tight">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Send className="w-4 h-4" />
+              </div>
+              <span>Emitir Nueva Solicitud de Garantía Oficial</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+              Taller Emisor: <strong className="text-zinc-800">{defaultTallerOrigin}</strong> • Destino: <strong>Matriz Central (En Revisión)</strong>
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs sm:text-sm font-bold cursor-pointer transition"
         >
           Cancelar
         </button>
@@ -993,17 +1123,17 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
 
       {/* Selector Rápido de Clientes de Taller */}
       {clients.length > 0 && (
-        <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200">
-          <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
+        <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-2xs">
+          <label className="block text-xs font-bold text-zinc-600 mb-2">
             Cargar datos de cliente existente en taller:
           </label>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {clients.slice(0, 5).map((c) => (
+          <div className="flex gap-2.5 overflow-x-auto pb-1">
+            {clients.slice(0, 8).map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => handleSelectClient(c)}
-                className="px-2.5 py-1 bg-white hover:bg-blue-50 border border-zinc-200 hover:border-blue-300 rounded-lg text-xs font-bold text-zinc-800 whitespace-nowrap cursor-pointer transition"
+                className="px-3 py-1.5 bg-zinc-50 hover:bg-blue-50 border border-zinc-200 hover:border-blue-300 rounded-xl text-xs font-bold text-zinc-800 whitespace-nowrap cursor-pointer transition active:scale-98"
               >
                 + {c.fullName} ({c.idNumber})
               </button>
@@ -1012,232 +1142,386 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         </div>
       )}
 
-      {/* Formulario 3 Columnas */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Formulario 3 Columnas Simétricas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         {/* Columna 1: Cliente & Póliza */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <User className="w-4 h-4 text-blue-600" />
-            <span>1. Datos del Cliente & Póliza</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4" />
+              </div>
+              <span>1. Datos del Cliente & Póliza</span>
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">Cédula o RUC *</label>
-            <input
-              type="text"
-              required
-              value={formData.clientIdNumber}
-              onChange={(e) => setFormData({ ...formData, clientIdNumber: e.target.value })}
-              placeholder="1204567890"
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Cédula o RUC <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.clientIdNumber}
+                onChange={(e) => setFormData({ ...formData, clientIdNumber: e.target.value })}
+                placeholder="Ej: 1204567890"
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">Nombres y Apellidos *</label>
-            <input
-              type="text"
-              required
-              value={formData.clientName}
-              onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-              placeholder="Ej: Fernando Vaca"
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Nombres y Apellidos <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.clientName}
+                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                placeholder="Ej: Fernando Vaca"
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">Celular / Teléfono</label>
-            <input
-              type="tel"
-              value={formData.clientPhone}
-              onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
-              placeholder="0990000000"
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Celular / WhatsApp
+              </label>
+              <input
+                type="tel"
+                value={formData.clientPhone}
+                onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                placeholder="Ej: 0990000000"
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">Tipo de Póliza *</label>
-            <select
-              value={formData.warrantyType}
-              onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 cursor-pointer"
-            >
-              <option value="marca">Garantía Oficial de Marca (Fábrica)</option>
-              <option value="plus_taller">Garantía Plus StarMotos</option>
-              <option value="gps">Garantía Dispositivo GPS Satelital</option>
-            </select>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Tipo de Cobertura / Póliza <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.warrantyType}
+                onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none cursor-pointer"
+              >
+                <option value="marca">Garantía Oficial de Marca (Fábrica)</option>
+                <option value="plus_taller">Garantía Plus StarMotos</option>
+                <option value="gps">Garantía Dispositivo GPS Satelital</option>
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Columna 2: Vehículo */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <Bike className="w-4 h-4 text-blue-600" />
-            <span>2. Motocicleta Reclamada</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Bike className="w-4 h-4" />
+              </div>
+              <span>2. Motocicleta Reclamada</span>
+            </div>
 
-          <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                  Marca <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.motorcycleBrand}
+                  onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
+                  placeholder="Ej: Benelli"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                  Modelo <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.motorcycleModel}
+                  onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
+                  placeholder="Ej: TRK 502X"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Placa</label>
+                <input
+                  type="text"
+                  value={formData.motorcyclePlate}
+                  onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
+                  placeholder="PBX-8492"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Kilometraje Actual</label>
+                <input
+                  type="number"
+                  value={formData.motorcycleMileage}
+                  onChange={(e) => setFormData({ ...formData, motorcycleMileage: Number(e.target.value) })}
+                  placeholder="12000"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-[11px] font-bold text-zinc-700 mb-1">Marca *</label>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Número de Chasis / VIN</label>
               <input
                 type="text"
-                required
-                value={formData.motorcycleBrand}
-                onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
+                value={formData.motorcycleVin}
+                onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
+                placeholder="LBBP57008PA..."
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-bold text-zinc-700 mb-1">Modelo *</label>
-              <input
-                type="text"
-                required
-                value={formData.motorcycleModel}
-                onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-bold text-zinc-700 mb-1">Placa</label>
-              <input
-                type="text"
-                value={formData.motorcyclePlate}
-                onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
-                placeholder="PBX-8492"
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-zinc-700 mb-1">Kilometraje Actual</label>
-              <input
-                type="number"
-                value={formData.motorcycleMileage}
-                onChange={(e) => setFormData({ ...formData, motorcycleMileage: Number(e.target.value) })}
-                className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">VIN / Chasis</label>
-            <input
-              type="text"
-              value={formData.motorcycleVin}
-              onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
-              placeholder="LBBP57008PA..."
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
-            />
           </div>
         </div>
 
         {/* Columna 3: Reclamo Técnico & Presupuesto */}
-        <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-200 text-xs font-bold uppercase text-zinc-800">
-            <Wrench className="w-4 h-4 text-blue-600" />
-            <span>3. Reclamo & Diagnóstico</span>
-          </div>
+        <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Wrench className="w-4 h-4" />
+              </div>
+              <span>3. Reclamo & Diagnóstico</span>
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-              Descripción del Daño / Falla *
-            </label>
-            <textarea
-              rows={2}
-              required
-              value={formData.issueDescription}
-              onChange={(e) => setFormData({ ...formData, issueDescription: e.target.value })}
-              placeholder="Describa el código de error, ruido, fuga o falla eléctrica..."
-              className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 outline-none focus:border-blue-600 resize-none"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Descripción del Daño / Falla <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                required
+                value={formData.issueDescription}
+                onChange={(e) => setFormData({ ...formData, issueDescription: e.target.value })}
+                placeholder="Describa el código de error, ruido, fuga, falla eléctrica o pieza averiada..."
+                className="w-full p-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm text-zinc-900 transition-all outline-none resize-none leading-relaxed"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-              Repuestos Requeridos para Cambio
-            </label>
-            <input
-              type="text"
-              value={formData.partsRequired}
-              onChange={(e) => setFormData({ ...formData, partsRequired: e.target.value })}
-              placeholder="Ej. Sensor de presión Benelli, retén horquilla izquierda"
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 outline-none focus:border-blue-600"
-            />
-          </div>
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Repuestos Requeridos para Cambio
+              </label>
+              <input
+                type="text"
+                value={formData.partsRequired}
+                onChange={(e) => setFormData({ ...formData, partsRequired: e.target.value })}
+                placeholder="Ej: Sensor TPS Benelli, retenedores horquilla"
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm text-zinc-900 transition-all outline-none"
+              />
+            </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-              Costo Estimado Reclamado ($ USD) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              required
-              value={formData.estimatedCost}
-              onChange={(e) => setFormData({ ...formData, estimatedCost: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-emerald-800 outline-none focus:border-blue-600"
-            />
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Costo Estimado Reclamado ($ USD) <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-sm">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.estimatedCost}
+                  onChange={(e) => setFormData({ ...formData, estimatedCost: parseFloat(e.target.value) || 0 })}
+                  className="w-full h-11 sm:h-12 pl-8 pr-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-emerald-800 transition-all outline-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Evidencias Fotográficas */}
-      <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-zinc-800 flex items-center gap-1.5">
-            <Camera className="w-4 h-4 text-blue-600" />
-            <span>Evidencias Fotográficas del Daño ({formData.photos.length})</span>
-          </label>
+      {/* Evidencias e Imágenes de la Garantía */}
+      <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Camera className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-zinc-900">
+                Evidencias Fotográficas e Inspección Visual
+              </h3>
+              <p className="text-xs text-zinc-500">
+                Adjunte fotos del daño, número de chasis, tacómetro y piezas averiadas.
+              </p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
+              {formData.photos.length} imagen{formData.photos.length === 1 ? '' : 'es'}
+            </span>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-xs active:scale-98"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Subir Fotos desde Computador</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Zona Drag & Drop / Seleccionar */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+          }}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
+            isDragging
+              ? 'border-blue-600 bg-blue-50/80 scale-[1.01]'
+              : 'border-zinc-300 hover:border-blue-400 bg-zinc-50/50 hover:bg-blue-50/20'
+          }`}
+        >
+          <div className="w-12 h-12 mx-auto rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+            <UploadCloud className="w-6 h-6" />
+          </div>
+          <p className="text-sm font-bold text-zinc-800">
+            Arrastra y suelta imágenes aquí, o <span className="text-blue-600 underline">haz clic para examinar</span>
+          </p>
+          <p className="text-xs text-zinc-500 mt-1">
+            Formatos soportados: JPG, PNG, WEBP. Puedes seleccionar varias imágenes a la vez o pegar con <kbd className="px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded font-mono text-[11px]">Ctrl+V</kbd>
+          </p>
+        </div>
+
+        {/* Input para agregar imagen por URL directa */}
+        <div className="flex items-center gap-2 pt-1">
+          <div className="relative flex-1">
+            <LinkIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddImageUrl();
+                }
+              }}
+              placeholder="O pega una URL de imagen directa (https://...)"
+              className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs sm:text-sm text-zinc-900 outline-none focus:border-blue-500 focus:bg-white"
+            />
+          </div>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-1 bg-white hover:bg-blue-50 border border-zinc-300 hover:border-blue-300 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+            onClick={handleAddImageUrl}
+            className="px-4 h-11 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-800 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition shrink-0"
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>+ Adjuntar Fotos del Computador</span>
+            + Agregar URL
           </button>
         </div>
 
+        {/* Galería de Fotos */}
         {formData.photos.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-2">
-            {formData.photos.map((p, idx) => (
-              <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200">
-                <img src={p} alt="Foto" className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      photos: prev.photos.filter((_, i) => i !== idx),
-                    }))
-                  }
-                  className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+          <div className="pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {formData.photos.map((p, idx) => (
+                <div
+                  key={idx}
+                  className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 shadow-2xs"
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
+                  <img
+                    src={p}
+                    alt={`Evidencia ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewZoomImage(p);
+                      }}
+                      className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                      title="Ampliar foto"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFormData((prev) => ({
+                          ...prev,
+                          photos: prev.photos.filter((_, i) => i !== idx),
+                        }));
+                      }}
+                      className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                      title="Eliminar foto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none">
+                    #{idx + 1}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
+      {/* Lightbox Zoom Modal */}
+      {previewZoomImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewZoomImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewZoomImage(null)}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-sm font-bold"
+            >
+              ✕
+            </button>
+            <img
+              src={previewZoomImage}
+              alt="Evidencia ampliada"
+              className="max-h-[85vh] w-auto object-contain mx-auto"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Botones de Envío */}
-      <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-200">
+      <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-zinc-200">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition cursor-pointer"
+          className="px-6 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-sm font-bold transition cursor-pointer"
         >
           Cancelar
         </button>
 
         <button
           type="submit"
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-98"
+          className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-2.5 shadow-md hover:shadow-lg cursor-pointer active:scale-98"
         >
           <Send className="w-4 h-4" />
           <span>Emitir Solicitud de Garantía a Matriz (En Revisión)</span>

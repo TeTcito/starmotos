@@ -11,6 +11,7 @@ import {
   LogOut,
   MapPin,
   ChevronRight,
+  Wrench,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -21,9 +22,12 @@ import {
   AlistamientoClient,
   AlistamientoMotorcycle,
   AlistamientoService,
+  Technician,
+  AlistamientoFullRecord,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
-import { AlistamientoMobile } from './AlistamientoMobile';
+import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { TecnicosMobile } from '../common/TecnicosMobile';
 import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
@@ -41,6 +45,12 @@ interface Props {
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
   invoices: AdminInvoice[];
+  technicians: Technician[];
+  origins: string[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onAddOrigin: (origin: string) => void;
+  onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   alistamientoClient: AlistamientoClient;
   setAlistamientoClient: React.Dispatch<React.SetStateAction<AlistamientoClient>>;
   alistamientoMoto: AlistamientoMotorcycle;
@@ -65,6 +75,12 @@ export const AdminViewMobile: React.FC<Props> = ({
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
   invoices,
+  technicians,
+  origins,
+  fullAlistamientos,
+  onAddTechnician,
+  onAddOrigin,
+  onSaveFullAlistamiento,
   alistamientoClient,
   setAlistamientoClient,
   alistamientoMoto,
@@ -80,6 +96,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'talleres', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
     { id: 'alistamiento', label: 'Alistamiento SRI', icon: <UserCheck className="w-4 h-4" /> },
+    { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
     { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" /> },
     { id: 'facturacion', label: 'Facturación', icon: <Receipt className="w-4 h-4" /> },
     { id: 'alertas', label: 'Alertas', icon: <Bell className="w-4 h-4" />, badge: `${alerts.filter((a) => !a.read).length || ''}` },
@@ -88,6 +105,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control de Talleres',
     alistamiento: 'Alistamiento SRI',
+    tecnicos: 'Equipo Técnico',
     garantias_admin: 'Garantías & Pólizas',
     facturacion: 'Facturación SRI',
     alertas: 'Alertas del Sistema',
@@ -180,16 +198,24 @@ export const AdminViewMobile: React.FC<Props> = ({
       <main className="max-w-md mx-auto px-4 py-4">
         {activeSection === 'talleres' && <TalleresMobile workshops={workshops} />}
         {activeSection === 'alistamiento' && (
-          <AlistamientoMobile
-            client={alistamientoClient}
-            setClient={setAlistamientoClient}
-            motorcycle={alistamientoMoto}
-            setMotorcycle={setAlistamientoMoto}
-            service={alistamientoService}
-            setService={setAlistamientoService}
-            isSearchingSri={isSearchingSri}
-            onSearchSri={onSearchSri}
-            onSubmit={onSubmitAlistamiento}
+          <AlistamientoWizard
+            defaultAtendidoPor="Ing. Mateo Enríquez"
+            defaultSede="StarMotos Matriz Central"
+            defaultSedeId="matriz"
+            technicians={technicians}
+            origins={origins}
+            workshops={workshops}
+            onAddTechnician={onAddTechnician}
+            onAddOrigin={onAddOrigin}
+            onSaveRecord={onSaveFullAlistamiento}
+          />
+        )}
+        {activeSection === 'tecnicos' && (
+          <TecnicosMobile
+            technicians={technicians}
+            workshops={workshops}
+            onAddTechnician={onAddTechnician}
+            currentWorkshopId="matriz-quito"
           />
         )}
         {activeSection === 'garantias_admin' && (

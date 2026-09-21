@@ -16,15 +16,26 @@ import {
   getStoredWarranties,
   saveStoredWarranties,
   getStoredClients,
+  saveStoredClients,
   getStoredInventory,
   saveStoredAlerts,
   getStoredAlerts,
+  getStoredTechnicians,
+  saveStoredTechnicians,
+  getStoredOrigins,
+  saveStoredOrigins,
+  getStoredFullAlistamientos,
+  saveStoredFullAlistamientos,
+  getStoredWorkshops,
 } from '../data/mockMultiRoleData';
+import { Technician, AlistamientoFullRecord, Workshop } from '../types/customer';
 
 export const TALLER_SECTIONS: TallerSection[] = [
   'ordenes_taller',
+  'alistamiento_taller',
   'solicitudes_garantia',
   'clientes_taller',
+  'tecnicos',
   'inventario',
 ];
 
@@ -43,21 +54,37 @@ export function useTallerPortal() {
   const activeSectionRef = useRef<TallerSection>(activeSection);
   activeSectionRef.current = activeSection;
 
+  const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
   const [orders, setOrders] = useState<TallerOrder[]>(getStoredOrders);
   const [warranties, setWarranties] = useState<WarrantyRequest[]>(getStoredWarranties);
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
   const [inventory, setInventory] = useState<InventoryItem[]>(getStoredInventory);
+  const [technicians, setTechnicians] = useState<Technician[]>(getStoredTechnicians);
+  const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
+  const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Sincronización entre ventanas o localStorage
   useEffect(() => {
     const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
     const handleOrdersUpdate = () => setOrders(getStoredOrders());
+    const handleTechsUpdate = () => setTechnicians(getStoredTechnicians());
+    const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
+    const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
+    const handleClientsUpdate = () => setClients(getStoredClients());
+
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    window.addEventListener('starmotos_technicians_updated', handleTechsUpdate);
+    window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
+    window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
       window.removeEventListener('starmotos_orders_updated', handleOrdersUpdate);
+      window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
+      window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
+      window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     };
   }, []);
 
@@ -188,6 +215,93 @@ export function useTallerPortal() {
     return true;
   }, [newWarrantyForm, showToast]);
 
+  // ===================== GESTIÓN DE TÉCNICOS & ALISTAMIENTO =====================
+  const addTechnician = useCallback((techData: Omit<Technician, 'id' | 'activeOrdersCount'>) => {
+    const newTech: Technician = {
+      ...techData,
+      id: `tec-${Date.now()}`,
+      activeOrdersCount: 0,
+    };
+    setTechnicians((prev) => {
+      const updated = [newTech, ...prev];
+      saveStoredTechnicians(updated);
+      return updated;
+    });
+    showToast(`Técnico ${newTech.name} registrado con éxito.`, 'success');
+  }, [showToast]);
+
+  const addOrigin = useCallback((newOrigin: string) => {
+    setOrigins((prev) => {
+      if (prev.includes(newOrigin)) return prev;
+      const updated = [...prev, newOrigin];
+      saveStoredOrigins(updated);
+      return updated;
+    });
+    showToast(`Almacén/Origen "${newOrigin}" agregado.`, 'success');
+  }, [showToast]);
+
+  const saveFullAlistamiento = useCallback((record: AlistamientoFullRecord) => {
+    // 1. Guardar en lista de alistamientos
+    setFullAlistamientos((prev) => {
+      const updated = [record, ...prev];
+      saveStoredFullAlistamientos(updated);
+      return updated;
+    });
+
+    // 2. Crear / actualizar en lista de clientes del taller
+    const newClient: TallerClient = {
+      id: `cli-${Date.now()}`,
+      fullName: `${record.nombres} ${record.apellidos}`.trim(),
+      idNumber: record.cedulaRuc,
+      phone: record.celular1,
+      email: record.email,
+      motorcycleBrand: record.modeloMarca.split(' ')[0] || 'Moto',
+      motorcycleModel: record.modeloMarca,
+      motorcyclePlate: record.placa,
+      lastVisit: record.fechaServicio,
+      totalVisits: 1,
+    };
+
+    setClients((prev) => {
+      const existingIdx = prev.findIndex((c) => c.idNumber === record.cedulaRuc);
+      let updated: TallerClient[];
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          lastVisit: record.fechaServicio,
+          totalVisits: updated[existingIdx].totalVisits + 1,
+          motorcyclePlate: record.placa || updated[existingIdx].motorcyclePlate,
+        };
+      } else {
+        updated = [newClient, ...prev];
+      }
+      saveStoredClients(updated);
+      return updated;
+    });
+
+    // 3. Crear Alerta de sistema
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'orden_creada',
+      title: 'Nuevo Alistamiento Registrado',
+      message: `${record.sede}: Cliente ${record.nombres} ${record.apellidos} — Moto ${record.modeloMarca} (${record.placa}). Factura ${record.numeroFactura}.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: record.id,
+    };
+    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#1d4ed8', '#dc2626', '#10b981'],
+    });
+
+    showToast('¡Alistamiento registrado y sincronizado exitosamente!', 'success');
+  }, [showToast]);
+
   return {
     activeSection,
     setActiveSection,
@@ -198,6 +312,13 @@ export function useTallerPortal() {
     warranties,
     clients,
     inventory,
+    workshops,
+    technicians,
+    origins,
+    fullAlistamientos,
+    addTechnician,
+    addOrigin,
+    saveFullAlistamiento,
     newWarrantyForm,
     setNewWarrantyForm,
     createWarrantyRequest,
@@ -205,3 +326,4 @@ export function useTallerPortal() {
     showToast,
   };
 }
+

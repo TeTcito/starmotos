@@ -8,6 +8,8 @@ import {
   TallerClient,
   TallerOrder,
   GaranteProfile,
+  Technician,
+  AlistamientoFullRecord,
 } from '../types/customer';
 
 // --- Talleres Iniciales ---
@@ -67,6 +69,20 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     completedToday: 2,
     pendingWarranties: 1,
     mechanics: 2,
+  },
+  {
+    id: 'taller-quevedo',
+    name: 'StarMotos Sede Quevedo',
+    code: 'QVD-05',
+    address: 'Av. Quito frente a la planta de agua',
+    city: 'Quevedo, Los Ríos',
+    phone: '+593 98 285 2456',
+    manager: 'Daniel Meza Quevedo',
+    status: 'operativo',
+    activeOrders: 5,
+    completedToday: 4,
+    pendingWarranties: 1,
+    mechanics: 3,
   },
 ];
 
@@ -528,6 +544,13 @@ export const SRI_MOCK_DATABASE: Record<string, { razonSocial: string; tipoContri
     email: 'jorge.caicedo@ecuaexpress.com',
     phone: '0979988776',
   },
+  '2350999252': {
+    razonSocial: 'GRACIA GUATO FELIX RAFAEL',
+    tipoContribuyente: 'PERSONA NATURAL',
+    address: 'Quevedo Av.quito frente a la planta de agua',
+    email: 'felix.graciag.r@gmail.com',
+    phone: '0982852456',
+  },
 };
 
 // Función auxiliar para consultar SRI simulada (genera un nombre realista si no existe)
@@ -687,3 +710,195 @@ export function getStoredInventory(): InventoryItem[] {
   }
   return INITIAL_INVENTORY;
 }
+
+// ===================== TÉCNICOS =====================
+export const INITIAL_TECHNICIANS: Technician[] = [
+  {
+    id: 'tec-01',
+    name: 'WILLIAM MEZA',
+    workshopId: 'taller-quevedo',
+    workshopName: 'StarMotos Sede Quevedo',
+    specialty: 'Mecánica Integral & Ajuste PDI',
+    phone: '0982112233',
+    status: 'activo',
+    activeOrdersCount: 2,
+  },
+  {
+    id: 'tec-02',
+    name: 'CARLOS "CHARLY" MORALES',
+    workshopId: 'matriz-quito',
+    workshopName: 'StarMotos Matriz Central',
+    specialty: 'Diagnóstico Electrónico & Escáner Delphi',
+    phone: '0994556677',
+    status: 'activo',
+    activeOrdersCount: 4,
+  },
+  {
+    id: 'tec-03',
+    name: 'DAVID CARRERA',
+    workshopId: 'taller-norte',
+    workshopName: 'StarMotos Express Norte',
+    specialty: 'Inyección Electrónica & Frenos ABS',
+    phone: '0992345678',
+    status: 'activo',
+    activeOrdersCount: 3,
+  },
+  {
+    id: 'tec-04',
+    name: 'ROBERTO ALMEIDA',
+    workshopId: 'taller-cumbaya',
+    workshopName: 'StarMotos Valle de Cumbayá',
+    specialty: 'Suspensiones & Chasis Multimarca',
+    phone: '0987654321',
+    status: 'activo',
+    activeOrdersCount: 2,
+  },
+  {
+    id: 'tec-05',
+    name: 'ANDRÉS GUANO',
+    workshopId: 'taller-sur',
+    workshopName: 'StarMotos Taller Sur',
+    specialty: 'Mantenimiento Preventivo & Lubricación',
+    phone: '0971239876',
+    status: 'activo',
+    activeOrdersCount: 1,
+  },
+];
+
+export function getStoredTechnicians(): Technician[] {
+  try {
+    const stored = localStorage.getItem('starmotos_shared_technicians');
+    if (stored) return JSON.parse(stored);
+  } catch (e) {
+    console.error('Error reading technicians from localStorage', e);
+  }
+  return INITIAL_TECHNICIANS;
+}
+
+export function saveStoredTechnicians(technicians: Technician[]) {
+  try {
+    localStorage.setItem('starmotos_shared_technicians', JSON.stringify(technicians));
+    window.dispatchEvent(new Event('starmotos_technicians_updated'));
+  } catch (e) {
+    console.error('Error saving technicians to localStorage', e);
+  }
+}
+
+// ===================== ORÍGENES / ALMACENES =====================
+export const INITIAL_ORIGINS: string[] = [
+  'almacen Tenso santo domingo',
+  'almacen Quevedo',
+  'almacen Matriz Quito',
+  'Particular (Venta directa)',
+  'Concesionario Asociado',
+  'Referido por cliente fundador',
+];
+
+export function getStoredOrigins(): string[] {
+  try {
+    const stored = localStorage.getItem('starmotos_shared_origins');
+    if (stored) return JSON.parse(stored);
+  } catch (e) {
+    console.error('Error reading origins from localStorage', e);
+  }
+  return INITIAL_ORIGINS;
+}
+
+export function saveStoredOrigins(origins: string[]) {
+  try {
+    localStorage.setItem('starmotos_shared_origins', JSON.stringify(origins));
+    window.dispatchEvent(new Event('starmotos_origins_updated'));
+  } catch (e) {
+    console.error('Error saving origins to localStorage', e);
+  }
+}
+
+// ===================== REGISTROS COMPLETOS DE ALISTAMIENTO =====================
+export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [
+  {
+    id: 'als-001',
+    atendidoPor: 'Daniel Meza Quevedo',
+    sede: 'StarMotos Sede Quevedo',
+    sedeId: 'taller-quevedo',
+    fechaServicio: '2026-09-21',
+    nombres: 'Felix Rafael',
+    apellidos: 'Gracia Guato',
+    cedulaRuc: '2350999252',
+    celular1: '0982852456',
+    email: 'felix.graciag.r@gmail.com',
+    direccion: 'Quevedo Av.quito frente a la planta de agua',
+    origen: 'almacen Tenso santo domingo',
+    chasis: 'LBBP57008PA049182',
+    placa: 'KX284T',
+    modeloMarca: 'Tundra r200',
+    serviciosRealizados: ['alistamiento_pdi', 'engrasado'],
+    tecnicoResponsable: 'WILLIAM MEZA',
+    tecnicoId: 'tec-01',
+    kilometraje: 450,
+    aceite: 'sin_aceite',
+    numeroFactura: '005-001-0004521',
+    numeroTicket: 'TCK-2026-9921',
+    valorServicio: 35.0,
+    montoPagado: 35.0,
+    metodoPago: 'Efectivo',
+    observaciones: 'Alistamiento PDI completado con lubricación de guayas, torque de pernos y revisión de presión de neumáticos.',
+    proximoMantenimientoKm: 1000,
+    fotos: [
+      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
+    ],
+    createdAt: '21 Sep 2026, 10:15 AM',
+  },
+  {
+    id: 'als-002',
+    atendidoPor: 'Ing. Mateo Enríquez',
+    sede: 'StarMotos Matriz Central',
+    sedeId: 'matriz-quito',
+    fechaServicio: '2026-09-20',
+    nombres: 'Fernando Xavier',
+    apellidos: 'Vaca Morales',
+    cedulaRuc: '1724890123',
+    celular1: '0998745612',
+    email: 'cliente@starmotos.ec',
+    direccion: 'Av. Brasil N39-122 y Edmundo Carvajal, Quito',
+    origen: 'almacen Matriz Quito',
+    chasis: 'LBBP57008PA049182',
+    placa: 'PBX-8492',
+    modeloMarca: 'Benelli TRK 502X ABS',
+    serviciosRealizados: ['alistamiento_pdi', 'mantenimiento'],
+    tecnicoResponsable: 'CARLOS "CHARLY" MORALES',
+    tecnicoId: 'tec-02',
+    kilometraje: 14850,
+    aceite: 'con_aceite',
+    numeroFactura: '001-002-0008891',
+    numeroTicket: 'TCK-2026-8841',
+    valorServicio: 45.0,
+    montoPagado: 45.0,
+    metodoPago: 'Transferencia',
+    observaciones: 'Mantenimiento preventivo oficial y escaneo con diagnóstico OBD.',
+    proximoMantenimientoKm: 18000,
+    fotos: [
+      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+    ],
+    createdAt: '20 Sep 2026, 16:20 PM',
+  },
+];
+
+export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
+  try {
+    const stored = localStorage.getItem('starmotos_shared_alistamientos');
+    if (stored) return JSON.parse(stored);
+  } catch (e) {
+    console.error('Error reading alistamientos from localStorage', e);
+  }
+  return INITIAL_FULL_ALISTAMIENTOS;
+}
+
+export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
+  try {
+    localStorage.setItem('starmotos_shared_alistamientos', JSON.stringify(records));
+    window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+  } catch (e) {
+    console.error('Error saving alistamientos to localStorage', e);
+  }
+}
+

@@ -21,12 +21,18 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     warranties,
     alerts,
     invoices,
+    technicians,
+    origins,
+    fullAlistamientos,
     toastMessage,
     validateWarrantyByMatriz,
     sendWarrantyToGarante,
     completeWarrantyRepair,
     markAlertAsRead,
     markAllAlertsAsRead,
+    addTechnician,
+    addOrigin,
+    saveFullAlistamiento,
     alistamientoClient,
     setAlistamientoClient,
     alistamientoMoto,
@@ -54,6 +60,12 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onMarkAlertAsRead={markAlertAsRead}
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
           invoices={invoices}
+          technicians={technicians}
+          origins={origins}
+          fullAlistamientos={fullAlistamientos}
+          onAddTechnician={addTechnician}
+          onAddOrigin={addOrigin}
+          onSaveFullAlistamiento={saveFullAlistamiento}
           alistamientoClient={alistamientoClient}
           setAlistamientoClient={setAlistamientoClient}
           alistamientoMoto={alistamientoMoto}
@@ -78,6 +90,12 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onMarkAlertAsRead={markAlertAsRead}
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
           invoices={invoices}
+          technicians={technicians}
+          origins={origins}
+          fullAlistamientos={fullAlistamientos}
+          onAddTechnician={addTechnician}
+          onAddOrigin={addOrigin}
+          onSaveFullAlistamiento={saveFullAlistamiento}
           alistamientoClient={alistamientoClient}
           setAlistamientoClient={setAlistamientoClient}
           alistamientoMoto={alistamientoMoto}

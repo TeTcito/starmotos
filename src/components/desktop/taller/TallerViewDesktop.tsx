@@ -9,6 +9,7 @@ import {
   MapPin,
   ChevronRight,
   Sparkles,
+  UserCheck,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -17,11 +18,16 @@ import {
   TallerClient,
   InventoryItem,
   WorkOrderStatus,
+  Technician,
+  AlistamientoFullRecord,
+  Workshop,
 } from '../../../types/customer';
 import { OrdenesTallerDesktop } from './OrdenesTallerDesktop';
 import { SolicitudesGarantiaTallerDesktop } from './SolicitudesGarantiaTallerDesktop';
 import { ClientesTallerDesktop } from './ClientesTallerDesktop';
 import { InventarioDesktop } from './InventarioDesktop';
+import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { TecnicosDesktop } from '../common/TecnicosDesktop';
 
 interface Props {
   activeSection: TallerSection;
@@ -32,6 +38,13 @@ interface Props {
   warranties: WarrantyRequest[];
   clients: TallerClient[];
   inventory: InventoryItem[];
+  workshops: Workshop[];
+  technicians: Technician[];
+  origins: string[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onAddOrigin: (origin: string) => void;
+  onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   newWarrantyForm: any;
   setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
   onCreateWarrantyRequest: () => boolean;
@@ -46,16 +59,33 @@ export const TallerViewDesktop: React.FC<Props> = ({
   warranties,
   clients,
   inventory,
+  workshops,
+  technicians,
+  origins,
+  fullAlistamientos,
+  onAddTechnician,
+  onAddOrigin,
+  onSaveFullAlistamiento,
   newWarrantyForm,
   setNewWarrantyForm,
   onCreateWarrantyRequest,
 }) => {
+  const tallerTechs = technicians.filter(
+    (t) => t.workshopId === 'taller-norte' || t.workshopName.toLowerCase().includes('norte')
+  );
+
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: 'ordenes_taller',
       label: 'Órdenes en Taller',
       icon: <Wrench className="w-4 h-4" />,
       badge: `${orders.length}`,
+    },
+    {
+      id: 'alistamiento_taller',
+      label: 'Alistamiento PDI',
+      icon: <UserCheck className="w-4 h-4" />,
+      badge: 'Nuevo',
     },
     {
       id: 'solicitudes_garantia',
@@ -69,6 +99,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
       icon: <Users className="w-4 h-4" />,
     },
     {
+      id: 'tecnicos',
+      label: 'Equipo de Técnicos',
+      icon: <Users className="w-4 h-4" />,
+      badge: `${tallerTechs.length}`,
+    },
+    {
       id: 'inventario',
       label: 'Inventario / Repuestos',
       icon: <Package className="w-4 h-4" />,
@@ -77,8 +113,10 @@ export const TallerViewDesktop: React.FC<Props> = ({
 
   const sectionTitles: Record<TallerSection, string> = {
     ordenes_taller: 'Bahías y Órdenes de Trabajo Activas',
+    alistamiento_taller: 'Alistamiento PDI, Registro de Clientes y Motocicletas',
     solicitudes_garantia: 'Solicitudes de Garantía Técnicas hacia Matriz',
     clientes_taller: 'Fichero de Clientes de la Sucursal',
+    tecnicos: 'Equipo de Mecánicos y Técnicos de la Sucursal',
     inventario: 'Inventario de Repuestos y Lubricantes',
   };
 
@@ -200,6 +238,19 @@ export const TallerViewDesktop: React.FC<Props> = ({
             {activeSection === 'ordenes_taller' && (
               <OrdenesTallerDesktop orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
             )}
+            {activeSection === 'alistamiento_taller' && (
+              <AlistamientoWizard
+                defaultAtendidoPor="Téc. David Carrera"
+                defaultSede="StarMotos Express Norte"
+                defaultSedeId="taller-norte"
+                technicians={technicians}
+                origins={origins}
+                workshops={workshops}
+                onAddTechnician={onAddTechnician}
+                onAddOrigin={onAddOrigin}
+                onSaveRecord={onSaveFullAlistamiento}
+              />
+            )}
             {activeSection === 'solicitudes_garantia' && (
               <SolicitudesGarantiaTallerDesktop
                 warranties={warranties}
@@ -209,6 +260,14 @@ export const TallerViewDesktop: React.FC<Props> = ({
               />
             )}
             {activeSection === 'clientes_taller' && <ClientesTallerDesktop clients={clients} />}
+            {activeSection === 'tecnicos' && (
+              <TecnicosDesktop
+                technicians={technicians}
+                workshops={workshops}
+                onAddTechnician={onAddTechnician}
+                currentWorkshopId="taller-norte"
+              />
+            )}
             {activeSection === 'inventario' && <InventarioDesktop inventory={inventory} />}
           </div>
         </main>

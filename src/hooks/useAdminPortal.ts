@@ -19,13 +19,23 @@ import {
   saveStoredAlerts,
   getStoredInvoices,
   saveStoredInvoices,
+  getStoredTechnicians,
+  saveStoredTechnicians,
+  getStoredOrigins,
+  saveStoredOrigins,
+  getStoredFullAlistamientos,
+  saveStoredFullAlistamientos,
+  getStoredClients,
+  saveStoredClients,
   querySriMock,
 } from '../data/mockMultiRoleData';
+import { Technician, AlistamientoFullRecord, TallerClient } from '../types/customer';
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   'talleres',
   'alistamiento',
   'garantias_admin',
+  'tecnicos',
   'facturacion',
   'alertas',
 ];
@@ -50,17 +60,33 @@ export function useAdminPortal() {
   const [warranties, setWarranties] = useState<WarrantyRequest[]>(getStoredWarranties);
   const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
   const [invoices, setInvoices] = useState<AdminInvoice[]>(getStoredInvoices);
+  const [technicians, setTechnicians] = useState<Technician[]>(getStoredTechnicians);
+  const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
+  const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
+  const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
   useEffect(() => {
     const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
     const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
+    const handleTechsUpdate = () => setTechnicians(getStoredTechnicians());
+    const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
+    const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
+    const handleClientsUpdate = () => setClients(getStoredClients());
+
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+    window.addEventListener('starmotos_technicians_updated', handleTechsUpdate);
+    window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
+    window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
       window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+      window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
+      window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
+      window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     };
   }, []);
 
@@ -352,6 +378,109 @@ export function useAdminPortal() {
     return true;
   }, [alistamientoClient, alistamientoMoto, alistamientoService, showToast]);
 
+  // ===================== GESTIÓN DE TÉCNICOS & ALISTAMIENTO FULL =====================
+  const addTechnician = useCallback((techData: Omit<Technician, 'id' | 'activeOrdersCount'>) => {
+    const newTech: Technician = {
+      ...techData,
+      id: `tec-${Date.now()}`,
+      activeOrdersCount: 0,
+    };
+    setTechnicians((prev) => {
+      const updated = [newTech, ...prev];
+      saveStoredTechnicians(updated);
+      return updated;
+    });
+    showToast(`Técnico ${newTech.name} registrado con éxito.`, 'success');
+  }, [showToast]);
+
+  const addOrigin = useCallback((newOrigin: string) => {
+    setOrigins((prev) => {
+      if (prev.includes(newOrigin)) return prev;
+      const updated = [...prev, newOrigin];
+      saveStoredOrigins(updated);
+      return updated;
+    });
+    showToast(`Almacén/Origen "${newOrigin}" agregado.`, 'success');
+  }, [showToast]);
+
+  const saveFullAlistamiento = useCallback((record: AlistamientoFullRecord) => {
+    // 1. Guardar en lista de alistamientos
+    setFullAlistamientos((prev) => {
+      const updated = [record, ...prev];
+      saveStoredFullAlistamientos(updated);
+      return updated;
+    });
+
+    // 2. Crear / actualizar en lista de clientes del taller
+    const newClient: TallerClient = {
+      id: `cli-${Date.now()}`,
+      fullName: `${record.nombres} ${record.apellidos}`.trim(),
+      idNumber: record.cedulaRuc,
+      phone: record.celular1,
+      email: record.email,
+      motorcycleBrand: record.modeloMarca.split(' ')[0] || 'Moto',
+      motorcycleModel: record.modeloMarca,
+      motorcyclePlate: record.placa,
+      lastVisit: record.fechaServicio,
+      totalVisits: 1,
+    };
+
+    setClients((prev) => {
+      const existingIdx = prev.findIndex((c) => c.idNumber === record.cedulaRuc);
+      let updated: TallerClient[];
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          lastVisit: record.fechaServicio,
+          totalVisits: updated[existingIdx].totalVisits + 1,
+          motorcyclePlate: record.placa || updated[existingIdx].motorcyclePlate,
+        };
+      } else {
+        updated = [newClient, ...prev];
+      }
+      saveStoredClients(updated);
+      return updated;
+    });
+
+    // 3. Crear factura
+    const newInv: AdminInvoice = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber: record.numeroFactura,
+      clientName: `${record.nombres} ${record.apellidos}`.trim(),
+      clientIdNumber: record.cedulaRuc,
+      date: record.fechaServicio,
+      subtotal: Number((record.valorServicio / 1.15).toFixed(2)),
+      iva: Number((record.valorServicio - record.valorServicio / 1.15).toFixed(2)),
+      total: record.valorServicio,
+      status: 'emitida',
+      workshopName: record.sede,
+    };
+    setInvoices((prev) => {
+      const updated = [newInv, ...prev];
+      saveStoredInvoices(updated);
+      return updated;
+    });
+
+    // 4. Crear Alerta
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'orden_creada',
+      title: 'Nuevo Alistamiento Registrado',
+      message: `${record.sede}: Cliente ${record.nombres} ${record.apellidos} — Moto ${record.modeloMarca} (${record.placa}). Factura ${record.numeroFactura}.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: record.id,
+    };
+    setAlerts((prev) => {
+      const updated = [newAlert, ...prev];
+      saveStoredAlerts(updated);
+      return updated;
+    });
+
+    showToast(`¡Alistamiento de ${record.nombres} registrado con éxito!`, 'success');
+  }, [showToast]);
+
   return {
     activeSection,
     setActiveSection,
@@ -361,6 +490,10 @@ export function useAdminPortal() {
     warranties,
     alerts,
     invoices,
+    technicians,
+    origins,
+    fullAlistamientos,
+    clients,
     toastMessage,
     showToast,
     // Garantías
@@ -370,7 +503,11 @@ export function useAdminPortal() {
     // Alertas
     markAlertAsRead,
     markAllAlertsAsRead,
-    // Alistamiento
+    // Técnicos & Alistamiento Full
+    addTechnician,
+    addOrigin,
+    saveFullAlistamiento,
+    // Alistamiento básico anterior (compatibilidad)
     alistamientoClient,
     setAlistamientoClient,
     alistamientoMoto,

@@ -22,6 +22,13 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     warranties,
     clients,
     inventory,
+    workshops,
+    technicians,
+    origins,
+    fullAlistamientos,
+    addTechnician,
+    addOrigin,
+    saveFullAlistamiento,
     newWarrantyForm,
     setNewWarrantyForm,
     createWarrantyRequest,
@@ -40,6 +47,13 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           warranties={warranties}
           clients={clients}
           inventory={inventory}
+          workshops={workshops}
+          technicians={technicians}
+          origins={origins}
+          fullAlistamientos={fullAlistamientos}
+          onAddTechnician={addTechnician}
+          onAddOrigin={addOrigin}
+          onSaveFullAlistamiento={saveFullAlistamiento}
           newWarrantyForm={newWarrantyForm}
           setNewWarrantyForm={setNewWarrantyForm}
           onCreateWarrantyRequest={createWarrantyRequest}
@@ -54,6 +68,13 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           warranties={warranties}
           clients={clients}
           inventory={inventory}
+          workshops={workshops}
+          technicians={technicians}
+          origins={origins}
+          fullAlistamientos={fullAlistamientos}
+          onAddTechnician={addTechnician}
+          onAddOrigin={addOrigin}
+          onSaveFullAlistamiento={saveFullAlistamiento}
           newWarrantyForm={newWarrantyForm}
           setNewWarrantyForm={setNewWarrantyForm}
           onCreateWarrantyRequest={createWarrantyRequest}

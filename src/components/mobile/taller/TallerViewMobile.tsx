@@ -8,6 +8,7 @@ import {
   Users,
   Package,
   LogOut,
+  UserCheck,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -16,11 +17,16 @@ import {
   TallerClient,
   InventoryItem,
   WorkOrderStatus,
+  Technician,
+  AlistamientoFullRecord,
+  Workshop,
 } from '../../../types/customer';
 import { OrdenesTallerMobile } from './OrdenesTallerMobile';
 import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobile';
 import { ClientesTallerMobile } from './ClientesTallerMobile';
 import { InventarioMobile } from './InventarioMobile';
+import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { TecnicosMobile } from '../common/TecnicosMobile';
 
 interface Props {
   activeSection: TallerSection;
@@ -31,6 +37,13 @@ interface Props {
   warranties: WarrantyRequest[];
   clients: TallerClient[];
   inventory: InventoryItem[];
+  workshops: Workshop[];
+  technicians: Technician[];
+  origins: string[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onAddOrigin: (origin: string) => void;
+  onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   newWarrantyForm: any;
   setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
   onCreateWarrantyRequest: () => boolean;
@@ -45,6 +58,13 @@ export const TallerViewMobile: React.FC<Props> = ({
   warranties,
   clients,
   inventory,
+  workshops,
+  technicians,
+  origins,
+  fullAlistamientos,
+  onAddTechnician,
+  onAddOrigin,
+  onSaveFullAlistamiento,
   newWarrantyForm,
   setNewWarrantyForm,
   onCreateWarrantyRequest,
@@ -53,15 +73,19 @@ export const TallerViewMobile: React.FC<Props> = ({
 
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
+    { id: 'alistamiento_taller', label: 'Alistamiento PDI', icon: <UserCheck className="w-4 h-4" />, badge: 'Nuevo' },
     { id: 'solicitudes_garantia', label: 'Solicitudes Garantía', icon: <ShieldAlert className="w-4 h-4" /> },
     { id: 'clientes_taller', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
+    { id: 'tecnicos', label: 'Técnicos', icon: <Users className="w-4 h-4" /> },
     { id: 'inventario', label: 'Inventario', icon: <Package className="w-4 h-4" /> },
   ];
 
   const sectionTitles: Record<TallerSection, string> = {
     ordenes_taller: 'Órdenes en Taller',
+    alistamiento_taller: 'Alistamiento PDI',
     solicitudes_garantia: 'Solicitudes Garantía',
     clientes_taller: 'Clientes Taller',
+    tecnicos: 'Equipo Técnico',
     inventario: 'Inventario Repuestos',
   };
 
@@ -145,6 +169,19 @@ export const TallerViewMobile: React.FC<Props> = ({
         {activeSection === 'ordenes_taller' && (
           <OrdenesTallerMobile orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
         )}
+        {activeSection === 'alistamiento_taller' && (
+          <AlistamientoWizard
+            defaultAtendidoPor="Téc. David Carrera"
+            defaultSede="StarMotos Express Norte"
+            defaultSedeId="taller-norte"
+            technicians={technicians}
+            origins={origins}
+            workshops={workshops}
+            onAddTechnician={onAddTechnician}
+            onAddOrigin={onAddOrigin}
+            onSaveRecord={onSaveFullAlistamiento}
+          />
+        )}
         {activeSection === 'solicitudes_garantia' && (
           <SolicitudesGarantiaTallerMobile
             warranties={warranties}
@@ -154,6 +191,14 @@ export const TallerViewMobile: React.FC<Props> = ({
           />
         )}
         {activeSection === 'clientes_taller' && <ClientesTallerMobile clients={clients} />}
+        {activeSection === 'tecnicos' && (
+          <TecnicosMobile
+            technicians={technicians}
+            workshops={workshops}
+            onAddTechnician={onAddTechnician}
+            currentWorkshopId="taller-norte"
+          />
+        )}
         {activeSection === 'inventario' && <InventarioMobile inventory={inventory} />}
       </main>
     </div>

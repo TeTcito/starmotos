@@ -261,13 +261,16 @@ export type AdminSection =
   | 'talleres'
   | 'alistamiento'
   | 'garantias_admin'
+  | 'tecnicos'
   | 'facturacion'
   | 'alertas';
 
 export type TallerSection =
   | 'ordenes_taller'
+  | 'alistamiento_taller'
   | 'solicitudes_garantia'
   | 'clientes_taller'
+  | 'tecnicos'
   | 'inventario';
 
 export type GaranteSection =
@@ -327,7 +330,62 @@ export interface Workshop {
   mechanics: number;
 }
 
-// --- Alistamiento (Wizard 3 Pasos) ---
+// --- Alistamiento (Wizard 3 Pasos Profesional) ---
+export type ServiceActionType = 'alistamiento_pdi' | 'engrasado' | 'mantenimiento';
+
+export interface AlistamientoFullRecord {
+  id: string;
+  // Paso 1: Atención & Sede
+  atendidoPor: string;
+  sede: string;
+  sedeId: string;
+  fechaServicio: string;
+  // Paso 1: Datos del cliente
+  nombres: string;
+  apellidos: string;
+  cedulaRuc: string;
+  celular1: string;
+  celular2?: string;
+  email: string;
+  direccion: string;
+  origen: string; // ej: "almacen Tenso santo domingo"
+  // Paso 2: Datos de la moto
+  motoPreviaId?: string;
+  chasis: string; // VIN
+  placa: string;
+  modeloMarca: string;
+  color?: string;
+  year?: number;
+  // Paso 3: Datos del servicio
+  serviciosRealizados: ServiceActionType[];
+  tecnicoResponsable: string;
+  tecnicoId: string;
+  kilometraje: number;
+  aceite: 'sin_aceite' | 'con_aceite';
+  numeroFactura: string;
+  numeroTicket: string;
+  valorServicio: number;
+  montoPagado: number;
+  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto';
+  observaciones: string;
+  proximoMantenimientoKm: number;
+  fotos: string[];
+  createdAt: string;
+}
+
+// --- Entidad Técnico ---
+export interface Technician {
+  id: string;
+  name: string;
+  workshopId: string;
+  workshopName: string;
+  specialty: string;
+  phone: string;
+  status: 'activo' | 'inactivo';
+  avatarUrl?: string;
+  activeOrdersCount: number;
+}
+
 export interface AlistamientoClient {
   idNumber: string;
   fullName: string;

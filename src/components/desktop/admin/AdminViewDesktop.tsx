@@ -10,6 +10,7 @@ import {
   MapPin,
   ChevronRight,
   Sparkles,
+  Wrench,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -20,9 +21,12 @@ import {
   AlistamientoClient,
   AlistamientoMotorcycle,
   AlistamientoService,
+  Technician,
+  AlistamientoFullRecord,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
-import { AlistamientoDesktop } from './AlistamientoDesktop';
+import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
 import { AlertasDesktop } from './AlertasDesktop';
@@ -40,6 +44,12 @@ interface Props {
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
   invoices: AdminInvoice[];
+  technicians: Technician[];
+  origins: string[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onAddOrigin: (origin: string) => void;
+  onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   alistamientoClient: AlistamientoClient;
   setAlistamientoClient: React.Dispatch<React.SetStateAction<AlistamientoClient>>;
   alistamientoMoto: AlistamientoMotorcycle;
@@ -64,6 +74,12 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
   invoices,
+  technicians,
+  origins,
+  fullAlistamientos,
+  onAddTechnician,
+  onAddOrigin,
+  onSaveFullAlistamiento,
   alistamientoClient,
   setAlistamientoClient,
   alistamientoMoto,
@@ -88,6 +104,12 @@ export const AdminViewDesktop: React.FC<Props> = ({
       badge: 'Nuevo',
     },
     {
+      id: 'tecnicos',
+      label: 'Equipo de Técnicos',
+      icon: <Wrench className="w-4 h-4" />,
+      badge: `${technicians.length}`,
+    },
+    {
       id: 'garantias_admin',
       label: 'Garantías & Pólizas',
       icon: <ShieldCheck className="w-4 h-4" />,
@@ -109,6 +131,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control Operativo de Talleres & Sucursales',
     alistamiento: 'Alistamiento de Clientes y Motos (Consulta SRI)',
+    tecnicos: 'Gestión y Despacho del Equipo Técnico',
     garantias_admin: 'Gestión y Auditoría de Garantías',
     facturacion: 'Facturación Electrónica SRI',
     alertas: 'Centro de Alertas del Sistema',
@@ -251,16 +274,24 @@ export const AdminViewDesktop: React.FC<Props> = ({
           <div className="w-full">
             {activeSection === 'talleres' && <TalleresDesktop workshops={workshops} />}
             {activeSection === 'alistamiento' && (
-              <AlistamientoDesktop
-                client={alistamientoClient}
-                setClient={setAlistamientoClient}
-                motorcycle={alistamientoMoto}
-                setMotorcycle={setAlistamientoMoto}
-                service={alistamientoService}
-                setService={setAlistamientoService}
-                isSearchingSri={isSearchingSri}
-                onSearchSri={onSearchSri}
-                onSubmit={onSubmitAlistamiento}
+              <AlistamientoWizard
+                defaultAtendidoPor="Ing. Mateo Enríquez"
+                defaultSede="StarMotos Matriz Central"
+                defaultSedeId="matriz"
+                technicians={technicians}
+                origins={origins}
+                workshops={workshops}
+                onAddTechnician={onAddTechnician}
+                onAddOrigin={onAddOrigin}
+                onSaveRecord={onSaveFullAlistamiento}
+              />
+            )}
+            {activeSection === 'tecnicos' && (
+              <TecnicosDesktop
+                technicians={technicians}
+                workshops={workshops}
+                onAddTechnician={onAddTechnician}
+                isMatriz={true}
               />
             )}
             {activeSection === 'garantias_admin' && (

@@ -1,5 +1,5 @@
 // src/components/desktop/ProfileDesktop.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   User,
   Mail,
@@ -8,6 +8,7 @@ import {
   MapPin,
   Save,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import { ClientProfile } from '../../types/customer';
 
@@ -19,6 +20,21 @@ interface Props {
 export const ProfileDesktop: React.FC<Props> = ({ profile, onUpdateProfile }) => {
   const [profileForm, setProfileForm] = useState<ClientProfile>(profile);
   const [isProfileSaved, setIsProfileSaved] = useState(false);
+
+  // Sincronizar si cambian las props
+  useEffect(() => {
+    setProfileForm(profile);
+  }, [profile]);
+
+  // Detectar cambios en el formulario
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(profileForm) !== JSON.stringify(profile);
+  }, [profileForm, profile]);
+
+  // Cancelar y restaurar valores
+  const handleCancel = () => {
+    setProfileForm(profile);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +82,7 @@ export const ProfileDesktop: React.FC<Props> = ({ profile, onUpdateProfile }) =>
                 value={profileForm.fullName}
                 onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
                 required
-                placeholder="Ej. Fernando David Paredes Zambrano"
+                placeholder="Ej. Fernando Vaca"
                 className="w-full bg-white border border-zinc-300 hover:border-zinc-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium transition placeholder:text-zinc-400"
               />
             </div>
@@ -84,7 +100,7 @@ export const ProfileDesktop: React.FC<Props> = ({ profile, onUpdateProfile }) =>
                 value={profileForm.idNumber}
                 onChange={(e) => setProfileForm({ ...profileForm, idNumber: e.target.value })}
                 required
-                placeholder="10 o 13 dígitos numéricos"
+                placeholder="Ej. 1712345678 o 1712345678001"
                 className="w-full bg-white border border-zinc-300 hover:border-zinc-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono transition placeholder:text-zinc-400"
               />
             </div>
@@ -180,16 +196,31 @@ export const ProfileDesktop: React.FC<Props> = ({ profile, onUpdateProfile }) =>
         {/* Barra de Acciones */}
         <div className="flex items-center justify-between pt-4 border-t border-zinc-200">
           <p className="text-xs text-zinc-500">
-            Tus datos se sincronizan automáticamente con el taller seleccionado.
+            {hasChanges
+              ? 'Tienes datos modificados pendientes de guardar en tu perfil.'
+              : 'Tus datos se sincronizan automáticamente con el taller seleccionado.'}
           </p>
 
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2.5 px-6 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Guardar Información de Perfil</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {hasChanges && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-5 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-bold text-sm transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-98 animate-fade-in"
+              >
+                <X className="w-4 h-4 text-zinc-500" />
+                <span>Cancelar</span>
+              </button>
+            )}
+
+            <button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2.5 px-6 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar Información de Perfil</span>
+            </button>
+          </div>
         </div>
       </form>
     </div>

@@ -2,11 +2,12 @@
 import React from 'react';
 import { Navbar } from '../Navbar';
 import { SidebarDrawer, ActiveSection } from '../SidebarDrawer';
+import { EventsMobile } from './EventsMobile';
+import { ScheduleAppointmentMobile } from './ScheduleAppointmentMobile';
 import { ProfileMobile } from './ProfileMobile';
 import { MotorcycleMobile } from './MotorcycleMobile';
 import { MaintenancesMobile } from './MaintenancesMobile';
 import { ActiveOrderMobile } from './ActiveOrderMobile';
-import { InspectionMobile } from './InspectionMobile';
 import { HistoryMobile } from './HistoryMobile';
 import { WarrantiesMobile } from './WarrantiesMobile';
 import { FileCheck } from 'lucide-react';
@@ -15,7 +16,6 @@ import {
   MotorcycleClientData,
   ScheduledMaintenance,
   WorkOrder,
-  Inspection360,
   MaintenanceRecord,
   WarrantyItem,
   Branch,
@@ -29,7 +29,6 @@ interface Props {
   scheduledMaintenances: ScheduledMaintenance[];
   addScheduledMaintenance: (maintenance: ScheduledMaintenance) => void;
   activeOrder: WorkOrder;
-  inspection: Inspection360;
   history: MaintenanceRecord[];
   warranties: WarrantyItem[];
   branches: Branch[];
@@ -43,8 +42,6 @@ interface Props {
   setIsApprovalModalOpen: (open: boolean) => void;
   isApproving: boolean;
   approveQuotation: () => void;
-  activePhotoModal: { url: string; title: string } | null;
-  setActivePhotoModal: (photo: { url: string; title: string } | null) => void;
 }
 
 export const CustomerViewMobile: React.FC<Props> = ({
@@ -55,7 +52,6 @@ export const CustomerViewMobile: React.FC<Props> = ({
   scheduledMaintenances,
   addScheduledMaintenance,
   activeOrder,
-  inspection,
   history,
   warranties,
   branches,
@@ -69,15 +65,14 @@ export const CustomerViewMobile: React.FC<Props> = ({
   setIsApprovalModalOpen,
   isApproving,
   approveQuotation,
-  activePhotoModal,
-  setActivePhotoModal,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
+    eventos: 'Eventos y Facturas',
+    agendar_cita: 'Agendar Cita',
     perfil: 'Perfil',
     mi_moto: 'Mi Moto',
     mantenimientos: 'Mantenimientos',
     orden_activa: 'Orden Activa',
-    inspeccion: 'Inspección 360°',
     historial: 'Historial',
     garantias: 'Garantías',
   };
@@ -106,6 +101,24 @@ export const CustomerViewMobile: React.FC<Props> = ({
 
       {/* 3. Contenido Principal Móvil */}
       <main className="max-w-md mx-auto px-4 py-4">
+        {activeSection === 'eventos' && (
+          <EventsMobile
+            history={history}
+            motorcycle={motorcycle}
+            profile={profile}
+          />
+        )}
+
+        {activeSection === 'agendar_cita' && (
+          <ScheduleAppointmentMobile
+            motorcycle={motorcycle}
+            profile={profile}
+            branches={branches}
+            scheduledMaintenances={scheduledMaintenances}
+            onScheduleNewMaintenance={addScheduledMaintenance}
+          />
+        )}
+
         {activeSection === 'perfil' && (
           <ProfileMobile profile={profile} onUpdateProfile={updateProfile} />
         )}
@@ -128,13 +141,6 @@ export const CustomerViewMobile: React.FC<Props> = ({
             activeOrder={activeOrder}
             motorcycle={motorcycle}
             onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
-          />
-        )}
-
-        {activeSection === 'inspeccion' && (
-          <InspectionMobile
-            inspection={inspection}
-            onSelectPhoto={setActivePhotoModal}
           />
         )}
 
@@ -201,32 +207,6 @@ export const CustomerViewMobile: React.FC<Props> = ({
                   {isApproving ? 'Procesando...' : 'Aprobar'}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Visor de Fotos Móvil */}
-      {activePhotoModal && (
-        <div
-          onClick={() => setActivePhotoModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative bg-white border border-zinc-200 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl"
-          >
-            <div className="p-3 border-b border-zinc-200 flex items-center justify-between">
-              <h4 className="text-xs font-bold text-zinc-900">{activePhotoModal.title}</h4>
-              <button
-                onClick={() => setActivePhotoModal(null)}
-                className="text-zinc-400 hover:text-zinc-700 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-2 bg-zinc-950 flex items-center justify-center max-h-[60vh]">
-              <img src={activePhotoModal.url} alt={activePhotoModal.title} className="max-h-[55vh] object-contain rounded-lg" />
             </div>
           </div>
         </div>

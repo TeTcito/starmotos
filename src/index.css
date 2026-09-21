@@ -4,33 +4,33 @@
 
 @layer base {
   body {
-    @apply bg-zinc-950 text-zinc-100 font-sans antialiased;
-    color-scheme: dark;
+    @apply bg-white text-zinc-900 font-sans antialiased;
+    color-scheme: light;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar para tema claro */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: #f8fafc;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #94a3b8;
 }
 
 /* Glassmorphism subtle helper */
 .glass-panel {
-  background: rgba(18, 18, 23, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -48,3 +48,17 @@
     display: block !important;
   }
 }
+
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-shrink {
+  animation: shrink 9.5s linear forwards;
+}
+

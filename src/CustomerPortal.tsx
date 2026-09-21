@@ -26,7 +26,6 @@ export const CustomerPortal: React.FC = () => {
     scheduledMaintenances,
     addScheduledMaintenance,
     activeOrder,
-    inspection,
     history,
     warranties,
     branches,
@@ -35,8 +34,6 @@ export const CustomerPortal: React.FC = () => {
     setIsApprovalModalOpen,
     isApproving,
     approveQuotation,
-    activePhotoModal,
-    setActivePhotoModal,
     toastMessage,
   } = portal;
 
@@ -57,7 +54,6 @@ export const CustomerPortal: React.FC = () => {
           scheduledMaintenances={scheduledMaintenances}
           addScheduledMaintenance={addScheduledMaintenance}
           activeOrder={activeOrder}
-          inspection={inspection}
           history={history}
           warranties={warranties}
           branches={branches}
@@ -69,8 +65,6 @@ export const CustomerPortal: React.FC = () => {
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
           approveQuotation={approveQuotation}
-          activePhotoModal={activePhotoModal}
-          setActivePhotoModal={setActivePhotoModal}
         />
       ) : (
         <CustomerViewMobile
@@ -81,7 +75,6 @@ export const CustomerPortal: React.FC = () => {
           scheduledMaintenances={scheduledMaintenances}
           addScheduledMaintenance={addScheduledMaintenance}
           activeOrder={activeOrder}
-          inspection={inspection}
           history={history}
           warranties={warranties}
           branches={branches}
@@ -95,8 +88,6 @@ export const CustomerPortal: React.FC = () => {
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
           approveQuotation={approveQuotation}
-          activePhotoModal={activePhotoModal}
-          setActivePhotoModal={setActivePhotoModal}
         />
       )}
 

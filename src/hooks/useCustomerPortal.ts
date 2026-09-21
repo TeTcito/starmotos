@@ -2,11 +2,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
-  CustomerPortalData,
   WorkOrder,
   Quotation,
   Vehicle,
-  Inspection360,
   MaintenanceRecord,
   WarrantyItem,
   Branch,
@@ -25,8 +23,8 @@ export const BRANCH_MATRIZ: Branch = {
   code: 'MAT-01',
   address: 'Av. 10 de Agosto N31-154 y Mariana de Jesús',
   city: 'Quito, Ecuador',
-  phone: '+593 2 254-8900',
-  whatsapp: '593998745612',
+  phone: '+593 93 931 6698',
+  whatsapp: '593939316698',
   email: 'matriz@starmotos.ec',
   schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
   googleMapsUrl: 'https://maps.google.com/?q=-0.1983,-78.4941',
@@ -38,8 +36,8 @@ export const BRANCH_NORTE: Branch = {
   code: 'NOR-02',
   address: 'Av. Galo Plaza Lasso N64-89 y De los Pinos',
   city: 'Quito Norte, Ecuador',
-  phone: '+593 2 248-3320',
-  whatsapp: '593984123789',
+  phone: '+593 93 931 6698',
+  whatsapp: '593939316698',
   email: 'norte@starmotos.ec',
   schedule: 'Lunes a Viernes: 08:00 - 17:30 | Sábados: 08:30 - 13:00',
   googleMapsUrl: 'https://maps.google.com/?q=-0.1256,-78.4723',
@@ -49,7 +47,7 @@ export const ALL_BRANCHES = [BRANCH_MATRIZ, BRANCH_NORTE];
 
 const INITIAL_PROFILE: ClientProfile = {
   id: 'cli-0089',
-  fullName: 'Fernando David Paredes Zambrano',
+  fullName: 'Fernando Vaca',
   idNumber: '1724890123',
   phone: '+593 99 874 5612',
   email: 'cliente@starmotos.ec',
@@ -197,34 +195,6 @@ const INITIAL_WORK_ORDER: WorkOrder = {
   },
 };
 
-const INITIAL_INSPECTION: Inspection360 = {
-  receptionDate: '20 Sep 2026, 08:30 AM',
-  advisorName: 'Mateo Enríquez',
-  advisorGeneralNotes: 'Vehículo ingresa con maletas laterales originales instaladas. Llave original en recepción.',
-  fuelLevelAtCheckin: 'half',
-  kmAtCheckin: 14850,
-  helmetReceived: false,
-  documentsReceived: true,
-  toolsReceived: true,
-  photos: {
-    frontal: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80',
-    lateralIzq: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-    lateralDer: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-    trasera: 'https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&w=800&q=80',
-    tablero: 'https://images.unsplash.com/photo-1547549082-6bc09f2049ae?auto=format&fit=crop&w=800&q=80',
-  },
-  damages: [
-    { id: 'dam-1', zone: 'Defensa Baja Lateral Izquierda', damageType: 'Rayón por apoyo en garaje', severity: 'leve', advisorNotes: 'Raspones superficiales en tubo metálico.' },
-    { id: 'dam-2', zone: 'Cúpula Parabrisas', damageType: 'Microrayaduras por lavado previo', severity: 'leve', advisorNotes: 'No afecta visibilidad.' },
-  ],
-  signature: {
-    signatureUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100" viewBox="0 0 300 100"><path d="M 20 60 Q 60 10 110 50 T 180 40 T 260 70 M 70 45 L 240 45" stroke="%23dc2626" stroke-width="3" fill="none" stroke-linecap="round"/></svg>',
-    clientName: 'Fernando David Paredes Zambrano',
-    identificationId: '1724890123',
-    timestamp: '20 Sep 2026, 08:38:14 ECT',
-  },
-};
-
 const INITIAL_HISTORY: MaintenanceRecord[] = [
   {
     id: 'hist-1',
@@ -233,10 +203,48 @@ const INITIAL_HISTORY: MaintenanceRecord[] = [
     date: '15 Mar 2026',
     mileage: 10200,
     branchName: 'StarMotos Matriz Central',
-    workSummary: ['Cambio de Aceite Motul 7100', 'Filtro de Aceite OEM', 'Lavado Técnico'],
-    partsReplaced: ['Aceite 10W-40 (3.2 L)', 'Filtro Aceite Benelli'],
+    workSummary: [
+      'Cambio de Aceite Sintético Motul 7100 10W-40 (3.2 L)',
+      'Reemplazo de Filtro de Aceite Original Benelli',
+      'Lavado Técnico a Presión y Lubricación de Cadena con Motul C4',
+    ],
+    partsReplaced: ['Aceite Motul 7100 (4 cuartos)', 'Filtro Aceite Benelli OEM', 'Arandela de Cárter'],
     totalPaid: 92.5,
-    technicianName: 'Carlos Morales',
+    technicianName: 'Carlos Morales (Técnico Certificado)',
+  },
+  {
+    id: 'hist-2',
+    otNumber: 'OT-2025-0842',
+    invoiceNumber: 'FAC-001-002-0003840',
+    date: '18 Nov 2025',
+    mileage: 6100,
+    branchName: 'StarMotos Matriz Central',
+    workSummary: [
+      'Mantenimiento Preventivo 6.000 km según manual de fábrica',
+      'Calibración de Válvulas y Sincronización de Inyección EFI',
+      'Cambio de Pastillas de Freno Delanteras Brembo Sinterizadas',
+      'Revisión y Ajuste de Holgura de Rodamientos de Dirección',
+    ],
+    partsReplaced: ['Pastillas Delanteras Brembo 07BB04SA', 'Líquido de Frenos Motul DOT 5.1'],
+    totalPaid: 148.0,
+    technicianName: 'Ing. Carlos Mendoza (Master Tech)',
+  },
+  {
+    id: 'hist-3',
+    otNumber: 'OT-2025-0320',
+    invoiceNumber: 'FAC-001-001-0002155',
+    date: '24 Jul 2025',
+    mileage: 2500,
+    branchName: 'StarMotos Taller Express Norte',
+    workSummary: [
+      'Primer Servicio Oficial de Rodaje Benelli',
+      'Cambio de Aceite Mineral de Asentamiento por Sintético',
+      'Ajuste Dinamométrico Completo de Tornillería de Chasis y Motor',
+      'Inspección Electrónica con Escáner OBD Benelli Diagnosis',
+    ],
+    partsReplaced: ['Aceite Motul 5100 10W-40', 'Filtro Aceite OEM', 'Spray Limpiador de Inyección'],
+    totalPaid: 74.5,
+    technicianName: 'David Carrera (Especialista Benelli)',
   },
 ];
 
@@ -261,8 +269,8 @@ export function useCustomerPortal() {
     return localStorage.getItem('starmotos_auth') === 'true';
   });
 
-  // Sección activa en el menú lateral (por defecto: 'perfil')
-  const [activeSection, setActiveSection] = useState<ActiveSection>('perfil');
+  // Sección activa en el menú lateral: Por defecto 'eventos' al ingresar
+  const [activeSection, setActiveSection] = useState<ActiveSection>('eventos');
 
   // Drawer / menú hamburguesa
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -274,14 +282,12 @@ export function useCustomerPortal() {
 
   // Orden de Trabajo y otros datos
   const [activeOrder, setActiveOrder] = useState<WorkOrder>(INITIAL_WORK_ORDER);
-  const [inspection, setInspection] = useState<Inspection360>(INITIAL_INSPECTION);
   const [history, setHistory] = useState<MaintenanceRecord[]>(INITIAL_HISTORY);
   const [warranties, setWarranties] = useState<WarrantyItem[]>(INITIAL_WARRANTIES);
 
   // Modales
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
-  const [activePhotoModal, setActivePhotoModal] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   // Notificación Toast
@@ -292,10 +298,11 @@ export function useCustomerPortal() {
     }, 4000);
   }, []);
 
-  // Login
+  // Login: Al ingresar al sistema, lo primero que muestra es el módulo de eventos
   const login = useCallback(() => {
     setIsAuthenticated(true);
     localStorage.setItem('starmotos_auth', 'true');
+    setActiveSection('eventos');
     showToast(`¡Bienvenido al Portal, ${profile.fullName.split(' ')[0]}!`, 'success');
   }, [profile.fullName, showToast]);
 
@@ -303,7 +310,7 @@ export function useCustomerPortal() {
   const logout = useCallback(() => {
     setIsAuthenticated(false);
     localStorage.removeItem('starmotos_auth');
-    setActiveSection('perfil');
+    setActiveSection('eventos');
   }, []);
 
   // Actualizar perfil
@@ -327,7 +334,7 @@ export function useCustomerPortal() {
       origin: { y: 0.6 },
       colors: ['#1d4ed8', '#dc2626', '#ffffff'],
     });
-    showToast('¡Cita de mantenimiento agendada exitosamente en StarMotos!', 'success');
+    showToast('¡Cita técnica agendada exitosamente en StarMotos!', 'success');
   }, [showToast]);
 
   // Aprobar cotización de la OT activa
@@ -380,7 +387,6 @@ export function useCustomerPortal() {
     scheduledMaintenances,
     addScheduledMaintenance,
     activeOrder,
-    inspection,
     history,
     warranties,
     branches: ALL_BRANCHES,
@@ -389,8 +395,6 @@ export function useCustomerPortal() {
     setIsApprovalModalOpen,
     isApproving,
     approveQuotation,
-    activePhotoModal,
-    setActivePhotoModal,
     toastMessage,
     showToast,
   };

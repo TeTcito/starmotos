@@ -51,42 +51,33 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
       </div>
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Primera Sección: Placa de la Moto */}
-        <div className="flex items-center justify-between gap-3 bg-zinc-900 p-3 rounded-xl border border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center bg-white text-zinc-950 px-2.5 py-0.5 rounded border border-zinc-300 font-mono shrink-0 shadow-sm">
-              <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.2">
-                <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
-                <span>EC</span>
-              </div>
-              <span className="text-xs font-black tracking-wide leading-tight mt-0.5">
-                {motoForm.plate || 'S/P'}
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-white">
-                Placa del Vehículo
-              </label>
-              <span className="text-[10px] text-zinc-400">
-                Identificación oficial ANT
-              </span>
-            </div>
-          </div>
-
-          <div className="w-32 sm:w-40">
-            <input
-              type="text"
-              value={motoForm.plate}
-              onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
-              placeholder="PBX-8492"
-              className="w-full bg-zinc-950 border border-zinc-800 focus:border-blue-500 text-white rounded-xl px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider text-center"
-            />
-          </div>
-        </div>
-
         {/* Campos Independientes de la Motocicleta */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Placa del Vehículo */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1">
+              Placa del Vehículo
+            </label>
+            <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5">
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Bike className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-xs text-zinc-400 font-medium">Matrícula</span>
+              </div>
+              <div className="flex flex-col items-center bg-zinc-950 text-white px-2.5 py-0.5 rounded border border-zinc-800 font-mono shrink-0 shadow-xs">
+                <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-400 uppercase border-b border-zinc-800 pb-0.2">
+                  <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
+                  <span>EC</span>
+                </div>
+                <input
+                  type="text"
+                  value={motoForm.plate}
+                  onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
+                  placeholder="PBX-8492"
+                  className="w-24 text-center text-xs font-black tracking-wider bg-transparent border-none outline-none uppercase p-0 text-white"
+                />
+              </div>
+            </div>
+          </div>
           {/* Marca */}
           <div>
             <label className="block text-xs font-medium text-zinc-300 mb-1">

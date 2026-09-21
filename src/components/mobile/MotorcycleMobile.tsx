@@ -1,5 +1,5 @@
 // src/components/mobile/MotorcycleMobile.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Wrench,
   Gauge,
@@ -12,6 +12,7 @@ import {
   Zap,
   Palette,
   Hash,
+  X,
 } from 'lucide-react';
 import { MotorcycleClientData } from '../../types/customer';
 
@@ -23,6 +24,21 @@ interface Props {
 export const MotorcycleMobile: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle }) => {
   const [motoForm, setMotoForm] = useState<MotorcycleClientData>(motorcycle);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Sincronizar si las props cambian
+  useEffect(() => {
+    setMotoForm(motorcycle);
+  }, [motorcycle]);
+
+  // Detectar si hay cambios pendientes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(motoForm) !== JSON.stringify(motorcycle);
+  }, [motoForm, motorcycle]);
+
+  // Cancelar y restaurar valores originales
+  const handleCancel = () => {
+    setMotoForm(motorcycle);
+  };
 
   // Función para interceptar teclas no numéricas
   const handleNumericKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -60,42 +76,36 @@ export const MotorcycleMobile: React.FC<Props> = ({ motorcycle, onUpdateMotorcyc
       </div>
 
       <form onSubmit={handleSave} className="space-y-3.5">
-        {/* Primera Sección: Placa de la Moto */}
-        <div className="flex items-center justify-between gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center bg-white text-zinc-950 px-2.5 py-0.5 rounded border border-zinc-300 font-mono shrink-0 shadow-sm">
-              <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.2">
-                <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
-                <span>EC</span>
-              </div>
-              <span className="text-xs font-black tracking-wide leading-tight mt-0.5">
-                {motoForm.plate || 'S/P'}
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-900">
-                Placa del Vehículo
-              </label>
-              <span className="text-[10px] text-zinc-500">
-                Identificación oficial ANT
-              </span>
-            </div>
-          </div>
-
-          <div className="w-32 sm:w-36">
-            <input
-              type="text"
-              value={motoForm.plate}
-              onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
-              placeholder="PBX-8492"
-              className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-wider text-center"
-            />
-          </div>
-        </div>
-
         {/* Campos Independientes de la Motocicleta */}
         <div className="space-y-3">
+          {/* Placa del Vehículo */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 mb-1">
+              Placa del Vehículo
+            </label>
+            <div className="relative flex items-center justify-between bg-white border border-zinc-300 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 text-zinc-900 rounded-xl px-3 py-1.5 transition">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Bike className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-xs text-zinc-500 font-medium">Matrícula</span>
+              </div>
+
+              {/* Bloque de la placa a la derecha */}
+              <div className="flex flex-col items-center bg-zinc-50 text-zinc-950 px-2.5 py-0.5 rounded border border-zinc-300 font-mono shrink-0 shadow-xs focus-within:border-blue-600">
+                <div className="flex items-center gap-1 text-[6px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.2">
+                  <span className="w-2 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
+                  <span>ECUADOR</span>
+                </div>
+                <input
+                  type="text"
+                  value={motoForm.plate}
+                  onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
+                  placeholder="PBX-8492"
+                  className="w-24 text-center text-xs font-black tracking-wider bg-transparent border-none outline-none uppercase p-0"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Marca */}
           <div>
             <label className="block text-xs font-semibold text-zinc-700 mb-1">
@@ -130,14 +140,11 @@ export const MotorcycleMobile: React.FC<Props> = ({ motorcycle, onUpdateMotorcyc
             </div>
           </div>
 
-          {/* Año - Teclado Numérico Estricto */}
+          {/* Año - Teclado Numérico */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-zinc-700">
-                Año de Fabricación
-              </label>
-              <span className="text-[10px] text-amber-600 font-mono font-bold">Solo números</span>
-            </div>
+            <label className="block text-xs font-semibold text-zinc-700 mb-1">
+              Año de Fabricación
+            </label>
             <div className="relative">
               <Calendar className="w-3.5 h-3.5 absolute left-3 top-3 text-amber-500" />
               <input
@@ -208,14 +215,11 @@ export const MotorcycleMobile: React.FC<Props> = ({ motorcycle, onUpdateMotorcyc
             </div>
           </div>
 
-          {/* Kilometraje Actual - Teclado Numérico Estricto */}
+          {/* Kilometraje Actual - Teclado Numérico */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-zinc-700">
-                Kilometraje Actual
-              </label>
-              <span className="text-[10px] text-blue-600 font-mono font-bold">Solo números</span>
-            </div>
+            <label className="block text-xs font-semibold text-zinc-700 mb-1">
+              Kilometraje Actual
+            </label>
             <div className="relative">
               <Gauge className="w-3.5 h-3.5 absolute left-3 top-3 text-blue-600" />
               <input
@@ -289,10 +293,21 @@ export const MotorcycleMobile: React.FC<Props> = ({ motorcycle, onUpdateMotorcyc
           </div>
         </div>
 
-        <div className="flex justify-end pt-3 border-t border-zinc-200">
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-200">
+          {hasChanges && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="flex-1 sm:flex-none border border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer animate-fade-in"
+            >
+              <X className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Cancelar</span>
+            </button>
+          )}
+
           <button
             type="submit"
-            className="w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2.5 px-5 rounded-xl shadow transition flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
+            className="flex-1 sm:flex-none bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2.5 px-5 rounded-xl shadow transition flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Guardar Ficha</span>

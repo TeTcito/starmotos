@@ -1,0 +1,25 @@
+{
+  "short_name": "StarMotos",
+  "name": "StarMotos - Portal de Clientes",
+  "description": "Portal oficial de clientes de StarMotos. Seguimiento en tiempo real y gestión técnica de motocicletas.",
+  "icons": [
+    {
+      "src": "/starmotos-logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/starmotos-logo.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}

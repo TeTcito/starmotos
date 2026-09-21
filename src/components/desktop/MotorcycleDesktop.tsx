@@ -1,5 +1,5 @@
 // src/components/desktop/MotorcycleDesktop.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Wrench,
   Gauge,
@@ -12,6 +12,7 @@ import {
   Zap,
   Palette,
   Hash,
+  X,
 } from 'lucide-react';
 import { MotorcycleClientData } from '../../types/customer';
 
@@ -23,6 +24,21 @@ interface Props {
 export const MotorcycleDesktop: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle }) => {
   const [motoForm, setMotoForm] = useState<MotorcycleClientData>(motorcycle);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Sincronizar si las props cambian
+  useEffect(() => {
+    setMotoForm(motorcycle);
+  }, [motorcycle]);
+
+  // Detectar si hay cambios pendientes
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(motoForm) !== JSON.stringify(motorcycle);
+  }, [motoForm, motorcycle]);
+
+  // Cancelar y restaurar valores iniciales
+  const handleCancel = () => {
+    setMotoForm(motorcycle);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,45 +72,33 @@ export const MotorcycleDesktop: React.FC<Props> = ({ motorcycle, onUpdateMotorcy
       </div>
 
       <form onSubmit={handleSave} className="space-y-6 w-full">
-        {/* 1. Sección Placa de la Moto (Ancho Completo Proporcional) */}
-        <div className="flex items-center justify-between gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200 shadow-sm w-full">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col items-center bg-white text-zinc-950 px-3 py-1 rounded-md border border-zinc-300 font-mono shrink-0 shadow-sm">
-              <div className="flex items-center gap-1.5 text-[8px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.5">
-                <span className="w-3 h-1.5 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
-                <span>ECUADOR</span>
-              </div>
-              <span className="text-base font-black tracking-wider leading-tight mt-0.5">
-                {motoForm.plate || 'SIN-PLACA'}
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-zinc-900">
-                Placa Registrada en ANT
-              </label>
-              <p className="text-xs text-zinc-500">
-                Identificador oficial vehicular para el historial técnico y garantías de taller
-              </p>
-            </div>
-          </div>
-
-          <div className="w-48">
-            <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-              Modificar Placa
-            </label>
-            <input
-              type="text"
-              value={motoForm.plate}
-              onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
-              placeholder="PBX-8492"
-              className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3.5 py-2 text-sm font-mono font-bold uppercase tracking-wider text-center"
-            />
-          </div>
-        </div>
-
-        {/* 2. Cuadrícula Proporcional de Campos de Izquierda a Derecha */}
+        {/* Cuadrícula Proporcional de Campos de Izquierda a Derecha */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+          {/* Placa del Vehículo */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+              Placa del Vehículo
+            </label>
+            <div className="flex items-center justify-between bg-white border border-zinc-300 hover:border-zinc-400 focus-within:border-blue-600 focus-within:ring-1 focus-within:ring-blue-600 text-zinc-900 rounded-xl pl-3.5 pr-2 py-2 text-sm transition shadow-xs">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Bike className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-xs font-medium text-zinc-500">Matrícula</span>
+              </div>
+              <div className="flex flex-col items-center bg-zinc-50 text-zinc-950 px-2.5 py-0.5 rounded border border-zinc-300 font-mono shrink-0 shadow-xs focus-within:border-blue-600">
+                <div className="flex items-center gap-1.5 text-[7px] font-black tracking-widest text-zinc-800 uppercase border-b border-zinc-200 pb-0.5">
+                  <span className="w-2.5 h-1 bg-gradient-to-r from-yellow-400 via-blue-600 to-red-600 rounded-[0.5px]" />
+                  <span>ECUADOR</span>
+                </div>
+                <input
+                  type="text"
+                  value={motoForm.plate}
+                  onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
+                  placeholder="PBX-8492"
+                  className="w-24 text-center text-xs font-black tracking-wider bg-transparent border-none outline-none uppercase p-0"
+                />
+              </div>
+            </div>
+          </div>
           {/* Marca */}
           <div>
             <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
@@ -267,19 +271,34 @@ export const MotorcycleDesktop: React.FC<Props> = ({ motorcycle, onUpdateMotorcy
           </div>
         </div>
 
-        {/* Botón de Guardado */}
+        {/* Barra de Acciones: Guardar y Cancelar (este último solo cuando hay cambios) */}
         <div className="flex items-center justify-between pt-4 border-t border-zinc-200">
           <p className="text-xs text-zinc-500">
-            Esta información es utilizada por los mecánicos para la preparación de los insumos antes de su cita.
+            {hasChanges
+              ? 'Tienes modificaciones pendientes en la ficha técnica.'
+              : 'Esta información es utilizada por los mecánicos para la preparación de los insumos antes de su cita.'}
           </p>
 
-          <button
-            type="submit"
-            className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm py-2.5 px-6 rounded-xl shadow-md shadow-red-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Guardar Ficha de la Moto</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {hasChanges && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-5 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-bold text-sm transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-98 animate-fade-in"
+              >
+                <X className="w-4 h-4 text-zinc-500" />
+                <span>Cancelar</span>
+              </button>
+            )}
+
+            <button
+              type="submit"
+              className="bg-red-600 hover:bg-red-500 text-white font-bold text-sm py-2.5 px-6 rounded-xl shadow-md shadow-red-600/20 transition flex items-center gap-2 active:scale-98 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar Ficha de la Moto</span>
+            </button>
+          </div>
         </div>
       </form>
     </div>

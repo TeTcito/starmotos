@@ -23,6 +23,7 @@ import {
   Lock,
   ArrowLeft,
   MessageCircle,
+  Save,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -76,8 +77,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Búsqueda en el listado
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Registro seleccionado para ver detalle en modal
+  // Registro seleccionado para ver detalle en formulario
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<AlistamientoFullRecord | null>(null);
+  const [detailFormData, setDetailFormData] = useState<AlistamientoFullRecord | null>(null);
+  const [detailSuccessToast, setDetailSuccessToast] = useState<string | null>(null);
 
   // Paso para vista móvil (1: Cliente, 2: Moto, 3: Servicio)
   const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(1);
@@ -419,6 +422,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setEffectiveViewMode('form');
   };
 
+  // Abrir registro existente en formulario estructurado
+  const handleOpenRecordDetail = (record: AlistamientoFullRecord) => {
+    setSelectedRecordForDetail(record);
+    setDetailFormData({ ...record });
+    setDetailSuccessToast(null);
+  };
+
+  // Guardar modificaciones del formulario de alistamiento
+  const handleSaveRecordDetail = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!detailFormData) return;
+    if (onSaveRecord) {
+      onSaveRecord(detailFormData);
+    }
+    setDetailSuccessToast('✓ Ficha técnica y datos de alistamiento actualizados correctamente.');
+    setTimeout(() => setDetailSuccessToast(null), 3500);
+  };
+
   // Servicios toggle (con bloqueo si ya se realizaron previamente)
   const toggleServicio = (servicio: ServiceActionType) => {
     if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
@@ -621,14 +642,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* 1. VISTA: LISTADO O APARTADO INDEPENDIENTE DE ALISTAMIENTO                 */}
       {/* ========================================================================= */}
-      {currentViewMode === 'list' && selectedRecordForDetail && (
-        <div className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs">
-          {/* Cabecera del Apartado de Alistamiento */}
+      {/* ========================================================================= */}
+      {/* 1. VISTA: FORMULARIO DE DETALLE DE ALISTAMIENTO PREVIO                    */}
+      {/* ========================================================================= */}
+      {currentViewMode === 'list' && selectedRecordForDetail && detailFormData && (
+        <form
+          onSubmit={handleSaveRecordDetail}
+          className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs"
+        >
+          {/* Cabecera del Formulario de Alistamiento */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setSelectedRecordForDetail(null)}
+                onClick={() => {
+                  setSelectedRecordForDetail(null);
+                  setDetailFormData(null);
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
               >
                 <ArrowLeft className="w-4 h-4 text-zinc-600" />
@@ -638,19 +668,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
-                    Ficha Técnica: {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
+                    Ficha Técnica: {detailFormData.nombres} {detailFormData.apellidos}
                   </h2>
                   <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
-                    C.I./RUC: {selectedRecordForDetail.cedulaRuc}
+                    C.I./RUC: {detailFormData.cedulaRuc}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     ✓ COMPLETADO
                   </span>
                 </div>
                 <p className="text-xs text-zinc-500">
-                  Sede: <strong className="text-zinc-700">{selectedRecordForDetail.sede}</strong> • Fecha:{' '}
-                  <strong className="text-zinc-700">{selectedRecordForDetail.fechaServicio}</strong> • Atendido por:{' '}
-                  <strong className="text-zinc-700">{selectedRecordForDetail.atendidoPor || 'StarMotos'}</strong>
+                  Sede: <strong className="text-zinc-700">{detailFormData.sede}</strong> • Fecha:{' '}
+                  <strong className="text-zinc-700">{detailFormData.fechaServicio}</strong> • Atendido por:{' '}
+                  <strong className="text-zinc-700">{detailFormData.atendidoPor || 'StarMotos'}</strong>
                 </p>
               </div>
             </div>
@@ -666,9 +696,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <span>Imprimir Ficha</span>
               </button>
 
-              {selectedRecordForDetail.celular1 && (
+              {detailFormData.celular1 && (
                 <a
-                  href={getCleanWhatsappUrl(selectedRecordForDetail.celular1, `${selectedRecordForDetail.nombres} ${selectedRecordForDetail.apellidos}`)}
+                  href={getCleanWhatsappUrl(
+                    detailFormData.celular1,
+                    `${detailFormData.nombres} ${detailFormData.apellidos}`
+                  )}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all"
@@ -681,95 +714,331 @@ export const AlistamientoWizard: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => {
-                  handleNewServiceForExisting(selectedRecordForDetail);
+                  handleNewServiceForExisting(detailFormData);
                   setSelectedRecordForDetail(null);
+                  setDetailFormData(null);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-black text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ Nuevo Servicio</span>
               </button>
+
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Cambios</span>
+              </button>
             </div>
           </div>
 
-          {/* Resumen Métricas / KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
-            <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/70 space-y-1">
-              <span className="text-[10px] font-black uppercase text-blue-900 block">Propietario</span>
-              <div className="font-bold text-zinc-900 text-xs truncate">
-                {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
-              </div>
-              <div className="font-mono text-zinc-600 text-[11px]">
-                C.I. {selectedRecordForDetail.cedulaRuc}
-              </div>
-              <div className="text-[10px] text-zinc-500 truncate">
-                Tel: {selectedRecordForDetail.celular1 || 'Sin teléfono'}
-              </div>
+          {/* Notificación de éxito al guardar */}
+          {detailSuccessToast && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 animate-slide-in shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{detailSuccessToast}</span>
             </div>
+          )}
 
-            <div className="bg-red-50/50 p-3 rounded-xl border border-red-200/70 space-y-1">
-              <span className="text-[10px] font-black uppercase text-red-900 block">Motocicleta</span>
-              <div className="font-bold text-zinc-900 text-xs truncate">
-                {selectedRecordForDetail.modeloMarca}
-              </div>
-              <div className="text-zinc-600 font-mono text-[11px] flex items-center justify-between">
-                <span>Placa: <strong>{selectedRecordForDetail.placa || 'SIN PLACA'}</strong></span>
-                <span>Km: <strong>{selectedRecordForDetail.kilometraje}</strong></span>
-              </div>
-              <div className="text-[10px] font-mono text-zinc-500 truncate">
-                VIN: {selectedRecordForDetail.chasis || 'S/N'}
-              </div>
-            </div>
-
-            <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200/70 space-y-1">
-              <span className="text-[10px] font-black uppercase text-emerald-900 block">Servicio & Cobro</span>
-              <div className="font-mono font-bold text-emerald-900 text-sm">
-                ${(selectedRecordForDetail.montoPagado || selectedRecordForDetail.valorServicio || 35).toFixed(2)}
-              </div>
-              <div className="text-[11px] text-emerald-800">
-                Método: <strong>{selectedRecordForDetail.metodoPago || 'Efectivo'}</strong>
-              </div>
-              <div className="text-[10px] font-mono text-emerald-700 truncate">
-                Doc: {selectedRecordForDetail.numeroFactura || selectedRecordForDetail.numeroTicket || 'Ticket'}
-              </div>
-            </div>
-
-            <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1">
-              <span className="text-[10px] font-black uppercase text-zinc-500 block">Técnico & Lubricante</span>
-              <div className="font-bold text-zinc-900 text-xs truncate">
-                Téc. {selectedRecordForDetail.tecnicoResponsable}
-              </div>
-              <div className="text-[11px] text-zinc-700">
-                Aceite: <strong>{selectedRecordForDetail.aceite === 'sin_aceite' ? 'Sin Aceite' : `${selectedRecordForDetail.aceite} (${selectedRecordForDetail.nivelAceite || 'Óptimo'})`}</strong>
-              </div>
-              <div className="text-[10px] text-zinc-500">
-                Próximo mantenimiento: <strong>{selectedRecordForDetail.proximoMantenimientoKm || 1000} km</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Scrollable body */}
+          {/* Formulario en 3 Columnas Simétricas */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+              {/* COLUMNA 1: DATOS DEL CLIENTE */}
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
+                    <UserCheck className="w-4 h-4 text-blue-600" />
+                    <span>1. Datos del Cliente</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono">Propietario</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Cédula o RUC *</label>
+                  <input
+                    type="text"
+                    value={detailFormData.cedulaRuc}
+                    readOnly
+                    className="w-full px-3 py-1.5 bg-zinc-100 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Nombres *</label>
+                  <input
+                    type="text"
+                    value={detailFormData.nombres}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, nombres: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-medium text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Apellidos *</label>
+                  <input
+                    type="text"
+                    value={detailFormData.apellidos}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, apellidos: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-medium text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Teléfono / Celular 1 *
+                  </label>
+                  <input
+                    type="tel"
+                    value={detailFormData.celular1}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, celular1: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-medium text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1">Sede / Taller</label>
+                    <select
+                      value={detailFormData.sede}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, sede: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium text-zinc-900 outline-none focus:border-blue-600"
+                    >
+                      {workshops.map((w) => (
+                        <option key={w.id} value={w.name}>
+                          {w.name}
+                        </option>
+                      ))}
+                      {!workshops.some((w) => w.name === detailFormData.sede) && (
+                        <option value={detailFormData.sede}>{detailFormData.sede}</option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1">
+                      Origen / Procedencia
+                    </label>
+                    <input
+                      type="text"
+                      value={detailFormData.origen}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, origen: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium text-zinc-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* COLUMNA 2: DATOS DE LA MOTOCICLETA */}
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
+                    <Bike className="w-4 h-4 text-blue-600" />
+                    <span>2. Motocicleta Registrada</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono">Unidad</span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Modelo y Marca *</label>
+                  <input
+                    type="text"
+                    value={detailFormData.modeloMarca}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, modeloMarca: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-semibold text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Placa Vehicular</label>
+                  <input
+                    type="text"
+                    value={detailFormData.placa}
+                    onChange={(e) =>
+                      setDetailFormData({ ...detailFormData, placa: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
+                    placeholder="SIN PLACA"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Número de Chasis / VIN *
+                  </label>
+                  <input
+                    type="text"
+                    value={detailFormData.chasis}
+                    onChange={(e) =>
+                      setDetailFormData({ ...detailFormData, chasis: e.target.value.toUpperCase() })
+                    }
+                    required
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-medium text-zinc-900 uppercase outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Kilometraje de Recepción (km) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={detailFormData.kilometraje}
+                    onChange={(e) =>
+                      setDetailFormData({ ...detailFormData, kilometraje: parseInt(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 text-xs">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
+                    Resumen del Vehículo:
+                  </span>
+                  <div className="text-zinc-800 font-bold">{detailFormData.modeloMarca || 'Sin modelo'}</div>
+                  <div className="text-[11px] text-zinc-600 font-mono mt-0.5">
+                    Placa: <strong>{detailFormData.placa || 'SIN PLACA'}</strong> • Km:{' '}
+                    <strong>{detailFormData.kilometraje} km</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* COLUMNA 3: SERVICIO & COBRO */}
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
+                    <Wrench className="w-4 h-4 text-blue-600" />
+                    <span>3. Servicio & Cobro</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 font-mono">Técnico</span>
+                </div>
+
+                {/* Servicios Realizados Chips */}
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Servicios Ejecutados:</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detailFormData.serviciosRealizados?.map((s) => (
+                      <span
+                        key={s}
+                        className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 uppercase"
+                      >
+                        {s.replace('_', ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Técnico y Aceite */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Técnico Responsable</label>
+                    <input
+                      type="text"
+                      value={detailFormData.tecnicoResponsable}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, tecnicoResponsable: e.target.value })
+                      }
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Estado Aceite</label>
+                    <input
+                      type="text"
+                      value={
+                        detailFormData.aceite === 'sin_aceite'
+                          ? 'Sin Aceite'
+                          : `${detailFormData.aceite} (${detailFormData.nivelAceite || 'Óptimo'})`
+                      }
+                      onChange={(e) => setDetailFormData({ ...detailFormData, aceite: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium text-zinc-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Cobro y Factura */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Monto Cobrado ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={detailFormData.montoPagado || detailFormData.valorServicio || 35.0}
+                      onChange={(e) =>
+                        setDetailFormData({
+                          ...detailFormData,
+                          montoPagado: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-emerald-800 outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Método de Pago</label>
+                    <select
+                      value={detailFormData.metodoPago || 'Efectivo'}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, metodoPago: e.target.value as any })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
+                    >
+                      <option value="Efectivo">Efectivo</option>
+                      <option value="Transferencia">Transferencia</option>
+                      <option value="Tarjeta">Tarjeta</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">N° Factura o Ticket</label>
+                  <input
+                    type="text"
+                    value={detailFormData.numeroFactura || detailFormData.numeroTicket || ''}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, numeroFactura: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Próximo Mantenimiento Sugerido
+                  </label>
+                  <div className="text-xs font-mono font-bold text-blue-700 bg-blue-50/70 p-2 rounded-lg border border-blue-200">
+                    A los {detailFormData.proximoMantenimientoKm || 1000} km
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Observaciones Técnicas */}
             <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-1.5">
-              <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-zinc-500" />
-                <span>Observaciones Mecánicas del Taller</span>
-              </h4>
-              <p className="text-xs text-zinc-600 italic">
-                "{selectedRecordForDetail.observaciones || 'Sin observaciones mecánicas registradas para esta unidad.'}"
-              </p>
+              <label className="block text-xs font-black uppercase text-zinc-800 tracking-wider">
+                Observaciones Mecánicas del Taller
+              </label>
+              <textarea
+                rows={2}
+                value={detailFormData.observaciones || ''}
+                onChange={(e) => setDetailFormData({ ...detailFormData, observaciones: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs text-zinc-900 outline-none transition-all resize-none"
+                placeholder="Sin observaciones mecánicas registradas para esta unidad."
+              />
             </div>
 
             {/* Evidencia Fotográfica de Entrega */}
-            {selectedRecordForDetail.fotos && selectedRecordForDetail.fotos.length > 0 && (
+            {detailFormData.fotos && detailFormData.fotos.length > 0 && (
               <div className="bg-white p-4 rounded-xl border border-zinc-200 space-y-2">
                 <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Inspección Visual & Evidencias Fotográficas ({selectedRecordForDetail.fotos.length})</span>
+                  <span>Inspección Visual & Evidencias Fotográficas ({detailFormData.fotos.length})</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {selectedRecordForDetail.fotos.map((url, i) => (
+                  {detailFormData.fotos.map((url, i) => (
                     <a
                       key={i}
                       href={url}
@@ -788,84 +1057,158 @@ export const AlistamientoWizard: React.FC<Props> = ({
               </div>
             )}
           </div>
-        </div>
+
+          {/* Footer del Formulario */}
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRecordForDetail(null);
+                setDetailFormData(null);
+              }}
+              className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              ← Cancelar / Volver a la Lista
+            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleNewServiceForExisting(detailFormData);
+                  setSelectedRecordForDetail(null);
+                  setDetailFormData(null);
+                }}
+                className="px-3.5 py-1.5 bg-zinc-800 hover:bg-black text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Iniciar Nuevo Servicio con este Cliente</span>
+              </button>
+
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Cambios</span>
+              </button>
+            </div>
+          </div>
+        </form>
       )}
 
+      {/* 2. VISTA: LIBRO DE ALISTAMIENTOS (TABLA EXCEL) */}
       {currentViewMode === 'list' && !selectedRecordForDetail && (
         <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
-          {/* Header Superior Compacto */}
-          <div className="bg-white border border-zinc-200 rounded-xl px-3.5 py-2 shadow-2xs space-y-2 shrink-0">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
-                  <Wrench className="w-4 h-4" />
+          {/* Header Superior Destacado: Libro de Alistamientos & Búsqueda de Cédula */}
+          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 shrink-0">
+            {/* Fila 1: Título con Icono y Badges de Métricas */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <Wrench className="w-5 h-5" />
                 </div>
-                <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-tight whitespace-nowrap">
-                  Libro de Alistamiento PDI & Servicios
-                </h2>
-                <div className="hidden sm:flex items-center gap-1.5 ml-1">
-                  <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-md whitespace-nowrap">
-                    {recentRecords.length} Registros
-                  </span>
-                  <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md whitespace-nowrap">
-                    {recentRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
-                  </span>
-                  <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-mono whitespace-nowrap">
-                    ${recentRecords.reduce((acc, r) => acc + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)} Facturado
-                  </span>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                    Libro de Alistamiento PDI & Mantenimientos
+                  </h2>
+                  <p className="text-xs text-zinc-500 font-medium">
+                    Historial de unidades entregadas, fichas técnicas y servicios mecánicos
+                  </p>
                 </div>
               </div>
 
-              {/* Botón "+ Nuevo Alistamiento" */}
-              <button
-                type="button"
-                onClick={() => handleStartNewAlistamiento()}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Nuevo Alistamiento</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg whitespace-nowrap shadow-2xs">
+                  {recentRecords.length} Registros Totales
+                </span>
+                <span className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg whitespace-nowrap shadow-2xs">
+                  {recentRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
+                </span>
+                <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
+                  ${recentRecords.reduce((acc, r) => acc + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)} Facturado
+                </span>
+              </div>
             </div>
 
-            {/* Barra de Búsqueda */}
-            <div className="flex items-center gap-2 pt-1.5 border-t border-zinc-100">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            {/* Fila 2: Barra de Búsqueda de Cédula / Cliente LLAMATIVA y GRANDE */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-2.5 border-t border-zinc-100">
+              {/* Contenedor del Buscador Prominente */}
+              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-blue-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
+                <Search className="w-5 h-5 text-blue-600 shrink-0" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
-                      handleStartNewAlistamiento(searchTerm.trim());
+                    if (e.key === 'Enter') {
+                      if (filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
+                        handleStartNewAlistamiento(searchTerm.trim());
+                      } else if (filteredRecords.length > 0) {
+                        handleOpenRecordDetail(filteredRecords[0]);
+                      }
                     }
                   }}
-                  placeholder="Buscar cédula, cliente, modelo, placa, chasis..."
-                  className="w-full pl-8 pr-7 py-1 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium h-7.5"
+                  placeholder="Buscar por número de Cédula o RUC (ej. 1204567890), nombre del cliente, placa o chasis..."
+                  className="w-full bg-transparent text-sm sm:text-base font-semibold text-zinc-900 placeholder:text-zinc-400 outline-none"
                 />
                 {searchTerm && (
                   <button
                     type="button"
                     onClick={() => setSearchTerm('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-0.5 cursor-pointer"
+                    className="text-zinc-400 hover:text-zinc-600 p-1 rounded-full hover:bg-zinc-200 cursor-pointer shrink-0 transition-colors"
+                    title="Limpiar búsqueda"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                {searchTerm.trim().length >= 8 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (filteredRecords.length > 0) {
+                        handleOpenRecordDetail(filteredRecords[0]);
+                      } else {
+                        handleStartNewAlistamiento(searchTerm.trim());
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    {filteredRecords.length > 0 ? 'Ver Formulario' : 'Consultar C.I.'}
                   </button>
                 )}
               </div>
 
-              {/* Sugerencia para registrar si la cédula no existe */}
-              {searchTerm.trim().length >= 8 && filteredRecords.length === 0 && (
+              {/* Botón "+ Nuevo Alistamiento" Destacado */}
+              <button
+                type="button"
+                onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
+                className="h-12 sm:h-13 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 shrink-0"
+              >
+                <Plus className="w-4.5 h-4.5" />
+                <span>+ Nuevo Alistamiento</span>
+              </button>
+            </div>
+
+            {/* Aviso o Sugerencia reactiva si escribe una cédula no existente */}
+            {searchTerm.trim().length >= 8 && filteredRecords.length === 0 && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between gap-3 animate-slide-in">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-900">
+                  <UserCheck className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+                  <span>
+                    No hay alistamientos previos registrados con C.I. <strong>"{searchTerm}"</strong>. ¿Desea iniciar un nuevo registro?
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
-                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer h-7.5 shrink-0 shadow-2xs"
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
                 >
-                  <UserCheck className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5" />
                   <span>Registrar nuevo con C.I. {searchTerm}</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Tabla Tipo Excel de Alistamientos */}
@@ -893,7 +1236,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       return (
                         <tr
                           key={record.id}
-                          onClick={() => setSelectedRecordForDetail(record)}
+                          onClick={() => handleOpenRecordDetail(record)}
                           className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
                           title={`Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`}
                         >
@@ -990,7 +1333,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedRecordForDetail(record);
+                                  handleOpenRecordDetail(record);
                                 }}
                                 className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
                                 title="Ver Ficha Técnica"

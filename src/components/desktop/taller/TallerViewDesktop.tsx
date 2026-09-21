@@ -277,12 +277,20 @@ export const TallerViewDesktop: React.FC<Props> = ({
         {/* CONTENIDO PRINCIPAL */}
         <main
           className={`flex-1 w-full bg-white ${
-            activeSection === 'clientes_taller'
+            activeSection === 'clientes_taller' ||
+            (activeSection === 'alistamiento_taller' && alistamientoViewMode === 'list')
               ? 'overflow-hidden flex flex-col p-4'
               : 'overflow-y-auto px-6 lg:px-8 py-6'
           }`}
         >
-          <div className={`w-full ${activeSection === 'clientes_taller' ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+          <div
+            className={`w-full ${
+              activeSection === 'clientes_taller' ||
+              (activeSection === 'alistamiento_taller' && alistamientoViewMode === 'list')
+                ? 'flex-1 min-h-0 flex flex-col'
+                : ''
+            }`}
+          >
             {activeSection === 'ordenes_taller' && (
               <OrdenesTallerDesktop orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
             )}

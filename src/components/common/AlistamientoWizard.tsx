@@ -21,6 +21,8 @@ import {
   Check,
   Upload,
   Lock,
+  ArrowLeft,
+  MessageCircle,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -149,6 +151,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
       sedeId: prev.sedeId || defaultSedeId,
     }));
   }, [defaultAtendidoPor, defaultSede, defaultSedeId]);
+
+  const getCleanWhatsappUrl = (phone: string, clientName: string) => {
+    const cleanDigits = phone.replace(/\D/g, '');
+    let fullNumber = cleanDigits;
+    if (fullNumber.startsWith('0')) {
+      fullNumber = `593${fullNumber.substring(1)}`;
+    }
+    const message = encodeURIComponent(
+      `Estimado/a ${clientName}, le saludamos desde StarMotos. Le compartimos la información de su orden de servicio y alistamiento.`
+    );
+    return `https://wa.me/${fullNumber}?text=${message}`;
+  };
 
   // Filtrado de alistamientos existentes
   const filteredRecords = useMemo(() => {
@@ -605,224 +619,457 @@ export const AlistamientoWizard: React.FC<Props> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 1. VISTA: LISTADO EN TARJETAS COMPACTAS (SIN CONTENEDORES INTERNOS)       */}
+      {/* 1. VISTA: LISTADO O APARTADO INDEPENDIENTE DE ALISTAMIENTO                 */}
       {/* ========================================================================= */}
-      {currentViewMode === 'list' && (
-        <div className="space-y-4 animate-fade-in">
-          {/* Header Superior con Buscador y Botón Nuevo Alistamiento */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {currentViewMode === 'list' && selectedRecordForDetail && (
+        <div className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs">
+          {/* Cabecera del Apartado de Alistamiento */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedRecordForDetail(null)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft className="w-4 h-4 text-zinc-600" />
+                <span>Volver al Libro de Alistamientos</span>
+              </button>
+              <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg sm:text-xl font-black text-zinc-900 tracking-tight">
-                    Módulo de Alistamiento & Mantenimientos
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
+                    Ficha Técnica: {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
                   </h2>
-                  <span className="px-2.5 py-0.5 text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
-                    {recentRecords.length} Registros
+                  <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
+                    C.I./RUC: {selectedRecordForDetail.cedulaRuc}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    ✓ COMPLETADO
                   </span>
                 </div>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Historial de alistamientos PDI, auditoría técnica y entrega de motocicletas StarMotos.
+                <p className="text-xs text-zinc-500">
+                  Sede: <strong className="text-zinc-700">{selectedRecordForDetail.sede}</strong> • Fecha:{' '}
+                  <strong className="text-zinc-700">{selectedRecordForDetail.fechaServicio}</strong> • Atendido por:{' '}
+                  <strong className="text-zinc-700">{selectedRecordForDetail.atendidoPor || 'StarMotos'}</strong>
                 </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                title="Imprimir ficha técnica"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Ficha</span>
+              </button>
+
+              {selectedRecordForDetail.celular1 && (
+                <a
+                  href={getCleanWhatsappUrl(selectedRecordForDetail.celular1, `${selectedRecordForDetail.nombres} ${selectedRecordForDetail.apellidos}`)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleNewServiceForExisting(selectedRecordForDetail);
+                  setSelectedRecordForDetail(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Nuevo Servicio</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Resumen Métricas / KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+            <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/70 space-y-1">
+              <span className="text-[10px] font-black uppercase text-blue-900 block">Propietario</span>
+              <div className="font-bold text-zinc-900 text-xs truncate">
+                {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
+              </div>
+              <div className="font-mono text-zinc-600 text-[11px]">
+                C.I. {selectedRecordForDetail.cedulaRuc}
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate">
+                Tel: {selectedRecordForDetail.celular1 || 'Sin teléfono'}
+              </div>
+            </div>
+
+            <div className="bg-red-50/50 p-3 rounded-xl border border-red-200/70 space-y-1">
+              <span className="text-[10px] font-black uppercase text-red-900 block">Motocicleta</span>
+              <div className="font-bold text-zinc-900 text-xs truncate">
+                {selectedRecordForDetail.modeloMarca}
+              </div>
+              <div className="text-zinc-600 font-mono text-[11px] flex items-center justify-between">
+                <span>Placa: <strong>{selectedRecordForDetail.placa || 'SIN PLACA'}</strong></span>
+                <span>Km: <strong>{selectedRecordForDetail.kilometraje}</strong></span>
+              </div>
+              <div className="text-[10px] font-mono text-zinc-500 truncate">
+                VIN: {selectedRecordForDetail.chasis || 'S/N'}
+              </div>
+            </div>
+
+            <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200/70 space-y-1">
+              <span className="text-[10px] font-black uppercase text-emerald-900 block">Servicio & Cobro</span>
+              <div className="font-mono font-bold text-emerald-900 text-sm">
+                ${(selectedRecordForDetail.montoPagado || selectedRecordForDetail.valorServicio || 35).toFixed(2)}
+              </div>
+              <div className="text-[11px] text-emerald-800">
+                Método: <strong>{selectedRecordForDetail.metodoPago || 'Efectivo'}</strong>
+              </div>
+              <div className="text-[10px] font-mono text-emerald-700 truncate">
+                Doc: {selectedRecordForDetail.numeroFactura || selectedRecordForDetail.numeroTicket || 'Ticket'}
+              </div>
+            </div>
+
+            <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1">
+              <span className="text-[10px] font-black uppercase text-zinc-500 block">Técnico & Lubricante</span>
+              <div className="font-bold text-zinc-900 text-xs truncate">
+                Téc. {selectedRecordForDetail.tecnicoResponsable}
+              </div>
+              <div className="text-[11px] text-zinc-700">
+                Aceite: <strong>{selectedRecordForDetail.aceite === 'sin_aceite' ? 'Sin Aceite' : `${selectedRecordForDetail.aceite} (${selectedRecordForDetail.nivelAceite || 'Óptimo'})`}</strong>
+              </div>
+              <div className="text-[10px] text-zinc-500">
+                Próximo mantenimiento: <strong>{selectedRecordForDetail.proximoMantenimientoKm || 1000} km</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+            {/* Observaciones Técnicas */}
+            <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-1.5">
+              <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-zinc-500" />
+                <span>Observaciones Mecánicas del Taller</span>
+              </h4>
+              <p className="text-xs text-zinc-600 italic">
+                "{selectedRecordForDetail.observaciones || 'Sin observaciones mecánicas registradas para esta unidad.'}"
+              </p>
+            </div>
+
+            {/* Evidencia Fotográfica de Entrega */}
+            {selectedRecordForDetail.fotos && selectedRecordForDetail.fotos.length > 0 && (
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 space-y-2">
+                <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Inspección Visual & Evidencias Fotográficas ({selectedRecordForDetail.fotos.length})</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {selectedRecordForDetail.fotos.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="aspect-video rounded-lg overflow-hidden border border-zinc-200 block group relative shadow-2xs"
+                    >
+                      <img
+                        src={url}
+                        alt={`Evidencia ${i + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {currentViewMode === 'list' && !selectedRecordForDetail && (
+        <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
+          {/* Header Superior Compacto */}
+          <div className="bg-white border border-zinc-200 rounded-xl px-3.5 py-2 shadow-2xs space-y-2 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-tight whitespace-nowrap">
+                  Libro de Alistamiento PDI & Servicios
+                </h2>
+                <div className="hidden sm:flex items-center gap-1.5 ml-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-md whitespace-nowrap">
+                    {recentRecords.length} Registros
+                  </span>
+                  <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md whitespace-nowrap">
+                    {recentRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
+                  </span>
+                  <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-mono whitespace-nowrap">
+                    ${recentRecords.reduce((acc, r) => acc + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)} Facturado
+                  </span>
+                </div>
               </div>
 
               {/* Botón "+ Nuevo Alistamiento" */}
               <button
                 type="button"
                 onClick={() => handleStartNewAlistamiento()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer shrink-0"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>+ Nuevo Alistamiento</span>
               </button>
             </div>
 
             {/* Barra de Búsqueda */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
-                    handleStartNewAlistamiento(searchTerm.trim());
-                  }
-                }}
-                placeholder="Buscar cliente por cédula/RUC, nombres, modelo de moto, placa o chasis..."
-                className="w-full pl-10 pr-10 py-2.5 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-xl text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            <div className="flex items-center gap-2 pt-1.5 border-t border-zinc-100">
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
+                      handleStartNewAlistamiento(searchTerm.trim());
+                    }
+                  }}
+                  placeholder="Buscar cédula, cliente, modelo, placa, chasis..."
+                  className="w-full pl-8 pr-7 py-1 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium h-7.5"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-            {/* Banner sugerencia si busca una cédula que no existe */}
-            {searchTerm.trim().length >= 8 && filteredRecords.length === 0 && (
-              <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-amber-900">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>
-                    No encontramos alistamientos para <strong className="font-mono">"{searchTerm}"</strong>.
-                  </span>
-                </div>
+              {/* Sugerencia para registrar si la cédula no existe */}
+              {searchTerm.trim().length >= 8 && filteredRecords.length === 0 && (
                 <button
                   type="button"
                   onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer h-7.5 shrink-0 shadow-2xs"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
                   <span>Registrar nuevo con C.I. {searchTerm}</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Grid de Tarjetas Compactas (Sin contenedores adentro) */}
+          {/* Tabla Tipo Excel de Alistamientos */}
           {filteredRecords.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-              {filteredRecords.map((record) => {
-                const isPdi = record.serviciosRealizados.includes('alistamiento_pdi');
-                return (
-                  <div
-                    key={record.id}
-                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between relative overflow-hidden group"
-                  >
-                    {/* Borde superior decorativo */}
-                    <div
-                      className={`absolute top-0 left-0 right-0 h-1 ${
-                        isPdi ? 'bg-blue-600' : 'bg-emerald-600'
-                      }`}
-                    />
+            <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
+              <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
+                <table className="w-full table-fixed text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
+                    <tr className="text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 select-none">
+                      <th className="w-[3%] px-1 py-2 text-center text-zinc-500 font-mono">#</th>
+                      <th className="w-[13%] px-2.5 py-2 truncate">Cliente</th>
+                      <th className="w-[10%] px-2 py-2 truncate">Origen</th>
+                      <th className="w-[10%] px-2 py-2 truncate">Sede</th>
+                      <th className="w-[7.5%] px-1.5 py-2 text-center whitespace-nowrap">Fecha</th>
+                      <th className="w-[14%] px-2 py-2 truncate">Motocicleta</th>
+                      <th className="w-[12%] px-2 py-2 truncate">Servicios</th>
+                      <th className="w-[8.5%] px-2 py-2 truncate">Técnico</th>
+                      <th className="w-[6%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
+                      <th className="w-[7.5%] px-2 py-2 truncate">Factura</th>
+                      <th className="w-[8.5%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-200 text-zinc-800">
+                    {filteredRecords.map((record, idx) => {
+                      return (
+                        <tr
+                          key={record.id}
+                          onClick={() => setSelectedRecordForDetail(record)}
+                          className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
+                          title={`Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`}
+                        >
+                          {/* 1. # */}
+                          <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
+                            {idx + 1}
+                          </td>
 
-                    {/* Contenido Texto Directo (Sin contenedores anidados) */}
-                    <div className="space-y-2.5 pt-0.5">
-                      {/* Cabecera de la Tarjeta */}
-                      <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-zinc-100">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-700 truncate max-w-[150px]">
-                          <Building2 className="w-3 h-3 text-zinc-400 shrink-0" />
-                          <span className="truncate">{record.sede}</span>
-                        </span>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px]">
-                            COMPLETADO
-                          </span>
-                          <span className="font-black text-xs text-zinc-900">
-                            ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
+                          {/* 2. Cliente */}
+                          <td className="px-2.5 py-2 truncate" title={`${record.nombres} ${record.apellidos} (C.I. ${record.cedulaRuc})`}>
+                            <div className="flex flex-col truncate">
+                              <span className="font-bold truncate text-xs text-zinc-900 group-hover:text-blue-600 transition-colors">
+                                {record.nombres} {record.apellidos}
+                              </span>
+                              <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
+                                C.I. {record.cedulaRuc}
+                              </span>
+                            </div>
+                          </td>
 
-                      {/* Bloque 1: Cliente (Texto directo) */}
-                      <div className="space-y-0.5">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-blue-600 flex items-center gap-1">
-                          <UserCheck className="w-3 h-3" />
-                          <span>Cliente</span>
-                        </div>
-                        <div className="font-bold text-zinc-900 text-sm truncate">
-                          {record.nombres} {record.apellidos}
-                        </div>
-                        <div className="text-zinc-600 text-xs font-mono flex items-center justify-between">
-                          <span>C.I: <strong>{record.cedulaRuc}</strong></span>
-                          {record.celular1 && <span className="text-zinc-500">Tel: {record.celular1}</span>}
-                        </div>
-                        <div className="text-[11px] text-zinc-400 truncate">
-                          Origen: <span className="text-zinc-600 font-medium">{record.origen}</span>
-                        </div>
-                      </div>
+                          {/* 3. Origen */}
+                          <td className="px-2 py-2 text-zinc-600 truncate" title={record.origen}>
+                            <span className="truncate block text-xs">{record.origen}</span>
+                          </td>
 
-                      {/* Bloque 2: Motocicleta (Texto directo) */}
-                      <div className="space-y-0.5 pt-1.5 border-t border-zinc-100">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1">
-                          <Bike className="w-3 h-3" />
-                          <span>Motocicleta</span>
-                        </div>
-                        <div className="font-bold text-zinc-800 text-xs truncate">
-                          {record.modeloMarca || 'Modelo no especificado'}
-                        </div>
-                        <div className="text-zinc-600 text-[11px] font-mono flex items-center justify-between">
-                          <span className="px-1.5 py-0.2 bg-zinc-100 rounded font-bold text-zinc-800 text-[10px]">
-                            {record.placa ? record.placa : 'SIN PLACA'}
-                          </span>
-                          <span>Km: <strong className="text-zinc-800">{record.kilometraje || 0}</strong></span>
-                        </div>
-                        <div className="text-[10px] text-zinc-400 truncate">
-                          VIN: <span className="font-mono text-zinc-600">{record.chasis ? record.chasis.substring(0, 15) + '...' : 'S/N'}</span>
-                        </div>
-                      </div>
-
-                      {/* Bloque 3: Servicio (Texto directo) */}
-                      <div className="space-y-1 pt-1.5 border-t border-zinc-100 text-[11px]">
-                        <div className="flex flex-wrap gap-1">
-                          {record.serviciosRealizados.map((srv) => (
-                            <span
-                              key={srv}
-                              className="px-1.5 py-0.2 bg-zinc-100 text-zinc-700 rounded text-[10px] font-bold"
-                            >
-                              {srv === 'alistamiento_pdi'
-                                ? 'ALISTAMIENTO PDI'
-                                : srv === 'engrasado'
-                                ? 'ENGRASADO'
-                                : 'MANTENIMIENTO'}
+                          {/* 4. Sede */}
+                          <td className="px-2 py-2 text-zinc-700 truncate" title={record.sede}>
+                            <span className="inline-block text-[11px] font-medium bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded border border-zinc-200/80 truncate max-w-full">
+                              {record.sede}
                             </span>
-                          ))}
-                        </div>
-                        <div className="text-zinc-500 text-[10px] flex items-center justify-between">
-                          <span>Téc: <strong className="text-zinc-700">{record.tecnicoResponsable}</strong></span>
-                          <span>{record.metodoPago || 'Efectivo'}</span>
-                        </div>
-                      </div>
-                    </div>
+                          </td>
 
-                    {/* Botones de Acción */}
-                    <div className="pt-2 mt-2.5 border-t border-zinc-100 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRecordForDetail(record)}
-                        className="flex-1 py-1.5 text-zinc-700 hover:text-blue-600 hover:bg-blue-50 border border-zinc-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Ver Ficha</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleNewServiceForExisting(record)}
-                        className="flex-1 py-1.5 bg-zinc-100 hover:bg-blue-600 text-zinc-700 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                        title="Crear nuevo mantenimiento subsecuente con este cliente"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Nuevo Servicio</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                          {/* 5. Fecha */}
+                          <td className="px-1.5 py-2 text-center whitespace-nowrap font-mono text-zinc-600 text-[11px]" title={record.fechaServicio}>
+                            {record.fechaServicio}
+                          </td>
+
+                          {/* 6. Motocicleta */}
+                          <td className="px-2 py-2 truncate" title={`${record.modeloMarca} - Placa: ${record.placa || 'S/P'}`}>
+                            <div className="flex flex-col truncate">
+                              <span className="font-semibold text-xs text-zinc-800 truncate">
+                                {record.modeloMarca || 'Modelo no esp.'}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 truncate">
+                                <span className="font-bold text-zinc-700 bg-zinc-100 px-1 rounded">{record.placa || 'S/P'}</span>
+                                <span>• {record.kilometraje || 0} km</span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 7. Servicios */}
+                          <td className="px-2 py-2 truncate">
+                            <div className="flex flex-wrap gap-1">
+                              {record.serviciosRealizados.map((srv) => (
+                                <span
+                                  key={srv}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    srv === 'alistamiento_pdi'
+                                      ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                      : srv === 'engrasado'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      : 'bg-purple-50 text-purple-800 border border-purple-200'
+                                  }`}
+                                >
+                                  {srv === 'alistamiento_pdi'
+                                    ? 'PDI'
+                                    : srv === 'engrasado'
+                                    ? 'Engrasado'
+                                    : 'Mantenimiento'}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+
+                          {/* 8. Técnico */}
+                          <td className="px-2 py-2 text-zinc-700 truncate" title={record.tecnicoResponsable}>
+                            <span className="truncate block text-xs font-medium">{record.tecnicoResponsable}</span>
+                          </td>
+
+                          {/* 9. Valor */}
+                          <td className="px-2 py-2 text-right font-mono font-bold text-zinc-900 whitespace-nowrap text-xs">
+                            ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
+                          </td>
+
+                          {/* 10. Factura */}
+                          <td className="px-2 py-2 font-mono text-zinc-700 truncate text-[11px]" title={record.numeroFactura || record.numeroTicket || 'Ticket'}>
+                            <span className="truncate block">{record.numeroFactura || record.numeroTicket || 'Ticket'}</span>
+                          </td>
+
+                          {/* 11. Acciones */}
+                          <td className="px-1.5 py-2 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedRecordForDetail(record);
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                                title="Ver Ficha Técnica"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>Ficha</span>
+                              </button>
+                              {record.celular1 && (
+                                <a
+                                  href={getCleanWhatsappUrl(record.celular1, `${record.nombres} ${record.apellidos}`)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-0.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                                  title="Contactar por WhatsApp"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNewServiceForExisting(record);
+                                }}
+                                className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                title="Nuevo Servicio subsecuente"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="sticky bottom-0 bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px] shadow-xs z-10">
+                    <tr className="divide-x divide-zinc-200">
+                      <td colSpan={8} className="px-3 py-2 text-right font-mono uppercase tracking-wider text-[11px]">
+                        Total ({filteredRecords.length} registros):
+                      </td>
+                      <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
+                        ${filteredRecords.reduce((sum, r) => sum + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)}
+                      </td>
+                      <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
+                        <span className="font-bold text-blue-700">
+                          {filteredRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI OK
+                        </span>{' '}
+                        •{' '}
+                        <span className="font-bold text-purple-700">
+                          {filteredRecords.filter((r) => r.serviciosRealizados.includes('mantenimiento')).length} Mantenimientos
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           ) : (
-            <div className="bg-white border border-zinc-200 rounded-2xl p-10 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
-                <Bike className="w-6 h-6" />
+            <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-white border border-zinc-200 rounded-xl">
+              <div className="text-center space-y-2 max-w-sm">
+                <Bike className="w-8 h-8 text-zinc-300 mx-auto" />
+                <h3 className="text-sm font-bold text-zinc-800">
+                  No se encontraron alistamientos registrados
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {searchTerm
+                    ? 'Ningún registro coincide con los criterios de búsqueda especificados.'
+                    : 'Aún no hay alistamientos registrados en esta sede. Inicia el primer registro ahora.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleStartNewAlistamiento(searchTerm)}
+                  className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Registrar Nuevo Alistamiento</span>
+                </button>
               </div>
-              <h3 className="text-sm font-bold text-zinc-900">No se encontraron alistamientos registrados</h3>
-              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                {searchTerm
-                  ? 'Ningún registro coincide con los criterios de búsqueda especificados.'
-                  : 'Aún no hay alistamientos registrados en esta sede. Inicia el primer registro ahora.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => handleStartNewAlistamiento(searchTerm)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Registrar Primer Alistamiento</span>
-              </button>
             </div>
           )}
         </div>
@@ -1954,166 +2201,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
         </form>
       )}
 
-      {/* ========================================================================= */}
-      {/* 3. MODAL: DETALLE COMPLETO DE ALISTAMIENTO PREVIO                         */}
-      {/* ========================================================================= */}
-      {selectedRecordForDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in max-h-[90vh] overflow-y-auto">
-            {/* Header Modal */}
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-zinc-900">
-                    Ficha Técnica de Alistamiento
-                  </h3>
-                  <p className="text-[11px] text-zinc-500">
-                    ID: <span className="font-mono font-bold text-zinc-800">{selectedRecordForDetail.id}</span> • Sede:{' '}
-                    <span className="font-bold text-zinc-800">{selectedRecordForDetail.sede}</span>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedRecordForDetail(null)}
-                className="text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* 3 Bloques de Información */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              {/* Cliente */}
-              <div className="bg-blue-50/40 p-3 rounded-xl border border-blue-100 space-y-1.5">
-                <div className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-1">
-                  <UserCheck className="w-3 h-3" />
-                  <span>Cliente</span>
-                </div>
-                <div className="font-bold text-zinc-900 text-sm">
-                  {selectedRecordForDetail.nombres} {selectedRecordForDetail.apellidos}
-                </div>
-                <div className="text-zinc-600 font-mono text-[11px]">C.I: {selectedRecordForDetail.cedulaRuc}</div>
-                <div className="text-zinc-600 text-[11px]">Tel: {selectedRecordForDetail.celular1}</div>
-                {selectedRecordForDetail.email && (
-                  <div className="text-zinc-500 text-[10px] truncate">{selectedRecordForDetail.email}</div>
-                )}
-                {selectedRecordForDetail.direccion && (
-                  <div className="text-zinc-500 text-[10px]">{selectedRecordForDetail.direccion}</div>
-                )}
-                <div className="text-[10px] text-zinc-400 pt-1 border-t border-blue-100">
-                  Origen: <span className="font-medium text-zinc-700">{selectedRecordForDetail.origen}</span>
-                </div>
-              </div>
-
-              {/* Moto */}
-              <div className="bg-red-50/40 p-3 rounded-xl border border-red-100 space-y-1.5">
-                <div className="text-[10px] font-black uppercase text-red-800 flex items-center gap-1">
-                  <Bike className="w-3 h-3" />
-                  <span>Motocicleta</span>
-                </div>
-                <div className="font-bold text-zinc-900 text-sm">
-                  {selectedRecordForDetail.modeloMarca}
-                </div>
-                <div className="text-zinc-600 font-mono text-[11px]">
-                  Placa: <strong className="text-zinc-900">{selectedRecordForDetail.placa || 'SIN PLACA'}</strong>
-                </div>
-                <div className="text-zinc-600 font-mono text-[10px] truncate">
-                  VIN: {selectedRecordForDetail.chasis || 'S/N'}
-                </div>
-                <div className="text-zinc-600 text-[11px]">
-                  Km: <strong className="text-zinc-900">{selectedRecordForDetail.kilometraje} km</strong>
-                </div>
-              </div>
-
-              {/* Servicio */}
-              <div className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-100 space-y-1.5">
-                <div className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
-                  <Wrench className="w-3 h-3" />
-                  <span>Servicio</span>
-                </div>
-                <div className="font-bold text-zinc-900 text-sm">
-                  ${(selectedRecordForDetail.montoPagado || selectedRecordForDetail.valorServicio).toFixed(2)}
-                </div>
-                <div className="text-zinc-600 text-[11px]">
-                  Método: <strong className="text-zinc-900">{selectedRecordForDetail.metodoPago}</strong>
-                </div>
-                <div className="text-zinc-600 text-[11px]">
-                  Técnico: <strong className="text-zinc-900">{selectedRecordForDetail.tecnicoResponsable}</strong>
-                </div>
-                <div className="text-zinc-600 text-[11px]">
-                  Aceite: <strong className="text-zinc-900">{selectedRecordForDetail.aceite === 'sin_aceite' ? 'Sin Aceite' : `${selectedRecordForDetail.aceite} (${selectedRecordForDetail.nivelAceite || 'Óptimo'})`}</strong>
-                </div>
-                <div className="text-zinc-600 text-[10px]">
-                  Próx: <strong className="text-zinc-900">{selectedRecordForDetail.proximoMantenimientoKm || 1000} km</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Observaciones */}
-            <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 text-xs space-y-1">
-              <div className="font-bold text-zinc-700">Observaciones Técnicas:</div>
-              <p className="text-zinc-600 italic">
-                {selectedRecordForDetail.observaciones || 'Sin observaciones mecánicas registradas.'}
-              </p>
-            </div>
-
-            {/* Fotos si las hay */}
-            {selectedRecordForDetail.fotos && selectedRecordForDetail.fotos.length > 0 && (
-              <div className="space-y-1.5">
-                <div className="text-xs font-bold text-zinc-700">Evidencia Fotográfica de Entrega:</div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {selectedRecordForDetail.fotos.map((url, i) => (
-                    <img
-                      key={i}
-                      src={url}
-                      alt="Inspección"
-                      className="rounded-lg aspect-video object-cover border border-zinc-200"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Acciones del Modal */}
-            <div className="pt-3 border-t border-zinc-100 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir Ficha</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleNewServiceForExisting(selectedRecordForDetail);
-                    setSelectedRecordForDetail(null);
-                  }}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Nuevo Servicio con este Cliente</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRecordForDetail(null)}
-                  className="px-3 py-1.5 border border-zinc-300 text-zinc-700 rounded-xl text-xs font-bold hover:bg-zinc-50 cursor-pointer"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* 4. MODAL: AGREGAR NUEVO TÉCNICO AL TALLER                                 */}

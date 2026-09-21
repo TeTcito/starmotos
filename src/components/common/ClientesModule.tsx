@@ -29,6 +29,8 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  ArrowLeft,
+  Printer,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -451,6 +453,274 @@ export const ClientesModule: React.FC<Props> = ({
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
 
+  if (selectedClientForDetail) {
+    const detailData = getClientRowData(selectedClientForDetail);
+    return (
+      <div className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs">
+        {/* Cabecera del Apartado */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedClientForDetail(null)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            >
+              <ArrowLeft className="w-4 h-4 text-zinc-600" />
+              <span>Volver a la Lista de Clientes</span>
+            </button>
+            <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
+                  {selectedClientForDetail.fullName}
+                </h2>
+                <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
+                  C.I./RUC: {selectedClientForDetail.cedulaRuc}
+                </span>
+                {detailData.estado === 'referente' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    ⭐ Referente
+                  </span>
+                )}
+                {detailData.estado === 'iniciado' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    🚀 Iniciado
+                  </span>
+                )}
+                {detailData.estado === 'pendiente' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    ⏳ Pendiente
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-zinc-500">
+                Sede Oficial: <strong className="text-zinc-700">{selectedClientForDetail.workshopName}</strong> • Origen de Compra: <strong className="text-zinc-700">{selectedClientForDetail.origin || 'Almacén Oficial'}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              title="Imprimir ficha del cliente"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir Ficha</span>
+            </button>
+
+            {selectedClientForDetail.phone && (
+              <a
+                href={getCleanWhatsappUrl(selectedClientForDetail.phone, selectedClientForDetail.fullName)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Contactar por WhatsApp</span>
+              </a>
+            )}
+
+            {onNavigateToAlistamiento && (
+              <button
+                type="button"
+                onClick={() => onNavigateToAlistamiento(selectedClientForDetail.cedulaRuc)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Nuevo Alistamiento</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Resumen Métricas / KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+          <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-200/70 space-y-1">
+            <span className="text-[10px] font-black uppercase text-blue-900 block">Contacto Directo</span>
+            <div className="font-mono font-bold text-zinc-800 text-xs">
+              {selectedClientForDetail.phone || 'Sin celular'}
+            </div>
+            <div className="text-[11px] text-zinc-600 truncate">
+              {selectedClientForDetail.email || 'Sin correo'}
+            </div>
+            {selectedClientForDetail.address && (
+              <div className="text-[10px] text-zinc-500 truncate">
+                📍 {selectedClientForDetail.address}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200/70 space-y-1">
+            <span className="text-[10px] font-black uppercase text-emerald-900 block">Cumplimiento Técnico</span>
+            <div className="flex items-center gap-1 font-bold text-emerald-900 text-xs">
+              {selectedClientForDetail.pdiCompleted ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Alistamiento PDI OK</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Alistamiento PDI Pendiente</span>
+                </>
+              )}
+            </div>
+            <div className="text-[11px] text-emerald-800">
+              Engrasado: <strong>{selectedClientForDetail.engrasadoCompleted ? 'Completado' : 'Pendiente'}</strong>
+            </div>
+            <div className="text-[10px] text-emerald-700">
+              Total Servicios: <strong>{selectedClientForDetail.records.length} registrados</strong>
+            </div>
+          </div>
+
+          <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/70 space-y-1">
+            <span className="text-[10px] font-black uppercase text-purple-900 block">Facturación Acumulada</span>
+            <div className="text-sm font-black font-mono text-purple-950">
+              ${selectedClientForDetail.totalSpent.toFixed(2)}
+            </div>
+            <div className="text-[11px] text-purple-800">
+              Garantías: <strong>{selectedClientForDetail.warrantiesCount} casos</strong>
+            </div>
+            <div className="text-[10px] text-purple-700">
+              Última visita: <strong>{selectedClientForDetail.lastVisitDate || 'Reciente'}</strong>
+            </div>
+          </div>
+
+          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1">
+            <span className="text-[10px] font-black uppercase text-zinc-500 block">Flota Asociada</span>
+            <div className="text-sm font-black text-zinc-900">
+              {selectedClientForDetail.motorcycles.length} {selectedClientForDetail.motorcycles.length === 1 ? 'Motocicleta' : 'Motocicletas'}
+            </div>
+            <div className="text-[11px] text-zinc-600 truncate">
+              {selectedClientForDetail.motorcycles[0]?.model || 'Sin moto registrada'}
+            </div>
+            <div className="text-[10px] font-mono text-zinc-500">
+              Placa: {selectedClientForDetail.motorcycles[0]?.plate || 'S/P'}
+            </div>
+          </div>
+        </div>
+
+        {/* Contenido con scroll independiente */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+          {/* Motocicletas Registradas */}
+          <div>
+            <h4 className="text-xs font-black uppercase text-zinc-900 tracking-wider mb-2 flex items-center gap-1.5">
+              <Bike className="w-3.5 h-3.5 text-blue-600" />
+              <span>Parque Vehicular Registrado ({selectedClientForDetail.motorcycles.length})</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {selectedClientForDetail.motorcycles.map((moto, i) => (
+                <div
+                  key={i}
+                  className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 flex items-center justify-between"
+                >
+                  <div>
+                    <div className="font-bold text-zinc-900 text-xs">{moto.model}</div>
+                    <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
+                      VIN: {moto.chasis || 'S/N'}
+                      {moto.lastMileage ? ` • ${moto.lastMileage} km` : ''}
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 bg-white border border-zinc-300 rounded-md">
+                    {moto.plate || 'S/P'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Historial de Servicios & Alistamientos */}
+          <div>
+            <h4 className="text-xs font-black uppercase text-zinc-900 tracking-wider mb-2 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Historial de Servicios & Alistamientos ({selectedClientForDetail.records.length})</span>
+            </h4>
+
+            {selectedClientForDetail.records.length > 0 ? (
+              <div className="space-y-2.5">
+                {selectedClientForDetail.records.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className="bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2 hover:border-zinc-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-zinc-900">
+                          {rec.serviciosRealizados?.map((s) => s.toUpperCase()).join(' • ')}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">• {rec.fechaServicio}</span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        ${(rec.montoPagado || rec.valorServicio).toFixed(2)} ({rec.metodoPago})
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 bg-zinc-50 p-2 rounded-lg">
+                      <div>
+                        <span className="text-zinc-400 block text-[9px] uppercase">Técnico</span>
+                        <strong>{rec.tecnicoResponsable}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px] uppercase">Kilometraje</span>
+                        <strong>{rec.kilometraje} km</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px] uppercase">Aceite</span>
+                        <strong>{rec.aceite === 'sin_aceite' ? 'Sin Aceite' : rec.nivelAceite || 'Óptimo'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-400 block text-[9px] uppercase">Factura</span>
+                        <strong className="font-mono">{rec.numeroFactura || 'S/F'}</strong>
+                      </div>
+                    </div>
+
+                    {rec.observaciones && (
+                      <p className="text-[11px] text-zinc-600 italic bg-zinc-50/50 p-2 rounded border border-zinc-100">
+                        "{rec.observaciones}"
+                      </p>
+                    )}
+
+                    {rec.fotos && rec.fotos.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold text-zinc-500 block mb-1 flex items-center gap-1">
+                          <Camera className="w-3 h-3 text-zinc-400" />
+                          <span>Evidencias de Entrega ({rec.fotos.length})</span>
+                        </span>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                          {rec.fotos.map((url, idx) => (
+                            <a
+                              key={idx}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="aspect-video rounded overflow-hidden border border-zinc-200 block group relative"
+                            >
+                              <img
+                                src={url}
+                                alt={`Evidencia ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-6 text-center text-zinc-500 text-xs">
+                No hay servicios técnicos previos registrados para este cliente.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
       {/* ========================================================================= */}
@@ -662,7 +932,11 @@ export const ClientesModule: React.FC<Props> = ({
 
                   return (
                     <React.Fragment key={client.id}>
-                      <tr className="hover:bg-blue-50/50 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40">
+                      <tr
+                        onClick={() => setSelectedClientForDetail(client)}
+                        className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
+                        title={`Haga clic en cualquier lado para abrir el apartado completo de ${data.nombre} ${data.apellido}`}
+                      >
                         {/* 1. # */}
                         <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
                           {idx + 1}
@@ -671,7 +945,7 @@ export const ClientesModule: React.FC<Props> = ({
                         {/* 2. Nombre */}
                         <td className="px-2.5 py-2 text-zinc-900 truncate" title={`${data.nombre} (C.I. ${client.cedulaRuc})`}>
                           <div className="flex flex-col truncate">
-                            <span className="font-bold truncate text-xs">{data.nombre}</span>
+                            <span className="font-bold truncate text-xs group-hover:text-blue-600 transition-colors">{data.nombre}</span>
                             <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
                               C.I. {client.cedulaRuc}
                             </span>
@@ -680,7 +954,7 @@ export const ClientesModule: React.FC<Props> = ({
 
                         {/* 3. Apellido */}
                         <td className="px-2.5 py-2 text-zinc-800 truncate" title={data.apellido}>
-                          <span className="font-semibold truncate block text-xs">{data.apellido || '—'}</span>
+                          <span className="font-semibold truncate block text-xs group-hover:text-blue-600 transition-colors">{data.apellido || '—'}</span>
                         </td>
 
                         {/* 4. Origen */}
@@ -709,7 +983,10 @@ export const ClientesModule: React.FC<Props> = ({
                             {otherRecords.length > 0 && (
                               <button
                                 type="button"
-                                onClick={() => toggleRowExpand(client.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRowExpand(client.id);
+                                }}
                                 className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1 py-0.5 rounded border border-blue-200 cursor-pointer"
                                 title="Ver historial anterior"
                               >
@@ -776,11 +1053,14 @@ export const ClientesModule: React.FC<Props> = ({
                           <div className="inline-flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => setSelectedClientForDetail(client)}
-                              className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
-                              title="Ver Ficha y Motos del Cliente"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedClientForDetail(client);
+                              }}
+                              className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                              title="Ver Apartado del Cliente"
                             >
-                              <Eye className="w-3 h-3 text-zinc-600" />
+                              <Eye className="w-3 h-3" />
                               <span>Ficha</span>
                             </button>
                             {client.phone && (
@@ -788,6 +1068,7 @@ export const ClientesModule: React.FC<Props> = ({
                                 href={getCleanWhatsappUrl(client.phone, client.fullName)}
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
                                 className="p-0.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
                                 title="Contactar por WhatsApp"
                               >
@@ -797,7 +1078,10 @@ export const ClientesModule: React.FC<Props> = ({
                             {onNavigateToAlistamiento && (
                               <button
                                 type="button"
-                                onClick={() => onNavigateToAlistamiento(client.cedulaRuc)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigateToAlistamiento(client.cedulaRuc);
+                                }}
                                 className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                                 title="Nuevo Servicio para este cliente"
                               >
@@ -899,249 +1183,6 @@ export const ClientesModule: React.FC<Props> = ({
                 Restablecer Filtros
               </button>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 4. MODAL: FICHA DETALLADA DEL CLIENTE & HISTORIAL                         */}
-      {/* ========================================================================= */}
-      {selectedClientForDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-zinc-200 animate-slide-in">
-            {/* Header Modal */}
-            <div className="p-5 bg-zinc-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white font-black text-sm flex items-center justify-center">
-                  {selectedClientForDetail.fullName.slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-base font-black leading-tight">
-                    {selectedClientForDetail.fullName}
-                  </h3>
-                  <p className="text-xs text-zinc-300">
-                    C.I. / RUC: <span className="font-mono font-bold text-white">{selectedClientForDetail.cedulaRuc}</span> • Sede:{' '}
-                    <span className="font-bold text-blue-400">{selectedClientForDetail.workshopName}</span>
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedClientForDetail(null)}
-                className="text-zinc-400 hover:text-white p-1 rounded-lg cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Contenido Modal Scrollable */}
-            <div className="p-6 overflow-y-auto space-y-6 text-xs text-zinc-700">
-              {/* Bloque 1: Resumen Propietario & Contacto */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-blue-50/60 p-3 rounded-2xl border border-blue-200/70 space-y-1">
-                  <span className="text-[10px] font-black uppercase text-blue-900 block">
-                    Contacto Directo
-                  </span>
-                  <div className="font-mono font-bold text-zinc-800 text-xs">
-                    {selectedClientForDetail.phone || 'Sin celular'}
-                  </div>
-                  {selectedClientForDetail.email && (
-                    <div className="text-[11px] text-zinc-600 truncate">
-                      {selectedClientForDetail.email}
-                    </div>
-                  )}
-                  {selectedClientForDetail.address && (
-                    <div className="text-[10px] text-zinc-500 pt-1 border-t border-blue-200/50">
-                      📍 {selectedClientForDetail.address}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-200/70 space-y-1">
-                  <span className="text-[10px] font-black uppercase text-emerald-900 block">
-                    Cumplimiento Técnico
-                  </span>
-                  <div className="flex items-center gap-1.5 font-bold text-emerald-900 text-xs">
-                    {selectedClientForDetail.pdiCompleted ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Alistamiento PDI Oficial Realizado</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Alistamiento PDI Pendiente</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-emerald-800">
-                    Engrasado: <strong>{selectedClientForDetail.engrasadoCompleted ? 'Completado' : 'Pendiente'}</strong>
-                  </div>
-                  <div className="text-[10px] text-emerald-700">
-                    Total Servicios: <strong>{selectedClientForDetail.records.length} registrados</strong>
-                  </div>
-                </div>
-
-                <div className="bg-purple-50/60 p-3 rounded-2xl border border-purple-200/70 space-y-1">
-                  <span className="text-[10px] font-black uppercase text-purple-900 block">
-                    Facturación & Garantías
-                  </span>
-                  <div className="text-sm font-black font-mono text-purple-950">
-                    ${selectedClientForDetail.totalSpent.toFixed(2)}
-                  </div>
-                  <div className="text-[11px] text-purple-800">
-                    Garantías asociadas: <strong>{selectedClientForDetail.warrantiesCount}</strong>
-                  </div>
-                  <div className="text-[10px] text-purple-700">
-                    Origen: <strong>{selectedClientForDetail.origin || 'Almacén Oficial'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bloque 2: Motocicletas Registradas */}
-              <div>
-                <h4 className="text-xs font-black uppercase text-zinc-900 tracking-wider mb-2 flex items-center gap-1.5">
-                  <Bike className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Parque Vehicular Registrado ({selectedClientForDetail.motorcycles.length})</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {selectedClientForDetail.motorcycles.map((moto, i) => (
-                    <div
-                      key={i}
-                      className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="font-bold text-zinc-900 text-xs">{moto.model}</div>
-                        <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
-                          VIN: {moto.chasis || 'S/N'}
-                          {moto.lastMileage ? ` • ${moto.lastMileage} km` : ''}
-                        </div>
-                      </div>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 bg-white border border-zinc-300 rounded-md">
-                        {moto.plate || 'S/P'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bloque 3: Historial de Servicios & Alistamientos */}
-              <div>
-                <h4 className="text-xs font-black uppercase text-zinc-900 tracking-wider mb-2 flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Historial de Servicios & Alistamientos ({selectedClientForDetail.records.length})</span>
-                </h4>
-
-                {selectedClientForDetail.records.length > 0 ? (
-                  <div className="space-y-2.5">
-                    {selectedClientForDetail.records.map((rec) => (
-                      <div
-                        key={rec.id}
-                        className="bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2 hover:border-zinc-300 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-zinc-900">
-                              {rec.serviciosRealizados?.map((s) => s.toUpperCase()).join(' • ')}
-                            </span>
-                            <span className="text-[10px] text-zinc-400">• {rec.fechaServicio}</span>
-                          </div>
-                          <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            ${(rec.montoPagado || rec.valorServicio).toFixed(2)} ({rec.metodoPago})
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 bg-zinc-50 p-2 rounded-lg">
-                          <div>
-                            <span className="text-zinc-400 block text-[9px] uppercase">Técnico</span>
-                            <strong>{rec.tecnicoResponsable}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-400 block text-[9px] uppercase">Kilometraje</span>
-                            <strong>{rec.kilometraje} km</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-400 block text-[9px] uppercase">Aceite</span>
-                            <strong>{rec.aceite === 'sin_aceite' ? 'Sin Aceite' : rec.nivelAceite || 'Óptimo'}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-400 block text-[9px] uppercase">Factura</span>
-                            <strong className="font-mono">{rec.numeroFactura || 'S/F'}</strong>
-                          </div>
-                        </div>
-
-                        {rec.observaciones && (
-                          <p className="text-[11px] text-zinc-600 italic bg-zinc-50/50 p-2 rounded border border-zinc-100">
-                            "{rec.observaciones}"
-                          </p>
-                        )}
-
-                        {rec.fotos && rec.fotos.length > 0 && (
-                          <div>
-                            <span className="text-[10px] font-bold text-zinc-500 block mb-1 flex items-center gap-1">
-                              <Camera className="w-3 h-3 text-zinc-400" />
-                              <span>Evidencias de Entrega ({rec.fotos.length})</span>
-                            </span>
-                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-                              {rec.fotos.map((url, idx) => (
-                                <a
-                                  key={idx}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="aspect-video rounded overflow-hidden border border-zinc-200 block group relative"
-                                >
-                                  <img
-                                    src={url}
-                                    alt={`Evidencia ${idx + 1}`}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                  />
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-zinc-400 italic">
-                    No registra alistamientos o mantenimientos cargados en este portal aún.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Footer Modal */}
-            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-              <span className="text-xs text-zinc-500">
-                Ficha generada para el sistema integral StarMotos.
-              </span>
-              <div className="flex items-center gap-2">
-                {onNavigateToAlistamiento && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const cId = selectedClientForDetail.cedulaRuc;
-                      setSelectedClientForDetail(null);
-                      onNavigateToAlistamiento(cId);
-                    }}
-                    className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Iniciar Nuevo Alistamiento / Servicio</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSelectedClientForDetail(null)}
-                  className="px-4 py-2 text-xs font-bold bg-white border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl cursor-pointer"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

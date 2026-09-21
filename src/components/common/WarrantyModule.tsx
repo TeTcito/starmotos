@@ -28,6 +28,7 @@ import {
   Sparkles,
   Navigation,
   Check,
+  Search,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
@@ -936,21 +937,43 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     photos: [] as string[],
   });
 
+  const [searchStatus, setSearchStatus] = useState<{ type: 'success' | 'warning'; message: string } | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
 
-  // Selector rápido de cliente si existe
-  const handleSelectClient = (c: TallerClient) => {
-    setFormData((prev) => ({
-      ...prev,
-      clientName: c.fullName || prev.clientName,
-      clientIdNumber: c.idNumber || prev.clientIdNumber,
-      clientPhone: c.phone || prev.clientPhone,
-      motorcycleBrand: c.motorcycleBrand || prev.motorcycleBrand,
-      motorcycleModel: c.motorcycleModel || prev.motorcycleModel,
-      motorcyclePlate: c.motorcyclePlate || prev.motorcyclePlate,
-    }));
+  // Consulta y autocompletado de cliente por Cédula / RUC
+  const handleConsultClient = () => {
+    const term = formData.clientIdNumber.trim().toLowerCase();
+    if (!term) {
+      setSearchStatus({ type: 'warning', message: 'Ingrese una cédula o RUC para consultar' });
+      return;
+    }
+
+    const found = clients.find(
+      (c) =>
+        c.idNumber?.toLowerCase() === term ||
+        c.idNumber?.toLowerCase().includes(term) ||
+        (c.phone && c.phone.includes(term))
+    );
+
+    if (found) {
+      setFormData((prev) => ({
+        ...prev,
+        clientName: found.fullName || prev.clientName,
+        clientIdNumber: found.idNumber || prev.clientIdNumber,
+        clientPhone: found.phone || prev.clientPhone,
+        motorcycleBrand: found.motorcycleBrand || prev.motorcycleBrand,
+        motorcycleModel: found.motorcycleModel || prev.motorcycleModel,
+        motorcyclePlate: (found.motorcyclePlate || prev.motorcyclePlate).toUpperCase(),
+      }));
+      setSearchStatus({ type: 'success', message: `✓ Cliente cargado: ${found.fullName}` });
+    } else {
+      setSearchStatus({
+        type: 'warning',
+        message: 'No encontrado en registro. Puede ingresar los datos manualmente.',
+      });
+    }
   };
 
   // Carga de imágenes desde archivos locales
@@ -1085,62 +1108,17 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         className="hidden"
       />
 
-      {/* Cabecera del Formulario */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-zinc-200">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Volver</span>
-          </button>
-
-          <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
-
-          <div>
-            <h2 className="text-base sm:text-xl font-black text-zinc-900 flex items-center gap-2.5 tracking-tight">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Send className="w-4 h-4" />
-              </div>
-              <span>Emitir Nueva Solicitud de Garantía Oficial</span>
-            </h2>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-              Taller Emisor: <strong className="text-zinc-800">{defaultTallerOrigin}</strong> • Destino: <strong>Matriz Central (En Revisión)</strong>
-            </p>
-          </div>
-        </div>
-
+      {/* Botón Volver arriba a la derecha en la esquina */}
+      <div className="flex justify-end pb-1">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs sm:text-sm font-bold cursor-pointer transition"
+          className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
         >
-          Cancelar
+          <ArrowLeft className="w-4 h-4" />
+          <span>Volver</span>
         </button>
       </div>
-
-      {/* Selector Rápido de Clientes de Taller */}
-      {clients.length > 0 && (
-        <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-2xs">
-          <label className="block text-xs font-bold text-zinc-600 mb-2">
-            Cargar datos de cliente existente en taller:
-          </label>
-          <div className="flex gap-2.5 overflow-x-auto pb-1">
-            {clients.slice(0, 8).map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => handleSelectClient(c)}
-                className="px-3 py-1.5 bg-zinc-50 hover:bg-blue-50 border border-zinc-200 hover:border-blue-300 rounded-xl text-xs font-bold text-zinc-800 whitespace-nowrap cursor-pointer transition active:scale-98"
-              >
-                + {c.fullName} ({c.idNumber})
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Formulario 3 Columnas Simétricas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
@@ -1154,18 +1132,49 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               <span>1. Datos del Cliente & Póliza</span>
             </div>
 
+            {/* Cédula o RUC con botón Consultar */}
             <div>
-              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                Cédula o RUC <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.clientIdNumber}
-                onChange={(e) => setFormData({ ...formData, clientIdNumber: e.target.value })}
-                placeholder="Ej: 1204567890"
-                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs sm:text-sm font-bold text-zinc-700">
+                  Cédula o RUC <span className="text-red-500">*</span>
+                </label>
+                {searchStatus && (
+                  <span
+                    className={`text-[11px] font-bold ${
+                      searchStatus.type === 'success' ? 'text-emerald-600' : 'text-amber-600'
+                    }`}
+                  >
+                    {searchStatus.message}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  required
+                  value={formData.clientIdNumber}
+                  onChange={(e) => {
+                    setFormData({ ...formData, clientIdNumber: e.target.value });
+                    if (searchStatus) setSearchStatus(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConsultClient();
+                    }
+                  }}
+                  placeholder="Ej: 1204567890"
+                  className="flex-1 h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleConsultClient}
+                  className="h-11 sm:h-12 px-4 sm:px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-98 shrink-0"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Consultar</span>
+                </button>
+              </div>
             </div>
 
             <div>
@@ -1344,7 +1353,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         </div>
       </div>
 
-      {/* Evidencias e Imágenes de la Garantía */}
+      {/* Evidencias e Imágenes de la Garantía (1/3 o 1/4 controles a la izq, 2/3 galería fotos a la der) */}
       <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
           <div className="flex items-center gap-2.5">
@@ -1361,126 +1370,146 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
-              {formData.photos.length} imagen{formData.photos.length === 1 ? '' : 'es'}
-            </span>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-xs active:scale-98"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Subir Fotos desde Computador</span>
-            </button>
-          </div>
+          <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
+            {formData.photos.length} imagen{formData.photos.length === 1 ? '' : 'es'} adjunta{formData.photos.length === 1 ? '' : 's'}
+          </span>
         </div>
 
-        {/* Zona Drag & Drop / Seleccionar */}
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-          }}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
-            isDragging
-              ? 'border-blue-600 bg-blue-50/80 scale-[1.01]'
-              : 'border-zinc-300 hover:border-blue-400 bg-zinc-50/50 hover:bg-blue-50/20'
-          }`}
-        >
-          <div className="w-12 h-12 mx-auto rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
-            <UploadCloud className="w-6 h-6" />
-          </div>
-          <p className="text-sm font-bold text-zinc-800">
-            Arrastra y suelta imágenes aquí, o <span className="text-blue-600 underline">haz clic para examinar</span>
-          </p>
-          <p className="text-xs text-zinc-500 mt-1">
-            Formatos soportados: JPG, PNG, WEBP. Puedes seleccionar varias imágenes a la vez o pegar con <kbd className="px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded font-mono text-[11px]">Ctrl+V</kbd>
-          </p>
-        </div>
-
-        {/* Input para agregar imagen por URL directa */}
-        <div className="flex items-center gap-2 pt-1">
-          <div className="relative flex-1">
-            <LinkIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="url"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddImageUrl();
-                }
+        {/* Estructura dividida: 1/3 panel de carga a la izquierda, 2/3 fotos a la derecha */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Panel Izquierdo: Cuadro de Subida (4 cols de 12 ~ 33%) */}
+          <div className="lg:col-span-4 space-y-3">
+            {/* Zona Drag & Drop / Seleccionar */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
               }}
-              placeholder="O pega una URL de imagen directa (https://...)"
-              className="w-full h-11 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs sm:text-sm text-zinc-900 outline-none focus:border-blue-500 focus:bg-white"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleAddImageUrl}
-            className="px-4 h-11 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-800 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition shrink-0"
-          >
-            + Agregar URL
-          </button>
-        </div>
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+              }}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
+                isDragging
+                  ? 'border-blue-600 bg-blue-50/80 scale-[1.01]'
+                  : 'border-zinc-300 hover:border-blue-400 bg-zinc-50/50 hover:bg-blue-50/20'
+              }`}
+            >
+              <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5">
+                <UploadCloud className="w-5 h-5" />
+              </div>
+              <p className="text-xs sm:text-sm font-bold text-zinc-800">
+                Arrastra imágenes aquí o <span className="text-blue-600 underline">haz clic</span>
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-1">
+                JPG, PNG, WEBP o pega con <kbd className="px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded font-mono text-[10px]">Ctrl+V</kbd>
+              </p>
 
-        {/* Galería de Fotos */}
-        {formData.photos.length > 0 && (
-          <div className="pt-2">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {formData.photos.map((p, idx) => (
-                <div
-                  key={idx}
-                  className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 shadow-2xs"
-                >
-                  <img
-                    src={p}
-                    alt={`Evidencia ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewZoomImage(p);
-                      }}
-                      className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                      title="Ampliar foto"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFormData((prev) => ({
-                          ...prev,
-                          photos: prev.photos.filter((_, i) => i !== idx),
-                        }));
-                      }}
-                      className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none">
-                    #{idx + 1}
-                  </span>
-                </div>
-              ))}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-98"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Subir desde Computador</span>
+              </button>
+            </div>
+
+            {/* Input para agregar imagen por URL directa */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <LinkIcon className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddImageUrl();
+                    }
+                  }}
+                  placeholder="Pegar URL de imagen directa..."
+                  className="w-full h-10 pl-8 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddImageUrl}
+                className="px-3 h-10 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition shrink-0"
+              >
+                + URL
+              </button>
             </div>
           </div>
-        )}
+
+          {/* Panel Derecho: Galería de Imágenes de Evidencia (8 cols de 12 ~ 67%) */}
+          <div className="lg:col-span-8 bg-zinc-50/60 rounded-2xl border border-zinc-200/80 p-4 min-h-[220px]">
+            {formData.photos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[200px] text-center p-4">
+                <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mb-2">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-zinc-700">
+                  No hay imágenes adjuntadas
+                </p>
+                <p className="text-xs text-zinc-400 max-w-sm mt-1">
+                  Las fotos que suba el jefe de taller como evidencia del reclamo se mostrarán aquí.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {formData.photos.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-white shadow-2xs"
+                  >
+                    <img
+                      src={p}
+                      alt={`Evidencia ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewZoomImage(p);
+                        }}
+                        className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                        title="Ampliar foto"
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFormData((prev) => ({
+                            ...prev,
+                            photos: prev.photos.filter((_, i) => i !== idx),
+                          }));
+                        }}
+                        className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                        title="Eliminar foto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none">
+                      #{idx + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Lightbox Zoom Modal */}
@@ -1524,7 +1553,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
           className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition flex items-center gap-2.5 shadow-md hover:shadow-lg cursor-pointer active:scale-98"
         >
           <Send className="w-4 h-4" />
-          <span>Emitir Solicitud de Garantía a Matriz (En Revisión)</span>
+          <span>Emitir Solicitud</span>
         </button>
       </div>
     </form>

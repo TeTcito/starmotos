@@ -12,6 +12,7 @@ import {
   MapPin,
   ChevronRight,
   Wrench,
+  Users,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -24,9 +25,11 @@ import {
   AlistamientoService,
   Technician,
   AlistamientoFullRecord,
+  TallerClient,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
@@ -48,6 +51,7 @@ interface Props {
   technicians: Technician[];
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
+  clients: TallerClient[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
@@ -78,6 +82,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   technicians,
   origins,
   fullAlistamientos,
+  clients,
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
@@ -96,6 +101,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'talleres', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
+    { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
     { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" /> },
     { id: 'facturacion', label: 'Facturación', icon: <Receipt className="w-4 h-4" /> },
@@ -105,6 +111,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control de Talleres',
     alistamiento: 'Alistamiento & PDI',
+    clientes_admin: 'Clientes & Flota',
     tecnicos: 'Equipo Técnico',
     garantias_admin: 'Garantías & Pólizas',
     facturacion: 'Facturación SRI',
@@ -209,6 +216,18 @@ export const AdminViewMobile: React.FC<Props> = ({
             onAddOrigin={onAddOrigin}
             onSaveRecord={onSaveFullAlistamiento}
             recentRecords={fullAlistamientos}
+          />
+        )}
+        {activeSection === 'clientes_admin' && (
+          <ClientesModule
+            role="admin"
+            workshops={workshops}
+            fullAlistamientos={fullAlistamientos}
+            clients={clients}
+            warranties={warranties}
+            onNavigateToAlistamiento={() => {
+              setActiveSection('alistamiento');
+            }}
           />
         )}
         {activeSection === 'tecnicos' && (

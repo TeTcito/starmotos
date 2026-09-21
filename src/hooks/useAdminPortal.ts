@@ -34,6 +34,7 @@ import { Technician, AlistamientoFullRecord, TallerClient } from '../types/custo
 export const ADMIN_SECTIONS: AdminSection[] = [
   'talleres',
   'alistamiento',
+  'clientes_admin',
   'garantias_admin',
   'tecnicos',
   'facturacion',

@@ -12,16 +12,21 @@ import {
   CheckCircle2,
   XCircle,
   X,
+  Users,
 } from 'lucide-react';
 import {
   GaranteSection,
   WarrantyRequest,
   GaranteProfile,
+  AlistamientoFullRecord,
+  TallerClient,
+  Workshop,
 } from '../../../types/customer';
 import { SolicitudesGaranteDesktop } from './SolicitudesGaranteDesktop';
 import { HistorialGarantiasDesktop } from './HistorialGarantiasDesktop';
 import { ReportesGaranteDesktop } from './ReportesGaranteDesktop';
 import { PerfilGaranteDesktop } from './PerfilGaranteDesktop';
+import { ClientesModule } from '../../common/ClientesModule';
 
 interface Props {
   activeSection: GaranteSection;
@@ -30,6 +35,9 @@ interface Props {
   warranties: WarrantyRequest[];
   pendingRequests: WarrantyRequest[];
   historyRequests: WarrantyRequest[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  clients: TallerClient[];
+  workshops: Workshop[];
   profile: GaranteProfile;
   selectedWarranty: WarrantyRequest | null;
   reviewNotes: string;
@@ -51,6 +59,9 @@ export const GaranteViewDesktop: React.FC<Props> = ({
   warranties,
   pendingRequests,
   historyRequests,
+  fullAlistamientos,
+  clients,
+  workshops,
   profile,
   selectedWarranty,
   reviewNotes,
@@ -72,6 +83,11 @@ export const GaranteViewDesktop: React.FC<Props> = ({
       badge: `${pendingRequests.length || ''}`,
     },
     {
+      id: 'clientes_garante',
+      label: 'Clientes & Flota',
+      icon: <Users className="w-4 h-4" />,
+    },
+    {
       id: 'historial_garantias',
       label: 'Historial Dictámenes',
       icon: <History className="w-4 h-4" />,
@@ -90,6 +106,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
 
   const sectionTitles: Record<GaranteSection, string> = {
     solicitudes_garante: 'Solicitudes de Garantía Pendientes de Dictamen',
+    clientes_garante: 'Clientes y Unidades con Cobertura de Garantía',
     historial_garantias: 'Historial Consolidado de Garantías Emitidas',
     reportes_garante: 'Indicadores Técnicos & Tasa de Reclamos',
     perfil_garante: 'Información Institucional del Garante Oficial',
@@ -214,6 +231,15 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               <SolicitudesGaranteDesktop
                 pendingRequests={pendingRequests}
                 onOpenDecisionModal={onOpenDecisionModal}
+              />
+            )}
+            {activeSection === 'clientes_garante' && (
+              <ClientesModule
+                role="garante"
+                workshops={workshops}
+                fullAlistamientos={fullAlistamientos}
+                clients={clients}
+                warranties={warranties}
               />
             )}
             {activeSection === 'historial_garantias' && (

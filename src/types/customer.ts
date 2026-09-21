@@ -264,6 +264,7 @@ export type UserRole = 'cliente' | 'admin' | 'taller' | 'garante';
 export type AdminSection =
   | 'talleres'
   | 'alistamiento'
+  | 'clientes_admin'
   | 'garantias_admin'
   | 'tecnicos'
   | 'facturacion'
@@ -280,6 +281,7 @@ export type TallerSection =
 export type GaranteSection =
   | 'solicitudes_garante'
   | 'historial_garantias'
+  | 'clientes_garante'
   | 'reportes_garante'
   | 'perfil_garante';
 
@@ -487,6 +489,8 @@ export interface TallerClient {
   motorcyclePlate: string;
   lastVisit: string;
   totalVisits: number;
+  workshopId?: string;
+  workshopName?: string;
 }
 
 // --- Orden de Taller ---
@@ -517,3 +521,35 @@ export interface GaranteProfile {
   contractStartDate: string;
   contractEndDate: string;
 }
+
+// --- Cliente Unificado para Módulo de Clientes Multirrol ---
+export interface UnifiedClient {
+  id: string; // cedulaRuc
+  fullName: string;
+  nombres: string;
+  apellidos: string;
+  cedulaRuc: string;
+  phone: string;
+  phone2?: string;
+  email?: string;
+  address?: string;
+  origin?: string;
+  workshopId?: string;
+  workshopName?: string;
+  motorcycles: Array<{
+    model: string;
+    brand?: string;
+    plate: string;
+    chasis: string;
+    lastMileage?: number;
+  }>;
+  pdiCompleted: boolean;
+  engrasadoCompleted: boolean;
+  maintenanceCount: number;
+  totalSpent: number;
+  lastVisitDate: string;
+  lastServiceType: string;
+  warrantiesCount: number;
+  records: AlistamientoFullRecord[];
+}
+

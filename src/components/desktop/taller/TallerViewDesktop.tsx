@@ -28,6 +28,7 @@ import { SolicitudesGarantiaTallerDesktop } from './SolicitudesGarantiaTallerDes
 import { ClientesTallerDesktop } from './ClientesTallerDesktop';
 import { InventarioDesktop } from './InventarioDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosDesktop } from '../common/TecnicosDesktop';
 
 interface Props {
@@ -303,7 +304,20 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 onCreateRequest={onCreateWarrantyRequest}
               />
             )}
-            {activeSection === 'clientes_taller' && <ClientesTallerDesktop clients={clients} />}
+            {activeSection === 'clientes_taller' && (
+              <ClientesModule
+                role="taller"
+                currentWorkshopId={currentWs.id}
+                workshops={workshops}
+                fullAlistamientos={fullAlistamientos}
+                clients={clients}
+                warranties={warranties}
+                onNavigateToAlistamiento={() => {
+                  setActiveSection('alistamiento_taller');
+                  setAlistamientoViewMode('form');
+                }}
+              />
+            )}
             {activeSection === 'tecnicos' && (
               <TecnicosDesktop
                 technicians={technicians}

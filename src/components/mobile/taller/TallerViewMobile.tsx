@@ -26,6 +26,7 @@ import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobi
 import { ClientesTallerMobile } from './ClientesTallerMobile';
 import { InventarioMobile } from './InventarioMobile';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 
 interface Props {
@@ -231,7 +232,19 @@ export const TallerViewMobile: React.FC<Props> = ({
             onCreateRequest={onCreateWarrantyRequest}
           />
         )}
-        {activeSection === 'clientes_taller' && <ClientesTallerMobile clients={clients} />}
+        {activeSection === 'clientes_taller' && (
+          <ClientesModule
+            role="taller"
+            currentWorkshopId={currentWs.id}
+            workshops={workshops}
+            fullAlistamientos={fullAlistamientos}
+            clients={clients}
+            warranties={warranties}
+            onNavigateToAlistamiento={() => {
+              setActiveSection('alistamiento_taller');
+            }}
+          />
+        )}
         {activeSection === 'tecnicos' && (
           <TecnicosMobile
             technicians={technicians}

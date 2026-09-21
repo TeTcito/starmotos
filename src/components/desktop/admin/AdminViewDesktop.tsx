@@ -12,6 +12,7 @@ import {
   Sparkles,
   Wrench,
   ArrowLeft,
+  Users,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -24,9 +25,11 @@ import {
   AlistamientoService,
   Technician,
   AlistamientoFullRecord,
+  TallerClient,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
+import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
@@ -48,6 +51,7 @@ interface Props {
   technicians: Technician[];
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
+  clients: TallerClient[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
@@ -78,6 +82,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   technicians,
   origins,
   fullAlistamientos,
+  clients,
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
@@ -104,6 +109,11 @@ export const AdminViewDesktop: React.FC<Props> = ({
       label: 'Alistamiento & PDI',
       icon: <UserCheck className="w-4 h-4" />,
       badge: 'Nuevo',
+    },
+    {
+      id: 'clientes_admin',
+      label: 'Clientes & Flota',
+      icon: <Users className="w-4 h-4" />,
     },
     {
       id: 'tecnicos',
@@ -133,6 +143,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control Operativo de Talleres & Sucursales',
     alistamiento: 'Alistamiento de Clientes y Motocicletas',
+    clientes_admin: 'Fichero Nacional de Clientes & Flota StarMotos',
     tecnicos: 'Gestión y Despacho del Equipo Técnico',
     garantias_admin: 'Gestión y Auditoría de Garantías',
     facturacion: 'Facturación Electrónica SRI',
@@ -299,6 +310,19 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 recentRecords={fullAlistamientos}
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
+              />
+            )}
+            {activeSection === 'clientes_admin' && (
+              <ClientesModule
+                role="admin"
+                workshops={workshops}
+                fullAlistamientos={fullAlistamientos}
+                clients={clients}
+                warranties={warranties}
+                onNavigateToAlistamiento={() => {
+                  setActiveSection('alistamiento');
+                  setAlistamientoViewMode('form');
+                }}
               />
             )}
             {activeSection === 'tecnicos' && (

@@ -10,16 +10,21 @@ import {
   LogOut,
   CheckCircle2,
   XCircle,
+  Users,
 } from 'lucide-react';
 import {
   GaranteSection,
   WarrantyRequest,
   GaranteProfile,
+  AlistamientoFullRecord,
+  TallerClient,
+  Workshop,
 } from '../../../types/customer';
 import { SolicitudesGaranteMobile } from './SolicitudesGaranteMobile';
 import { HistorialGarantiasMobile } from './HistorialGarantiasMobile';
 import { ReportesGaranteMobile } from './ReportesGaranteMobile';
 import { PerfilGaranteMobile } from './PerfilGaranteMobile';
+import { ClientesModule } from '../../common/ClientesModule';
 
 interface Props {
   activeSection: GaranteSection;
@@ -28,6 +33,9 @@ interface Props {
   warranties: WarrantyRequest[];
   pendingRequests: WarrantyRequest[];
   historyRequests: WarrantyRequest[];
+  fullAlistamientos: AlistamientoFullRecord[];
+  clients: TallerClient[];
+  workshops: Workshop[];
   profile: GaranteProfile;
   selectedWarranty: WarrantyRequest | null;
   reviewNotes: string;
@@ -49,6 +57,9 @@ export const GaranteViewMobile: React.FC<Props> = ({
   warranties,
   pendingRequests,
   historyRequests,
+  fullAlistamientos,
+  clients,
+  workshops,
   profile,
   selectedWarranty,
   reviewNotes,
@@ -66,6 +77,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
 
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'solicitudes_garante', label: 'Bandeja', icon: <Inbox className="w-4 h-4" />, badge: `${pendingRequests.length || ''}` },
+    { id: 'clientes_garante', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'historial_garantias', label: 'Historial', icon: <History className="w-4 h-4" /> },
     { id: 'reportes_garante', label: 'Reportes', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'perfil_garante', label: 'Ficha Marca', icon: <Building2 className="w-4 h-4" /> },
@@ -73,6 +85,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
 
   const sectionTitles: Record<GaranteSection, string> = {
     solicitudes_garante: 'Bandeja de Entrada',
+    clientes_garante: 'Clientes & Flota',
     historial_garantias: 'Historial Dictámenes',
     reportes_garante: 'Reportes Técnicos',
     perfil_garante: 'Ficha de Marca',
@@ -159,6 +172,15 @@ export const GaranteViewMobile: React.FC<Props> = ({
           <SolicitudesGaranteMobile
             pendingRequests={pendingRequests}
             onOpenDecisionModal={onOpenDecisionModal}
+          />
+        )}
+        {activeSection === 'clientes_garante' && (
+          <ClientesModule
+            role="garante"
+            workshops={workshops}
+            fullAlistamientos={fullAlistamientos}
+            clients={clients}
+            warranties={warranties}
           />
         )}
         {activeSection === 'historial_garantias' && (

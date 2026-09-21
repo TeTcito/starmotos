@@ -20,6 +20,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
     warranties,
     pendingRequests,
     historyRequests,
+    fullAlistamientos,
+    clients,
+    workshops,
     profile,
     selectedWarranty,
     reviewNotes,
@@ -45,6 +48,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           warranties={warranties}
           pendingRequests={pendingRequests}
           historyRequests={historyRequests}
+          fullAlistamientos={fullAlistamientos}
+          clients={clients}
+          workshops={workshops}
           profile={profile}
           selectedWarranty={selectedWarranty}
           reviewNotes={reviewNotes}
@@ -66,6 +72,9 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           warranties={warranties}
           pendingRequests={pendingRequests}
           historyRequests={historyRequests}
+          fullAlistamientos={fullAlistamientos}
+          clients={clients}
+          workshops={workshops}
           profile={profile}
           selectedWarranty={selectedWarranty}
           reviewNotes={reviewNotes}

@@ -24,6 +24,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     technicians,
     origins,
     fullAlistamientos,
+    clients,
     toastMessage,
     validateWarrantyByMatriz,
     sendWarrantyToGarante,
@@ -63,6 +64,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           technicians={technicians}
           origins={origins}
           fullAlistamientos={fullAlistamientos}
+          clients={clients}
           onAddTechnician={addTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}
@@ -93,6 +95,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           technicians={technicians}
           origins={origins}
           fullAlistamientos={fullAlistamientos}
+          clients={clients}
           onAddTechnician={addTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}

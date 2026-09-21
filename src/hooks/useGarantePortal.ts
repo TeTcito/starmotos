@@ -13,11 +13,16 @@ import {
   INITIAL_GARANTE_PROFILE,
   saveStoredAlerts,
   getStoredAlerts,
+  getStoredFullAlistamientos,
+  getStoredClients,
+  getStoredWorkshops,
 } from '../data/mockMultiRoleData';
+import { AlistamientoFullRecord, TallerClient, Workshop } from '../types/customer';
 
 export const GARANTE_SECTIONS: GaranteSection[] = [
   'solicitudes_garante',
   'historial_garantias',
+  'clientes_garante',
   'reportes_garante',
   'perfil_garante',
 ];
@@ -38,6 +43,9 @@ export function useGarantePortal() {
   activeSectionRef.current = activeSection;
 
   const [warranties, setWarranties] = useState<WarrantyRequest[]>(getStoredWarranties);
+  const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
+  const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
+  const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
   const [profile, setProfile] = useState<GaranteProfile>(INITIAL_GARANTE_PROFILE);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -51,8 +59,21 @@ export function useGarantePortal() {
   // Sincronización en vivo
   useEffect(() => {
     const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
+    const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
+    const handleClientsUpdate = () => setClients(getStoredClients());
+    const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
+
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
-    return () => window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
+    window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+    window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
+    window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+
+    return () => {
+      window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
+      window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+      window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
+      window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+    };
   }, []);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -194,6 +215,9 @@ export function useGarantePortal() {
     warranties,
     pendingRequests,
     historyRequests,
+    fullAlistamientos,
+    clients,
+    workshops,
     profile,
     setProfile,
     toastMessage,

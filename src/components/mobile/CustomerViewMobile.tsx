@@ -11,6 +11,7 @@ import { ActiveOrderMobile } from './ActiveOrderMobile';
 import { HistoryMobile } from './HistoryMobile';
 import { WarrantiesMobile } from './WarrantiesMobile';
 import { FileCheck } from 'lucide-react';
+import { ModalPortal } from '../common/ModalPortal';
 import {
   ClientProfile,
   MotorcycleClientData,
@@ -154,63 +155,64 @@ export const CustomerViewMobile: React.FC<Props> = ({
       </main>
 
       {/* Modal Aprobación Presupuesto Móvil */}
-      {isApprovalModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-bold text-zinc-900">Autorizar Presupuesto</h3>
-              </div>
-              <button
-                onClick={() => setIsApprovalModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700 text-base font-bold cursor-pointer"
-              >
-                ✕
-              </button>
+      <ModalPortal
+        isOpen={isApprovalModalOpen}
+        onClose={() => setIsApprovalModalOpen(false)}
+        maxWidth="max-w-sm"
+      >
+        <div className="p-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold text-zinc-900">Autorizar Presupuesto</h3>
+          </div>
+          <button
+            onClick={() => setIsApprovalModalOpen(false)}
+            className="text-zinc-400 hover:text-zinc-700 text-base font-bold cursor-pointer p-1"
+            title="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3 text-xs">
+          <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1.5">
+            <div className="flex justify-between text-zinc-600">
+              <span>Repuestos:</span>
+              <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
             </div>
-
-            <div className="p-4 space-y-3 text-xs">
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 space-y-1.5">
-                <div className="flex justify-between text-zinc-600">
-                  <span>Repuestos:</span>
-                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalParts.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-zinc-600">
-                  <span>Mano de Obra:</span>
-                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-zinc-600">
-                  <span>IVA 15%:</span>
-                  <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
-                </div>
-                <div className="pt-1.5 border-t border-zinc-200 flex justify-between font-bold text-zinc-900">
-                  <span>Total:</span>
-                  <span className="font-mono text-blue-600 font-bold">${activeOrder.quotation.total.toFixed(2)} USD</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsApprovalModalOpen(false)}
-                  className="flex-1 py-2 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={approveQuotation}
-                  disabled={isApproving}
-                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow transition"
-                >
-                  {isApproving ? 'Procesando...' : 'Aprobar'}
-                </button>
-              </div>
+            <div className="flex justify-between text-zinc-600">
+              <span>Mano de Obra:</span>
+              <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.subtotalServices.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-zinc-600">
+              <span>IVA 15%:</span>
+              <span className="font-mono text-zinc-900 font-medium">${activeOrder.quotation.taxAmount.toFixed(2)}</span>
+            </div>
+            <div className="pt-1.5 border-t border-zinc-200 flex justify-between font-bold text-zinc-900">
+              <span>Total:</span>
+              <span className="font-mono text-blue-600 font-bold">${activeOrder.quotation.total.toFixed(2)} USD</span>
             </div>
           </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsApprovalModalOpen(false)}
+              className="flex-1 py-2 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={approveQuotation}
+              disabled={isApproving}
+              className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer shadow transition"
+            >
+              {isApproving ? 'Procesando...' : 'Aprobar'}
+            </button>
+          </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   );
 };

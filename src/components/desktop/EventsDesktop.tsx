@@ -18,6 +18,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { MaintenanceRecord, MotorcycleClientData, ClientProfile } from '../../types/customer';
+import { ModalPortal } from '../common/ModalPortal';
 
 interface Props {
   history: MaintenanceRecord[];
@@ -358,11 +359,15 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
       </div>
 
       {/* 4. MODAL VISOR DE FACTURA ELECTRÓNICA SRI ECUADOR */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-zinc-300 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-scale-up">
+      <ModalPortal
+        isOpen={Boolean(selectedInvoice)}
+        onClose={() => setSelectedInvoice(null)}
+        maxWidth="max-w-2xl"
+      >
+        {selectedInvoice && (
+          <>
             {/* Cabecera del Comprobante */}
-            <div className="p-5 bg-gradient-to-r from-blue-700 to-blue-800 text-white flex items-center justify-between">
+            <div className="p-5 bg-gradient-to-r from-blue-700 to-blue-800 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
                   <img src="/starmotos-logo.jpg" alt="StarMotos" className="w-full h-full object-cover rounded-lg" />
@@ -380,6 +385,7 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
               <button
                 onClick={() => setSelectedInvoice(null)}
                 className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center font-bold text-sm cursor-pointer transition"
+                title="Cerrar ventana"
               >
                 ✕
               </button>
@@ -467,7 +473,7 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
             </div>
 
             {/* Footer Modal */}
-            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between shrink-0">
               <span className="text-[11px] text-zinc-500">Documento electrónico generado por StarMotos SRI Core v2.4</span>
               <button
                 onClick={() => setSelectedInvoice(null)}
@@ -476,9 +482,9 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
                 Cerrar Detalle
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </ModalPortal>
     </div>
   );
 };

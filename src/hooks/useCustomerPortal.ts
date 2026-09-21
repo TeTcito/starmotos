@@ -1,5 +1,5 @@
 // src/hooks/useCustomerPortal.ts
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   WorkOrder,
@@ -263,17 +263,146 @@ const INITIAL_WARRANTIES: WarrantyItem[] = [
   },
 ];
 
+// Lista de secciones válidas en el portal
+export const VALID_SECTIONS: ActiveSection[] = [
+  'eventos',
+  'agendar_cita',
+  'perfil',
+  'mi_moto',
+  'mantenimientos',
+  'orden_activa',
+  'historial',
+  'garantias',
+];
+
+// Obtener sección desde el hash de la URL
+const getSectionFromHash = (): ActiveSection => {
+  if (typeof window === 'undefined') return 'eventos';
+  const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (VALID_SECTIONS.includes(cleanHash as ActiveSection)) {
+    return cleanHash as ActiveSection;
+  }
+  return 'eventos';
+};
+
+// Detección de entorno móvil / PWA
+const isMobileViewport = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.innerWidth < 1024 ||
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    window.matchMedia('(display-mode: standalone)').matches
+  );
+};
+
 export function useCustomerPortal() {
   // Estado de Autenticación
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('starmotos_auth') === 'true';
   });
 
-  // Sección activa en el menú lateral: Por defecto 'eventos' al ingresar
-  const [activeSection, setActiveSection] = useState<ActiveSection>('eventos');
+  // Sección activa en el menú lateral: lee del hash URL al iniciar o recargar (F5)
+  const [activeSection, setActiveSectionState] = useState<ActiveSection>(getSectionFromHash);
 
   // Drawer / menú hamburguesa
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Referencias para popstate y doble salir
+  const activeSectionRef = useRef<ActiveSection>(activeSection);
+  activeSectionRef.current = activeSection;
+
+  const isSidebarOpenRef = useRef<boolean>(isSidebarOpen);
+  isSidebarOpenRef.current = isSidebarOpen;
+
+  const isApprovalModalOpenRef = useRef<boolean>(false);
+
+  const lastBackPressRef = useRef<number>(0);
+
+  // Notificación Toast (declarada temprano para ser usada por popstate)
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  const showToast = useCallback((text: string, type: 'success' | 'info' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  }, []);
+
+  // Función para cambiar de módulo actualizando la URL y el historial del navegador
+  const setActiveSection = useCallback((newSection: ActiveSection, replace = false) => {
+    if (!VALID_SECTIONS.includes(newSection)) return;
+
+    setActiveSectionState((current) => {
+      if (current === newSection) return current;
+      const targetHash = `#${newSection}`;
+      if (replace) {
+        window.history.replaceState({ section: newSection }, '', targetHash);
+      } else {
+        window.history.pushState({ section: newSection }, '', targetHash);
+      }
+      return newSection;
+    });
+  }, []);
+
+  // Manejo del historial del navegador (Atrás / Adelante) y Doble Salir en móvil
+  useEffect(() => {
+    const initialSection = getSectionFromHash();
+    const isMobile = isMobileViewport();
+
+    // Sincronizar hash inicial si está vacío
+    if (!window.location.hash || !VALID_SECTIONS.includes(window.location.hash.replace(/^#\/?/, '') as ActiveSection)) {
+      window.history.replaceState({ section: initialSection }, '', `#${initialSection}`);
+    }
+
+    // En móvil, si arranca en 'eventos', agregar guard para interceptar el botón atrás
+    if (isMobile && initialSection === 'eventos') {
+      window.history.pushState({ section: 'eventos', isGuard: true }, '', '#eventos');
+    }
+
+    const handlePopState = () => {
+      const isMobile = isMobileViewport();
+
+      // 1. Si el drawer móvil está abierto, cerrarlo primero sin salir ni cambiar sección
+      if (isSidebarOpenRef.current) {
+        setIsSidebarOpen(false);
+        window.history.pushState({ section: activeSectionRef.current }, '', `#${activeSectionRef.current}`);
+        return;
+      }
+
+      // 2. Si el modal de aprobación de presupuesto está abierto, cerrarlo primero
+      if (isApprovalModalOpenRef.current) {
+        setIsApprovalModalOpen(false);
+        window.history.pushState({ section: activeSectionRef.current }, '', `#${activeSectionRef.current}`);
+        return;
+      }
+
+      const targetFromHash = getSectionFromHash();
+
+      // 3. En móvil: si ya estamos en la raíz ('eventos') y el usuario presiona Atrás
+      if (isMobile && activeSectionRef.current === 'eventos' && targetFromHash === 'eventos') {
+        const now = Date.now();
+        if (now - lastBackPressRef.current < 2000) {
+          // Doble toque dentro de 2 segundos: permitir salida
+          showToast('Saliendo de la aplicación...', 'info');
+          window.history.go(-2);
+        } else {
+          // Primer toque: advertir al usuario y re-armar el guard
+          lastBackPressRef.current = now;
+          showToast('Presione atrás nuevamente para salir', 'info');
+          window.history.pushState({ section: 'eventos', isGuard: true }, '', '#eventos');
+        }
+        return;
+      }
+
+      // 4. Navegación normal entre secciones del historial
+      setActiveSectionState(targetFromHash);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [showToast]);
 
   // Datos del Cliente y Ficha de la Moto
   const [profile, setProfile] = useState<ClientProfile>(INITIAL_PROFILE);
@@ -287,31 +416,24 @@ export function useCustomerPortal() {
 
   // Modales
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  isApprovalModalOpenRef.current = isApprovalModalOpen;
   const [isApproving, setIsApproving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
-  // Notificación Toast
-  const showToast = useCallback((text: string, type: 'success' | 'info' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
-  }, []);
-
-  // Login: Al ingresar al sistema, lo primero que muestra es el módulo de eventos
+  // Login: Al ingresar, respeta la sección del hash si es válida, o va a eventos
   const login = useCallback(() => {
     setIsAuthenticated(true);
     localStorage.setItem('starmotos_auth', 'true');
-    setActiveSection('eventos');
+    const target = getSectionFromHash();
+    setActiveSection(target, true);
     showToast(`¡Bienvenido al Portal, ${profile.fullName.split(' ')[0]}!`, 'success');
-  }, [profile.fullName, showToast]);
+  }, [profile.fullName, showToast, setActiveSection]);
 
   // Logout
   const logout = useCallback(() => {
     setIsAuthenticated(false);
     localStorage.removeItem('starmotos_auth');
-    setActiveSection('eventos');
-  }, []);
+    setActiveSection('eventos', true);
+  }, [setActiveSection]);
 
   // Actualizar perfil
   const updateProfile = useCallback((updated: ClientProfile) => {

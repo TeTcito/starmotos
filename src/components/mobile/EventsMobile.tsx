@@ -13,6 +13,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { MaintenanceRecord, MotorcycleClientData, ClientProfile } from '../../types/customer';
+import { ModalPortal } from '../common/ModalPortal';
 
 interface Props {
   history: MaintenanceRecord[];
@@ -196,17 +197,22 @@ export const EventsMobile: React.FC<Props> = ({ history, motorcycle, profile }) 
       )}
 
       {/* Modal Factura Móvil */}
-      {selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-zinc-300 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
-            <div className="p-3.5 bg-blue-700 text-white flex items-center justify-between">
+      <ModalPortal
+        isOpen={Boolean(selectedInvoice)}
+        onClose={() => setSelectedInvoice(null)}
+        maxWidth="max-w-sm"
+      >
+        {selectedInvoice && (
+          <>
+            <div className="p-3.5 bg-blue-700 text-white flex items-center justify-between shrink-0">
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider">Factura Electrónica SRI</h4>
                 <p className="text-[10px] text-blue-200 font-mono">{selectedInvoice.invoiceNumber}</p>
               </div>
               <button
                 onClick={() => setSelectedInvoice(null)}
-                className="text-white hover:text-zinc-200 font-bold text-sm cursor-pointer"
+                className="text-white hover:text-zinc-200 font-bold text-sm cursor-pointer p-1"
+                title="Cerrar ventana"
               >
                 ✕
               </button>
@@ -243,14 +249,14 @@ export const EventsMobile: React.FC<Props> = ({ history, motorcycle, profile }) 
 
               <button
                 onClick={() => setSelectedInvoice(null)}
-                className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer transition shadow-sm"
               >
                 Cerrar
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </ModalPortal>
     </div>
   );
 };

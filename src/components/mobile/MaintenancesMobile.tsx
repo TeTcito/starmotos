@@ -5,6 +5,7 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { ScheduledMaintenance, MotorcycleClientData, Branch } from '../../types/customer';
+import { ModalPortal } from '../common/ModalPortal';
 
 interface Props {
   scheduledMaintenances: ScheduledMaintenance[];
@@ -144,127 +145,128 @@ export const MaintenancesMobile: React.FC<Props> = ({
       </div>
 
       {/* Modal Agendar Cita */}
-      {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up">
-            <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-red-600" />
-                <h3 className="text-xs font-bold text-zinc-900">Agendar Cita</h3>
-              </div>
-              <button
-                onClick={() => setIsScheduleModalOpen(false)}
-                className="text-zinc-400 hover:text-zinc-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmSchedule} className="p-4 space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Servicio Requerido
-                </label>
-                <select
-                  value={selectedServiceTitle}
-                  onChange={(e) => setSelectedServiceTitle(e.target.value)}
-                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs cursor-pointer focus:border-blue-600"
-                >
-                  <option value="Mantenimiento Preventivo (Aceite y Filtros)">
-                    Mantenimiento Preventivo (Aceite + Filtro + Cadena)
-                  </option>
-                  <option value="Servicio Mayor / Afinamiento">
-                    Servicio Mayor (Válvulas + Inyección + Bujías)
-                  </option>
-                  <option value="Revisión de Frenos">
-                    Revisión de Frenos y Pastillas
-                  </option>
-                  <option value="Kit de Arrastre">
-                    Cambio Kit de Arrastre
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Sucursal
-                </label>
-                <select
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs cursor-pointer focus:border-blue-600"
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">
-                    Fecha
-                  </label>
-                  <input
-                    type="date"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    required
-                    className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs font-mono focus:border-blue-600"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-zinc-700 mb-1">
-                    Hora
-                  </label>
-                  <select
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs font-mono cursor-pointer focus:border-blue-600"
-                  >
-                    <option value="08:30">08:30 AM</option>
-                    <option value="09:30">09:30 AM</option>
-                    <option value="11:00">11:00 AM</option>
-                    <option value="14:00">02:00 PM</option>
-                    <option value="16:00">04:00 PM</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-zinc-700 mb-1">
-                  Nota adicional
-                </label>
-                <textarea
-                  value={scheduleNotes}
-                  onChange={(e) => setScheduleNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Detalles para el taller..."
-                  className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs placeholder:text-zinc-400 focus:border-blue-600"
-                />
-              </div>
-
-              <div className="pt-1 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleModalOpen(false)}
-                  className="flex-1 py-2 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold shadow transition"
-                >
-                  Confirmar Cita
-                </button>
-              </div>
-            </form>
+      <ModalPortal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        maxWidth="max-w-sm"
+      >
+        <div className="p-4 border-b border-zinc-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-red-600" />
+            <h3 className="text-xs font-bold text-zinc-900">Agendar Cita</h3>
           </div>
+          <button
+            onClick={() => setIsScheduleModalOpen(false)}
+            className="text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer font-bold"
+            title="Cerrar"
+          >
+            ✕
+          </button>
         </div>
-      )}
+
+        <form onSubmit={handleConfirmSchedule} className="p-4 space-y-3 text-xs">
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Servicio Requerido
+            </label>
+            <select
+              value={selectedServiceTitle}
+              onChange={(e) => setSelectedServiceTitle(e.target.value)}
+              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs cursor-pointer focus:border-blue-600"
+            >
+              <option value="Mantenimiento Preventivo (Aceite y Filtros)">
+                Mantenimiento Preventivo (Aceite + Filtro + Cadena)
+              </option>
+              <option value="Servicio Mayor / Afinamiento">
+                Servicio Mayor (Válvulas + Inyección + Bujías)
+              </option>
+              <option value="Revisión de Frenos">
+                Revisión de Frenos y Pastillas
+              </option>
+              <option value="Kit de Arrastre">
+                Cambio Kit de Arrastre
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Sucursal
+            </label>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs cursor-pointer focus:border-blue-600"
+            >
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Fecha
+              </label>
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                required
+                className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs font-mono focus:border-blue-600"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-zinc-700 mb-1">
+                Hora
+              </label>
+              <select
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs font-mono cursor-pointer focus:border-blue-600"
+              >
+                <option value="08:30">08:30 AM</option>
+                <option value="09:30">09:30 AM</option>
+                <option value="11:00">11:00 AM</option>
+                <option value="14:00">02:00 PM</option>
+                <option value="16:00">04:00 PM</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-zinc-700 mb-1">
+              Nota adicional
+            </label>
+            <textarea
+              value={scheduleNotes}
+              onChange={(e) => setScheduleNotes(e.target.value)}
+              rows={2}
+              placeholder="Detalles para el taller..."
+              className="w-full bg-white border border-zinc-300 text-zinc-900 rounded-xl p-2 text-xs placeholder:text-zinc-400 focus:border-blue-600"
+            />
+          </div>
+
+          <div className="pt-1 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(false)}
+              className="flex-1 py-2 rounded-xl border border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold shadow transition cursor-pointer"
+            >
+              Confirmar Cita
+            </button>
+          </div>
+        </form>
+      </ModalPortal>
     </div>
   );
 };

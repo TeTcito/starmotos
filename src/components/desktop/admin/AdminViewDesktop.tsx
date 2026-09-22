@@ -27,6 +27,8 @@ import {
   AlistamientoFullRecord,
   TallerClient,
   WarrantyRequestStatus,
+  TallerOrder,
+  InventoryItem,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -55,6 +57,8 @@ interface Props {
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
   clients: TallerClient[];
+  orders: TallerOrder[];
+  inventory: InventoryItem[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
@@ -94,6 +98,8 @@ export const AdminViewDesktop: React.FC<Props> = ({
   origins,
   fullAlistamientos,
   clients,
+  orders,
+  inventory,
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
@@ -330,7 +336,18 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 : ''
             }`}
           >
-            {activeSection === 'talleres' && <TalleresDesktop workshops={workshops} />}
+            {activeSection === 'talleres' && (
+              <TalleresDesktop
+                workshops={workshops}
+                warranties={warranties}
+                fullAlistamientos={fullAlistamientos}
+                clients={clients}
+                technicians={technicians}
+                orders={orders}
+                inventory={inventory}
+                invoices={invoices}
+              />
+            )}
             {activeSection === 'alistamiento' && (
               <AlistamientoWizard
                 defaultAtendidoPor="William Daniel Meza (Gerente)"

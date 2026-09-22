@@ -10,6 +10,12 @@ import {
   AlistamientoClient,
   AlistamientoMotorcycle,
   AlistamientoService,
+  Technician,
+  AlistamientoFullRecord,
+  TallerClient,
+  WarrantyRequestStatus,
+  TallerOrder,
+  InventoryItem,
 } from '../types/customer';
 import {
   getStoredWarranties,
@@ -33,8 +39,9 @@ import {
   deleteStoredAlert,
   deleteStoredAlerts,
   querySriMock,
+  getStoredOrders,
+  getStoredInventory,
 } from '../data/mockMultiRoleData';
-import { Technician, AlistamientoFullRecord, TallerClient, WarrantyRequestStatus } from '../types/customer';
 
 
 export const ADMIN_SECTIONS: AdminSection[] = [
@@ -71,6 +78,8 @@ export function useAdminPortal() {
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
+  const [orders] = useState<TallerOrder[]>(getStoredOrders);
+  const [inventory] = useState<InventoryItem[]>(getStoredInventory);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
@@ -707,6 +716,8 @@ export function useAdminPortal() {
     origins,
     fullAlistamientos,
     clients,
+    orders,
+    inventory,
     toastMessage,
     showToast,
     // Garantías

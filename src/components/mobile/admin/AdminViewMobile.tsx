@@ -27,6 +27,8 @@ import {
   AlistamientoFullRecord,
   TallerClient,
   WarrantyRequestStatus,
+  TallerOrder,
+  InventoryItem,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -54,6 +56,8 @@ interface Props {
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
   clients: TallerClient[];
+  orders: TallerOrder[];
+  inventory: InventoryItem[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
@@ -92,6 +96,8 @@ export const AdminViewMobile: React.FC<Props> = ({
   origins,
   fullAlistamientos,
   clients,
+  orders,
+  inventory,
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
@@ -234,7 +240,18 @@ export const AdminViewMobile: React.FC<Props> = ({
 
       {/* Main Móvil */}
       <main className="max-w-md mx-auto px-4 py-4">
-        {activeSection === 'talleres' && <TalleresMobile workshops={workshops} />}
+        {activeSection === 'talleres' && (
+          <TalleresMobile
+            workshops={workshops}
+            warranties={warranties}
+            fullAlistamientos={fullAlistamientos}
+            clients={clients}
+            technicians={technicians}
+            orders={orders}
+            inventory={inventory}
+            invoices={invoices}
+          />
+        )}
         {activeSection === 'alistamiento' && (
           <AlistamientoWizard
             defaultAtendidoPor="William Daniel Meza (Gerente)"

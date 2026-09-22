@@ -76,12 +76,26 @@ export function useTallerPortal() {
     const handleClientsUpdate = () => setClients(getStoredClients());
     const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
 
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith('starmotos_shared_')) {
+        handleWarrantiesUpdate();
+        handleOrdersUpdate();
+        handleTechsUpdate();
+        handleOriginsUpdate();
+        handleAlistamientosUpdate();
+        handleClientsUpdate();
+        handleAlertsUpdate();
+      }
+    };
+
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
     window.addEventListener('starmotos_technicians_updated', handleTechsUpdate);
     window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+    window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+    window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -89,7 +103,9 @@ export function useTallerPortal() {
       window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
       window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+      window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
       window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+      window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
 
@@ -290,6 +306,8 @@ export function useTallerPortal() {
       motorcyclePlate: record.placa,
       lastVisit: record.fechaServicio,
       totalVisits: 1,
+      workshopId: record.sedeId || 'taller-quevedo',
+      workshopName: record.sede || 'StarMotos Sucursal Quevedo',
     };
 
     setClients((prev) => {

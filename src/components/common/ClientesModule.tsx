@@ -35,6 +35,9 @@ import {
   UserCheck,
   MapPin,
   CreditCard,
+  ArrowUpDown,
+  Maximize2,
+  Sparkles,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -43,6 +46,12 @@ import {
   WarrantyRequest,
   UnifiedClient,
 } from '../../types/customer';
+import {
+  getStoredClients,
+  saveStoredClients,
+  getStoredFullAlistamientos,
+  saveStoredFullAlistamientos,
+} from '../../data/mockMultiRoleData';
 
 export interface ClientRowData {
   nombre: string;
@@ -50,13 +59,21 @@ export interface ClientRowData {
   origen: string;
   sede: string;
   fecha: string;
-  servicio: string;
-  valor: number;
-  factura: string;
-  isPaid: boolean;
+  serviciosCount: number;
+  totalInvertido: number;
   estado: 'iniciado' | 'pendiente' | 'referente';
   observaciones: string;
 }
+
+export type SortOption =
+  | 'alpha_asc'
+  | 'alpha_desc'
+  | 'lastname_asc'
+  | 'lastname_desc'
+  | 'sede_asc'
+  | 'recent'
+  | 'spent_desc'
+  | 'services_desc';
 
 export function getClientRowData(
   client: UnifiedClient,
@@ -69,37 +86,20 @@ export function getClientRowData(
   const origen = override?.origin || client.origin || rec?.origen || 'Almacén Oficial';
   const sede = override?.workshopName || client.workshopName || rec?.sede || 'StarMotos Sede';
   const fecha = client.lastVisitDate || rec?.fechaServicio || 'Reciente';
+  const serviciosCount = client.records.length > 0 ? client.records.length : (client.maintenanceCount || 1);
 
-  // Servicio realizado
-  let servicio = client.lastServiceType || 'Alistamiento';
-  if (rec?.serviciosRealizados && rec.serviciosRealizados.length > 0) {
-    const list: string[] = [];
-    if (rec.serviciosRealizados.includes('alistamiento_pdi')) list.push('Alistamiento PDI');
-    if (rec.serviciosRealizados.includes('engrasado')) list.push('Engrasado');
-    if (rec.serviciosRealizados.includes('mantenimiento')) list.push('Mantenimiento');
-    servicio = list.join(' + ') || 'Servicio';
-  }
-
-  // Valor
-  const valor = override?.valor !== undefined
+  // Total Invertido
+  const totalInvertido = override?.valor !== undefined
     ? Number(override.valor)
-    : (rec ? (rec.montoPagado || rec.valorServicio || 0) : (client.totalSpent || 35.0));
-
-  // Factura
-  const factura = override?.factura || rec?.numeroFactura || rec?.numeroTicket || `FAC-${client.cedulaRuc.slice(-4)}`;
-
-  // ¿Pagada?
-  const isPaid = override?.isPaid !== undefined
-    ? Boolean(override.isPaid)
-    : (rec ? (rec.montoPagado ?? 0) >= (rec.valorServicio ?? 0) || !!rec.metodoPago : true);
+    : (client.totalSpent > 0 ? client.totalSpent : (rec ? (rec.montoPagado || rec.valorServicio || 35.0) : 35.0));
 
   // Estado: iniciado | pendiente | referente
   let estado: 'iniciado' | 'pendiente' | 'referente' = 'iniciado';
   if (override?.estado) {
     estado = override.estado;
-  } else if (client.maintenanceCount >= 2 || (client.pdiCompleted && client.engrasadoCompleted)) {
+  } else if (client.maintenanceCount >= 2 || (client.pdiCompleted && client.engrasadoCompleted) || client.records.length >= 2) {
     estado = 'referente';
-  } else if (!isPaid || (!client.pdiCompleted && client.records.length === 0)) {
+  } else if (!client.pdiCompleted && client.records.length === 0) {
     estado = 'pendiente';
   } else {
     estado = 'iniciado';
@@ -114,10 +114,8 @@ export function getClientRowData(
     origen,
     sede,
     fecha,
-    servicio,
-    valor,
-    factura,
-    isPaid,
+    serviciosCount,
+    totalInvertido,
     estado,
     observaciones,
   };
@@ -145,8 +143,9 @@ export const ClientesModule: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
   const [activeFilterTab, setActiveFilterTab] = useState<
-    'all' | 'iniciado' | 'pendiente' | 'referente' | 'pagada' | 'pdi_ok' | 'warranties'
+    'all' | 'iniciado' | 'pendiente' | 'referente' | 'pdi_ok' | 'warranties'
   >('all');
+  const [sortBy, setSortBy] = useState<SortOption>('alpha_asc');
   const [selectedClientForDetail, setSelectedClientForDetail] = useState<UnifiedClient | null>(null);
   const [clientOverrides, setClientOverrides] = useState<Record<string, any>>({});
   const [clientFormData, setClientFormData] = useState<{
@@ -164,16 +163,13 @@ export const ClientesModule: React.FC<Props> = ({
     motoChasis: string;
     motoMileage: string;
     estado: 'iniciado' | 'pendiente' | 'referente';
-    isPaid: boolean;
-    valor: number;
-    factura: string;
     pdiCompleted: boolean;
     engrasadoCompleted: boolean;
     observaciones: string;
   } | null>(null);
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
   const [copiedCedula, setCopiedCedula] = useState<string | null>(null);
-  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
+  const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
 
   // Helper para consultar datos de fila con overrides aplicados
   const getRowData = (c: UnifiedClient) => getClientRowData(c, clientOverrides);
@@ -187,7 +183,12 @@ export const ClientesModule: React.FC<Props> = ({
       const cedula = rec.cedulaRuc.trim();
       if (!cedula) return;
 
-      const ws = workshops.find((w) => w.id === rec.sedeId || w.name === rec.sede);
+      const ws = workshops.find(
+        (w) =>
+          w.id === rec.sedeId ||
+          w.name.toLowerCase() === rec.sede.toLowerCase() ||
+          (rec.sedeId && w.id.toLowerCase().includes(rec.sedeId.toLowerCase()))
+      );
       const isPdi = rec.serviciosRealizados?.includes('alistamiento_pdi') || false;
       const isEngrasado = rec.serviciosRealizados?.includes('engrasado') || false;
       const isMant = rec.serviciosRealizados?.includes('mantenimiento') || false;
@@ -214,7 +215,7 @@ export const ClientesModule: React.FC<Props> = ({
           address: rec.direccion,
           origin: rec.origen,
           workshopId: rec.sedeId || ws?.id || 'taller-quevedo',
-          workshopName: rec.sede || ws?.name || 'Sede Quevedo',
+          workshopName: rec.sede || ws?.name || 'StarMotos Sucursal Quevedo',
           motorcycles: [
             {
               model: rec.modeloMarca,
@@ -283,7 +284,7 @@ export const ClientesModule: React.FC<Props> = ({
           phone: c.phone,
           email: c.email,
           workshopId: c.workshopId || currentWorkshopId || 'taller-quevedo',
-          workshopName: c.workshopName || 'Sede Quevedo',
+          workshopName: c.workshopName || 'StarMotos Sucursal Quevedo',
           motorcycles: [
             {
               model: `${c.motorcycleBrand} ${c.motorcycleModel}`.trim(),
@@ -307,9 +308,9 @@ export const ClientesModule: React.FC<Props> = ({
     return Array.from(map.values());
   }, [fullAlistamientos, clients, workshops, warranties, currentWorkshopId]);
 
-  // Filtrado según rol, sede, tab y búsqueda
+  // Filtrado y Ordenación de clientes
   const filteredClients = useMemo(() => {
-    return unifiedClients.filter((client) => {
+    let result = unifiedClients.filter((client) => {
       // Filtro de alcance por rol
       if (role === 'taller' && currentWorkshopId) {
         const matchesWorkshop =
@@ -326,26 +327,24 @@ export const ClientesModule: React.FC<Props> = ({
       }
 
       // Filtro de Tabs
-      if (activeFilterTab === 'iniciado' && getRowData(client).estado !== 'iniciado') return false;
-      if (activeFilterTab === 'pendiente' && getRowData(client).estado !== 'pendiente') return false;
-      if (activeFilterTab === 'referente' && getRowData(client).estado !== 'referente') return false;
-      if (activeFilterTab === 'pagada' && !getRowData(client).isPaid) return false;
+      const row = getRowData(client);
+      if (activeFilterTab === 'iniciado' && row.estado !== 'iniciado') return false;
+      if (activeFilterTab === 'pendiente' && row.estado !== 'pendiente') return false;
+      if (activeFilterTab === 'referente' && row.estado !== 'referente') return false;
       if (activeFilterTab === 'pdi_ok' && !client.pdiCompleted) return false;
       if (activeFilterTab === 'warranties' && client.warrantiesCount === 0) return false;
 
       // Buscador multi-campo
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
-        const data = getRowData(client);
-        const matchName = data.nombre.toLowerCase().includes(term);
-        const matchApellido = data.apellido.toLowerCase().includes(term);
+        const matchName = row.nombre.toLowerCase().includes(term);
+        const matchApellido = row.apellido.toLowerCase().includes(term);
         const matchCedula = client.cedulaRuc.toLowerCase().includes(term);
         const matchPhone = client.phone?.toLowerCase().includes(term);
-        const matchOrigen = data.origen.toLowerCase().includes(term);
-        const matchSede = data.sede.toLowerCase().includes(term);
-        const matchServicio = data.servicio.toLowerCase().includes(term);
-        const matchFactura = data.factura.toLowerCase().includes(term);
-        const matchObservaciones = data.observaciones.toLowerCase().includes(term);
+        const matchEmail = client.email?.toLowerCase().includes(term);
+        const matchOrigen = row.origen.toLowerCase().includes(term);
+        const matchSede = row.sede.toLowerCase().includes(term);
+        const matchObservaciones = row.observaciones.toLowerCase().includes(term);
         const matchMoto = client.motorcycles.some(
           (m) =>
             m.model.toLowerCase().includes(term) ||
@@ -357,10 +356,9 @@ export const ClientesModule: React.FC<Props> = ({
           matchApellido ||
           matchCedula ||
           matchPhone ||
+          matchEmail ||
           matchOrigen ||
           matchSede ||
-          matchServicio ||
-          matchFactura ||
           matchObservaciones ||
           matchMoto
         );
@@ -368,7 +366,36 @@ export const ClientesModule: React.FC<Props> = ({
 
       return true;
     });
-  }, [unifiedClients, role, currentWorkshopId, selectedWorkshopFilter, activeFilterTab, searchTerm, clientOverrides]);
+
+    // Ordenación según selección del usuario
+    result.sort((a, b) => {
+      const dataA = getRowData(a);
+      const dataB = getRowData(b);
+
+      switch (sortBy) {
+        case 'alpha_asc':
+          return dataA.nombre.localeCompare(dataB.nombre, 'es', { sensitivity: 'base' });
+        case 'alpha_desc':
+          return dataB.nombre.localeCompare(dataA.nombre, 'es', { sensitivity: 'base' });
+        case 'lastname_asc':
+          return (dataA.apellido || '').localeCompare(dataB.apellido || '', 'es', { sensitivity: 'base' });
+        case 'lastname_desc':
+          return (dataB.apellido || '').localeCompare(dataA.apellido || '', 'es', { sensitivity: 'base' });
+        case 'sede_asc':
+          return dataA.sede.localeCompare(dataB.sede, 'es', { sensitivity: 'base' });
+        case 'recent':
+          return (b.lastVisitDate || '').localeCompare(a.lastVisitDate || '');
+        case 'spent_desc':
+          return dataB.totalInvertido - dataA.totalInvertido;
+        case 'services_desc':
+          return b.records.length - a.records.length;
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [unifiedClients, role, currentWorkshopId, selectedWorkshopFilter, activeFilterTab, searchTerm, clientOverrides, sortBy]);
 
   // Conteos por estado para los tabs
   const iniciadosCount = useMemo(
@@ -381,10 +408,6 @@ export const ClientesModule: React.FC<Props> = ({
   );
   const referentesCount = useMemo(
     () => unifiedClients.filter((c) => getRowData(c).estado === 'referente').length,
-    [unifiedClients, clientOverrides]
-  );
-  const pagadasCount = useMemo(
-    () => unifiedClients.filter((c) => getRowData(c).isPaid).length,
     [unifiedClients, clientOverrides]
   );
   const pdiOkCount = useMemo(
@@ -402,64 +425,52 @@ export const ClientesModule: React.FC<Props> = ({
     [filteredClients]
   );
   const totalSpentAll = useMemo(
-    () => filteredClients.reduce((acc, c) => acc + getRowData(c).valor, 0),
+    () => filteredClients.reduce((acc, c) => acc + getRowData(c).totalInvertido, 0),
     [filteredClients, clientOverrides]
   );
-
-  const toggleRowExpand = (id: string) => {
-    setExpandedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
 
   const handleExportCsv = () => {
     const headers = [
       '#',
       'Cédula/RUC',
-      'Nombre',
-      'Apellido',
-      'Origen',
-      'Sede',
-      'Fecha',
-      'Servicio',
-      'Valor ($)',
-      'Factura',
-      'Pagada',
-      'Estado',
-      'Observaciones',
-      'Teléfono',
+      'Nombres',
+      'Apellidos',
+      'Teléfono/WhatsApp',
+      'Email',
+      'Dirección',
+      'Sede/Taller',
+      'Origen/Procedencia',
       'Motocicleta',
       'Placa',
-      'Chasis'
+      'Chasis/VIN',
+      'Servicios Adquiridos',
+      'Total Invertido ($)',
+      'Última Visita',
+      'Estado',
+      'Observaciones',
     ];
 
     const rows = filteredClients.map((client, idx) => {
-      const data = getClientRowData(client);
+      const data = getRowData(client);
       const moto = client.motorcycles[0];
       return [
         idx + 1,
         `"${client.cedulaRuc}"`,
         `"${data.nombre}"`,
         `"${data.apellido}"`,
-        `"${data.origen}"`,
-        `"${data.sede}"`,
-        `"${data.fecha}"`,
-        `"${data.servicio}"`,
-        data.valor.toFixed(2),
-        `"${data.factura}"`,
-        data.isPaid ? 'Pagada' : 'Pendiente',
-        data.estado.toUpperCase(),
-        `"${data.observaciones.replace(/"/g, '""')}"`,
         `"${client.phone || ''}"`,
+        `"${client.email || ''}"`,
+        `"${client.address || ''}"`,
+        `"${data.sede}"`,
+        `"${data.origen}"`,
         `"${moto?.model || ''}"`,
         `"${moto?.plate || ''}"`,
         `"${moto?.chasis || ''}"`,
+        client.records.length,
+        data.totalInvertido.toFixed(2),
+        `"${client.lastVisitDate}"`,
+        data.estado.toUpperCase(),
+        `"${data.observaciones.replace(/"/g, '""')}"`,
       ].join(';');
     });
 
@@ -468,7 +479,7 @@ export const ClientesModule: React.FC<Props> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `clientes_starmotos_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `fichero_clientes_starmotos_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -506,15 +517,12 @@ export const ClientesModule: React.FC<Props> = ({
       email: override.email ?? client.email ?? '',
       address: override.address ?? client.address ?? '',
       origin: override.origin ?? client.origin ?? 'Almacén Oficial Quevedo',
-      workshopName: override.workshopName ?? client.workshopName ?? 'Sede Quevedo',
+      workshopName: override.workshopName ?? client.workshopName ?? 'StarMotos Sucursal Quevedo',
       motoModel: override.motoModel ?? client.motorcycles[0]?.model ?? 'Loncin CR5 250cc',
       motoPlate: override.motoPlate ?? client.motorcycles[0]?.plate ?? '',
       motoChasis: override.motoChasis ?? client.motorcycles[0]?.chasis ?? '',
       motoMileage: String(override.motoMileage ?? client.motorcycles[0]?.lastMileage ?? '1000'),
       estado: override.estado ?? row.estado,
-      isPaid: override.isPaid !== undefined ? override.isPaid : row.isPaid,
-      valor: override.valor !== undefined ? override.valor : row.valor,
-      factura: override.factura ?? row.factura,
       pdiCompleted: override.pdiCompleted !== undefined ? override.pdiCompleted : client.pdiCompleted,
       engrasadoCompleted: override.engrasadoCompleted !== undefined ? override.engrasadoCompleted : client.engrasadoCompleted,
       observaciones: override.observaciones ?? row.observaciones,
@@ -524,6 +532,8 @@ export const ClientesModule: React.FC<Props> = ({
   const handleSaveClientForm = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!clientFormData || !selectedClientForDetail) return;
+
+    // 1. Guardar en estado local de overrides
     setClientOverrides((prev) => ({
       ...prev,
       [clientFormData.cedulaRuc]: {
@@ -531,15 +541,101 @@ export const ClientesModule: React.FC<Props> = ({
         fullName: `${clientFormData.nombres} ${clientFormData.apellidos}`.trim(),
       },
     }));
-    setSaveSuccessToast('✓ Datos del cliente actualizados y guardados correctamente.');
+
+    // 2. Persistir en la base de clientes de localStorage
+    try {
+      const storedClients = getStoredClients();
+      const existingIdx = storedClients.findIndex((c) => c.idNumber === clientFormData.cedulaRuc);
+      let updatedClients: TallerClient[];
+      if (existingIdx >= 0) {
+        updatedClients = [...storedClients];
+        updatedClients[existingIdx] = {
+          ...updatedClients[existingIdx],
+          fullName: `${clientFormData.nombres} ${clientFormData.apellidos}`.trim(),
+          phone: clientFormData.phone,
+          email: clientFormData.email,
+          motorcycleModel: clientFormData.motoModel,
+          motorcyclePlate: clientFormData.motoPlate,
+          workshopName: clientFormData.workshopName,
+        };
+      } else {
+        updatedClients = [
+          {
+            id: `cli-${Date.now()}`,
+            fullName: `${clientFormData.nombres} ${clientFormData.apellidos}`.trim(),
+            idNumber: clientFormData.cedulaRuc,
+            phone: clientFormData.phone,
+            email: clientFormData.email,
+            motorcycleBrand: clientFormData.motoModel.split(' ')[0] || 'Moto',
+            motorcycleModel: clientFormData.motoModel,
+            motorcyclePlate: clientFormData.motoPlate,
+            lastVisit: new Date().toLocaleDateString('es-EC'),
+            totalVisits: selectedClientForDetail.records.length || 1,
+            workshopName: clientFormData.workshopName,
+          },
+          ...storedClients,
+        ];
+      }
+      saveStoredClients(updatedClients);
+
+      // 3. Si tiene registros de alistamiento asociados, actualizar datos personales en los registros
+      const storedAlistamientos = getStoredFullAlistamientos();
+      let hasUpdatedAlistamientos = false;
+      const updatedAlistamientos = storedAlistamientos.map((rec) => {
+        if (rec.cedulaRuc === clientFormData.cedulaRuc) {
+          hasUpdatedAlistamientos = true;
+          return {
+            ...rec,
+            nombres: clientFormData.nombres,
+            apellidos: clientFormData.apellidos,
+            celular1: clientFormData.phone,
+            email: clientFormData.email,
+            direccion: clientFormData.address,
+            origen: clientFormData.origin,
+            modeloMarca: clientFormData.motoModel,
+            placa: clientFormData.motoPlate,
+            chasis: clientFormData.motoChasis,
+          };
+        }
+        return rec;
+      });
+
+      if (hasUpdatedAlistamientos) {
+        saveStoredFullAlistamientos(updatedAlistamientos);
+      }
+    } catch (err) {
+      console.error('Error sincronizando cliente editado en localStorage:', err);
+    }
+
+    setSaveSuccessToast('✓ Datos del cliente y servicios actualizados en todo el sistema.');
     setTimeout(() => setSaveSuccessToast(null), 3500);
   };
 
+  // Helper para alternar orden al hacer clic en las cabeceras de columna
+  const handleSortToggle = (field: 'nombre' | 'apellido' | 'sede' | 'spent' | 'services') => {
+    if (field === 'nombre') {
+      setSortBy((prev) => (prev === 'alpha_asc' ? 'alpha_desc' : 'alpha_asc'));
+    } else if (field === 'apellido') {
+      setSortBy((prev) => (prev === 'lastname_asc' ? 'lastname_desc' : 'lastname_asc'));
+    } else if (field === 'sede') {
+      setSortBy((prev) => (prev === 'sede_asc' ? 'alpha_asc' : 'sede_asc'));
+    } else if (field === 'spent') {
+      setSortBy((prev) => (prev === 'spent_desc' ? 'recent' : 'spent_desc'));
+    } else if (field === 'services') {
+      setSortBy((prev) => (prev === 'services_desc' ? 'recent' : 'services_desc'));
+    }
+  };
+
+  // =========================================================================
+  // VISTA 1: FORMULARIO DEL CLIENTE + TARJETITAS CUADRADAS DE SERVICIOS
+  // =========================================================================
   if (selectedClientForDetail && clientFormData) {
+    const row = getRowData(selectedClientForDetail);
+
     return (
       <form
         onSubmit={handleSaveClientForm}
-        className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs"
+        className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs relative"
       >
         {/* Cabecera del Formulario */}
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
@@ -557,9 +653,9 @@ export const ClientesModule: React.FC<Props> = ({
             </button>
             <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
-                  Formulario del Cliente: {clientFormData.nombres} {clientFormData.apellidos}
+                  Ficha del Cliente: {clientFormData.nombres} {clientFormData.apellidos}
                 </h2>
                 <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
                   C.I./RUC: {clientFormData.cedulaRuc}
@@ -581,7 +677,7 @@ export const ClientesModule: React.FC<Props> = ({
                 </span>
               </div>
               <p className="text-xs text-zinc-500">
-                Edite los datos del cliente, motocicleta asociada y condiciones de servicio directamente en los campos.
+                Información personal, vehículo asignado y servicios adquiridos en StarMotos.
               </p>
             </div>
           </div>
@@ -641,12 +737,13 @@ export const ClientesModule: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Cuerpo del Formulario en 3 Columnas con scroll interno */}
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+        {/* Cuerpo del Formulario en 3 Columnas + Abajo Tarjetitas Cuadradas */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-5 pr-1">
+          {/* ======================================================== */}
+          {/* FORMULARIO DEL CLIENTE: 3 COLUMNAS                       */}
+          {/* ======================================================== */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-            {/* ======================================================== */}
-            {/* COLUMNA 1: DATOS DEL CLIENTE Y CONTACTO                 */}
-            {/* ======================================================== */}
+            {/* COLUMNA 1: DATOS DEL CLIENTE Y CONTACTO */}
             <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                 <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
@@ -710,7 +807,7 @@ export const ClientesModule: React.FC<Props> = ({
               {/* Celular 1 */}
               <div>
                 <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                  Teléfono / Celular 1 *
+                  Teléfono / Celular WhatsApp *
                 </label>
                 <div className="relative">
                   <Phone className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -728,7 +825,7 @@ export const ClientesModule: React.FC<Props> = ({
               {/* Celular 2 */}
               <div>
                 <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                  Teléfono Secundario / Convencional
+                  Teléfono Convencional / Secundario
                 </label>
                 <input
                   type="tel"
@@ -800,15 +897,13 @@ export const ClientesModule: React.FC<Props> = ({
                     value={clientFormData.origin}
                     onChange={(e) => setClientFormData({ ...clientFormData, origin: e.target.value })}
                     className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium text-zinc-900 outline-none focus:border-blue-600"
-                    placeholder="Almacén de compra"
+                    placeholder="Almacén de procedencia"
                   />
                 </div>
               </div>
             </div>
 
-            {/* ======================================================== */}
-            {/* COLUMNA 2: DATOS DE LA MOTOCICLETA                      */}
-            {/* ======================================================== */}
+            {/* COLUMNA 2: DATOS DE LA MOTOCICLETA */}
             <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                 <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
@@ -927,16 +1022,14 @@ export const ClientesModule: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* ======================================================== */}
-            {/* COLUMNA 3: CLASIFICACIÓN, FACTURACIÓN & NOTAS            */}
-            {/* ======================================================== */}
+            {/* COLUMNA 3: CLASIFICACIÓN & OBSERVACIONES */}
             <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                 <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>3. Estado & Facturación</span>
+                  <span>3. Estado & Perfil</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-mono">Control</span>
+                <span className="text-[10px] text-zinc-400 font-mono">Fidelización</span>
               </div>
 
               {/* Estado del Cliente */}
@@ -948,53 +1041,9 @@ export const ClientesModule: React.FC<Props> = ({
                   className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-bold text-zinc-900 outline-none"
                 >
                   <option value="iniciado">🚀 Iniciado (Nuevo ingreso)</option>
-                  <option value="pendiente">⏳ Pendiente (En proceso / Falta pago)</option>
+                  <option value="pendiente">⏳ Pendiente (En proceso / Incompleto)</option>
                   <option value="referente">⭐ Referente (Cliente Frecuente / VIP)</option>
                 </select>
-              </div>
-
-              {/* Estado de Cobro y Factura */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-700 mb-1">¿Factura Pagada?</label>
-                  <select
-                    value={clientFormData.isPaid ? 'true' : 'false'}
-                    onChange={(e) =>
-                      setClientFormData({ ...clientFormData, isPaid: e.target.value === 'true' })
-                    }
-                    className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
-                  >
-                    <option value="true">✓ Pagada</option>
-                    <option value="false">⏳ Pendiente</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-700 mb-1">Monto Cobrado ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={clientFormData.valor}
-                    onChange={(e) =>
-                      setClientFormData({ ...clientFormData, valor: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-emerald-800 outline-none focus:border-blue-600"
-                  />
-                </div>
-              </div>
-
-              {/* N° Factura */}
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                  N° Factura o Comprobante
-                </label>
-                <input
-                  type="text"
-                  value={clientFormData.factura}
-                  onChange={(e) => setClientFormData({ ...clientFormData, factura: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
-                  placeholder="FAC-001-0921"
-                />
               </div>
 
               {/* Cumplimiento Técnico */}
@@ -1012,7 +1061,7 @@ export const ClientesModule: React.FC<Props> = ({
                       }
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                     />
-                    <span>Alistamiento PDI Completado</span>
+                    <span>Alistamiento PDI Oficial Completado</span>
                   </label>
                   <label className="flex items-center gap-2 text-xs font-semibold text-zinc-800 cursor-pointer">
                     <input
@@ -1028,6 +1077,22 @@ export const ClientesModule: React.FC<Props> = ({
                 </div>
               </div>
 
+              {/* Resumen Inversión y Servicios */}
+              <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-200 text-xs space-y-1">
+                <div className="flex items-center justify-between text-zinc-700">
+                  <span>Servicios Adquiridos:</span>
+                  <strong className="font-mono text-blue-700 font-bold">{selectedClientForDetail.records.length} alistamientos</strong>
+                </div>
+                <div className="flex items-center justify-between text-zinc-700">
+                  <span>Total Invertido:</span>
+                  <strong className="font-mono text-emerald-700 font-bold">${selectedClientForDetail.totalSpent.toFixed(2)}</strong>
+                </div>
+                <div className="flex items-center justify-between text-zinc-700">
+                  <span>Última Visita:</span>
+                  <span className="font-mono text-zinc-600">{selectedClientForDetail.lastVisitDate}</span>
+                </div>
+              </div>
+
               {/* Observaciones Generales */}
               <div>
                 <label className="block text-[11px] font-bold text-zinc-700 mb-1">
@@ -1040,105 +1105,166 @@ export const ClientesModule: React.FC<Props> = ({
                     setClientFormData({ ...clientFormData, observaciones: e.target.value })
                   }
                   className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs text-zinc-900 outline-none transition-all resize-none"
-                  placeholder="Detalles mecánicos, acuerdos de garantía o notas..."
+                  placeholder="Detalles mecánicos, acuerdos de garantía o notas de seguimiento..."
                 />
               </div>
             </div>
           </div>
 
-          {/* ======================================================== */}
-          {/* SECCIÓN INFERIOR: HISTORIAL DE SERVICIOS & FOTOS          */}
-          {/* ======================================================== */}
-          <div className="bg-zinc-50/50 p-4 rounded-xl border border-zinc-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black uppercase text-zinc-900 tracking-wider flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Historial de Servicios & Evidencias ({selectedClientForDetail.records.length})</span>
-              </h4>
-              <span className="text-[10px] text-zinc-500">
-                Total Acumulado: <strong>${selectedClientForDetail.totalSpent.toFixed(2)}</strong>
-              </span>
+          {/* ========================================================================= */}
+          {/* SECCIÓN INFERIOR: HISTORIAL DE SERVICIOS EN TARJETITAS CUADRADAS           */}
+          {/* ========================================================================= */}
+          <div className="bg-zinc-50/70 p-4 rounded-xl border border-zinc-200 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center">
+                  <Wrench className="w-3.5 h-3.5" />
+                </div>
+                <h4 className="text-xs sm:text-sm font-black uppercase text-zinc-900 tracking-wider">
+                  Servicios y Alistamientos Adquiridos ({selectedClientForDetail.records.length})
+                </h4>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-zinc-500">Inversión Acumulada:</span>
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-mono font-bold text-xs border border-emerald-300">
+                  ${selectedClientForDetail.totalSpent.toFixed(2)} USD
+                </span>
+              </div>
             </div>
 
             {selectedClientForDetail.records.length > 0 ? (
-              <div className="space-y-2.5">
-                {selectedClientForDetail.records.map((rec) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                {selectedClientForDetail.records.map((rec, idx) => (
                   <div
-                    key={rec.id}
-                    className="bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2 hover:border-zinc-300 transition-colors shadow-2xs"
+                    key={rec.id || `srv-${idx}`}
+                    className="bg-white border border-zinc-200 hover:border-blue-400 hover:shadow-md transition-all rounded-xl p-3.5 flex flex-col justify-between space-y-2.5 shadow-2xs group relative"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-zinc-900">
-                          {rec.serviciosRealizados?.map((s) => s.toUpperCase()).join(' • ')}
+                    {/* Header de la Tarjetita */}
+                    <div>
+                      <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-zinc-100">
+                        <span className="font-mono text-[10px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200 truncate">
+                          {rec.numeroFactura ? `FAC: ${rec.numeroFactura}` : (rec.numeroTicket || `OT-${idx + 1}`)}
                         </span>
-                        <span className="text-[10px] text-zinc-400">• {rec.fechaServicio}</span>
+                        <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-zinc-400" />
+                          <span>{rec.fechaServicio || rec.createdAt}</span>
+                        </span>
                       </div>
-                      <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        ${(rec.montoPagado || rec.valorServicio).toFixed(2)} ({rec.metodoPago})
-                      </span>
+
+                      {/* Badges de Servicios Realizados */}
+                      <div className="pt-2 flex flex-wrap gap-1">
+                        {rec.serviciosRealizados && rec.serviciosRealizados.length > 0 ? (
+                          rec.serviciosRealizados.map((serv, sIdx) => (
+                            <span
+                              key={sIdx}
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                serv === 'alistamiento_pdi'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : serv === 'engrasado'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-purple-50 text-purple-700 border-purple-200'
+                              }`}
+                            >
+                              {serv === 'alistamiento_pdi'
+                                ? 'PDI Alistamiento'
+                                : serv === 'engrasado'
+                                ? 'Engrasado'
+                                : 'Mantenimiento'}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
+                            Servicio General
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-zinc-600 bg-zinc-50 p-2 rounded-lg">
-                      <div>
-                        <span className="text-zinc-400 block text-[9px] uppercase">Técnico</span>
-                        <strong>{rec.tecnicoResponsable}</strong>
+                    {/* Cuerpo con datos mecánicos */}
+                    <div className="bg-zinc-50 p-2.5 rounded-lg border border-zinc-100 text-[11px] space-y-1.5 text-zinc-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 text-[10px]">Sede:</span>
+                        <strong className="text-zinc-800 truncate max-w-[140px]">{rec.sede}</strong>
                       </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px] uppercase">Kilometraje</span>
-                        <strong>{rec.kilometraje} km</strong>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 text-[10px]">Técnico:</span>
+                        <span className="font-semibold text-zinc-800 truncate max-w-[140px]">
+                          {rec.tecnicoResponsable}
+                        </span>
                       </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px] uppercase">Aceite</span>
-                        <strong>
-                          {rec.aceite === 'sin_aceite'
-                            ? 'Sin Aceite'
-                            : `${rec.aceite} (${rec.nivelAceite || 'Óptimo'})`}
-                        </strong>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 text-[10px]">Kilometraje:</span>
+                        <strong className="font-mono text-zinc-900">{rec.kilometraje} km</strong>
                       </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[9px] uppercase">Factura</span>
-                        <strong className="font-mono">{rec.numeroFactura || 'S/F'}</strong>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 text-[10px]">Cobro:</span>
+                        <span className="font-mono font-bold text-emerald-700">
+                          ${(rec.montoPagado || rec.valorServicio || 0).toFixed(2)}{' '}
+                          <span className="text-[9px] font-normal text-zinc-500">({rec.metodoPago})</span>
+                        </span>
                       </div>
+
+                      {rec.observaciones && (
+                        <div className="pt-1 border-t border-zinc-200/60 text-[10px] text-zinc-500 italic truncate" title={rec.observaciones}>
+                          "{rec.observaciones}"
+                        </div>
+                      )}
                     </div>
 
-                    {rec.observaciones && (
-                      <p className="text-[11px] text-zinc-600 italic bg-zinc-50/50 p-2 rounded border border-zinc-100">
-                        "{rec.observaciones}"
-                      </p>
-                    )}
-
-                    {rec.fotos && rec.fotos.length > 0 && (
-                      <div>
-                        <span className="text-[10px] font-bold text-zinc-500 block mb-1 flex items-center gap-1">
+                    {/* Miniaturas de Fotos de Evidencia con Zoom al hacer clic */}
+                    {rec.fotos && rec.fotos.length > 0 ? (
+                      <div className="pt-1">
+                        <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mb-1">
                           <Camera className="w-3 h-3 text-zinc-400" />
-                          <span>Evidencias de Entrega ({rec.fotos.length})</span>
+                          <span>Evidencias Fotográficas ({rec.fotos.length})</span>
                         </span>
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-                          {rec.fotos.map((url, idx) => (
-                            <a
-                              key={idx}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="aspect-video rounded overflow-hidden border border-zinc-200 block group relative"
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {rec.fotos.slice(0, 3).map((fotoUrl, fIdx) => (
+                            <div
+                              key={fIdx}
+                              onClick={() => setPreviewZoomImage(fotoUrl)}
+                              className="aspect-square rounded-lg overflow-hidden border border-zinc-200 bg-zinc-100 cursor-pointer relative group/img hover:ring-2 hover:ring-blue-500 transition-all"
+                              title="Haga clic para ampliar la imagen"
                             >
                               <img
-                                src={url}
-                                alt={`Evidencia ${idx + 1}`}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                src={fotoUrl}
+                                alt={`Evidencia ${fIdx + 1}`}
+                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
                               />
-                            </a>
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                <Maximize2 className="w-3.5 h-3.5 text-white" />
+                              </div>
+                            </div>
                           ))}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-zinc-400 text-center py-1">
+                        Sin evidencias fotográficas adjuntas
                       </div>
                     )}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-white border border-zinc-200 rounded-xl p-4 text-center text-zinc-500 text-xs">
-                No registra alistamientos o servicios previos cargados en este portal.
+              <div className="bg-white border border-zinc-200 rounded-xl p-6 text-center space-y-2">
+                <Wrench className="w-7 h-7 text-zinc-300 mx-auto" />
+                <h5 className="text-xs font-bold text-zinc-700">
+                  Este cliente aún no registra alistamientos o servicios técnicos realizados.
+                </h5>
+                <p className="text-[11px] text-zinc-500 max-w-md mx-auto">
+                  Al registrar una entrega PDI, engrasado o mantenimiento oficial desde el módulo de Alistamiento, aparecerá aquí automáticamente en su historial de tarjetas.
+                </p>
+                {onNavigateToAlistamiento && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToAlistamiento(clientFormData.cedulaRuc)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Iniciar Primer Alistamiento para este cliente</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1154,7 +1280,7 @@ export const ClientesModule: React.FC<Props> = ({
             }}
             className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
           >
-            ← Cancelar / Volver a la Lista
+            ← Volver a la Lista
           </button>
 
           <div className="flex items-center gap-2">
@@ -1178,15 +1304,50 @@ export const ClientesModule: React.FC<Props> = ({
             </button>
           </div>
         </div>
+
+        {/* Modal de Zoom de Fotografía de Evidencia */}
+        {previewZoomImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+            onClick={() => setPreviewZoomImage(null)}
+          >
+            <div
+              className="relative max-w-3xl w-full bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-700 p-2 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-3 py-2 text-white border-b border-zinc-800">
+                <span className="text-xs font-bold flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-400" />
+                  <span>Evidencia Fotográfica de Entrega / Servicio</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoomImage(null)}
+                  className="p-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-2 flex items-center justify-center max-h-[75vh] overflow-hidden">
+                <img
+                  src={previewZoomImage}
+                  alt="Zoom Evidencia"
+                  className="max-h-[70vh] w-auto object-contain rounded-xl shadow-lg"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </form>
     );
   }
 
+  // =========================================================================
+  // VISTA 2: FICHERO DE CLIENTES & FLOTA (TABLA PURA DE CLIENTES)
+  // =========================================================================
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
-      {/* ========================================================================= */}
-      {/* 1. BARRA SUPERIOR COMPACTA: TÍTULO, MÉTRICAS & ACCIONES                   */}
-      {/* ========================================================================= */}
+    <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in relative">
+      {/* 1. BARRA SUPERIOR COMPACTA: TÍTULO, MÉTRICAS & ACCIONES */}
       <div className="bg-white border border-zinc-200 rounded-xl px-3.5 py-2 shadow-2xs space-y-2 shrink-0">
         {/* Fila 1: Título + Métricas compactas + Botones */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1196,7 +1357,7 @@ export const ClientesModule: React.FC<Props> = ({
             </div>
             <h2 className="text-sm sm:text-base font-black text-zinc-900 tracking-tight whitespace-nowrap">
               {role === 'admin'
-                ? 'Fichero de Clientes & Flota'
+                ? 'Fichero de Clientes & Flota StarMotos'
                 : role === 'taller'
                 ? 'Directorio de Clientes del Taller'
                 : 'Clientes & Flota con Garantía'}
@@ -1208,15 +1369,13 @@ export const ClientesModule: React.FC<Props> = ({
                 {filteredClients.length} Clientes
               </span>
               <span className="px-2 py-0.5 text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-md whitespace-nowrap">
-                {totalMotos} Motos
+                {totalMotos} Motocicletas
               </span>
               <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md whitespace-nowrap">
-                {totalPdiOk} PDI OK
+                {totalPdiOk} PDI Completados
               </span>
               <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-mono whitespace-nowrap">
-                {role === 'garante'
-                  ? `${filteredClients.reduce((acc, c) => acc + c.warrantiesCount, 0)} Garantías`
-                  : `$${totalSpentAll.toFixed(2)} Facturado`}
+                ${totalSpentAll.toFixed(2)} Inversión Acumulada
               </span>
             </div>
           </div>
@@ -1246,7 +1405,7 @@ export const ClientesModule: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Fila 2: Buscador + Selector de sede + Chips de Filtro */}
+        {/* Fila 2: Buscador + Selector de Sede + Ordenador + Chips de Filtro */}
         <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-zinc-100">
           {/* Buscador */}
           <div className="relative flex-1 min-w-[180px] max-w-xs">
@@ -1255,7 +1414,7 @@ export const ClientesModule: React.FC<Props> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar cédula, nombre, placa, VIN..."
+              placeholder="Buscar cédula, nombre, apellido, placa, chasis..."
               className="w-full pl-8 pr-7 py-1 bg-zinc-50 hover:bg-zinc-100/80 focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 placeholder:text-zinc-400 outline-none transition-all font-medium h-7.5"
             />
             {searchTerm && (
@@ -1277,15 +1436,39 @@ export const ClientesModule: React.FC<Props> = ({
                 onChange={(e) => setSelectedWorkshopFilter(e.target.value)}
                 className="w-full px-2 py-1 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 h-7.5"
               >
-                <option value="all">🏢 Todas las Sedes</option>
-                {workshops.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} ({w.city})
-                  </option>
-                ))}
+                <option value="all">🏢 Todas las Sedes ({unifiedClients.length})</option>
+                {workshops.map((w) => {
+                  const count = unifiedClients.filter(
+                    (c) => c.workshopId === w.id || c.records.some((r) => r.sedeId === w.id)
+                  ).length;
+                  return (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({count})
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}
+
+          {/* Selector de Ordenación A-Z, Z-A, etc. */}
+          <div className="flex items-center gap-1.5 shrink-0 bg-zinc-50 border border-zinc-300 rounded-lg px-2 h-7.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="bg-transparent text-xs font-bold text-zinc-800 outline-none cursor-pointer"
+            >
+              <option value="alpha_asc">🔤 Nombres: A a la Z</option>
+              <option value="alpha_desc">🔤 Nombres: Z a la A</option>
+              <option value="lastname_asc">👤 Apellidos: A a la Z</option>
+              <option value="lastname_desc">👤 Apellidos: Z a la A</option>
+              <option value="sede_asc">🏢 Sede / Taller (A-Z)</option>
+              <option value="recent">📅 Más Recientes</option>
+              <option value="spent_desc">💰 Mayor Inversión ($)</option>
+              <option value="services_desc">🔧 Más Servicios</option>
+            </select>
+          </div>
 
           {/* Chips de filtro */}
           <div className="flex items-center gap-1 overflow-x-auto text-xs py-0.5">
@@ -1335,18 +1518,6 @@ export const ClientesModule: React.FC<Props> = ({
             </button>
             <button
               type="button"
-              onClick={() => setActiveFilterTab('pagada')}
-              className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] flex items-center gap-1 ${
-                activeFilterTab === 'pagada'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-              }`}
-            >
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Pagadas ({pagadasCount})</span>
-            </button>
-            <button
-              type="button"
               onClick={() => setActiveFilterTab('pdi_ok')}
               className={`px-2 py-1 rounded-md font-bold transition-all cursor-pointer shrink-0 text-[11px] flex items-center gap-1 ${
                 activeFilterTab === 'pdi_ok'
@@ -1361,9 +1532,7 @@ export const ClientesModule: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 2. TABLA DE CLIENTES TIPO EXCEL (100% ANCHO, SCROLL INTERNO VERTICAL)    */}
-      {/* ========================================================================= */}
+      {/* 2. TABLA PURA DE CLIENTES (100% ANCHO, SCROLL INTERNO VERTICAL, COLUMNAS DE CLIENTE) */}
       {filteredClients.length > 0 ? (
         <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
           <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
@@ -1371,247 +1540,244 @@ export const ClientesModule: React.FC<Props> = ({
               <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
                 <tr className="text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 select-none">
                   <th className="w-[3%] px-1 py-2 text-center text-zinc-500 font-mono">#</th>
-                  <th className="w-[10.5%] px-2.5 py-2 truncate">Nombre</th>
-                  <th className="w-[10.5%] px-2.5 py-2 truncate">Apellido</th>
+                  <th
+                    onClick={() => handleSortToggle('nombre')}
+                    className="w-[15%] px-2.5 py-2 truncate cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    title="Clic para ordenar A-Z / Z-A por Nombre"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Cliente / Cédula</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSortToggle('apellido')}
+                    className="w-[12%] px-2.5 py-2 truncate cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    title="Clic para ordenar A-Z / Z-A por Apellidos"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Apellidos</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  </th>
+                  <th className="w-[14%] px-2.5 py-2 truncate">Contacto (Celular / Email)</th>
+                  <th
+                    onClick={() => handleSortToggle('sede')}
+                    className="w-[11%] px-2 py-2 truncate cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    title="Clic para ordenar por Sede"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Sede / Taller</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  </th>
                   <th className="w-[9%] px-2 py-2 truncate">Origen</th>
-                  <th className="w-[9%] px-2 py-2 truncate">Sede</th>
-                  <th className="w-[7.5%] px-1.5 py-2 text-center whitespace-nowrap">Fecha</th>
-                  <th className="w-[10.5%] px-2 py-2 truncate">Servicio</th>
-                  <th className="w-[6.5%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
-                  <th className="w-[8%] px-2 py-2 truncate">Factura</th>
-                  <th className="w-[6.5%] px-1.5 py-2 text-center whitespace-nowrap">¿Pagada?</th>
-                  <th className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap">Estado</th>
-                  <th className="w-[14%] px-2.5 py-2 truncate">Observaciones</th>
-                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
+                  <th className="w-[13%] px-2 py-2 truncate">Motocicleta & Placa</th>
+                  <th
+                    onClick={() => handleSortToggle('services')}
+                    className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    title="Clic para ordenar por Cantidad de Servicios"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Servicios</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSortToggle('spent')}
+                    className="w-[8%] px-2 py-2 text-right whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    title="Clic para ordenar por Total Invertido"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Inversión</span>
+                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  </th>
+                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Estado</th>
+                  <th className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 text-zinc-800">
                 {filteredClients.map((client, idx) => {
                   const data = getRowData(client);
-                  const isExpanded = expandedRowIds.has(client.id);
-                  const otherRecords = client.records.slice(1);
+                  const moto = client.motorcycles[0];
 
                   return (
-                    <React.Fragment key={client.id}>
-                      <tr
-                        onClick={() => handleOpenClientForm(client)}
-                        className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
-                        title={`Haga clic en cualquier lado para abrir el formulario de ${data.nombre} ${data.apellido}`}
-                      >
-                        {/* 1. # */}
-                        <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
-                          {idx + 1}
-                        </td>
+                    <tr
+                      key={client.id}
+                      onClick={() => handleOpenClientForm(client)}
+                      className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
+                      title={`Haga clic en cualquier parte de la fila para ver la ficha completa de ${data.nombre} ${data.apellido}`}
+                    >
+                      {/* 1. # */}
+                      <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
+                        {idx + 1}
+                      </td>
 
-                        {/* 2. Nombre */}
-                        <td className="px-2.5 py-2 text-zinc-900 truncate" title={`${data.nombre} (C.I. ${client.cedulaRuc})`}>
-                          <div className="flex flex-col truncate">
-                            <span className="font-bold truncate text-xs group-hover:text-blue-600 transition-colors">{data.nombre}</span>
-                            <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
-                              C.I. {client.cedulaRuc}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 3. Apellido */}
-                        <td className="px-2.5 py-2 text-zinc-800 truncate" title={data.apellido}>
-                          <span className="font-semibold truncate block text-xs group-hover:text-blue-600 transition-colors">{data.apellido || '—'}</span>
-                        </td>
-
-                        {/* 4. Origen */}
-                        <td className="px-2 py-2 text-zinc-600 truncate" title={data.origen}>
-                          <span className="truncate block text-xs">{data.origen}</span>
-                        </td>
-
-                        {/* 5. Sede */}
-                        <td className="px-2 py-2 text-zinc-700 truncate" title={data.sede}>
-                          <span className="inline-block text-[11px] font-medium bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded border border-zinc-200/80 truncate max-w-full">
-                            {data.sede}
+                      {/* 2. Cliente / Cédula */}
+                      <td className="px-2.5 py-2 text-zinc-900 truncate" title={`${data.nombre} (C.I. ${client.cedulaRuc})`}>
+                        <div className="flex flex-col truncate">
+                          <span className="font-bold truncate text-xs group-hover:text-blue-600 transition-colors">
+                            {data.nombre}
                           </span>
-                        </td>
+                          <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
+                            C.I. {client.cedulaRuc}
+                          </span>
+                        </div>
+                      </td>
 
-                        {/* 6. Fecha */}
-                        <td className="px-1.5 py-2 text-center whitespace-nowrap font-mono text-zinc-600 text-[11px]" title={data.fecha}>
-                          {data.fecha}
-                        </td>
+                      {/* 3. Apellidos */}
+                      <td className="px-2.5 py-2 text-zinc-800 truncate" title={data.apellido}>
+                        <span className="font-semibold truncate block text-xs group-hover:text-blue-600 transition-colors">
+                          {data.apellido || '—'}
+                        </span>
+                      </td>
 
-                        {/* 7. Servicio */}
-                        <td className="px-2 py-2 truncate" title={data.servicio}>
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span className="truncate px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                              {data.servicio}
-                            </span>
-                            {otherRecords.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleRowExpand(client.id);
-                                }}
-                                className="shrink-0 inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-1 py-0.5 rounded border border-blue-200 cursor-pointer"
-                                title="Ver historial anterior"
-                              >
-                                {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-                                <span>+{otherRecords.length}</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 8. Valor */}
-                        <td className="px-2 py-2 text-right whitespace-nowrap font-mono font-bold text-xs text-zinc-900" title={`$${data.valor.toFixed(2)}`}>
-                          ${data.valor.toFixed(2)}
-                        </td>
-
-                        {/* 9. Factura */}
-                        <td className="px-2 py-2 text-zinc-600 truncate font-mono text-[11px]" title={data.factura}>
-                          {data.factura}
-                        </td>
-
-                        {/* 10. ¿Pagada? */}
-                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
-                          {data.isPaid ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              ✓ Pagada
+                      {/* 4. Contacto (Celular / Email) */}
+                      <td className="px-2.5 py-2 text-zinc-700 truncate">
+                        <div className="flex flex-col truncate text-[11px]">
+                          {client.phone ? (
+                            <span className="font-mono font-semibold text-zinc-900 flex items-center gap-1">
+                              <Phone className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{client.phone}</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                              ⏳ Pendiente
-                            </span>
+                            <span className="text-zinc-400 italic text-[10px]">Sin teléfono</span>
                           )}
-                        </td>
+                          {client.email ? (
+                            <span className="text-zinc-500 text-[10px] truncate">{client.email}</span>
+                          ) : null}
+                        </div>
+                      </td>
 
-                        {/* 11. Estado */}
-                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
-                          {data.estado === 'referente' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                              ⭐ Referente
-                            </span>
-                          )}
-                          {data.estado === 'pendiente' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              ⏳ Pendiente
-                            </span>
-                          )}
-                          {data.estado === 'iniciado' && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              🚀 Iniciado
-                            </span>
-                          )}
-                        </td>
+                      {/* 5. Sede / Taller */}
+                      <td className="px-2 py-2 text-zinc-700 truncate" title={data.sede}>
+                        <span className="inline-block text-[11px] font-medium bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200/80 truncate max-w-full">
+                          {data.sede}
+                        </span>
+                      </td>
 
-                        {/* 12. Observaciones */}
-                        <td className="px-2.5 py-2 text-zinc-600 truncate" title={data.observaciones}>
-                          <span className="truncate block text-[11px]">
-                            {data.observaciones}
+                      {/* 6. Origen */}
+                      <td className="px-2 py-2 text-zinc-600 truncate" title={data.origen}>
+                        <span className="truncate block text-xs">{data.origen}</span>
+                      </td>
+
+                      {/* 7. Motocicleta & Placa */}
+                      <td className="px-2 py-2 truncate">
+                        {moto ? (
+                          <div className="flex flex-col truncate">
+                            <span className="font-semibold text-zinc-900 text-xs truncate">
+                              {moto.model}
+                            </span>
+                            <span className="text-[10px] font-mono text-zinc-500 truncate">
+                              Placa: <strong className="text-zinc-700">{moto.plate || 'SIN PLACA'}</strong>
+                              {moto.chasis && moto.chasis !== 'S/N' && ` • VIN: ${moto.chasis.slice(-6)}`}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-400 italic text-[10px]">Sin moto registrada</span>
+                        )}
+                      </td>
+
+                      {/* 8. Servicios Adquiridos */}
+                      <td className="px-1.5 py-2 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 font-mono">
+                          {client.records.length > 0 ? `${client.records.length} serv.` : `${client.maintenanceCount || 1} serv.`}
+                        </span>
+                      </td>
+
+                      {/* 9. Inversión Acumulada */}
+                      <td className="px-2 py-2 text-right whitespace-nowrap font-mono font-bold text-xs text-emerald-800" title={`Inversión total: $${data.totalInvertido.toFixed(2)}`}>
+                        ${data.totalInvertido.toFixed(2)}
+                      </td>
+
+                      {/* 10. Estado */}
+                      <td className="px-1.5 py-2 text-center whitespace-nowrap">
+                        {data.estado === 'referente' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            ⭐ Referente
                           </span>
-                        </td>
+                        )}
+                        {data.estado === 'pendiente' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            ⏳ Pendiente
+                          </span>
+                        )}
+                        {data.estado === 'iniciado' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            🚀 Iniciado
+                          </span>
+                        )}
+                      </td>
 
-                        {/* 13. Acciones */}
-                        <td className="px-1.5 py-2 text-center whitespace-nowrap">
-                          <div className="inline-flex items-center justify-center gap-1">
+                      {/* 11. Acciones */}
+                      <td className="px-1.5 py-2 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenClientForm(client);
+                            }}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                            title="Ver Ficha y Formulario del Cliente"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Formulario</span>
+                          </button>
+                          {client.phone && (
+                            <a
+                              href={getCleanWhatsappUrl(client.phone, client.fullName)}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                              title="Contactar por WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                          {onNavigateToAlistamiento && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleOpenClientForm(client);
+                                onNavigateToAlistamiento(client.cedulaRuc);
                               }}
-                              className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
-                              title="Ver Formulario del Cliente"
+                              className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                              title="Nuevo Alistamiento / Servicio para este cliente"
                             >
-                              <Eye className="w-3 h-3" />
-                              <span>Formulario</span>
+                              <Plus className="w-3.5 h-3.5" />
                             </button>
-                            {client.phone && (
-                              <a
-                                href={getCleanWhatsappUrl(client.phone, client.fullName)}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-0.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
-                                title="Contactar por WhatsApp"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            {onNavigateToAlistamiento && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onNavigateToAlistamiento(client.cedulaRuc);
-                                }}
-                                className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                                title="Nuevo Servicio para este cliente"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Sub-filas expandibles con historial previo */}
-                      {isExpanded &&
-                        otherRecords.map((histRec, hIdx) => (
-                          <tr
-                            key={histRec.id || `hist-${hIdx}`}
-                            className="bg-blue-50/25 text-zinc-600 divide-x divide-blue-100/70 text-[11px]"
-                          >
-                            <td className="px-1 py-1.5 text-center font-mono text-zinc-400">↳</td>
-                            <td colSpan={2} className="px-2.5 py-1.5 pl-4 italic text-zinc-500 truncate" title={`Servicio anterior de ${data.nombre}`}>
-                              Servicio anterior de {data.nombre}
-                            </td>
-                            <td className="px-2 py-1.5 text-zinc-500 truncate" title={histRec.origen || data.origen}>
-                              {histRec.origen || data.origen}
-                            </td>
-                            <td className="px-2 py-1.5 text-zinc-500 truncate" title={histRec.sede}>
-                              {histRec.sede}
-                            </td>
-                            <td className="px-1.5 py-1.5 text-center font-mono whitespace-nowrap text-[10px]">
-                              {histRec.fechaServicio}
-                            </td>
-                            <td className="px-2 py-1.5 truncate" title={histRec.serviciosRealizados?.join(' + ') || 'Mantenimiento'}>
-                              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200 truncate">
-                                {histRec.serviciosRealizados?.join(' + ') || 'Mantenimiento'}
-                              </span>
-                            </td>
-                            <td className="px-2 py-1.5 text-right font-mono font-semibold text-zinc-700 whitespace-nowrap text-[11px]">
-                              ${(histRec.montoPagado || histRec.valorServicio || 0).toFixed(2)}
-                            </td>
-                            <td className="px-2 py-1.5 font-mono text-zinc-600 truncate text-[10px]" title={histRec.numeroFactura}>
-                              {histRec.numeroFactura}
-                            </td>
-                            <td className="px-1.5 py-1.5 text-center whitespace-nowrap">
-                              <span className="text-[10px] font-bold text-emerald-700">✓ Pagada</span>
-                            </td>
-                            <td className="px-1.5 py-1.5 text-center whitespace-nowrap">
-                              <span className="text-[10px] font-bold text-purple-700">Completado</span>
-                            </td>
-                            <td colSpan={2} className="px-2.5 py-1.5 italic text-zinc-500 truncate" title={histRec.observaciones || '—'}>
-                              {histRec.observaciones || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                    </React.Fragment>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
               <tfoot className="sticky bottom-0 bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px] shadow-xs z-10">
                 <tr className="divide-x divide-zinc-200">
                   <td colSpan={7} className="px-3 py-2 text-right font-mono uppercase tracking-wider text-[11px]">
-                    Total ({filteredClients.length} registros):
+                    Total ({filteredClients.length} clientes en directorio):
+                  </td>
+                  <td className="px-1.5 py-2 text-center font-mono text-blue-800 font-bold text-xs">
+                    {filteredClients.reduce((acc, c) => acc + (c.records.length || c.maintenanceCount || 1), 0)} serv.
                   </td>
                   <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
-                    ${filteredClients.reduce((sum, c) => sum + getClientRowData(c).valor, 0).toFixed(2)}
+                    ${filteredClients.reduce((sum, c) => sum + getRowData(c).totalInvertido, 0).toFixed(2)}
                   </td>
-                  <td colSpan={5} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
-                    <span className="font-bold text-emerald-700">
-                      {filteredClients.filter((c) => getClientRowData(c).isPaid).length} pagadas
+                  <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
+                    <span className="font-bold text-purple-700">
+                      {referentesCount} referentes
+                    </span>{' '}
+                    •{' '}
+                    <span className="font-bold text-blue-700">
+                      {iniciadosCount} iniciados
                     </span>{' '}
                     •{' '}
                     <span className="font-bold text-amber-700">
-                      {filteredClients.filter((c) => !getClientRowData(c).isPaid).length} pendientes
+                      {pendientesCount} pendientes
                     </span>
                   </td>
                 </tr>
@@ -1627,7 +1793,7 @@ export const ClientesModule: React.FC<Props> = ({
               No se encontraron clientes con los filtros aplicados
             </h3>
             <p className="text-xs text-zinc-500">
-              Verifique la ortografía de la cédula o nombre, o cambie el filtro de sede para ver más resultados.
+              Verifique la búsqueda por cédula, nombre o placa, o cambie el filtro de sede para ver más resultados.
             </p>
             {searchTerm && (
               <button

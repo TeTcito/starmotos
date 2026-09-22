@@ -76,11 +76,24 @@ export function useAdminPortal() {
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
 
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith('starmotos_shared_')) {
+        handleWarrantiesUpdate();
+        handleAlertsUpdate();
+        handleTechsUpdate();
+        handleOriginsUpdate();
+        handleAlistamientosUpdate();
+        handleClientsUpdate();
+      }
+    };
+
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
     window.addEventListener('starmotos_technicians_updated', handleTechsUpdate);
     window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+    window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
+    window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -88,6 +101,8 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
       window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
+      window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
+      window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
 
@@ -460,6 +475,8 @@ export function useAdminPortal() {
       motorcyclePlate: record.placa,
       lastVisit: record.fechaServicio,
       totalVisits: 1,
+      workshopId: record.sedeId || 'matriz-la-mana',
+      workshopName: record.sede || 'StarMotos Matriz La Maná',
     };
 
     setClients((prev) => {

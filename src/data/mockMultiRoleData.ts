@@ -637,7 +637,7 @@ export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [];
 
 export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
   try {
-    const stored = localStorage.getItem('starmotos_shared_alistamientos_v4');
+    const stored = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
     if (stored) return JSON.parse(stored);
   } catch (e) {
     console.error('Error reading alistamientos from localStorage', e);
@@ -647,7 +647,7 @@ export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
 
 export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
   try {
-    localStorage.setItem('starmotos_shared_alistamientos_v4', JSON.stringify(records));
+    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(records));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
   } catch (e) {
     console.error('Error saving alistamientos to localStorage', e);

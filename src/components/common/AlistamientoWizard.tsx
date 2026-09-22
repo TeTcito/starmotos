@@ -74,8 +74,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Referencia para selector de archivos del computador/dispositivo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Búsqueda en el listado
+  // Búsqueda y Filtro de Sede en el listado
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
 
   // Registro seleccionado para ver detalle en formulario
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<AlistamientoFullRecord | null>(null);
@@ -167,11 +168,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
 
-  // Filtrado de alistamientos existentes
+  // Filtrado de alistamientos existentes por Sede y término de búsqueda
   const filteredRecords = useMemo(() => {
-    if (!searchTerm.trim()) return recentRecords;
-    const term = searchTerm.toLowerCase().trim();
     return recentRecords.filter((r) => {
+      // Filtro de Sede / Taller
+      if (selectedWorkshopFilter !== 'all') {
+        const matchesWs = r.sedeId === selectedWorkshopFilter || r.sede === selectedWorkshopFilter;
+        if (!matchesWs) return false;
+      }
+
+      if (!searchTerm.trim()) return true;
+      const term = searchTerm.toLowerCase().trim();
       const fullClient = `${r.nombres} ${r.apellidos}`.toLowerCase();
       return (
         r.cedulaRuc.toLowerCase().includes(term) ||
@@ -180,10 +187,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
         r.chasis.toLowerCase().includes(term) ||
         r.modeloMarca.toLowerCase().includes(term) ||
         r.sede.toLowerCase().includes(term) ||
+        r.origen.toLowerCase().includes(term) ||
         r.tecnicoResponsable.toLowerCase().includes(term)
       );
     });
-  }, [recentRecords, searchTerm]);
+  }, [recentRecords, searchTerm, selectedWorkshopFilter]);
 
   // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
   const clientHistoricalRecords = useMemo(() => {
@@ -1178,6 +1186,28 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </button>
                 )}
               </div>
+
+              {/* Filtro de Sede / Taller */}
+              {workshops && workshops.length > 0 && (
+                <div className="h-12 sm:h-13 bg-white border border-zinc-300 rounded-xl px-3 flex items-center shrink-0 shadow-2xs">
+                  <Building2 className="w-4 h-4 text-blue-600 mr-2 shrink-0" />
+                  <select
+                    value={selectedWorkshopFilter}
+                    onChange={(e) => setSelectedWorkshopFilter(e.target.value)}
+                    className="bg-transparent text-xs sm:text-sm font-bold text-zinc-800 outline-none cursor-pointer"
+                  >
+                    <option value="all">🏢 Todas las Sedes ({recentRecords.length})</option>
+                    {workshops.map((w) => {
+                      const count = recentRecords.filter((r) => r.sedeId === w.id || r.sede === w.name).length;
+                      return (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
 
               {/* Botón "+ Nuevo Alistamiento" Destacado */}
               <button

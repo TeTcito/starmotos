@@ -2329,39 +2329,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* Subir Fotos */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                    Fotos de la Unidad
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-bold text-emerald-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>+ Subir Foto</span>
-                  </button>
-                </div>
-                {formData.fotos.length > 0 && (
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {formData.fotos.map((url, i) => (
-                      <div key={i} className="relative aspect-video rounded-lg overflow-hidden border">
-                        <img src={url} alt="Foto" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhoto(i)}
-                          className="absolute top-0.5 right-0.5 bg-black/70 text-white p-0.5 rounded"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
@@ -2803,6 +2770,48 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Fotos de Entrega / Servicio */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                    Fotos de Entrega / Servicio ({formData.fotos.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-bold text-emerald-600 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>+ Subir Foto</span>
+                  </button>
+                </div>
+                {formData.fotos.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {formData.fotos.map((url, i) => (
+                      <div key={i} className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200">
+                        <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(i)}
+                          className="absolute top-0.5 right-0.5 bg-black/70 text-white p-0.5 rounded cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2 border border-dashed border-zinc-300 hover:border-emerald-500 rounded-xl text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-emerald-50/50 flex items-center justify-center gap-1.5 text-zinc-600"
+                  >
+                    <Camera className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold">Subir fotos de inspección o entrega</span>
+                  </button>
+                )}
               </div>
 
               <div>

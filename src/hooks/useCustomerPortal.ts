@@ -466,8 +466,27 @@ export function useCustomerPortal() {
   }, [showToast]);
 
   // Datos del Cliente y Ficha de la Moto
-  const [profile, setProfile] = useState<ClientProfile>(INITIAL_PROFILE);
-  const [motorcycle, setMotorcycle] = useState<MotorcycleClientData>(INITIAL_MOTORCYCLE);
+  const [profile, setProfile] = useState<ClientProfile>(() => {
+    try {
+      const stored = localStorage.getItem('starmotos_current_client_profile');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return { ...INITIAL_PROFILE, ...parsed };
+      }
+    } catch (_) {}
+    return INITIAL_PROFILE;
+  });
+
+  const [motorcycle, setMotorcycle] = useState<MotorcycleClientData>(() => {
+    try {
+      const stored = localStorage.getItem('starmotos_current_client_moto');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return { ...INITIAL_MOTORCYCLE, ...parsed };
+      }
+    } catch (_) {}
+    return INITIAL_MOTORCYCLE;
+  });
   const [scheduledMaintenances, setScheduledMaintenances] = useState<ScheduledMaintenance[]>(INITIAL_SCHEDULED_MAINTENANCES);
 
   // Orden de Trabajo y otros datos
@@ -499,12 +518,18 @@ export function useCustomerPortal() {
   // Actualizar perfil
   const updateProfile = useCallback((updated: ClientProfile) => {
     setProfile(updated);
+    try {
+      localStorage.setItem('starmotos_current_client_profile', JSON.stringify(updated));
+    } catch (_) {}
     showToast('Tus datos de perfil y facturación se han guardado exitosamente.', 'success');
   }, [showToast]);
 
   // Actualizar datos técnicos de la moto
   const updateMotorcycle = useCallback((updated: MotorcycleClientData) => {
     setMotorcycle(updated);
+    try {
+      localStorage.setItem('starmotos_current_client_moto', JSON.stringify(updated));
+    } catch (_) {}
     showToast('Ficha técnica para el taller actualizada correctamente.', 'success');
   }, [showToast]);
 

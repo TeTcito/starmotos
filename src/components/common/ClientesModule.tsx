@@ -429,10 +429,6 @@ export const ClientesModule: React.FC<Props> = ({
     () => filteredClients.filter((c) => c.pdiCompleted).length,
     [filteredClients]
   );
-  const totalSpentAll = useMemo(
-    () => filteredClients.reduce((acc, c) => acc + getRowData(c).totalInvertido, 0),
-    [filteredClients, clientOverrides]
-  );
 
   const handleExportCsv = () => {
     const headers = [
@@ -449,7 +445,6 @@ export const ClientesModule: React.FC<Props> = ({
       'Placa',
       'Chasis/VIN',
       'Servicios Adquiridos',
-      'Total Invertido ($)',
       'Última Visita',
       'Estado',
       'Observaciones',
@@ -472,7 +467,6 @@ export const ClientesModule: React.FC<Props> = ({
         `"${moto?.plate || ''}"`,
         `"${moto?.chasis || ''}"`,
         client.records.length,
-        data.totalInvertido.toFixed(2),
         `"${client.lastVisitDate}"`,
         data.estado.toUpperCase(),
         `"${data.observaciones.replace(/"/g, '""')}"`,
@@ -1108,15 +1102,11 @@ export const ClientesModule: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* Resumen Inversión y Servicios */}
+              {/* Resumen de Servicios */}
               <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-200 text-xs space-y-1">
                 <div className="flex items-center justify-between text-zinc-700">
                   <span>Servicios Adquiridos:</span>
                   <strong className="font-mono text-blue-700 font-bold">{selectedClientForDetail.records.length} alistamientos</strong>
-                </div>
-                <div className="flex items-center justify-between text-zinc-700">
-                  <span>Total Invertido:</span>
-                  <strong className="font-mono text-emerald-700 font-bold">${selectedClientForDetail.totalSpent.toFixed(2)}</strong>
                 </div>
                 <div className="flex items-center justify-between text-zinc-700">
                   <span>Última Visita:</span>
@@ -1154,12 +1144,6 @@ export const ClientesModule: React.FC<Props> = ({
                 <h4 className="text-xs sm:text-sm font-black uppercase text-zinc-900 tracking-wider">
                   Servicios y Alistamientos Adquiridos ({selectedClientForDetail.records.length})
                 </h4>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-zinc-500">Inversión Acumulada:</span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-mono font-bold text-xs border border-emerald-300">
-                  ${selectedClientForDetail.totalSpent.toFixed(2)} USD
-                </span>
               </div>
             </div>
 
@@ -1226,13 +1210,6 @@ export const ClientesModule: React.FC<Props> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-zinc-400 text-[10px]">Kilometraje:</span>
                         <strong className="font-mono text-zinc-900">{rec.kilometraje} km</strong>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-zinc-400 text-[10px]">Cobro:</span>
-                        <span className="font-mono font-bold text-emerald-700">
-                          ${(rec.montoPagado || rec.valorServicio || 0).toFixed(2)}{' '}
-                          <span className="text-[9px] font-normal text-zinc-500">({rec.metodoPago})</span>
-                        </span>
                       </div>
 
                       {rec.observaciones && (
@@ -1404,9 +1381,6 @@ export const ClientesModule: React.FC<Props> = ({
               </span>
               <span className="px-2 py-0.5 text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md whitespace-nowrap">
                 {totalPdiOk} PDI Completados
-              </span>
-              <span className="px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-mono whitespace-nowrap">
-                ${totalSpentAll.toFixed(2)} Inversión Acumulada
               </span>
             </div>
           </div>
@@ -1603,10 +1577,10 @@ export const ClientesModule: React.FC<Props> = ({
                     </div>
                   </th>
                   <th className="w-[9%] px-2 py-2 truncate">Origen</th>
-                  <th className="w-[13%] px-2 py-2 truncate">Motocicleta & Placa</th>
+                  <th className="w-[17%] px-2 py-2 truncate">Motocicleta & Placa</th>
                   <th
                     onClick={() => handleSortToggle('services')}
-                    className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
                     title="Clic para ordenar por Cantidad de Servicios"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -1614,18 +1588,8 @@ export const ClientesModule: React.FC<Props> = ({
                       <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                     </div>
                   </th>
-                  <th
-                    onClick={() => handleSortToggle('spent')}
-                    className="w-[8%] px-2 py-2 text-right whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
-                    title="Clic para ordenar por Total Invertido"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Inversión</span>
-                      <ArrowUpDown className="w-3 h-3 text-zinc-400" />
-                    </div>
-                  </th>
                   <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Estado</th>
-                  <th className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
+                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 text-zinc-800">
@@ -1717,12 +1681,7 @@ export const ClientesModule: React.FC<Props> = ({
                         </span>
                       </td>
 
-                      {/* 9. Inversión Acumulada */}
-                      <td className="px-2 py-2 text-right whitespace-nowrap font-mono font-bold text-xs text-emerald-800" title={`Inversión total: $${data.totalInvertido.toFixed(2)}`}>
-                        ${data.totalInvertido.toFixed(2)}
-                      </td>
-
-                      {/* 10. Estado */}
+                      {/* 9. Estado */}
                       <td className="px-1.5 py-2 text-center whitespace-nowrap">
                         {data.estado === 'referente' && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
@@ -1809,9 +1768,6 @@ export const ClientesModule: React.FC<Props> = ({
                   </td>
                   <td className="px-1.5 py-2 text-center font-mono text-blue-800 font-bold text-xs">
                     {filteredClients.reduce((acc, c) => acc + (c.records.length || c.maintenanceCount || 1), 0)} serv.
-                  </td>
-                  <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
-                    ${filteredClients.reduce((sum, c) => sum + getRowData(c).totalInvertido, 0).toFixed(2)}
                   </td>
                   <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
                     <span className="font-bold text-purple-700">

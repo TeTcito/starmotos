@@ -43,7 +43,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
     phone: '0939316698 / 0939317809',
     manager: 'William Daniel Meza Chicaiza (Gerente)',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.la-mana@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -62,7 +62,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Vía al cementerio de Buena Fe',
     phone: '0939316698',
     manager: 'Jefe de Taller Buena Fe',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.buena-fe@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -81,7 +81,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Al lado de Picantería Nayeli',
     phone: '0939317809',
     manager: 'Jefe de Taller Balzar',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.balzar@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -100,7 +100,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Diagonal al SuperKia',
     phone: '0939316698',
     manager: 'Jefe de Taller El Carmen',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.el-carmen@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -119,7 +119,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Ingresa por lubricadora Don Lucho, al lado de Hostal Carmita',
     phone: '0982852456 / 0939316698',
     manager: 'Daniel Meza Quevedo',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.quevedo@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -138,7 +138,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Diagonal al parque central',
     phone: '0939317809',
     manager: 'Jefe de Taller Moraspungo',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.moraspungo@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -157,7 +157,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Loma de Mocache, frente al Colegio Nacional y al taller, al lado de peluquería',
     phone: '0939316698',
     manager: 'Jefe de Taller Mocache',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.mocache@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -176,7 +176,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Frente al Cuerpo de Bomberos',
     phone: '0939317809',
     manager: 'Jefe de Taller Quinzaloma',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.quinzaloma@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -195,7 +195,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Al lado de Almacén El Centinela Rulimán',
     phone: '0939316698',
     manager: 'Jefe de Taller Portoviejo',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.portoviejo@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -214,7 +214,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Frente a la Escuela 28 de Mayo',
     phone: '0939317809',
     manager: 'Jefe de Taller Ricaurte',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.ricaurte@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -233,7 +233,7 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     reference: 'Vía Manabí, frente a Cerámica Mejía',
     phone: '0939316698',
     manager: 'Jefe de Taller El Empalme',
-    email: 'starsmotor17@gmail.com',
+    email: 'sede.el-empalme@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -466,7 +466,11 @@ export function getStoredWorkshops(): Workshop[] {
     if (stored) {
       const parsed: Workshop[] = JSON.parse(stored);
       if (parsed.length >= 11 && parsed.some((w) => w.id === 'matriz-la-mana')) {
-        return parsed;
+        // Sincronizar correos corporativos oficiales actualizados
+        return parsed.map((ws) => {
+          const initWs = INITIAL_WORKSHOPS.find((i) => i.id === ws.id);
+          return initWs ? { ...ws, email: initWs.email } : ws;
+        });
       }
     }
   } catch (e) {

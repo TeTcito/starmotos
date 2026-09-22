@@ -7,8 +7,14 @@ import { AdminPortal } from './AdminPortal';
 import { TallerPortal } from './TallerPortal';
 import { GarantePortal } from './GarantePortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { initSupabaseRealtime } from './services/supabaseService';
 
 function App() {
+  // Inicializar sincronización en tiempo real con Supabase
+  useEffect(() => {
+    initSupabaseRealtime();
+  }, []);
+
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('starmotos_auth') === 'true';
   });

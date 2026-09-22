@@ -128,7 +128,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
       id: 'garantias_admin',
       label: 'Garantías & Pólizas',
       icon: <ShieldCheck className="w-4 h-4" />,
-      badge: `${warranties.filter((w) => w.status === 'enviada_matriz').length || ''}`,
+      badge: `${warranties.filter((w) => w.status === 'en_revision' || w.status === 'enviada_matriz').length || ''}`,
     },
     {
       id: 'facturacion',
@@ -205,6 +205,11 @@ export const AdminViewDesktop: React.FC<Props> = ({
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Matriz La Maná (Cotopaxi)</span>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-[11px] text-emerald-300 font-semibold shadow-xs" title="Conectado en tiempo real con Supabase Cloud">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>BD Nube Activa</span>
             </div>
           </div>
         </div>

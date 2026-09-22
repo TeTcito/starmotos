@@ -78,7 +78,7 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
 
             {/* Acciones */}
             <div className="pt-2 border-t border-zinc-100 flex justify-end gap-1.5">
-              {w.status === 'enviada_matriz' && (
+              {(w.status === 'enviada_matriz' || w.status === 'en_revision') && (
                 <button
                   type="button"
                   onClick={() => onValidateWarranty(w.id, 'Validado por Matriz.')}

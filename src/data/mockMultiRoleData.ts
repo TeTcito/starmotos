@@ -11,6 +11,15 @@ import {
   Technician,
   AlistamientoFullRecord,
 } from '../types/customer';
+import {
+  cloudSaveWarranty,
+  cloudSaveAlert,
+  cloudSaveClient,
+  cloudSaveAlistamiento,
+  cloudSaveOrder,
+  cloudSaveInvoice,
+} from '../services/supabaseService';
+import { supabase } from '../lib/supabase';
 
 // --- Talleres y Sucursales Oficiales de StarMotos (11 Ubicaciones Oficiales) ---
 export const INITIAL_WORKSHOPS: Workshop[] = [
@@ -387,6 +396,9 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(warranties));
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
+    if (warranties.length > 0) {
+      warranties.forEach((w) => cloudSaveWarranty(w));
+    }
   } catch (e) {
     console.error('Error saving warranties to localStorage', e);
   }
@@ -407,6 +419,9 @@ export function saveStoredAlerts(alerts: SystemAlert[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(alerts));
     window.dispatchEvent(new Event('starmotos_alerts_updated'));
+    if (alerts.length > 0) {
+      alerts.forEach((alt) => cloudSaveAlert(alt));
+    }
   } catch (e) {
     console.error('Error saving alerts to localStorage', e);
   }
@@ -446,6 +461,9 @@ export function saveStoredInvoices(invoices: AdminInvoice[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
     window.dispatchEvent(new Event('starmotos_invoices_updated'));
+    if (invoices.length > 0) {
+      invoices.forEach((i) => cloudSaveInvoice(i));
+    }
   } catch (e) {
     console.error('Error saving invoices to localStorage', e);
   }
@@ -466,6 +484,9 @@ export function saveStoredOrders(orders: TallerOrder[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
     window.dispatchEvent(new Event('starmotos_orders_updated'));
+    if (orders.length > 0) {
+      orders.forEach((o) => cloudSaveOrder(o));
+    }
   } catch (e) {
     console.error('Error saving orders to localStorage', e);
   }
@@ -486,6 +507,9 @@ export function saveStoredClients(clients: TallerClient[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
     window.dispatchEvent(new Event('starmotos_clients_updated'));
+    if (clients.length > 0) {
+      clients.forEach((c) => cloudSaveClient(c));
+    }
   } catch (e) {
     console.error('Error saving clients to localStorage', e);
   }
@@ -649,6 +673,9 @@ export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(records));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+    if (records.length > 0) {
+      records.forEach((r) => cloudSaveAlistamiento(r));
+    }
   } catch (e) {
     console.error('Error saving alistamientos to localStorage', e);
   }
@@ -663,5 +690,13 @@ export function resetAllSystemData() {
   saveStoredClients([]);
   saveStoredInventory([]);
   saveStoredFullAlistamientos([]);
+  try {
+    supabase.from('warranties').delete().neq('id', '___').then(() => {});
+    supabase.from('full_alistamientos').delete().neq('id', '___').then(() => {});
+    supabase.from('clients').delete().neq('id', '___').then(() => {});
+    supabase.from('alerts').delete().neq('id', '___').then(() => {});
+    supabase.from('orders').delete().neq('id', '___').then(() => {});
+    supabase.from('invoices').delete().neq('id', '___').then(() => {});
+  } catch (_) {}
 }
 

@@ -511,6 +511,10 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
                   <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800 font-mono">
                     Casos & Eventos
                   </span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Nube Activa</span>
+                  </span>
                 </div>
                 <p className="text-[10px] text-zinc-500 truncate">
                   {unreadCount > 0

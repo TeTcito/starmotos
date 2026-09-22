@@ -168,6 +168,11 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Auditoría Oficial Benelli & CFMOTO</span>
             </div>
+
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-[11px] text-emerald-300 font-semibold shadow-xs" title="Conectado en tiempo real con Supabase Cloud">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>BD Nube Activa</span>
+            </div>
           </div>
         </div>
       </header>

@@ -104,7 +104,7 @@ export const AdminViewMobile: React.FC<Props> = ({
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
     { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
-    { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" /> },
+    { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" />, badge: `${warranties.filter((w) => w.status === 'en_revision' || w.status === 'enviada_matriz').length || ''}` },
     { id: 'facturacion', label: 'Facturación', icon: <Receipt className="w-4 h-4" /> },
     { id: 'alertas', label: 'Alertas', icon: <Bell className="w-4 h-4" />, badge: `${alerts.filter((a) => !a.read).length || ''}` },
   ];

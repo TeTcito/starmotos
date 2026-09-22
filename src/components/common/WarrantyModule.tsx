@@ -1411,17 +1411,17 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
 
-          {/* DISTRIBUCIÓN: A LA IZQUIERDA REPUESTOS EN FILAS, A LA DERECHA MANO DE OBRA */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {/* LADO IZQUIERDO: APARTADO 1 - REPUESTOS POR FILAS (UNA SOLA COLUMNA) */}
+          {/* DISTRIBUCIÓN EN 3 APARTADOS: 1. PRESUPUESTO SOLICITADO, 2. MANO DE OBRA, 3. RESUMEN DE COMPRA */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+            {/* APARTADO 1: PRESUPUESTO SOLICITADO (REPUESTOS) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-                  1. Repuestos Solicitados por el Taller ({parsedPartsList.length})
+                  1. Presupuesto Solicitado ({parsedPartsList.length})
                 </label>
                 {parsedPartsList.length > 0 && (
                   <span className="text-xs font-mono font-bold text-zinc-500">
-                    Subtotal Repuestos: ${partsTotal.toFixed(2)}
+                    ${partsTotal.toFixed(2)}
                   </span>
                 )}
               </div>
@@ -1431,13 +1431,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   No se especificaron repuestos desglosados en esta solicitud.
                 </p>
               ) : (
-                <div className="flex flex-col space-y-2.5">
+                <div className="flex flex-col space-y-2 max-h-[380px] overflow-y-auto pr-1">
                   {parsedPartsList.map((part, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs flex items-center justify-between gap-3"
+                      className="p-2.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs flex items-center justify-between gap-2"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">
                           #{idx + 1}
                         </span>
@@ -1446,8 +1446,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                         </span>
                       </div>
 
-                      <div className="relative w-32 shrink-0">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                      <div className="relative w-28 shrink-0">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1461,7 +1461,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                               [part]: val,
                             }));
                           }}
-                          className="w-full h-9 pl-6 pr-2.5 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
+                          className="w-full h-8 pl-5 pr-2 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
                         />
                       </div>
                     </div>
@@ -1470,25 +1470,25 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               )}
             </div>
 
-            {/* LADO DERECHO: APARTADO 2 - MANO DE OBRA CALIFICADA (ARRIBA HORAS, ABAJO PRECIO) */}
+            {/* APARTADO 2: MANO DE OBRA CALIFICADA */}
             <div className="space-y-3">
               <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-                2. Mano de Obra Calificada
+                2. Mano de Obra
               </label>
 
-              <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-200 space-y-4">
+              <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
                 {/* Arriba: Las horas / tiempo estimado de demora */}
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-600 mb-2">
                     Tiempo Estimado de Demora (Clic Rápido):
                   </label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {QUICK_LABOR_TIMES.map((timeOption) => (
                       <button
                         key={timeOption}
                         type="button"
                         onClick={() => setLaborTime(timeOption)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        className={`px-2 py-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
                           laborTime === timeOption
                             ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200'
                             : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
@@ -1518,12 +1518,63 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* APARTADO 3: RESUMEN DE COMPRA */}
+            <div className="space-y-3">
+              <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
+                3. Resumen de Compra
+              </label>
+
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 shadow-xs space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-zinc-900 uppercase">
+                        Liquidación Oficial
+                      </h4>
+                      <p className="text-[10px] text-zinc-500">Taller Autorizado</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
+                    USD ($)
+                  </span>
+                </div>
+
+                {/* Resumen de costos: Repuestos, Mantenimiento, Total */}
+                <div className="space-y-2 text-xs">
+                  <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 flex items-center justify-between">
+                    <span className="text-zinc-600 font-medium">Costo por Repuestos:</span>
+                    <span className="font-mono font-bold text-zinc-900">${partsTotal.toFixed(2)} USD</span>
+                  </div>
+
+                  <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 flex items-center justify-between">
+                    <span className="text-zinc-600 font-medium">Costo por Mantenimiento:</span>
+                    <span className="font-mono font-bold text-zinc-900">${laborCost.toFixed(2)} USD</span>
+                  </div>
+
+                  <div className="p-3 bg-emerald-50 rounded-xl border-2 border-emerald-400 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] font-black uppercase text-emerald-900 tracking-wider block">
+                        Total General
+                      </span>
+                      <span className="text-[10px] text-emerald-700 font-medium">Liquidación Autorizada</span>
+                    </div>
+                    <span className="text-xl font-black font-mono text-emerald-700">
+                      ${grandTotalBudget.toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
 
                 {/* Botón de Guardar Presupuesto */}
                 <button
                   type="button"
                   onClick={handleSaveBudget}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   <span>Guardar Presupuesto Oficial</span>

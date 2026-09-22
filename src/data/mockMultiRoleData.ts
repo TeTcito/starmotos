@@ -361,7 +361,7 @@ try {
   legacyKeys.forEach((k) => localStorage.removeItem(k));
 } catch (_) {}
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   WARRANTIES: 'starmotos_shared_warranties_v4',
   WORKSHOPS: 'starmotos_shared_workshops_v4',
   ALERTS: 'starmotos_shared_alerts_v4',
@@ -369,6 +369,7 @@ const STORAGE_KEYS = {
   ORDERS: 'starmotos_shared_orders_v4',
   CLIENTS: 'starmotos_shared_clients_v4',
   INVENTORY: 'starmotos_shared_inventory_v4',
+  ALISTAMIENTOS: 'starmotos_shared_alistamientos_v4',
 };
 
 // Garantías
@@ -444,6 +445,7 @@ export function getStoredInvoices(): AdminInvoice[] {
 export function saveStoredInvoices(invoices: AdminInvoice[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    window.dispatchEvent(new Event('starmotos_invoices_updated'));
   } catch (e) {
     console.error('Error saving invoices to localStorage', e);
   }
@@ -483,6 +485,7 @@ export function getStoredClients(): TallerClient[] {
 export function saveStoredClients(clients: TallerClient[]) {
   try {
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+    window.dispatchEvent(new Event('starmotos_clients_updated'));
   } catch (e) {
     console.error('Error saving clients to localStorage', e);
   }

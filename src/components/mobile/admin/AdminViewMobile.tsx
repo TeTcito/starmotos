@@ -31,8 +31,8 @@ import {
   InventoryItem,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
-import { AlistamientoWizard } from '../../common/AlistamientoWizard';
-import { ClientesModule } from '../../common/ClientesModule';
+import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
+import { ClientesModuleMobile } from '../common/ClientesModuleMobile';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
@@ -253,7 +253,7 @@ export const AdminViewMobile: React.FC<Props> = ({
           />
         )}
         {activeSection === 'alistamiento' && (
-          <AlistamientoWizard
+          <AlistamientoWizardMobile
             defaultAtendidoPor="William Daniel Meza (Gerente)"
             defaultSede="StarMotos Matriz La Maná"
             defaultSedeId="matriz-la-mana"
@@ -269,7 +269,7 @@ export const AdminViewMobile: React.FC<Props> = ({
           />
         )}
         {activeSection === 'clientes_admin' && (
-          <ClientesModule
+          <ClientesModuleMobile
             role="admin"
             workshops={workshops}
             fullAlistamientos={fullAlistamientos}

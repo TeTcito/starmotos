@@ -27,8 +27,8 @@ import { OrdenesTallerMobile } from './OrdenesTallerMobile';
 import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobile';
 import { ClientesTallerMobile } from './ClientesTallerMobile';
 import { InventarioMobile } from './InventarioMobile';
-import { AlistamientoWizard } from '../../common/AlistamientoWizard';
-import { ClientesModule } from '../../common/ClientesModule';
+import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
+import { ClientesModuleMobile } from '../common/ClientesModuleMobile';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
@@ -248,7 +248,7 @@ export const TallerViewMobile: React.FC<Props> = ({
           <OrdenesTallerMobile orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
         )}
         {activeSection === 'alistamiento_taller' && (
-          <AlistamientoWizard
+          <AlistamientoWizardMobile
             defaultAtendidoPor={currentWs.manager}
             defaultSede={currentWs.name}
             defaultSedeId={currentWs.id}
@@ -264,13 +264,15 @@ export const TallerViewMobile: React.FC<Props> = ({
         {activeSection === 'solicitudes_garantia' && (
           <SolicitudesGarantiaTallerMobile
             warranties={warranties}
+            clients={clients}
+            currentWorkshopName={currentWs.name}
             newForm={newWarrantyForm}
             setNewForm={setNewWarrantyForm}
             onCreateRequest={onCreateWarrantyRequest}
           />
         )}
         {activeSection === 'clientes_taller' && (
-          <ClientesModule
+          <ClientesModuleMobile
             role="taller"
             currentWorkshopId={currentWs.id}
             workshops={workshops}

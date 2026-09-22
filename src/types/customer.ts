@@ -15,6 +15,7 @@ export interface ClientProfile {
   emergencyContactPhone: string;
   clientType: 'particular' | 'delivery' | 'motoviajero';
   avatarUrl: string;
+  mustChangePassword?: boolean;
 }
 
 export interface MotorcycleClientData {
@@ -523,6 +524,8 @@ export interface TallerClient {
   totalVisits: number;
   workshopId?: string;
   workshopName?: string;
+  mustChangePassword?: boolean;
+  createdManually?: boolean;
 }
 
 // --- Orden de Taller ---

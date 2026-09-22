@@ -180,6 +180,13 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       );
 
       if (matchedClient) {
+        const mustChange = Boolean(matchedClient.mustChangePassword);
+        if (mustChange) {
+          localStorage.setItem('starmotos_must_change_password', 'true');
+        } else {
+          localStorage.removeItem('starmotos_must_change_password');
+        }
+
         try {
           localStorage.setItem(
             'starmotos_current_client_profile',
@@ -191,6 +198,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               address: matchedClient.address || '',
               city: matchedClient.workshopName || 'StarMotos Sede Oficial',
               taxId: matchedClient.idNumber,
+              mustChangePassword: mustChange,
             })
           );
           localStorage.setItem(
@@ -206,6 +214,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             })
           );
         } catch (_) {}
+      } else {
+        localStorage.removeItem('starmotos_must_change_password');
       }
 
       onLoginSuccess('cliente');

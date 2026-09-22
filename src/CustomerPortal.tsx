@@ -1,9 +1,10 @@
 // src/CustomerPortal.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useCustomerPortal } from './hooks/useCustomerPortal';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { CustomerViewMobile } from './components/mobile/CustomerViewMobile';
 import { CustomerViewDesktop } from './components/desktop/CustomerViewDesktop';
+import { ForceChangePasswordModal } from './components/common/ForceChangePasswordModal';
 import { CheckCircle2 } from 'lucide-react';
 
 interface CustomerPortalProps {
@@ -36,6 +37,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     approveQuotation,
     toastMessage,
   } = portal;
+
+  // Estado para forzar cambio de contraseña en clientes creados manualmente
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(() => {
+    return (
+      profile.mustChangePassword === true ||
+      localStorage.getItem('starmotos_must_change_password') === 'true'
+    );
+  });
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -83,6 +92,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
           approveQuotation={approveQuotation}
+        />
+      )}
+
+      {/* Modal Obligatorio de Cambio de Contraseña en Primer Acceso */}
+      {mustChangePassword && (
+        <ForceChangePasswordModal
+          profile={profile}
+          onPasswordChanged={() => {
+            setMustChangePassword(false);
+            updateProfile({ ...profile, mustChangePassword: false });
+          }}
+          onLogout={onLogout}
         />
       )}
 

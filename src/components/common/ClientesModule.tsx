@@ -39,6 +39,9 @@ import {
   Maximize2,
   Sparkles,
   Trash2,
+  UserPlus,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -53,6 +56,7 @@ import {
   getStoredFullAlistamientos,
   saveStoredFullAlistamientos,
 } from '../../data/mockMultiRoleData';
+import { cloudSaveClient } from '../../services/supabaseService';
 
 export interface ClientRowData {
   nombre: string;
@@ -173,6 +177,124 @@ export const ClientesModule: React.FC<Props> = ({
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
   const [copiedCedula, setCopiedCedula] = useState<string | null>(null);
   const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
+
+  // Estado para Modal de "+ Nuevo Cliente" (Registro Manual desde Panel)
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [newClientTab, setNewClientTab] = useState<'cliente' | 'moto'>('cliente');
+  const [newClientError, setNewClientError] = useState('');
+  const [isSavingNewClient, setIsSavingNewClient] = useState(false);
+  const [newClientData, setNewClientData] = useState({
+    firstNames: '',
+    lastNames: '',
+    idNumber: '',
+    phone: '',
+    email: '',
+    address: '',
+    workshopId: currentWorkshopId || (workshops[0]?.id || 'matriz-la-mana'),
+    motoBrand: 'StarMotos',
+    motoModel: '',
+    motoPlate: '',
+    motoColor: '',
+    motoVin: '',
+    motorNumber: '',
+    motoMileage: '',
+  });
+
+  const handleCreateNewClientSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewClientError('');
+
+    if (
+      !newClientData.firstNames.trim() ||
+      !newClientData.lastNames.trim() ||
+      !newClientData.idNumber.trim() ||
+      !newClientData.phone.trim() ||
+      !newClientData.email.trim()
+    ) {
+      setNewClientTab('cliente');
+      setNewClientError('Por favor complete los campos obligatorios del cliente (Nombres, Apellidos, Cédula, Teléfono, Correo).');
+      return;
+    }
+
+    if (!newClientData.motoModel.trim() || !newClientData.motoVin.trim()) {
+      setNewClientTab('moto');
+      setNewClientError('Por favor complete los campos obligatorios de la moto (Modelo y Chasis/VIN).');
+      return;
+    }
+
+    setIsSavingNewClient(true);
+
+    const cleanCedula = newClientData.idNumber.trim();
+    const cleanEmail = newClientData.email.trim().toLowerCase();
+    const fullName = `${newClientData.firstNames.trim()} ${newClientData.lastNames.trim()}`.trim();
+    const selectedWs = workshops.find((w) => w.id === newClientData.workshopId) || workshops[0];
+
+    const newClient: TallerClient = {
+      id: cleanCedula,
+      idNumber: cleanCedula,
+      fullName,
+      phone: newClientData.phone.trim(),
+      email: cleanEmail,
+      address: newClientData.address.trim(),
+      workshopId: selectedWs?.id || 'matriz-la-mana',
+      workshopName: selectedWs?.name || 'StarMotos Matriz La Maná',
+      motorcycleBrand: newClientData.motoBrand.trim() || 'StarMotos',
+      motorcycleModel: newClientData.motoModel.trim(),
+      motorcyclePlate: newClientData.motoPlate.trim().toUpperCase() || 'EN TRÁMITE',
+      motorcycleVin: newClientData.motoVin.trim().toUpperCase(),
+      motorNumber: newClientData.motorNumber.trim().toUpperCase(),
+      color: newClientData.motoColor.trim() || 'Negro',
+      motorcycleMileage: Number(newClientData.motoMileage) || 0,
+      totalVisits: 0,
+      lastVisit: new Date().toISOString().split('T')[0],
+      mustChangePassword: true,
+      createdManually: true,
+    };
+
+    try {
+      const stored = getStoredClients();
+      const updated = [newClient, ...stored.filter((c) => c.idNumber !== cleanCedula)];
+      saveStoredClients(updated);
+      cloudSaveClient(newClient);
+
+      // Guardar credenciales iniciales con cambio obligatorio de clave
+      const accounts = JSON.parse(localStorage.getItem('starmotos_registered_accounts') || '{}');
+      accounts[cleanEmail] = {
+        password: cleanCedula,
+        mustChangePassword: true,
+      };
+      accounts[cleanCedula] = {
+        password: cleanCedula,
+        mustChangePassword: true,
+      };
+      localStorage.setItem('starmotos_registered_accounts', JSON.stringify(accounts));
+    } catch (err) {
+      console.error('Error al registrar nuevo cliente manual:', err);
+    }
+
+    setIsSavingNewClient(false);
+    setIsNewClientModalOpen(false);
+    setNewClientData({
+      firstNames: '',
+      lastNames: '',
+      idNumber: '',
+      phone: '',
+      email: '',
+      address: '',
+      workshopId: currentWorkshopId || (workshops[0]?.id || 'matriz-la-mana'),
+      motoBrand: 'StarMotos',
+      motoModel: '',
+      motoPlate: '',
+      motoColor: '',
+      motoVin: '',
+      motorNumber: '',
+      motoMileage: '',
+    });
+    setSaveSuccessToast(
+      `¡Cliente ${fullName} registrado exitosamente! Usuario: ${cleanEmail} | Clave temporal: ${cleanCedula}`
+    );
+    setTimeout(() => setSaveSuccessToast(null), 6000);
+  };
 
   // Helper para consultar datos de fila con overrides aplicados
   const getRowData = (c: UnifiedClient) => getClientRowData(c, clientOverrides);
@@ -1397,16 +1519,19 @@ export const ClientesModule: React.FC<Props> = ({
               <span>Exportar Excel</span>
             </button>
 
-            {onNavigateToAlistamiento && (
-              <button
-                type="button"
-                onClick={() => onNavigateToAlistamiento()}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Nuevo Alistamiento</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setNewClientTab('cliente');
+                setNewClientError('');
+                setIsNewClientModalOpen(true);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-all cursor-pointer shrink-0"
+              title="Registrar manualmente un cliente y su motocicleta desde el panel de administración o taller"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>+ Nuevo Cliente</span>
+            </button>
           </div>
         </div>
 
@@ -1810,6 +1935,421 @@ export const ClientesModule: React.FC<Props> = ({
                 Restablecer Filtros
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: REGISTRAR NUEVO CLIENTE MANUALMENTE (DESDE EL PANEL)               */}
+      {/* ========================================================================= */}
+      {isNewClientModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-zinc-200 overflow-hidden my-auto animate-scale-up text-left">
+            {/* Cabecera del Modal */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-200 bg-zinc-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-zinc-900">
+                    Registrar Nuevo Cliente en el Sistema
+                  </h3>
+                  <p className="text-[11px] text-zinc-500">
+                    Ingreso manual para clientes que no usan el portal web. Se generará usuario y clave temporal.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsNewClientModalOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 rounded-lg transition cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Aviso Informativo de Credenciales Iniciales */}
+            <div className="mx-4 sm:mx-6 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
+              <KeyRound className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-bold block">Credenciales asignadas automáticamente:</span>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  • <strong>Usuario:</strong> Correo Electrónico (o Cédula)<br />
+                  • <strong>Contraseña temporal:</strong> Número de Cédula del cliente<br />
+                  • <strong>Seguridad:</strong> El sistema obligará al cliente a cambiar su contraseña de manera forzosa en su primer inicio de sesión.
+                </p>
+              </div>
+            </div>
+
+            {/* Error si existe */}
+            {newClientError && (
+              <div className="mx-4 sm:mx-6 mt-3 p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                <span>{newClientError}</span>
+              </div>
+            )}
+
+            {/* Selector de Pestañas Superiores */}
+            <div className="px-4 sm:px-6 pt-3">
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 rounded-xl border border-zinc-200">
+                <button
+                  type="button"
+                  onClick={() => setNewClientTab('cliente')}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    newClientTab === 'cliente'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>1. Datos del Cliente</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setNewClientTab('moto')}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    newClientTab === 'moto'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                  }`}
+                >
+                  <Bike className="w-3.5 h-3.5" />
+                  <span>2. Datos de la Moto</span>
+                  {newClientData.motoModel && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleCreateNewClientSubmit} className="p-4 sm:p-6 space-y-3">
+              {/* PESTAÑA 1: DATOS DEL CLIENTE */}
+              {newClientTab === 'cliente' && (
+                <div className="space-y-3 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Nombres *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.firstNames}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, firstNames: e.target.value })
+                        }
+                        placeholder="Ej: Fernando David"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Apellidos *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.lastNames}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, lastNames: e.target.value })
+                        }
+                        placeholder="Ej: Paredes Zambrano"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Cédula / RUC *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.idNumber}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, idNumber: e.target.value })
+                        }
+                        placeholder="10 o 13 dígitos"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Celular / WhatsApp *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.phone}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, phone: e.target.value })
+                        }
+                        placeholder="0991234567"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Correo Electrónico *
+                      </label>
+                      <input
+                        type="email"
+                        value={newClientData.email}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, email: e.target.value })
+                        }
+                        placeholder="cliente@ejemplo.com"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Sede / Taller Asignado
+                      </label>
+                      <select
+                        value={newClientData.workshopId}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, workshopId: e.target.value })
+                        }
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition cursor-pointer"
+                      >
+                        {workshops.map((ws) => (
+                          <option key={ws.id} value={ws.id}>
+                            {ws.name.replace('StarMotos ', '')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                      Dirección Domiciliaria
+                    </label>
+                    <input
+                      type="text"
+                      value={newClientData.address}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, address: e.target.value })
+                      }
+                      placeholder="Ciudad / Barrio / Calle principal"
+                      className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          !newClientData.firstNames.trim() ||
+                          !newClientData.lastNames.trim() ||
+                          !newClientData.idNumber.trim() ||
+                          !newClientData.phone.trim() ||
+                          !newClientData.email.trim()
+                        ) {
+                          setNewClientError('Por favor complete los campos obligatorios del cliente.');
+                          return;
+                        }
+                        setNewClientError('');
+                        setNewClientTab('moto');
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Siguiente: Datos de la Moto</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PESTAÑA 2: DATOS DE LA MOTOCICLETA */}
+              {newClientTab === 'moto' && (
+                <div className="space-y-3 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Marca *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.motoBrand}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motoBrand: e.target.value })
+                        }
+                        placeholder="StarMotos, Benelli..."
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition font-medium"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Modelo de la Moto *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.motoModel}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motoModel: e.target.value })
+                        }
+                        placeholder="Ej: Loncin CR5 250cc, Tekken 250..."
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition font-medium"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider">
+                          Placa Vehicular
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewClientData({ ...newClientData, motoPlate: 'EN TRÁMITE' })
+                          }
+                          className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 cursor-pointer transition"
+                        >
+                          + En trámite
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={newClientData.motoPlate}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase() })
+                        }
+                        placeholder="Ej: AB123C o EN TRÁMITE"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono font-bold uppercase text-zinc-800 outline-none transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Color de la Moto
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.motoColor}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motoColor: e.target.value })
+                        }
+                        placeholder="Ej: Negro / Rojo"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-800 outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Chasis / VIN (17 dígitos) *
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.motoVin}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase() })
+                        }
+                        placeholder="Serie o VIN"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono uppercase text-zinc-800 outline-none transition"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Número de Motor (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newClientData.motorNumber}
+                        onChange={(e) =>
+                          setNewClientData({ ...newClientData, motorNumber: e.target.value.toUpperCase() })
+                        }
+                        placeholder="Opcional"
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono uppercase text-zinc-800 outline-none transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                      Kilometraje Actual (km)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newClientData.motoMileage}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, motoMileage: e.target.value })
+                      }
+                      placeholder="0"
+                      className="w-full px-3 py-2 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono text-zinc-800 outline-none transition"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Botones de Acción del Pie de Formulario */}
+              <div className="pt-4 border-t border-zinc-200 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsNewClientModalOpen(false)}
+                  className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {newClientTab === 'moto' && (
+                    <button
+                      type="button"
+                      onClick={() => setNewClientTab('cliente')}
+                      className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Volver al Cliente</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSavingNewClient}
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingNewClient ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Guardar y Registrar Cliente</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

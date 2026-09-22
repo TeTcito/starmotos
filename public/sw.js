@@ -1,4 +1,4 @@
-const CACHE_NAME = 'starmotos-v37';
+const CACHE_NAME = 'starmotos-v38';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

@@ -323,6 +323,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   useEffect(() => {
     setCurrentWarranty(warranty);
     setEditFormData(warranty);
+    setGaranteSelectedResolution(warranty.resolutionType || null);
   }, [warranty]);
 
   const statusInfo = getWarrantyStatusInfo(currentWarranty.status);
@@ -334,8 +335,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   const [garanteInputNotes, setGaranteInputNotes] = useState(
     currentWarranty.garanteNotes || 'Dictamen oficial favorable emitido por la Gerencia de Garantías de la Marca.'
   );
-  const [garanteSelectedResolution, setGaranteSelectedResolution] = useState<'encargar_taller' | 'envio_repuesto'>(
-    currentWarranty.resolutionType || 'encargar_taller'
+  const [garanteSelectedResolution, setGaranteSelectedResolution] = useState<'encargar_taller' | 'envio_repuesto' | null>(
+    currentWarranty.resolutionType || null
   );
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
@@ -458,6 +459,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       resolutionType: 'encargar_taller',
       garanteNotes: garanteInputNotes,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotalBudget,
+      estimatedCost: grandTotalBudget,
     };
     setCurrentWarranty(updated);
     const all = getStoredWarranties();
@@ -484,6 +490,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       resolutionType: 'envio_repuesto',
       garanteNotes: garanteInputNotes,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      totalBudget: 0,
+      estimatedCost: 0,
     };
     setCurrentWarranty(updated);
     const all = getStoredWarranties();
@@ -1238,48 +1246,104 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Modalidad de Resolución</label>
-                <div className="h-11 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl flex items-center justify-between text-xs font-bold">
-                  <span className="text-zinc-600">Resolución:</span>
-                  {currentWarranty.resolutionType ? (
-                    <span
-                      className={`px-2.5 py-1 rounded-lg text-xs font-black ${
-                        currentWarranty.resolutionType === 'encargar_taller'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {currentWarranty.resolutionType === 'encargar_taller'
-                        ? '🔧 Encargar a Taller'
-                        : '📦 Envío de Repuesto'}
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                      ⏳ Pendiente de dictamen de Garante
+              {/* Donde estaba el presupuesto: 2 bloques resumidos (Encargar al taller / Envío de repuesto) */}
+              <div className="space-y-2 pt-1 border-t border-zinc-100">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs sm:text-sm font-bold text-zinc-700">
+                    Modalidad de Resolución <span className="text-red-500">*</span>
+                  </label>
+                  {garanteSelectedResolution && (
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                      Seleccionada
                     </span>
                   )}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                  {currentWarranty.totalBudget && currentWarranty.totalBudget > 0 ? 'Presupuesto Total Autorizado' : 'Monto Estimado Reclamado'}
-                </label>
-                <div className="flex items-center gap-2 h-11 sm:h-12 px-4 bg-emerald-50 border border-emerald-200 rounded-xl text-base font-black font-mono text-emerald-800">
-                  <DollarSign className="w-5 h-5 text-emerald-600" />
-                  <span>
-                    ${((currentWarranty.totalBudget && currentWarranty.totalBudget > 0) ? currentWarranty.totalBudget : (grandTotalBudget > 0 ? grandTotalBudget : (currentWarranty.estimatedCost || 60))).toFixed(2)} USD
-                  </span>
-                </div>
+                {viewerRole === 'taller' ? (
+                  <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                      Estado de Resolución
+                    </span>
+                    {currentWarranty.resolutionType === 'encargar_taller' ? (
+                      <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                        <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
+                      </div>
+                    ) : currentWarranty.resolutionType === 'envio_repuesto' ? (
+                      <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                        <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
+                        <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+                        <span>Pendiente de dictamen técnico del Garante de Marca</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGaranteSelectedResolution('encargar_taller')}
+                      className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        garanteSelectedResolution === 'encargar_taller'
+                          ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
+                        </div>
+                        {garanteSelectedResolution === 'encargar_taller' && (
+                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-tight">
+                        El taller ejecuta el trabajo y factura repuestos / mano de obra.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGaranteSelectedResolution('envio_repuesto')}
+                      className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        garanteSelectedResolution === 'envio_repuesto'
+                          ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
+                          : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
+                        </div>
+                        {garanteSelectedResolution === 'envio_repuesto' && (
+                          <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-tight">
+                        Fábrica o Marca despacha directamente las piezas sin costo.
+                      </p>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* SECCIÓN DE PRESUPUESTO OFICIAL PARA ADMINISTRADOR MATRIZ */}
-      {viewerRole === 'admin' && !isEditing && (
+      {/* SECCIÓN DE PRESUPUESTO OFICIAL (SE ACTIVA AL SELECCIONAR 'Encargar al taller') */}
+      {(viewerRole === 'admin' || viewerRole === 'garante') &&
+        (garanteSelectedResolution === 'encargar_taller' || currentWarranty.resolutionType === 'encargar_taller') &&
+        !isEditing && (
         <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
           {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
           {currentWarranty.garanteNotes && (
@@ -1294,31 +1358,16 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                       Dictamen & Observación Oficial del Garante de Marca
                     </h4>
                     <p className="text-[11px] text-indigo-700 font-medium">
-                      Instrucción técnica enviada por la Gerencia de Garantías para proceder con la liquidación
+                      Instrucción técnica emitida para la liquidación de la garantía
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-zinc-600">Resolución Garante:</span>
-                  <span
-                    className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs ${
-                      currentWarranty.resolutionType === 'encargar_taller'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-emerald-600 text-white'
-                    }`}
-                  >
-                    {currentWarranty.resolutionType === 'encargar_taller' ? (
-                      <>
-                        <Wrench className="w-3.5 h-3.5" />
-                        <span>Encargar a Taller</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Envío de Repuesto</span>
-                      </>
-                    )}
+                  <span className="text-xs font-bold text-zinc-600">Resolución:</span>
+                  <span className="px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs bg-indigo-600 text-white">
+                    <Wrench className="w-3.5 h-3.5" />
+                    <span>Encargar al Taller</span>
                   </span>
                 </div>
               </div>
@@ -1344,14 +1393,12 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               <div>
                 <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                   <span>Presupuesto de Repuestos & Mano de Obra (Taller)</span>
-                  {currentWarranty.status === 'en_proceso_aceptacion_2' && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black border border-indigo-200">
-                      En Proceso de Aceptación 2
-                    </span>
-                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black border border-indigo-200">
+                    Encargado al Taller
+                  </span>
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  Estipule el valor en dólares ($ USD) para cada repuesto reportado por el taller y defina el costo y demora de mano de obra.
+                  Valores unitarios en dólares ($ USD) para repuestos solicitados y costo/demora de mano de obra.
                 </p>
               </div>
             </div>
@@ -1364,32 +1411,95 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
 
-          {/* Bloques de Repuestos (Un bloque por cada repuesto puesto por el taller) */}
-          <div className="space-y-3">
-            <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-              1. Repuestos Solicitados por el Taller ({parsedPartsList.length})
-            </label>
+          {/* DISTRIBUCIÓN: A LA IZQUIERDA ABAJO CAMPOS DE PRESUPUESTO, A LA DERECHA TOTAL DE TODO */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* A LA IZQUIERDA ABAJO: CAMPOS DE PRESUPUESTO (REPUESTOS + MANO DE OBRA) */}
+            <div className="lg:col-span-2 space-y-5">
+              {/* 1. Repuestos Solicitados por el Taller */}
+              <div className="space-y-3">
+                <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
+                  1. Repuestos Solicitados por el Taller ({parsedPartsList.length})
+                </label>
 
-            {parsedPartsList.length === 0 ? (
-              <p className="text-xs text-zinc-400 italic bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-                No se especificaron repuestos desglosados en esta solicitud.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {parsedPartsList.map((part, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs space-y-2"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-bold text-zinc-800 line-clamp-2">
-                        {part}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-                        #{idx + 1}
-                      </span>
+                {parsedPartsList.length === 0 ? (
+                  <p className="text-xs text-zinc-400 italic bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+                    No se especificaron repuestos desglosados en esta solicitud.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {parsedPartsList.map((part, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-bold text-zinc-800 line-clamp-2">
+                            {part}
+                          </span>
+                          <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                            #{idx + 1}
+                          </span>
+                        </div>
+
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setPartsBudgetMap((prev) => ({
+                                ...prev,
+                                [part]: val,
+                              }));
+                            }}
+                            className="w-full h-9 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Mano de Obra Calificada */}
+              <div className="pt-2 border-t border-zinc-100 space-y-3">
+                <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
+                  2. Mano de Obra Calificada
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+                  {/* Botones de tiempo de demora con selección rápida */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
+                      Tiempo Estimado de Demora (Clic Rápido):
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {QUICK_LABOR_TIMES.map((timeOption) => (
+                        <button
+                          key={timeOption}
+                          type="button"
+                          onClick={() => setLaborTime(timeOption)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            laborTime === timeOption
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {timeOption}
+                        </button>
+                      ))}
                     </div>
+                  </div>
 
+                  {/* Valor de mano de obra */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
+                      Valor Mano de Obra ($ USD):
+                    </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
                       <input
@@ -1397,145 +1507,70 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                         step="0.01"
                         min="0"
                         placeholder="0.00"
-                        value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          setPartsBudgetMap((prev) => ({
-                            ...prev,
-                            [part]: val,
-                          }));
-                        }}
-                        className="w-full h-9 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
+                        value={laborCost !== undefined ? laborCost : ''}
+                        onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
+                        className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-sm font-mono font-bold text-zinc-900 outline-none"
                       />
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Bloque de Mano de Obra */}
-          <div className="pt-2 border-t border-zinc-100 space-y-3">
-            <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-              2. Mano de Obra Calificada
-            </label>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-              {/* Botones de tiempo de demora con selección rápida */}
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                  Tiempo Estimado de Demora (Clic Rápido):
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_LABOR_TIMES.map((timeOption) => (
-                    <button
-                      key={timeOption}
-                      type="button"
-                      onClick={() => setLaborTime(timeOption)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        laborTime === timeOption
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
-                      }`}
-                    >
-                      {timeOption}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Valor de mano de obra */}
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                  Valor Mano de Obra ($ USD):
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={laborCost !== undefined ? laborCost : ''}
-                    onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
-                    className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-sm font-mono font-bold text-zinc-900 outline-none"
-                  />
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* 3. CAMPO / BLOQUE DE TOTAL DE TODO (LIQUIDACIÓN COMPLETA) */}
-          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 text-white p-5 rounded-2xl shadow-md border border-zinc-800 space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">
-                  <DollarSign className="w-5 h-5" />
+            {/* A LA DERECHA ABAJO: TOTAL DE TODO Y GUARDAR */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 text-white p-5 rounded-2xl shadow-md border border-zinc-800 space-y-3.5">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black tracking-wide text-white uppercase">
+                        Total de Todo
+                      </h4>
+                      <p className="text-[10px] text-zinc-400">
+                        Presupuesto oficial autorizado
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold font-mono px-2 py-0.5 bg-zinc-800 text-zinc-300 rounded border border-zinc-700">
+                    USD ($)
+                  </span>
                 </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-black tracking-wide text-white uppercase">
-                    Total de Todo — Presupuesto General Autorizado
-                  </h4>
-                  <p className="text-[11px] text-zinc-400">
-                    Consolidado total de repuestos desglosados + costo oficial de mano de obra
-                  </p>
+
+                <div className="space-y-2">
+                  <div className="p-2.5 bg-zinc-800/70 rounded-xl border border-zinc-700/60 flex items-center justify-between text-xs">
+                    <span className="text-zinc-400">Repuestos ({parsedPartsList.length}):</span>
+                    <span className="font-mono font-bold text-zinc-100">${partsTotal.toFixed(2)}</span>
+                  </div>
+
+                  <div className="p-2.5 bg-zinc-800/70 rounded-xl border border-zinc-700/60 flex items-center justify-between text-xs">
+                    <span className="text-zinc-400">Mano de Obra ({laborTime}):</span>
+                    <span className="font-mono font-bold text-zinc-100">${laborCost.toFixed(2)}</span>
+                  </div>
+
+                  <div className="p-3 bg-emerald-950/80 rounded-xl border-2 border-emerald-500/60 shadow-inner flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">Gran Total de Todo</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    </div>
+                    <span className="text-2xl font-black font-mono text-emerald-400">
+                      ${grandTotalBudget.toFixed(2)} USD
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <span className="text-[10px] font-bold font-mono px-2.5 py-1 bg-zinc-800 text-zinc-300 rounded-lg border border-zinc-700">
-                Valores en USD ($)
-              </span>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              {/* Subtotal Repuestos */}
-              <div className="p-3 bg-zinc-800/80 rounded-xl border border-zinc-700/60 flex flex-col justify-between">
-                <span className="text-[11px] font-semibold text-zinc-400">Subtotal Repuestos ({parsedPartsList.length})</span>
-                <span className="text-base sm:text-lg font-black font-mono text-zinc-100 mt-1">
-                  ${partsTotal.toFixed(2)} USD
-                </span>
-              </div>
-
-              {/* Subtotal Mano de Obra */}
-              <div className="p-3 bg-zinc-800/80 rounded-xl border border-zinc-700/60 flex flex-col justify-between">
-                <span className="text-[11px] font-semibold text-zinc-400">Mano de Obra ({laborTime})</span>
-                <span className="text-base sm:text-lg font-black font-mono text-zinc-100 mt-1">
-                  ${laborCost.toFixed(2)} USD
-                </span>
-              </div>
-
-              {/* TOTAL DE TODO */}
-              <div className="p-3 bg-emerald-950/70 rounded-xl border-2 border-emerald-500/60 flex flex-col justify-between shadow-inner">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">Total de Todo</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                </div>
-                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1">
-                  ${grandTotalBudget.toFixed(2)} USD
-                </span>
+                <button
+                  type="button"
+                  onClick={handleSaveBudget}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Guardar Presupuesto Oficial</span>
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* Botón Guardar Presupuesto */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-3 text-xs text-zinc-500">
-              <span>Repuestos: <strong className="text-zinc-900 font-mono">${partsTotal.toFixed(2)}</strong></span>
-              <span>+</span>
-              <span>Mano de Obra: <strong className="text-zinc-900 font-mono">${laborCost.toFixed(2)}</strong></span>
-              <span>=</span>
-              <span className="text-emerald-700 font-bold font-mono text-sm bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                ${grandTotalBudget.toFixed(2)} USD
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveBudget}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>Guardar Presupuesto Oficial</span>
-            </button>
           </div>
         </div>
       )}
@@ -1699,62 +1734,32 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           )}
 
-          {/* Selector de Modalidad de Resolución por el Garante de Marca */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-800 mb-1.5">
-              Modalidad de Resolución Dictaminada <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setGaranteSelectedResolution('encargar_taller')}
-                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  garanteSelectedResolution === 'encargar_taller'
-                    ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
-                    : 'border-zinc-200 bg-white hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-black text-zinc-900">Encargar a Taller</span>
-                  </div>
-                  {garanteSelectedResolution === 'encargar_taller' && (
-                    <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
-                    </div>
-                  )}
-                </div>
-                <p className="text-[11px] text-zinc-600 leading-tight">
-                  Autoriza al taller oficial a ejecutar el servicio. Matriz procederá a valorizar repuestos y mano de obra para liquidación.
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setGaranteSelectedResolution('envio_repuesto')}
-                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  garanteSelectedResolution === 'envio_repuesto'
-                    ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
-                    : 'border-zinc-200 bg-white hover:bg-zinc-50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-black text-zinc-900">Envío de Repuesto</span>
-                  </div>
-                  {garanteSelectedResolution === 'envio_repuesto' && (
-                    <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
-                    </div>
-                  )}
-                </div>
-                <p className="text-[11px] text-zinc-600 leading-tight">
-                  La Fábrica / Importador despacha físicamente los repuestos requeridos a la sede solicitante sin cobro al cliente.
-                </p>
-              </button>
+          {/* Indicador de Modalidad Seleccionada en el Bloque 3 */}
+          <div className="p-3.5 rounded-xl border bg-zinc-50 border-zinc-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold text-zinc-700">Modalidad Dictaminada (Bloque 3):</span>
+              {garanteSelectedResolution === 'encargar_taller' ? (
+                <span className="px-3 py-1 rounded-lg text-xs font-black bg-indigo-600 text-white flex items-center gap-1.5 shadow-xs">
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Encargar al Taller (Presupuesto Habilitado)</span>
+                </span>
+              ) : garanteSelectedResolution === 'envio_repuesto' ? (
+                <span className="px-3 py-1 rounded-lg text-xs font-black bg-emerald-600 text-white flex items-center gap-1.5 shadow-xs">
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Envío de Repuesto Directo (Fábrica)</span>
+                </span>
+              ) : (
+                <span className="px-3 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Pendiente: Seleccione una opción en Columna 3 arriba</span>
+                </span>
+              )}
             </div>
+            {!garanteSelectedResolution && (
+              <p className="text-[11px] text-amber-700 mt-2">
+                Por favor haga clic en <strong>"Encargar al taller"</strong> o <strong>"Envío de repuesto"</strong> en la Columna 3 para formalizar el dictamen técnico.
+              </p>
+            )}
           </div>
 
           <div>
@@ -1805,22 +1810,35 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
             <button
               type="button"
+              disabled={!garanteSelectedResolution}
               onClick={() => {
+                if (!garanteSelectedResolution) {
+                  alert('Por favor seleccione la modalidad de resolución en la Columna 3 arriba (Encargar al taller o Envío de repuesto).');
+                  return;
+                }
+                if (!garanteInputNotes.trim()) {
+                  alert('Por favor ingrese su observación / dictamen técnico antes de formalizar la aprobación.');
+                  return;
+                }
                 if (garanteSelectedResolution === 'encargar_taller') {
                   handleGaranteApproveEncargar();
                 } else {
                   handleGaranteApproveEnvio();
                 }
               }}
-              className={`px-5 py-2.5 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer transition ${
-                garanteSelectedResolution === 'encargar_taller'
-                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
-                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+              className={`px-5 py-2.5 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition ${
+                !garanteSelectedResolution
+                  ? 'bg-zinc-400 cursor-not-allowed opacity-60'
+                  : garanteSelectedResolution === 'encargar_taller'
+                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 cursor-pointer'
+                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20 cursor-pointer'
               }`}
             >
               <Check className="w-4 h-4" />
               <span>
-                {garanteSelectedResolution === 'encargar_taller'
+                {!garanteSelectedResolution
+                  ? 'Seleccione Modalidad Arriba'
+                  : garanteSelectedResolution === 'encargar_taller'
                   ? 'Aprobar Dictamen: Encargar a Taller'
                   : 'Aprobar Dictamen: Envío de Repuesto'}
               </span>

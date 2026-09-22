@@ -326,12 +326,8 @@ export function useAdminPortal() {
 
   // Eliminar garantía
   const deleteWarranty = useCallback((id: string) => {
-    setWarranties((prev) => {
-      const updated = prev.filter((w) => w.id !== id);
-      saveStoredWarranties(updated);
-      return updated;
-    });
     deleteStoredWarranty(id);
+    setWarranties((prev) => prev.filter((w) => w.id !== id && w.requestNumber !== id));
     showToast('Solicitud de garantía eliminada.', 'info');
   }, [showToast]);
 
@@ -701,31 +697,20 @@ export function useAdminPortal() {
 
   // Eliminar alistamiento
   const deleteFullAlistamiento = useCallback((id: string) => {
-    setFullAlistamientos((prev) => {
-      const updated = prev.filter((r) => r.id !== id);
-      saveStoredFullAlistamientos(updated);
-      return updated;
-    });
     deleteStoredAlistamiento(id);
+    setFullAlistamientos((prev) => prev.filter((r) => r.id !== id && r.cedulaRuc !== id));
     showToast('Alistamiento eliminado correctamente.', 'info');
   }, [showToast]);
 
   // Eliminar cliente y cuenta de usuario de forma definitiva
   const deleteClient = useCallback((idOrCedula: string) => {
-    // 1. Eliminar de la lista de clientes de taller
-    setClients((prev) => {
-      const updated = prev.filter((c) => c.id !== idOrCedula && c.idNumber !== idOrCedula);
-      saveStoredClients(updated);
-      return updated;
-    });
+    // 1. Eliminar persistentemente con tombstones y cascada
     deleteStoredClient(idOrCedula);
 
-    // 2. Eliminar de registros de alistamiento para evitar que vuelva a aparecer como cliente unificado
-    setFullAlistamientos((prev) => {
-      const updated = prev.filter((r) => r.cedulaRuc !== idOrCedula && r.id !== idOrCedula);
-      saveStoredFullAlistamientos(updated);
-      return updated;
-    });
+    // 2. Actualizar estados locales de forma inmediata
+    setClients((prev) => prev.filter((c) => c.id !== idOrCedula && c.idNumber !== idOrCedula));
+    setFullAlistamientos((prev) => prev.filter((r) => r.cedulaRuc !== idOrCedula && r.id !== idOrCedula));
+    setWarranties((prev) => prev.filter((w) => w.clientIdNumber !== idOrCedula));
 
     // 3. Eliminar cuenta de credenciales de login si existía
     try {

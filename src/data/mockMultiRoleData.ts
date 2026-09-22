@@ -23,10 +23,20 @@ import {
   cloudDeleteClient,
   cloudDeleteAlert,
   cloudDeleteAlerts,
+  getDeletedTombstones,
+  addDeletedTombstone,
+  removeDeletedTombstone,
+  isDeletedTombstone,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-export { STORAGE_KEYS };
+export {
+  STORAGE_KEYS,
+  getDeletedTombstones,
+  addDeletedTombstone,
+  removeDeletedTombstone,
+  isDeletedTombstone,
+};
 
 
 // --- Talleres y Sucursales Oficiales de StarMotos (11 Ubicaciones Oficiales) ---
@@ -382,19 +392,44 @@ try {
 export function getStoredWarranties(): WarrantyRequest[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: WarrantyRequest[] = JSON.parse(stored);
+      return parsed.filter(
+        (w) =>
+          w &&
+          w.id &&
+          !isDeletedTombstone(w.id) &&
+          (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
+          (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
+      );
+    }
   } catch (e) {
     console.error('Error reading warranties from localStorage', e);
   }
-  return INITIAL_WARRANTY_REQUESTS;
+  return INITIAL_WARRANTY_REQUESTS.filter(
+    (w) =>
+      w &&
+      w.id &&
+      !isDeletedTombstone(w.id) &&
+      (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
+      (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
+  );
 }
 
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(warranties));
+    const cleanList = warranties.filter(
+      (w) =>
+        w &&
+        w.id &&
+        !isDeletedTombstone(w.id) &&
+        (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
+        (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
+    );
+    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
-    if (warranties.length > 0) {
-      warranties.forEach((w) => cloudSaveWarranty(w));
+    if (cleanList.length > 0) {
+      cleanList.forEach((w) => cloudSaveWarranty(w));
     }
   } catch (e) {
     console.error('Error saving warranties to localStorage', e);
@@ -403,10 +438,20 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
 
 export function deleteStoredWarranty(id: string) {
   try {
-    const current = getStoredWarranties().filter((w) => w.id !== id);
+    const cleanId = id.trim();
+    const stored = getStoredWarranties();
+    const target = stored.find((w) => w.id === cleanId || w.requestNumber === cleanId);
+    addDeletedTombstone(cleanId, target?.id, target?.requestNumber);
+
+    const current = stored.filter(
+      (w) =>
+        w.id !== cleanId &&
+        w.requestNumber !== cleanId &&
+        (target ? w.id !== target.id && w.requestNumber !== target.requestNumber : true)
+    );
     localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
-    cloudDeleteWarranty(id);
+    cloudDeleteWarranty(cleanId);
   } catch (e) {
     console.error('Error deleting warranty', e);
   }
@@ -416,19 +461,23 @@ export function deleteStoredWarranty(id: string) {
 export function getStoredAlerts(): SystemAlert[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.ALERTS);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: SystemAlert[] = JSON.parse(stored);
+      return parsed.filter((a) => a && a.id && !isDeletedTombstone(a.id));
+    }
   } catch (e) {
     console.error('Error reading alerts from localStorage', e);
   }
-  return INITIAL_ALERTS;
+  return INITIAL_ALERTS.filter((a) => a && a.id && !isDeletedTombstone(a.id));
 }
 
 export function saveStoredAlerts(alerts: SystemAlert[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(alerts));
+    const cleanList = alerts.filter((a) => a && a.id && !isDeletedTombstone(a.id));
+    localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_alerts_updated'));
-    if (alerts.length > 0) {
-      alerts.forEach((alt) => cloudSaveAlert(alt));
+    if (cleanList.length > 0) {
+      cleanList.forEach((alt) => cloudSaveAlert(alt));
     }
   } catch (e) {
     console.error('Error saving alerts to localStorage', e);
@@ -437,10 +486,12 @@ export function saveStoredAlerts(alerts: SystemAlert[]) {
 
 export function deleteStoredAlert(id: string) {
   try {
-    const current = getStoredAlerts().filter((a) => a.id !== id);
+    const cleanId = id.trim();
+    addDeletedTombstone(cleanId);
+    const current = getStoredAlerts().filter((a) => a.id !== cleanId);
     localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(current));
     window.dispatchEvent(new Event('starmotos_alerts_updated'));
-    cloudDeleteAlert(id);
+    cloudDeleteAlert(cleanId);
   } catch (e) {
     console.error('Error deleting alert', e);
   }
@@ -449,7 +500,8 @@ export function deleteStoredAlert(id: string) {
 export function deleteStoredAlerts(ids: string[]) {
   if (!ids || ids.length === 0) return;
   try {
-    const idSet = new Set(ids);
+    ids.forEach((id) => addDeletedTombstone(id));
+    const idSet = new Set(ids.map((i) => i.trim()));
     const current = getStoredAlerts().filter((a) => !idSet.has(a.id));
     localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(current));
     window.dispatchEvent(new Event('starmotos_alerts_updated'));
@@ -532,19 +584,41 @@ export function saveStoredOrders(orders: TallerOrder[]) {
 export function getStoredClients(): TallerClient[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: TallerClient[] = JSON.parse(stored);
+      return parsed.filter(
+        (c) =>
+          c &&
+          c.id &&
+          !isDeletedTombstone(c.id) &&
+          (!c.idNumber || !isDeletedTombstone(c.idNumber.trim()))
+      );
+    }
   } catch (e) {
     console.error('Error reading clients from localStorage', e);
   }
-  return INITIAL_TALLER_CLIENTS;
+  return INITIAL_TALLER_CLIENTS.filter(
+    (c) =>
+      c &&
+      c.id &&
+      !isDeletedTombstone(c.id) &&
+      (!c.idNumber || !isDeletedTombstone(c.idNumber.trim()))
+  );
 }
 
 export function saveStoredClients(clients: TallerClient[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+    const cleanList = clients.filter(
+      (c) =>
+        c &&
+        c.id &&
+        !isDeletedTombstone(c.id) &&
+        (!c.idNumber || !isDeletedTombstone(c.idNumber.trim()))
+    );
+    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_clients_updated'));
-    if (clients.length > 0) {
-      clients.forEach((c) => cloudSaveClient(c));
+    if (cleanList.length > 0) {
+      cleanList.forEach((c) => cloudSaveClient(c));
     }
   } catch (e) {
     console.error('Error saving clients to localStorage', e);
@@ -553,12 +627,72 @@ export function saveStoredClients(clients: TallerClient[]) {
 
 export function deleteStoredClient(idOrCedula: string) {
   try {
-    const current = getStoredClients().filter(
-      (c) => c.id !== idOrCedula && c.idNumber !== idOrCedula
+    const clean = idOrCedula.trim();
+    const currentClients = getStoredClients();
+    const target = currentClients.find(
+      (c) => c.id === clean || c.idNumber === clean
     );
-    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(current));
+    const idsToTombstone = [clean];
+    if (target?.id) idsToTombstone.push(target.id);
+    if (target?.idNumber) idsToTombstone.push(target.idNumber);
+
+    // 1. Registrar en tombstones para evitar cualquier resurrección
+    addDeletedTombstone(...idsToTombstone);
+
+    // 2. Filtrar y persistir clientes
+    const remainingClients = currentClients.filter(
+      (c) =>
+        c.id !== clean &&
+        c.idNumber !== clean &&
+        (target ? c.id !== target.id && c.idNumber !== target.idNumber : true)
+    );
+    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(remainingClients));
     window.dispatchEvent(new Event('starmotos_clients_updated'));
-    cloudDeleteClient(idOrCedula);
+
+    // 3. Limpiar y tombstonear alistamientos vinculados a este cliente
+    try {
+      const currentAls = getStoredFullAlistamientos();
+      const relatedAls = currentAls.filter(
+        (r) =>
+          r.cedulaRuc === clean ||
+          r.id === clean ||
+          (target?.idNumber && r.cedulaRuc === target.idNumber)
+      );
+      if (relatedAls.length > 0) {
+        relatedAls.forEach((r) => addDeletedTombstone(r.id, r.cedulaRuc));
+        const remainingAls = currentAls.filter(
+          (r) =>
+            r.cedulaRuc !== clean &&
+            r.id !== clean &&
+            (target?.idNumber ? r.cedulaRuc !== target.idNumber : true)
+        );
+        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(remainingAls));
+        window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+      }
+    } catch (_) {}
+
+    // 4. Limpiar y tombstonear garantías vinculadas a este cliente
+    try {
+      const currentW = getStoredWarranties();
+      const relatedW = currentW.filter(
+        (w) =>
+          w.clientIdNumber === clean ||
+          (target?.idNumber && w.clientIdNumber === target.idNumber)
+      );
+      if (relatedW.length > 0) {
+        relatedW.forEach((w) => addDeletedTombstone(w.id, w.requestNumber));
+        const remainingW = currentW.filter(
+          (w) =>
+            w.clientIdNumber !== clean &&
+            (target?.idNumber ? w.clientIdNumber !== target.idNumber : true)
+        );
+        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(remainingW));
+        window.dispatchEvent(new Event('starmotos_warranties_updated'));
+      }
+    } catch (_) {}
+
+    // 5. Eliminar en Supabase (en cascada)
+    cloudDeleteClient(clean);
   } catch (e) {
     console.error('Error deleting client', e);
   }
@@ -712,19 +846,41 @@ export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [];
 export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: AlistamientoFullRecord[] = JSON.parse(stored);
+      return parsed.filter(
+        (r) =>
+          r &&
+          r.id &&
+          !isDeletedTombstone(r.id) &&
+          (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
+      );
+    }
   } catch (e) {
     console.error('Error reading alistamientos from localStorage', e);
   }
-  return INITIAL_FULL_ALISTAMIENTOS;
+  return INITIAL_FULL_ALISTAMIENTOS.filter(
+    (r) =>
+      r &&
+      r.id &&
+      !isDeletedTombstone(r.id) &&
+      (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
+  );
 }
 
 export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(records));
+    const cleanList = records.filter(
+      (r) =>
+        r &&
+        r.id &&
+        !isDeletedTombstone(r.id) &&
+        (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
+    );
+    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
-    if (records.length > 0) {
-      records.forEach((r) => cloudSaveAlistamiento(r));
+    if (cleanList.length > 0) {
+      cleanList.forEach((r) => cloudSaveAlistamiento(r));
     }
   } catch (e) {
     console.error('Error saving alistamientos to localStorage', e);
@@ -733,10 +889,20 @@ export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
 
 export function deleteStoredAlistamiento(id: string) {
   try {
-    const current = getStoredFullAlistamientos().filter((r) => r.id !== id);
+    const clean = id.trim();
+    const stored = getStoredFullAlistamientos();
+    const target = stored.find((r) => r.id === clean || r.cedulaRuc === clean);
+    addDeletedTombstone(clean, target?.id, target?.cedulaRuc);
+
+    const current = stored.filter(
+      (r) =>
+        r.id !== clean &&
+        r.cedulaRuc !== clean &&
+        (target ? r.id !== target.id : true)
+    );
     localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(current));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
-    cloudDeleteAlistamiento(id);
+    cloudDeleteAlistamiento(clean);
   } catch (e) {
     console.error('Error deleting alistamiento', e);
   }
@@ -753,6 +919,7 @@ export function resetAllSystemData() {
   saveStoredInventory([]);
   saveStoredFullAlistamientos([]);
   try {
+    localStorage.removeItem('starmotos_deleted_tombstones_v1');
     supabase.from('warranties').delete().neq('id', '___').then(() => {});
     supabase.from('full_alistamientos').delete().neq('id', '___').then(() => {});
     supabase.from('clients').delete().neq('id', '___').then(() => {});

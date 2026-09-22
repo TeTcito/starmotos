@@ -14,6 +14,74 @@ let isRealtimeInitialized = false;
 let isSyncing = false;
 
 // =========================================================================
+// 0. CONTROL PERSISTENTE DE REGISTROS ELIMINADOS (TOMBSTONES ANTI-REAPARICIÓN)
+// =========================================================================
+
+const TOMBSTONES_STORAGE_KEY = 'starmotos_deleted_tombstones_v1';
+
+export function getDeletedTombstones(): Set<string> {
+  try {
+    const raw = localStorage.getItem(TOMBSTONES_STORAGE_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        return new Set(list.map((s) => String(s).trim()).filter(Boolean));
+      }
+    }
+  } catch (e) {
+    console.error('Error reading tombstones', e);
+  }
+  return new Set<string>();
+}
+
+export function addDeletedTombstone(...ids: (string | undefined | null)[]) {
+  try {
+    const current = getDeletedTombstones();
+    let added = false;
+    for (const id of ids) {
+      if (!id) continue;
+      const clean = String(id).trim();
+      if (clean && !current.has(clean)) {
+        current.add(clean);
+        added = true;
+      }
+    }
+    if (added) {
+      localStorage.setItem(TOMBSTONES_STORAGE_KEY, JSON.stringify(Array.from(current)));
+    }
+  } catch (e) {
+    console.error('Error adding tombstone', e);
+  }
+}
+
+export function removeDeletedTombstone(...ids: (string | undefined | null)[]) {
+  try {
+    const current = getDeletedTombstones();
+    let removed = false;
+    for (const id of ids) {
+      if (!id) continue;
+      const clean = String(id).trim();
+      if (clean && current.has(clean)) {
+        current.delete(clean);
+        removed = true;
+      }
+    }
+    if (removed) {
+      localStorage.setItem(TOMBSTONES_STORAGE_KEY, JSON.stringify(Array.from(current)));
+    }
+  } catch (e) {
+    console.error('Error removing tombstone', e);
+  }
+}
+
+export function isDeletedTombstone(id?: string | null): boolean {
+  if (!id) return false;
+  const clean = String(id).trim();
+  if (!clean) return false;
+  return getDeletedTombstones().has(clean);
+}
+
+// =========================================================================
 // 1. SINCRONIZACIÓN BIDIRECCIONAL INTELIGENTE (NUBE <-> LOCAL)
 // =========================================================================
 
@@ -29,6 +97,8 @@ export async function syncAllFromSupabase(): Promise<{
   isSyncing = true;
 
   try {
+    const tombstones = getDeletedTombstones();
+
     // -----------------------------------------------------------------------
     // 1. GARANTÍAS (RECLAMOS)
     // -----------------------------------------------------------------------
@@ -40,22 +110,48 @@ export async function syncAllFromSupabase(): Promise<{
         .order('updated_at', { ascending: false });
 
       if (!warErr) {
-        const cloudWarranties: WarrantyRequest[] = (warrantiesData || [])
+        const rawCloudWarranties: WarrantyRequest[] = (warrantiesData || [])
           .map((row) => row.data as WarrantyRequest)
           .filter(Boolean);
+
+        // Filtrar garantías eliminadas (tombstones) y eliminarlas proactivamente de Supabase
+        const cloudWarranties: WarrantyRequest[] = [];
+        for (const w of rawCloudWarranties) {
+          if (!w || !w.id) continue;
+          const isDeleted =
+            tombstones.has(w.id) ||
+            (w.requestNumber && tombstones.has(w.requestNumber)) ||
+            (w.clientIdNumber && tombstones.has(w.clientIdNumber));
+
+          if (isDeleted) {
+            cloudDeleteWarranty(w.id);
+          } else {
+            cloudWarranties.push(w);
+          }
+        }
 
         const localWarranties: WarrantyRequest[] = (() => {
           try {
             const raw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
-            return raw ? JSON.parse(raw) : [];
+            const parsed: WarrantyRequest[] = raw ? JSON.parse(raw) : [];
+            return parsed.filter(
+              (w) =>
+                w &&
+                w.id &&
+                !tombstones.has(w.id) &&
+                (!w.requestNumber || !tombstones.has(w.requestNumber)) &&
+                (!w.clientIdNumber || !tombstones.has(w.clientIdNumber))
+            );
           } catch {
             return [];
           }
         })();
 
-        // Reconciliación: Subir a la nube los registros locales que falten en Supabase
+        // Reconciliación: Subir a la nube los registros locales válidos que falten en Supabase
         const cloudIds = new Set(cloudWarranties.map((w) => w.id));
-        const missingInCloud = localWarranties.filter((w) => w && w.id && !cloudIds.has(w.id));
+        const missingInCloud = localWarranties.filter(
+          (w) => w && w.id && !cloudIds.has(w.id) && !tombstones.has(w.id)
+        );
         if (missingInCloud.length > 0) {
           console.log(`[Supabase] Subiendo ${missingInCloud.length} garantías locales a la nube...`);
           for (const w of missingInCloud) {
@@ -63,11 +159,11 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        // Unificar (los remotos mandan, pero se preservan los locales que no choquen)
+        // Unificar (los remotos mandan, pero se preservan los locales válidos que no choquen)
         const mergedMap = new Map<string, WarrantyRequest>();
         cloudWarranties.forEach((w) => mergedMap.set(w.id, w));
         localWarranties.forEach((w) => {
-          if (w && w.id && !mergedMap.has(w.id)) {
+          if (w && w.id && !mergedMap.has(w.id) && !tombstones.has(w.id)) {
             mergedMap.set(w.id, w);
           }
         });
@@ -92,22 +188,46 @@ export async function syncAllFromSupabase(): Promise<{
         .order('updated_at', { ascending: false });
 
       if (!alsErr) {
-        const cloudAlistamientos: AlistamientoFullRecord[] = (alsData || [])
+        const rawCloudAlistamientos: AlistamientoFullRecord[] = (alsData || [])
           .map((row) => row.data as AlistamientoFullRecord)
           .filter(Boolean);
+
+        // Filtrar alistamientos eliminados (tombstones) y eliminarlos proactivamente de Supabase
+        const cloudAlistamientos: AlistamientoFullRecord[] = [];
+        for (const a of rawCloudAlistamientos) {
+          if (!a || !a.id) continue;
+          const isDeleted =
+            tombstones.has(a.id) ||
+            (a.cedulaRuc && tombstones.has(a.cedulaRuc.trim()));
+
+          if (isDeleted) {
+            cloudDeleteAlistamiento(a.id);
+          } else {
+            cloudAlistamientos.push(a);
+          }
+        }
 
         const localAlistamientos: AlistamientoFullRecord[] = (() => {
           try {
             const raw = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
-            return raw ? JSON.parse(raw) : [];
+            const parsed: AlistamientoFullRecord[] = raw ? JSON.parse(raw) : [];
+            return parsed.filter(
+              (a) =>
+                a &&
+                a.id &&
+                !tombstones.has(a.id) &&
+                (!a.cedulaRuc || !tombstones.has(a.cedulaRuc.trim()))
+            );
           } catch {
             return [];
           }
         })();
 
-        // Subir a la nube los alistamientos locales que no existan aún
+        // Subir a la nube los alistamientos locales válidos que no existan aún
         const cloudIds = new Set(cloudAlistamientos.map((a) => a.id));
-        const missingInCloud = localAlistamientos.filter((a) => a && a.id && !cloudIds.has(a.id));
+        const missingInCloud = localAlistamientos.filter(
+          (a) => a && a.id && !cloudIds.has(a.id) && !tombstones.has(a.id)
+        );
         if (missingInCloud.length > 0) {
           console.log(`[Supabase] Subiendo ${missingInCloud.length} alistamientos locales a la nube...`);
           for (const a of missingInCloud) {
@@ -119,7 +239,7 @@ export async function syncAllFromSupabase(): Promise<{
         const mergedMap = new Map<string, AlistamientoFullRecord>();
         cloudAlistamientos.forEach((a) => mergedMap.set(a.id, a));
         localAlistamientos.forEach((a) => {
-          if (a && a.id && !mergedMap.has(a.id)) {
+          if (a && a.id && !mergedMap.has(a.id) && !tombstones.has(a.id)) {
             mergedMap.set(a.id, a);
           }
         });
@@ -144,24 +264,52 @@ export async function syncAllFromSupabase(): Promise<{
         .order('updated_at', { ascending: false });
 
       if (!cliErr) {
-        const cloudClients: TallerClient[] = (clientsData || [])
+        const rawCloudClients: TallerClient[] = (clientsData || [])
           .map((row) => row.data as TallerClient)
           .filter(Boolean);
+
+        // Filtrar clientes eliminados (tombstones) y eliminarlos proactivamente de Supabase
+        const cloudClients: TallerClient[] = [];
+        for (const c of rawCloudClients) {
+          if (!c || !c.id) continue;
+          const isDeleted =
+            tombstones.has(c.id) ||
+            (c.idNumber && tombstones.has(c.idNumber.trim()));
+
+          if (isDeleted) {
+            cloudDeleteClient(c.id);
+          } else {
+            cloudClients.push(c);
+          }
+        }
 
         const localClients: TallerClient[] = (() => {
           try {
             const raw = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-            return raw ? JSON.parse(raw) : [];
+            const parsed: TallerClient[] = raw ? JSON.parse(raw) : [];
+            return parsed.filter(
+              (c) =>
+                c &&
+                c.id &&
+                !tombstones.has(c.id) &&
+                (!c.idNumber || !tombstones.has(c.idNumber.trim()))
+            );
           } catch {
             return [];
           }
         })();
 
-        // Subir clientes locales no presentes en nube (por ID o por cédula)
+        // Subir clientes locales no presentes en nube (por ID o por cédula) siempre que no estén eliminados
         const cloudIds = new Set(cloudClients.map((c) => c.id));
         const cloudIdNumbers = new Set(cloudClients.map((c) => c.idNumber));
         const missingInCloud = localClients.filter(
-          (c) => c && c.id && !cloudIds.has(c.id) && !cloudIdNumbers.has(c.idNumber)
+          (c) =>
+            c &&
+            c.id &&
+            !cloudIds.has(c.id) &&
+            !cloudIdNumbers.has(c.idNumber) &&
+            !tombstones.has(c.id) &&
+            (!c.idNumber || !tombstones.has(c.idNumber.trim()))
         );
         if (missingInCloud.length > 0) {
           console.log(`[Supabase] Subiendo ${missingInCloud.length} clientes locales a la nube...`);
@@ -175,7 +323,12 @@ export async function syncAllFromSupabase(): Promise<{
         cloudClients.forEach((c) => mergedMap.set(c.idNumber || c.id, c));
         localClients.forEach((c) => {
           const key = c.idNumber || c.id;
-          if (key && !mergedMap.has(key)) {
+          if (
+            key &&
+            !mergedMap.has(key) &&
+            !tombstones.has(c.id) &&
+            (!c.idNumber || !tombstones.has(c.idNumber.trim()))
+          ) {
             mergedMap.set(key, c);
           }
         });
@@ -201,22 +354,35 @@ export async function syncAllFromSupabase(): Promise<{
         .limit(80);
 
       if (!altErr) {
-        const cloudAlerts: SystemAlert[] = (alertsData || [])
+        const rawCloudAlerts: SystemAlert[] = (alertsData || [])
           .map((row) => row.data as SystemAlert)
           .filter(Boolean);
+
+        const cloudAlerts: SystemAlert[] = [];
+        for (const a of rawCloudAlerts) {
+          if (!a || !a.id) continue;
+          if (tombstones.has(a.id)) {
+            cloudDeleteAlert(a.id);
+          } else {
+            cloudAlerts.push(a);
+          }
+        }
 
         const localAlerts: SystemAlert[] = (() => {
           try {
             const raw = localStorage.getItem(STORAGE_KEYS.ALERTS);
-            return raw ? JSON.parse(raw) : [];
+            const parsed: SystemAlert[] = raw ? JSON.parse(raw) : [];
+            return parsed.filter((a) => a && a.id && !tombstones.has(a.id));
           } catch {
             return [];
           }
         })();
 
-        // Subir alertas locales que falten
+        // Subir alertas locales que falten y no estén eliminadas
         const cloudIds = new Set(cloudAlerts.map((a) => a.id));
-        const missingInCloud = localAlerts.filter((a) => a && a.id && !cloudIds.has(a.id));
+        const missingInCloud = localAlerts.filter(
+          (a) => a && a.id && !cloudIds.has(a.id) && !tombstones.has(a.id)
+        );
         if (missingInCloud.length > 0) {
           for (const a of missingInCloud) {
             await cloudSaveAlert(a);
@@ -227,7 +393,7 @@ export async function syncAllFromSupabase(): Promise<{
         const mergedMap = new Map<string, SystemAlert>();
         cloudAlerts.forEach((a) => mergedMap.set(a.id, a));
         localAlerts.forEach((a) => {
-          if (a && a.id && !mergedMap.has(a.id)) {
+          if (a && a.id && !mergedMap.has(a.id) && !tombstones.has(a.id)) {
             mergedMap.set(a.id, a);
           }
         });
@@ -302,6 +468,7 @@ export async function syncAllFromSupabase(): Promise<{
 
 export async function cloudSaveWarranty(w: WarrantyRequest) {
   try {
+    removeDeletedTombstone(w.id, w.requestNumber, w.clientIdNumber);
     const payload = {
       id: w.id,
       request_number: w.requestNumber || null,
@@ -325,6 +492,7 @@ export async function cloudSaveWarranty(w: WarrantyRequest) {
 
 export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
   try {
+    removeDeletedTombstone(rec.id, rec.cedulaRuc);
     const payload = {
       id: rec.id,
       cedula_ruc: rec.cedulaRuc || null,
@@ -349,6 +517,7 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
 
 export async function cloudSaveClient(c: TallerClient) {
   try {
+    removeDeletedTombstone(c.id, c.idNumber);
     const payload = {
       id: c.id,
       id_number: c.idNumber || null,
@@ -372,12 +541,18 @@ export async function cloudSaveClient(c: TallerClient) {
 }
 
 // =========================================================================
-// ELIMINACIONES EN LA NUBE
+// ELIMINACIONES EN LA NUBE (DEFINITIVAS Y EN CASCADA)
 // =========================================================================
 
 export async function cloudDeleteWarranty(id: string) {
+  if (!id) return;
+  addDeletedTombstone(id);
   try {
-    const { error } = await supabase.from('warranties').delete().eq('id', id);
+    const cleanId = id.trim();
+    const { error } = await supabase
+      .from('warranties')
+      .delete()
+      .or(`id.eq.${cleanId},request_number.eq.${cleanId}`);
     if (error) console.error('[Supabase] Error eliminando garantía:', error);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando garantía:', err);
@@ -385,24 +560,53 @@ export async function cloudDeleteWarranty(id: string) {
 }
 
 export async function cloudDeleteAlistamiento(id: string) {
+  if (!id) return;
+  addDeletedTombstone(id);
   try {
-    const { error } = await supabase.from('full_alistamientos').delete().eq('id', id);
+    const cleanId = id.trim();
+    const { error } = await supabase
+      .from('full_alistamientos')
+      .delete()
+      .or(`id.eq.${cleanId},cedula_ruc.eq.${cleanId}`);
     if (error) console.error('[Supabase] Error eliminando alistamiento:', error);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando alistamiento:', err);
   }
 }
 
-export async function cloudDeleteClient(id: string) {
+export async function cloudDeleteClient(idOrCedula: string) {
+  if (!idOrCedula) return;
+  addDeletedTombstone(idOrCedula);
   try {
-    const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (error) console.error('[Supabase] Error eliminando cliente:', error);
+    const clean = idOrCedula.trim();
+    // 1. Eliminar de la tabla clients por ID o por id_number
+    const { error: cliErr } = await supabase
+      .from('clients')
+      .delete()
+      .or(`id.eq.${clean},id_number.eq.${clean}`);
+    if (cliErr) console.error('[Supabase] Error eliminando cliente:', cliErr);
+
+    // 2. Eliminar de la tabla full_alistamientos cualquier registro vinculado
+    const { error: alsErr } = await supabase
+      .from('full_alistamientos')
+      .delete()
+      .or(`id.eq.${clean},cedula_ruc.eq.${clean}`);
+    if (alsErr) console.error('[Supabase] Error eliminando alistamientos del cliente:', alsErr);
+
+    // 3. Eliminar de garantías cualquier reclamo con esta cédula
+    const { error: warErr } = await supabase
+      .from('warranties')
+      .delete()
+      .eq('client_id_number', clean);
+    if (warErr) console.error('[Supabase] Error eliminando garantías vinculadas:', warErr);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando cliente:', err);
   }
 }
 
 export async function cloudDeleteAlert(id: string) {
+  if (!id) return;
+  addDeletedTombstone(id);
   try {
     const { error } = await supabase.from('alerts').delete().eq('id', id);
     if (error) console.error('[Supabase] Error eliminando alerta:', error);
@@ -413,6 +617,7 @@ export async function cloudDeleteAlert(id: string) {
 
 export async function cloudDeleteAlerts(ids: string[]) {
   if (!ids || ids.length === 0) return;
+  ids.forEach((id) => addDeletedTombstone(id));
   try {
     const { error } = await supabase.from('alerts').delete().in('id', ids);
     if (error) console.error('[Supabase] Error eliminando alertas:', error);
@@ -519,16 +724,32 @@ export function initSupabaseRealtime() {
 
           if (payload.eventType === 'INSERT') {
             const newDoc = payload.new.data as WarrantyRequest;
-            if (newDoc && !current.some((w) => w.id === newDoc.id)) {
-              current = [newDoc, ...current];
+            if (
+              newDoc &&
+              !isDeletedTombstone(newDoc.id) &&
+              !isDeletedTombstone(newDoc.requestNumber) &&
+              !isDeletedTombstone(newDoc.clientIdNumber)
+            ) {
+              if (!current.some((w) => w.id === newDoc.id)) {
+                current = [newDoc, ...current];
+              }
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedDoc = payload.new.data as WarrantyRequest;
             if (updatedDoc) {
-              current = current.map((w) => (w.id === updatedDoc.id ? updatedDoc : w));
+              if (
+                isDeletedTombstone(updatedDoc.id) ||
+                isDeletedTombstone(updatedDoc.requestNumber) ||
+                isDeletedTombstone(updatedDoc.clientIdNumber)
+              ) {
+                current = current.filter((w) => w.id !== updatedDoc.id);
+              } else {
+                current = current.map((w) => (w.id === updatedDoc.id ? updatedDoc : w));
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
+            addDeletedTombstone(deletedId);
             current = current.filter((w) => w.id !== deletedId);
           }
 
@@ -550,16 +771,30 @@ export function initSupabaseRealtime() {
 
           if (payload.eventType === 'INSERT') {
             const newDoc = payload.new.data as AlistamientoFullRecord;
-            if (newDoc && !current.some((a) => a.id === newDoc.id)) {
-              current = [newDoc, ...current];
+            if (
+              newDoc &&
+              !isDeletedTombstone(newDoc.id) &&
+              !isDeletedTombstone(newDoc.cedulaRuc)
+            ) {
+              if (!current.some((a) => a.id === newDoc.id)) {
+                current = [newDoc, ...current];
+              }
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedDoc = payload.new.data as AlistamientoFullRecord;
             if (updatedDoc) {
-              current = current.map((a) => (a.id === updatedDoc.id ? updatedDoc : a));
+              if (
+                isDeletedTombstone(updatedDoc.id) ||
+                isDeletedTombstone(updatedDoc.cedulaRuc)
+              ) {
+                current = current.filter((a) => a.id !== updatedDoc.id);
+              } else {
+                current = current.map((a) => (a.id === updatedDoc.id ? updatedDoc : a));
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
+            addDeletedTombstone(deletedId);
             current = current.filter((a) => a.id !== deletedId);
           }
 
@@ -581,19 +816,35 @@ export function initSupabaseRealtime() {
 
           if (payload.eventType === 'INSERT') {
             const newDoc = payload.new.data as TallerClient;
-            if (newDoc && !current.some((c) => c.id === newDoc.id || c.idNumber === newDoc.idNumber)) {
-              current = [newDoc, ...current];
+            if (
+              newDoc &&
+              !isDeletedTombstone(newDoc.id) &&
+              !isDeletedTombstone(newDoc.idNumber)
+            ) {
+              if (!current.some((c) => c.id === newDoc.id || c.idNumber === newDoc.idNumber)) {
+                current = [newDoc, ...current];
+              }
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedDoc = payload.new.data as TallerClient;
             if (updatedDoc) {
-              current = current.map((c) =>
-                c.id === updatedDoc.id || c.idNumber === updatedDoc.idNumber ? updatedDoc : c
-              );
+              if (
+                isDeletedTombstone(updatedDoc.id) ||
+                isDeletedTombstone(updatedDoc.idNumber)
+              ) {
+                current = current.filter(
+                  (c) => c.id !== updatedDoc.id && c.idNumber !== updatedDoc.idNumber
+                );
+              } else {
+                current = current.map((c) =>
+                  c.id === updatedDoc.id || c.idNumber === updatedDoc.idNumber ? updatedDoc : c
+                );
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
-            current = current.filter((c) => c.id !== deletedId);
+            addDeletedTombstone(deletedId);
+            current = current.filter((c) => c.id !== deletedId && c.idNumber !== deletedId);
           }
 
           localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(current));
@@ -614,16 +865,23 @@ export function initSupabaseRealtime() {
 
           if (payload.eventType === 'INSERT') {
             const newDoc = payload.new.data as SystemAlert;
-            if (newDoc && !current.some((a) => a.id === newDoc.id)) {
-              current = [newDoc, ...current];
+            if (newDoc && !isDeletedTombstone(newDoc.id)) {
+              if (!current.some((a) => a.id === newDoc.id)) {
+                current = [newDoc, ...current];
+              }
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedDoc = payload.new.data as SystemAlert;
             if (updatedDoc) {
-              current = current.map((a) => (a.id === updatedDoc.id ? updatedDoc : a));
+              if (isDeletedTombstone(updatedDoc.id)) {
+                current = current.filter((a) => a.id !== updatedDoc.id);
+              } else {
+                current = current.map((a) => (a.id === updatedDoc.id ? updatedDoc : a));
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = payload.old.id;
+            addDeletedTombstone(deletedId);
             current = current.filter((a) => a.id !== deletedId);
           }
 

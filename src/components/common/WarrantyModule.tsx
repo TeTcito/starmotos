@@ -80,14 +80,6 @@ export function getWarrantyStatusInfo(status: WarrantyRequestStatus): StatusInfo
         icon: <Clock className="w-3.5 h-3.5 text-blue-600" />,
       };
     case 'en_proceso_aceptacion_2':
-      return {
-        canonical: 'en_proceso_aceptacion_2',
-        label: 'En Proceso de Aceptación 2',
-        badgeBg: 'bg-indigo-50',
-        badgeText: 'text-indigo-800',
-        badgeBorder: 'border-indigo-300',
-        icon: <Clock className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />,
-      };
     case 'aceptada':
     case 'aprobada':
       return {
@@ -455,7 +447,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     }
     const updated: WarrantyRequest = {
       ...currentWarranty,
-      status: 'en_proceso_aceptacion_2',
+      status: 'aceptada',
       resolutionType: 'encargar_taller',
       garanteNotes: garanteInputNotes,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
@@ -476,7 +468,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     if (onUpdateWarranty) {
       onUpdateWarranty(updated);
     }
-    setToastMessage('✓ Garantía aprobada: Encargada a taller. Estado: En Proceso de Aceptación 2.');
+    setToastMessage('✓ Garantía aprobada oficialmente por la Marca (Resolución: Encargar a Taller).');
     confetti({ particleCount: 80, spread: 70, colors: ['#6366f1', '#2563eb', '#10b981'] });
   };
 
@@ -1857,24 +1849,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
       )}
 
-      {/* RESOLUCIONES YA SELLADAS (SI YA FUE ACEPTADA O DENEGADA O EN PROCESO DE ACEPTACIÓN 2) */}
-      {statusInfo.canonical === 'en_proceso_aceptacion_2' && (
-        <div className="p-4 rounded-xl border-2 bg-indigo-50 border-indigo-300 text-indigo-950 space-y-2">
-          <div className="flex items-center gap-2 font-bold text-sm text-indigo-900">
-            {statusInfo.icon}
-            <span>Garantía Oficial APROBADA con Resolución: Encargar a Taller (En Proceso de Aceptación 2)</span>
-          </div>
-          {currentWarranty.garanteNotes && (
-            <p className="text-xs">
-              <strong>Resolución Garante de Marca:</strong> {currentWarranty.garanteNotes}
-            </p>
-          )}
-          <p className="text-xs text-indigo-800">
-            Matriz Central y el Taller Oficial están autorizados para ejecutar el trabajo técnico según el presupuesto pactado.
-          </p>
-        </div>
-      )}
-
+      {/* RESOLUCIONES YA SELLADAS (ACEPTADA O DENEGADA) */}
       {(statusInfo.canonical === 'aceptada' || statusInfo.canonical === 'denegada') && (
         <div
           className={`p-4 rounded-xl border-2 space-y-2 ${
@@ -1887,18 +1862,31 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             {statusInfo.icon}
             <span>
               {statusInfo.canonical === 'aceptada'
-                ? 'Garantía ACEPTADA Oficialmente por la Marca'
-                : 'Garantía DENEGADA'}
+                ? `Garantía ACEPTADA Oficialmente por la Marca${
+                    currentWarranty.resolutionType === 'encargar_taller'
+                      ? ' (Resolución: Encargar a Taller)'
+                      : currentWarranty.resolutionType === 'envio_repuesto'
+                      ? ' (Resolución: Envío de Repuesto)'
+                      : ''
+                  }`
+                : 'Garantía DENEGADA Oficialmente por la Marca'}
             </span>
           </div>
           {currentWarranty.garanteNotes && (
             <p className="text-xs">
-              <strong>Resolución Marca:</strong> {currentWarranty.garanteNotes}
+              <strong>Dictamen Oficial del Garante:</strong> {currentWarranty.garanteNotes}
             </p>
           )}
           {currentWarranty.rejectionReason && (
             <p className="text-xs">
-              <strong>Motivo:</strong> {currentWarranty.rejectionReason}
+              <strong>Motivo de Denegación:</strong> {currentWarranty.rejectionReason}
+            </p>
+          )}
+          {statusInfo.canonical === 'aceptada' && (
+            <p className="text-xs text-emerald-800">
+              {currentWarranty.resolutionType === 'encargar_taller'
+                ? 'El Taller Oficial y Matriz Central están autorizados para ejecutar el trabajo técnico y formalizar la liquidación.'
+                : 'La Marca despachará los repuestos físicos requeridos directamente a la sede para su respectiva instalación.'}
             </p>
           )}
           {currentWarranty.approvedAt && (

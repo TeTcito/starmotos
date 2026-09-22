@@ -189,7 +189,7 @@ export function useGarantePortal() {
 
     const finalNotes = notesOverride || reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.';
     const finalResolution = resolutionTypeOverride || targetWarranty.resolutionType || 'envio_repuesto';
-    const newStatus: WarrantyRequestStatus = finalResolution === 'encargar_taller' ? 'en_proceso_aceptacion_2' : 'aceptada';
+    const newStatus: WarrantyRequestStatus = 'aceptada';
 
     setWarranties((prev) => {
       const updated = prev.map((w) =>
@@ -212,8 +212,8 @@ export function useGarantePortal() {
       id: `alt-${Date.now()}`,
       type: 'garantia_aprobada',
       title: finalResolution === 'encargar_taller'
-        ? 'Garantía Encargada a Taller (Aceptación 2)'
-        : 'Garantía Aprobada por Garante de Marca',
+        ? 'Garantía Aprobada: Encargada a Taller'
+        : 'Garantía Aprobada: Envío de Repuesto',
       message: `El Garante oficial autorizó la cobertura de la solicitud ${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand} ${targetWarranty.motorcycleModel}). Resolución: ${finalResolution === 'encargar_taller' ? 'Encargar a Taller' : 'Envío de Repuestos'}. Procede a Matriz y Taller.`,
       timestamp: 'Ahora mismo',
       read: false,

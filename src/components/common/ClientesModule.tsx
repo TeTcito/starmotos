@@ -2287,7 +2287,7 @@ export const ClientesModule: React.FC<Props> = ({
                       <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                     </div>
                   </th>
-                  <th className="w-[14%] px-2.5 py-2 truncate">Contacto (Celular / Email)</th>
+                  <th className="w-[15%] px-2.5 py-2 truncate">Contacto (Celular / Email)</th>
                   <th
                     onClick={() => handleSortToggle('sede')}
                     className="w-[11%] px-2 py-2 truncate cursor-pointer hover:bg-zinc-200/80 transition-colors"
@@ -2299,10 +2299,10 @@ export const ClientesModule: React.FC<Props> = ({
                     </div>
                   </th>
                   <th className="w-[9%] px-2 py-2 truncate">Origen</th>
-                  <th className="w-[17%] px-2 py-2 truncate">Motocicleta & Placa</th>
+                  <th className="w-[18%] px-2 py-2 truncate">Motocicleta & Placa</th>
                   <th
                     onClick={() => handleSortToggle('services')}
-                    className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
+                    className="w-[7%] px-1.5 py-2 text-center whitespace-nowrap cursor-pointer hover:bg-zinc-200/80 transition-colors"
                     title="Clic para ordenar por Cantidad de Servicios"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -2310,8 +2310,7 @@ export const ClientesModule: React.FC<Props> = ({
                       <ArrowUpDown className="w-3 h-3 text-zinc-400" />
                     </div>
                   </th>
-                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Estado</th>
-                  <th className="w-[8%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
+                  <th className="w-[10%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 text-zinc-800">
@@ -2403,26 +2402,7 @@ export const ClientesModule: React.FC<Props> = ({
                         </span>
                       </td>
 
-                      {/* 9. Estado */}
-                      <td className="px-1.5 py-2 text-center whitespace-nowrap">
-                        {data.estado === 'referente' && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                            ⭐ Referente
-                          </span>
-                        )}
-                        {data.estado === 'pendiente' && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            ⏳ Pendiente
-                          </span>
-                        )}
-                        {data.estado === 'iniciado' && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            🚀 Iniciado
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 11. Acciones */}
+                      {/* 9. Acciones */}
                       <td className="px-1.5 py-2 text-center whitespace-nowrap">
                         <div className="inline-flex items-center justify-center gap-1">
                           <button
@@ -2495,18 +2475,8 @@ export const ClientesModule: React.FC<Props> = ({
                   <td className="px-1.5 py-2 text-center font-mono text-blue-800 font-bold text-xs">
                     {filteredClients.reduce((acc, c) => acc + (c.records.length || c.maintenanceCount || 1), 0)} serv.
                   </td>
-                  <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
-                    <span className="font-bold text-purple-700">
-                      {referentesCount} referentes
-                    </span>{' '}
-                    •{' '}
-                    <span className="font-bold text-blue-700">
-                      {iniciadosCount} iniciados
-                    </span>{' '}
-                    •{' '}
-                    <span className="font-bold text-amber-700">
-                      {pendientesCount} pendientes
-                    </span>
+                  <td className="px-3 py-2 text-center text-zinc-500 font-normal text-[11px]">
+                    <span className="font-bold text-zinc-700">{filteredClients.length}</span> registros
                   </td>
                 </tr>
               </tfoot>

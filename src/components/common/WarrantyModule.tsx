@@ -1411,160 +1411,119 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
 
-          {/* DISTRIBUCIÓN: A LA IZQUIERDA ABAJO CAMPOS DE PRESUPUESTO, A LA DERECHA TOTAL DE TODO */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* A LA IZQUIERDA ABAJO: CAMPOS DE PRESUPUESTO (REPUESTOS + MANO DE OBRA) */}
-            <div className="lg:col-span-2 space-y-5">
-              {/* 1. Repuestos Solicitados por el Taller */}
-              <div className="space-y-3">
+          {/* DISTRIBUCIÓN: A LA IZQUIERDA REPUESTOS EN FILAS, A LA DERECHA MANO DE OBRA */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* LADO IZQUIERDO: APARTADO 1 - REPUESTOS POR FILAS (UNA SOLA COLUMNA) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                 <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
                   1. Repuestos Solicitados por el Taller ({parsedPartsList.length})
                 </label>
-
-                {parsedPartsList.length === 0 ? (
-                  <p className="text-xs text-zinc-400 italic bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-                    No se especificaron repuestos desglosados en esta solicitud.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {parsedPartsList.map((part, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs space-y-2"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-xs font-bold text-zinc-800 line-clamp-2">
-                            {part}
-                          </span>
-                          <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-                            #{idx + 1}
-                          </span>
-                        </div>
-
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setPartsBudgetMap((prev) => ({
-                                ...prev,
-                                [part]: val,
-                              }));
-                            }}
-                            className="w-full h-9 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {parsedPartsList.length > 0 && (
+                  <span className="text-xs font-mono font-bold text-zinc-500">
+                    Subtotal Repuestos: ${partsTotal.toFixed(2)}
+                  </span>
                 )}
               </div>
 
-              {/* 2. Mano de Obra Calificada */}
-              <div className="pt-2 border-t border-zinc-100 space-y-3">
-                <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-                  2. Mano de Obra Calificada
-                </label>
+              {parsedPartsList.length === 0 ? (
+                <p className="text-xs text-zinc-400 italic bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+                  No se especificaron repuestos desglosados en esta solicitud.
+                </p>
+              ) : (
+                <div className="flex flex-col space-y-2.5">
+                  {parsedPartsList.map((part, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <span className="text-xs font-bold text-zinc-800 truncate" title={part}>
+                          {part}
+                        </span>
+                      </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
-                  {/* Botones de tiempo de demora con selección rápida */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                      Tiempo Estimado de Demora (Clic Rápido):
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {QUICK_LABOR_TIMES.map((timeOption) => (
-                        <button
-                          key={timeOption}
-                          type="button"
-                          onClick={() => setLaborTime(timeOption)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                            laborTime === timeOption
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
-                          }`}
-                        >
-                          {timeOption}
-                        </button>
-                      ))}
+                      <div className="relative w-32 shrink-0">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setPartsBudgetMap((prev) => ({
+                              ...prev,
+                              [part]: val,
+                            }));
+                          }}
+                          className="w-full h-9 pl-6 pr-2.5 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Valor de mano de obra */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                      Valor Mano de Obra ($ USD):
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={laborCost !== undefined ? laborCost : ''}
-                        onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
-                        className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-sm font-mono font-bold text-zinc-900 outline-none"
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* A LA DERECHA ABAJO: TOTAL DE TODO Y GUARDAR */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 text-white p-5 rounded-2xl shadow-md border border-zinc-800 space-y-3.5">
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">
-                      <DollarSign className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black tracking-wide text-white uppercase">
-                        Total de Todo
-                      </h4>
-                      <p className="text-[10px] text-zinc-400">
-                        Presupuesto oficial autorizado
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-bold font-mono px-2 py-0.5 bg-zinc-800 text-zinc-300 rounded border border-zinc-700">
-                    USD ($)
-                  </span>
-                </div>
+            {/* LADO DERECHO: APARTADO 2 - MANO DE OBRA CALIFICADA (ARRIBA HORAS, ABAJO PRECIO) */}
+            <div className="space-y-3">
+              <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
+                2. Mano de Obra Calificada
+              </label>
 
-                <div className="space-y-2">
-                  <div className="p-2.5 bg-zinc-800/70 rounded-xl border border-zinc-700/60 flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">Repuestos ({parsedPartsList.length}):</span>
-                    <span className="font-mono font-bold text-zinc-100">${partsTotal.toFixed(2)}</span>
-                  </div>
-
-                  <div className="p-2.5 bg-zinc-800/70 rounded-xl border border-zinc-700/60 flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">Mano de Obra ({laborTime}):</span>
-                    <span className="font-mono font-bold text-zinc-100">${laborCost.toFixed(2)}</span>
-                  </div>
-
-                  <div className="p-3 bg-emerald-950/80 rounded-xl border-2 border-emerald-500/60 shadow-inner flex flex-col justify-between">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">Gran Total de Todo</span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    </div>
-                    <span className="text-2xl font-black font-mono text-emerald-400">
-                      ${grandTotalBudget.toFixed(2)} USD
-                    </span>
+              <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-200 space-y-4">
+                {/* Arriba: Las horas / tiempo estimado de demora */}
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-600 mb-2">
+                    Tiempo Estimado de Demora (Clic Rápido):
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_LABOR_TIMES.map((timeOption) => (
+                      <button
+                        key={timeOption}
+                        type="button"
+                        onClick={() => setLaborTime(timeOption)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          laborTime === timeOption
+                            ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200'
+                            : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {timeOption}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
+                {/* Abajo: Poner el precio */}
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
+                    Valor Mano de Obra ($ USD):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={laborCost !== undefined ? laborCost : ''}
+                      onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
+                      className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Botón de Guardar Presupuesto */}
                 <button
                   type="button"
                   onClick={handleSaveBudget}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer mt-2"
                 >
                   <Check className="w-4 h-4" />
                   <span>Guardar Presupuesto Oficial</span>

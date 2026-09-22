@@ -20,6 +20,8 @@ import {
   cloudSaveInvoice,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+export { STORAGE_KEYS };
 
 // --- Talleres y Sucursales Oficiales de StarMotos (11 Ubicaciones Oficiales) ---
 export const INITIAL_WORKSHOPS: Workshop[] = [
@@ -369,17 +371,6 @@ try {
   ];
   legacyKeys.forEach((k) => localStorage.removeItem(k));
 } catch (_) {}
-
-export const STORAGE_KEYS = {
-  WARRANTIES: 'starmotos_shared_warranties_v4',
-  WORKSHOPS: 'starmotos_shared_workshops_v4',
-  ALERTS: 'starmotos_shared_alerts_v4',
-  INVOICES: 'starmotos_shared_invoices_v4',
-  ORDERS: 'starmotos_shared_orders_v4',
-  CLIENTS: 'starmotos_shared_clients_v4',
-  INVENTORY: 'starmotos_shared_inventory_v4',
-  ALISTAMIENTOS: 'starmotos_shared_alistamientos_v4',
-};
 
 // Garantías
 export function getStoredWarranties(): WarrantyRequest[] {

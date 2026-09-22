@@ -33,6 +33,7 @@ import {
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
 import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts } from '../../data/mockMultiRoleData';
+import { compressImageBase64 } from '../../utils/imageCompressor';
 
 // =========================================================================
 // 1. HELPERS DE ESTADO Y CANONIZACIÓN
@@ -976,65 +977,58 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     }
   };
 
-  // Carga de imágenes desde archivos locales
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Carga de imágenes desde archivos locales (comprimidas)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setFormData((prev) => ({
-            ...prev,
-            photos: [...prev.photos, event.target!.result as string],
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      const compressed = await compressImageBase64(file);
+      if (compressed) {
+        setFormData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, compressed],
+        }));
+      }
+    }
     e.target.value = '';
   };
 
-  // Drag & drop de imágenes
-  const handleDrop = (e: React.DragEvent) => {
+  // Drag & drop de imágenes (comprimidas)
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setFormData((prev) => ({
-            ...prev,
-            photos: [...prev.photos, event.target!.result as string],
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      const compressed = await compressImageBase64(file);
+      if (compressed) {
+        setFormData((prev) => ({
+          ...prev,
+          photos: [...prev.photos, compressed],
+        }));
+      }
+    }
   };
 
-  // Pegar imágenes con Ctrl + V
-  const handlePaste = (e: React.ClipboardEvent) => {
+  // Pegar imágenes con Ctrl + V (comprimidas)
+  const handlePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const file = items[i].getAsFile();
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (event.target?.result) {
-              setFormData((prev) => ({
-                ...prev,
-                photos: [...prev.photos, event.target!.result as string],
-              }));
-            }
-          };
-          reader.readAsDataURL(file);
+          const compressed = await compressImageBase64(file);
+          if (compressed) {
+            setFormData((prev) => ({
+              ...prev,
+              photos: [...prev.photos, compressed],
+            }));
+          }
         }
       }
     }

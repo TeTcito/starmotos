@@ -32,6 +32,7 @@ import {
   Workshop,
 } from '../../types/customer';
 import { querySriMock } from '../../data/mockMultiRoleData';
+import { compressImageBase64 } from '../../utils/imageCompressor';
 
 interface Props {
   defaultAtendidoPor: string;
@@ -475,27 +476,26 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   };
 
-  // Subir archivos reales desde el computador o dispositivo
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Subir archivos reales desde el computador o dispositivo (comprimidas)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setFormData((prev) => ({
-            ...prev,
-            fotos: [...prev.fotos, event.target!.result as string],
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      const compressed = await compressImageBase64(file);
+      if (compressed) {
+        setFormData((prev) => ({
+          ...prev,
+          fotos: [...prev.fotos, compressed],
+        }));
+      }
+    }
 
     // Resetear valor para permitir seleccionar el mismo archivo si se desea
     e.target.value = '';
   };
+
 
   const handleRemovePhoto = (index: number) => {
     setFormData((prev) => ({

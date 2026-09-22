@@ -26,6 +26,7 @@ import {
   Technician,
   AlistamientoFullRecord,
   TallerClient,
+  WarrantyRequestStatus,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -57,6 +58,13 @@ interface Props {
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
+  onDeleteFullAlistamiento?: (id: string) => void;
+  onDeleteClient?: (idOrCedula: string) => void;
+  onDeleteWarranty?: (id: string) => void;
+  onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onQuickUpdateWarrantyStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
   alistamientoClient: AlistamientoClient;
   setAlistamientoClient: React.Dispatch<React.SetStateAction<AlistamientoClient>>;
   alistamientoMoto: AlistamientoMotorcycle;
@@ -89,6 +97,13 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
+  onDeleteFullAlistamiento,
+  onDeleteClient,
+  onDeleteWarranty,
+  onCreateWarranty,
+  onQuickUpdateWarrantyStatus,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
   alistamientoClient,
   setAlistamientoClient,
   alistamientoMoto,
@@ -200,6 +215,8 @@ export const AdminViewDesktop: React.FC<Props> = ({
               onViewAll={() => setActiveSection('alertas')}
               onMarkAlertAsRead={onMarkAlertAsRead}
               onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+              onDeleteAlert={onDeleteAlert}
+              onDeleteAllReadAlerts={onDeleteAllReadAlerts}
             />
 
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
@@ -325,9 +342,11 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 onAddTechnician={onAddTechnician}
                 onAddOrigin={onAddOrigin}
                 onSaveRecord={onSaveFullAlistamiento}
+                onDeleteRecord={onDeleteFullAlistamiento}
                 recentRecords={fullAlistamientos}
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
+                isMatriz={true}
               />
             )}
             {activeSection === 'clientes_admin' && (
@@ -337,6 +356,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 fullAlistamientos={fullAlistamientos}
                 clients={clients}
                 warranties={warranties}
+                onDeleteClient={onDeleteClient}
                 onNavigateToAlistamiento={() => {
                   setActiveSection('alistamiento');
                   setAlistamientoViewMode('form');
@@ -354,10 +374,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
             {activeSection === 'garantias_admin' && (
               <GarantiasAdminDesktop
                 warranties={warranties}
+                clients={clients}
                 onValidateWarranty={onValidateWarranty}
                 onRejectWarranty={onRejectWarranty}
                 onSendToGarante={onSendToGarante}
                 onCompleteRepair={onCompleteRepair}
+                onCreateWarranty={onCreateWarranty}
+                onDeleteWarranty={onDeleteWarranty}
+                onQuickUpdateStatus={onQuickUpdateWarrantyStatus}
               />
             )}
             {activeSection === 'facturacion' && <FacturacionDesktop invoices={invoices} />}
@@ -366,6 +390,8 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 alerts={alerts}
                 onMarkAsRead={onMarkAlertAsRead}
                 onMarkAllAsRead={onMarkAllAlertsAsRead}
+                onDeleteAlert={onDeleteAlert}
+                onDeleteAllReadAlerts={onDeleteAllReadAlerts}
               />
             )}
           </div>

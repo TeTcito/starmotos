@@ -25,11 +25,17 @@ import {
   saveStoredOrigins,
   getStoredFullAlistamientos,
   saveStoredFullAlistamientos,
+  deleteStoredAlistamiento,
   getStoredClients,
   saveStoredClients,
+  deleteStoredClient,
+  deleteStoredWarranty,
+  deleteStoredAlert,
+  deleteStoredAlerts,
   querySriMock,
 } from '../data/mockMultiRoleData';
-import { Technician, AlistamientoFullRecord, TallerClient } from '../types/customer';
+import { Technician, AlistamientoFullRecord, TallerClient, WarrantyRequestStatus } from '../types/customer';
+
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   'talleres',
@@ -273,6 +279,87 @@ export function useAdminPortal() {
     showToast('Garantía marcada como COMPLETADA. Liquidación registrada.', 'success');
   }, [showToast]);
 
+  // Matriz emite nueva solicitud de garantía
+  const createWarrantyRequest = useCallback((directReq: WarrantyRequest) => {
+    const newReq: WarrantyRequest = {
+      ...directReq,
+      status: directReq.status || 'en_revision',
+      tallerOrigin: directReq.tallerOrigin || 'StarMotos Matriz La Maná',
+      tallerOriginId: directReq.tallerOriginId || 'matriz-la-mana',
+    };
+
+    setWarranties((prev) => {
+      const updated = [newReq, ...prev];
+      saveStoredWarranties(updated);
+      return updated;
+    });
+
+    const newAlert: SystemAlert = {
+      id: `alt-${Date.now()}`,
+      type: 'estado_cambiado',
+      title: 'Nueva Solicitud de Garantía en Matriz',
+      message: `StarMotos Matriz generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: newReq.id,
+    };
+    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.6 },
+    });
+
+    showToast(`Solicitud ${newReq.requestNumber} registrada en Matriz Central.`, 'success');
+    return true;
+  }, [showToast]);
+
+  // Eliminar garantía
+  const deleteWarranty = useCallback((id: string) => {
+    setWarranties((prev) => {
+      const updated = prev.filter((w) => w.id !== id);
+      saveStoredWarranties(updated);
+      return updated;
+    });
+    deleteStoredWarranty(id);
+    showToast('Solicitud de garantía eliminada.', 'info');
+  }, [showToast]);
+
+  // Cambio rápido de estado con observación del Administrador
+  const quickUpdateWarrantyStatus = useCallback((id: string, newStatus: WarrantyRequestStatus, notes?: string) => {
+    setWarranties((prev) => {
+      const target = prev.find((w) => w.id === id);
+      const updated = prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              status: newStatus,
+              matrizNotes: notes || w.matrizNotes,
+            }
+          : w
+      );
+      saveStoredWarranties(updated);
+
+      if (target) {
+        const newAlert: SystemAlert = {
+          id: `alt-${Date.now()}`,
+          type: 'estado_cambiado',
+          title: `Estado Actualizado: ${target.requestNumber}`,
+          message: `Matriz dictaminó "${newStatus}" para ${target.clientName}.${notes ? ` Observación: ${notes}` : ''}`,
+          timestamp: 'Ahora mismo',
+          read: false,
+          relatedId: target.id,
+        };
+        saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+      }
+      return updated;
+    });
+
+    confetti({ particleCount: 40, spread: 55, origin: { y: 0.6 } });
+    showToast(`Estado de garantía actualizado: ${newStatus}`, 'success');
+  }, [showToast]);
+
   // Marcar alertas como leídas
   const markAlertAsRead = useCallback((id: string) => {
     setAlerts((prev) => {
@@ -290,6 +377,33 @@ export function useAdminPortal() {
     });
     showToast('Todas las notificaciones marcadas como leídas.', 'info');
   }, [showToast]);
+
+  // Eliminar alertas
+  const deleteAlert = useCallback((id: string) => {
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlert(id);
+    showToast('Notificación eliminada.', 'info');
+  }, [showToast]);
+
+  const deleteAllReadAlerts = useCallback(() => {
+    const readIds = alerts.filter((a) => a.read).map((a) => a.id);
+    if (readIds.length === 0) {
+      showToast('No hay notificaciones leídas para eliminar.', 'info');
+      return;
+    }
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => !a.read);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlerts(readIds);
+    showToast('Notificaciones leídas eliminadas.', 'info');
+  }, [alerts, showToast]);
+
 
   // ===================== WIZARD DE ALISTAMIENTO =====================
 
@@ -456,14 +570,21 @@ export function useAdminPortal() {
   }, [showToast]);
 
   const saveFullAlistamiento = useCallback((record: AlistamientoFullRecord) => {
-    // 1. Guardar en lista de alistamientos
+    // 1. Guardar en lista de alistamientos (evitar duplicados al editar)
     setFullAlistamientos((prev) => {
-      const updated = [record, ...prev];
+      const idx = prev.findIndex((r) => r.id === record.id);
+      let updated: AlistamientoFullRecord[];
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = record;
+      } else {
+        updated = [record, ...prev];
+      }
       saveStoredFullAlistamientos(updated);
       return updated;
     });
 
-    // 2. Crear / actualizar en lista de clientes del taller
+    // 2. Crear / actualizar en lista de clientes del taller (con chasis, kilometraje y dirección)
     const newClient: TallerClient = {
       id: `cli-${Date.now()}`,
       fullName: `${record.nombres} ${record.apellidos}`.trim(),
@@ -473,6 +594,11 @@ export function useAdminPortal() {
       motorcycleBrand: record.modeloMarca.split(' ')[0] || 'Moto',
       motorcycleModel: record.modeloMarca,
       motorcyclePlate: record.placa,
+      motorcycleVin: record.chasis,
+      motorcycleMileage: record.kilometraje,
+      address: record.direccion,
+      color: record.color,
+      year: record.year,
       lastVisit: record.fechaServicio,
       totalVisits: 1,
       workshopId: record.sedeId || 'matriz-la-mana',
@@ -486,9 +612,18 @@ export function useAdminPortal() {
         updated = [...prev];
         updated[existingIdx] = {
           ...updated[existingIdx],
-          lastVisit: record.fechaServicio,
-          totalVisits: updated[existingIdx].totalVisits + 1,
+          fullName: `${record.nombres} ${record.apellidos}`.trim(),
+          phone: record.celular1 || updated[existingIdx].phone,
+          email: record.email || updated[existingIdx].email,
+          motorcycleBrand: record.modeloMarca.split(' ')[0] || updated[existingIdx].motorcycleBrand,
+          motorcycleModel: record.modeloMarca || updated[existingIdx].motorcycleModel,
           motorcyclePlate: record.placa || updated[existingIdx].motorcyclePlate,
+          motorcycleVin: record.chasis || updated[existingIdx].motorcycleVin,
+          motorcycleMileage: record.kilometraje !== undefined ? record.kilometraje : updated[existingIdx].motorcycleMileage,
+          address: record.direccion || updated[existingIdx].address,
+          color: record.color || updated[existingIdx].color,
+          year: record.year || updated[existingIdx].year,
+          lastVisit: record.fechaServicio || updated[existingIdx].lastVisit,
         };
       } else {
         updated = [newClient, ...prev];
@@ -497,7 +632,7 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // 3. Crear factura
+    // 3. Crear factura si no existe
     const newInv: AdminInvoice = {
       id: `inv-${Date.now()}`,
       invoiceNumber: record.numeroFactura,
@@ -511,6 +646,8 @@ export function useAdminPortal() {
       workshopName: record.sede,
     };
     setInvoices((prev) => {
+      const exists = prev.some((i) => i.invoiceNumber === record.numeroFactura);
+      if (exists) return prev;
       const updated = [newInv, ...prev];
       saveStoredInvoices(updated);
       return updated;
@@ -520,7 +657,7 @@ export function useAdminPortal() {
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'orden_creada',
-      title: 'Nuevo Alistamiento Registrado',
+      title: 'Alistamiento Guardado',
       message: `${record.sede}: Cliente ${record.nombres} ${record.apellidos} — Moto ${record.modeloMarca} (${record.placa}). Factura ${record.numeroFactura}.`,
       timestamp: 'Ahora mismo',
       read: false,
@@ -532,7 +669,29 @@ export function useAdminPortal() {
       return updated;
     });
 
-    showToast(`¡Alistamiento de ${record.nombres} registrado con éxito!`, 'success');
+    showToast(`¡Alistamiento de ${record.nombres} guardado correctamente!`, 'success');
+  }, [showToast]);
+
+  // Eliminar alistamiento
+  const deleteFullAlistamiento = useCallback((id: string) => {
+    setFullAlistamientos((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      saveStoredFullAlistamientos(updated);
+      return updated;
+    });
+    deleteStoredAlistamiento(id);
+    showToast('Alistamiento eliminado correctamente.', 'info');
+  }, [showToast]);
+
+  // Eliminar cliente
+  const deleteClient = useCallback((idOrCedula: string) => {
+    setClients((prev) => {
+      const updated = prev.filter((c) => c.id !== idOrCedula && c.idNumber !== idOrCedula);
+      saveStoredClients(updated);
+      return updated;
+    });
+    deleteStoredClient(idOrCedula);
+    showToast('Cliente eliminado del registro.', 'info');
   }, [showToast]);
 
   return {
@@ -551,6 +710,9 @@ export function useAdminPortal() {
     toastMessage,
     showToast,
     // Garantías
+    createWarrantyRequest,
+    deleteWarranty,
+    quickUpdateWarrantyStatus,
     validateWarrantyByMatriz,
     rejectWarrantyByMatriz,
     sendWarrantyToGarante,
@@ -558,10 +720,14 @@ export function useAdminPortal() {
     // Alertas
     markAlertAsRead,
     markAllAlertsAsRead,
+    deleteAlert,
+    deleteAllReadAlerts,
     // Técnicos & Alistamiento Full
     addTechnician,
     addOrigin,
     saveFullAlistamiento,
+    deleteFullAlistamiento,
+    deleteClient,
     // Alistamiento básico anterior (compatibilidad)
     alistamientoClient,
     setAlistamientoClient,

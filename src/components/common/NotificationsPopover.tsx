@@ -13,6 +13,7 @@ import {
   Receipt,
   ArrowRight,
   Inbox,
+  Trash2,
 } from 'lucide-react';
 import {
   SystemAlert,
@@ -52,6 +53,8 @@ export interface NotificationsPopoverProps {
   onViewAll: () => void;
   onMarkAlertAsRead?: (id: string) => void;
   onMarkAllAlertsAsRead?: () => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
   className?: string;
   badgeClassName?: string;
 }
@@ -90,6 +93,8 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
   onViewAll,
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
   className = '',
   badgeClassName = '',
 }) => {
@@ -536,6 +541,17 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
                   <span className="hidden sm:inline">Marcar leídas</span>
                 </button>
               )}
+              {onDeleteAllReadAlerts && alerts.some((a) => a.read) && (
+                <button
+                  type="button"
+                  onClick={onDeleteAllReadAlerts}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1 cursor-pointer"
+                  title="Eliminar notificaciones leídas"
+                >
+                  <Trash2 className="w-3 h-3 text-red-500" />
+                  <span className="hidden sm:inline">Limpiar</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
@@ -686,11 +702,26 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
                         <Clock className="w-3 h-3 text-zinc-400" />
                         <span>{item.timestamp}</span>
                       </span>
-                      {!item.read && (
-                        <span className="text-[10px] font-bold text-blue-600">
-                          Nueva
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {!item.read && (
+                          <span className="text-[10px] font-bold text-blue-600">
+                            Nueva
+                          </span>
+                        )}
+                        {item.category === 'evento' && onDeleteAlert && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteAlert(item.rawId);
+                            }}
+                            className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
+                            title="Eliminar esta notificación"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -20,6 +20,8 @@ import {
   getStoredInventory,
   saveStoredAlerts,
   getStoredAlerts,
+  deleteStoredAlert,
+  deleteStoredAlerts,
   getStoredTechnicians,
   saveStoredTechnicians,
   getStoredOrigins,
@@ -29,6 +31,7 @@ import {
   getStoredWorkshops,
 } from '../data/mockMultiRoleData';
 import { Technician, AlistamientoFullRecord, Workshop } from '../types/customer';
+
 
 export const TALLER_SECTIONS: TallerSection[] = [
   'ordenes_taller',
@@ -131,6 +134,31 @@ export function useTallerPortal() {
       setToastMessage(null);
     }, 4000);
   }, []);
+
+  const deleteAlert = useCallback((id: string) => {
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlert(id);
+    showToast('Notificación eliminada.', 'info');
+  }, [showToast]);
+
+  const deleteAllReadAlerts = useCallback(() => {
+    const readIds = alerts.filter((a) => a.read).map((a) => a.id);
+    if (readIds.length === 0) {
+      showToast('No hay notificaciones leídas para eliminar.', 'info');
+      return;
+    }
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => !a.read);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlerts(readIds);
+    showToast('Notificaciones leídas eliminadas.', 'info');
+  }, [alerts, showToast]);
 
   // Hash navigation
   const setActiveSection = useCallback((newSection: TallerSection, replace = false) => {
@@ -287,9 +315,16 @@ export function useTallerPortal() {
   }, [showToast]);
 
   const saveFullAlistamiento = useCallback((record: AlistamientoFullRecord) => {
-    // 1. Guardar en lista de alistamientos
+    // 1. Guardar en lista de alistamientos (evitar duplicados al editar)
     setFullAlistamientos((prev) => {
-      const updated = [record, ...prev];
+      const idx = prev.findIndex((r) => r.id === record.id);
+      let updated: AlistamientoFullRecord[];
+      if (idx >= 0) {
+        updated = [...prev];
+        updated[idx] = record;
+      } else {
+        updated = [record, ...prev];
+      }
       saveStoredFullAlistamientos(updated);
       return updated;
     });
@@ -304,6 +339,11 @@ export function useTallerPortal() {
       motorcycleBrand: record.modeloMarca.split(' ')[0] || 'Moto',
       motorcycleModel: record.modeloMarca,
       motorcyclePlate: record.placa,
+      motorcycleVin: record.chasis,
+      motorcycleMileage: record.kilometraje,
+      address: record.direccion,
+      color: record.color,
+      year: record.year,
       lastVisit: record.fechaServicio,
       totalVisits: 1,
       workshopId: record.sedeId || 'taller-quevedo',
@@ -317,9 +357,19 @@ export function useTallerPortal() {
         updated = [...prev];
         updated[existingIdx] = {
           ...updated[existingIdx],
-          lastVisit: record.fechaServicio,
-          totalVisits: updated[existingIdx].totalVisits + 1,
+          fullName: `${record.nombres} ${record.apellidos}`.trim(),
+          phone: record.celular1 || updated[existingIdx].phone,
+          email: record.email || updated[existingIdx].email,
+          motorcycleBrand: record.modeloMarca.split(' ')[0] || updated[existingIdx].motorcycleBrand,
+          motorcycleModel: record.modeloMarca || updated[existingIdx].motorcycleModel,
           motorcyclePlate: record.placa || updated[existingIdx].motorcyclePlate,
+          motorcycleVin: record.chasis || updated[existingIdx].motorcycleVin,
+          motorcycleMileage: record.kilometraje !== undefined ? record.kilometraje : updated[existingIdx].motorcycleMileage,
+          address: record.direccion || updated[existingIdx].address,
+          color: record.color || updated[existingIdx].color,
+          year: record.year || updated[existingIdx].year,
+          lastVisit: record.fechaServicio || updated[existingIdx].lastVisit,
+          totalVisits: updated[existingIdx].totalVisits + 1,
         };
       } else {
         updated = [newClient, ...prev];
@@ -332,7 +382,7 @@ export function useTallerPortal() {
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'orden_creada',
-      title: 'Nuevo Alistamiento Registrado',
+      title: 'Alistamiento Guardado',
       message: `${record.sede}: Cliente ${record.nombres} ${record.apellidos} — Moto ${record.modeloMarca} (${record.placa}). Factura ${record.numeroFactura}.`,
       timestamp: 'Ahora mismo',
       read: false,
@@ -347,7 +397,7 @@ export function useTallerPortal() {
       colors: ['#1d4ed8', '#dc2626', '#10b981'],
     });
 
-    showToast('¡Alistamiento registrado y sincronizado exitosamente!', 'success');
+    showToast('¡Alistamiento guardado y sincronizado exitosamente!', 'success');
   }, [showToast]);
 
   return {
@@ -373,6 +423,8 @@ export function useTallerPortal() {
     alerts,
     markAlertAsRead,
     markAllAlertsAsRead,
+    deleteAlert,
+    deleteAllReadAlerts,
     toastMessage,
     showToast,
   };

@@ -44,9 +44,11 @@ interface Props {
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveRecord: (record: AlistamientoFullRecord) => void;
+  onDeleteRecord?: (id: string) => void;
   recentRecords?: AlistamientoFullRecord[];
   viewMode?: 'list' | 'form';
   onViewModeChange?: (mode: 'list' | 'form') => void;
+  isMatriz?: boolean;
 }
 
 export const AlistamientoWizard: React.FC<Props> = ({
@@ -59,9 +61,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
   onAddTechnician,
   onAddOrigin,
   onSaveRecord,
+  onDeleteRecord,
   recentRecords = [],
   viewMode: externalViewMode,
   onViewModeChange,
+  isMatriz = false,
 }) => {
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
@@ -739,6 +743,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <Save className="w-3.5 h-3.5" />
                 <span>Guardar Cambios</span>
               </button>
+
+              {onDeleteRecord && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`¿Está seguro de eliminar permanentemente la ficha de alistamiento de ${detailFormData.nombres} ${detailFormData.apellidos}?`)) {
+                      onDeleteRecord(detailFormData.id);
+                      setSelectedRecordForDetail(null);
+                      setDetailFormData(null);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                  title="Eliminar este alistamiento de la base de datos"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar Ficha</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1394,6 +1416,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
+                              {onDeleteRecord && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`¿Está seguro de eliminar el alistamiento de ${record.nombres} ${record.apellidos}?`)) {
+                                      onDeleteRecord(record.id);
+                                    }
+                                  }}
+                                  className="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  title="Eliminar Alistamiento"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

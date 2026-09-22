@@ -13,6 +13,8 @@ import {
   INITIAL_GARANTE_PROFILE,
   saveStoredAlerts,
   getStoredAlerts,
+  deleteStoredAlert,
+  deleteStoredAlerts,
   getStoredFullAlistamientos,
   getStoredClients,
   getStoredWorkshops,
@@ -103,6 +105,31 @@ export function useGarantePortal() {
       setToastMessage(null);
     }, 4000);
   }, []);
+
+  const deleteAlert = useCallback((id: string) => {
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlert(id);
+    showToast('Notificación eliminada.', 'info');
+  }, [showToast]);
+
+  const deleteAllReadAlerts = useCallback(() => {
+    const readIds = alerts.filter((a) => a.read).map((a) => a.id);
+    if (readIds.length === 0) {
+      showToast('No hay notificaciones leídas para eliminar.', 'info');
+      return;
+    }
+    setAlerts((prev) => {
+      const updated = prev.filter((a) => !a.read);
+      saveStoredAlerts(updated);
+      return updated;
+    });
+    deleteStoredAlerts(readIds);
+    showToast('Notificaciones leídas eliminadas.', 'info');
+  }, [alerts, showToast]);
 
   const setActiveSection = useCallback((newSection: GaranteSection, replace = false) => {
     if (!GARANTE_SECTIONS.includes(newSection)) return;
@@ -254,6 +281,8 @@ export function useGarantePortal() {
     alerts,
     markAlertAsRead,
     markAllAlertsAsRead,
+    deleteAlert,
+    deleteAllReadAlerts,
     toastMessage,
     showToast,
     // Modal y acciones

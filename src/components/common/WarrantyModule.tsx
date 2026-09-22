@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
-import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts } from '../../data/mockMultiRoleData';
+import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos } from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 
 // =========================================================================
@@ -115,19 +115,23 @@ interface WarrantySquareCardProps {
   warranty: WarrantyRequest;
   onClick: () => void;
   viewerRole?: 'taller' | 'admin' | 'garante';
+  onDelete?: (id: string) => void;
+  onQuickStatusChange?: (warranty: WarrantyRequest) => void;
 }
 
 export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
   warranty,
   onClick,
   viewerRole = 'taller',
+  onDelete,
+  onQuickStatusChange,
 }) => {
   const statusInfo = getWarrantyStatusInfo(warranty.status);
 
   return (
     <div
       onClick={onClick}
-      className="group bg-white border-2 border-zinc-200 hover:border-blue-500 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[300px] select-none relative overflow-hidden active:scale-99"
+      className="group bg-white border-2 border-zinc-200 hover:border-blue-500 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[315px] select-none relative overflow-hidden active:scale-99"
     >
       {/* Barra superior de acento según estado */}
       <div
@@ -160,16 +164,34 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
             </span>
           </div>
 
-          <div
-            className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
-          >
-            {statusInfo.icon}
-            <span>{statusInfo.label}</span>
+          <div className="flex items-center gap-1">
+            <div
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
+            >
+              {statusInfo.icon}
+              <span>{statusInfo.label}</span>
+            </div>
+
+            {viewerRole === 'admin' && onDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber} de ${warranty.clientName}?`)) {
+                    onDelete(warranty.id);
+                  }
+                }}
+                className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                title="Eliminar Solicitud de Garantía"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Datos Principales (Cliente & Vehículo) */}
-        <div className="mt-3 space-y-2">
+        <div className="mt-2.5 space-y-2">
           {/* Cliente */}
           <div className="flex items-start gap-2">
             <User className="w-3.5 h-3.5 text-zinc-400 mt-0.5 shrink-0" />
@@ -192,7 +214,7 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
               </span>
               <span className="text-[11px] font-mono text-zinc-500">
                 Placa: <strong className="text-zinc-700">{warranty.motorcyclePlate || 'S/P'}</strong>
-                {warranty.motorcycleVin && ` • ${warranty.motorcycleVin.slice(-6)}`}
+                {warranty.motorcycleVin && ` • VIN: ${warranty.motorcycleVin.slice(-6)}`}
               </span>
             </div>
           </div>
@@ -206,19 +228,34 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
       </div>
 
       {/* Pie de la Tarjeta Cuadrada */}
-      <div className="pt-2.5 border-t border-zinc-100 flex items-center justify-between">
+      <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
         <div>
           <span className="text-[10px] uppercase font-bold text-zinc-400 block">Costo Reclamado</span>
-          <span className="text-sm font-black font-mono text-zinc-900">
+          <span className="text-xs font-black font-mono text-zinc-900">
             ${(warranty.estimatedCost || 60).toFixed(2)} USD
           </span>
         </div>
 
         <div className="flex items-center gap-1.5">
+          {viewerRole === 'admin' && onQuickStatusChange && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickStatusChange(warranty);
+              }}
+              className="px-2 py-1 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 text-[10px] font-bold rounded-lg border border-blue-200 transition-colors cursor-pointer flex items-center gap-1"
+              title="Cambiar estado o enviar notas"
+            >
+              <FileCheck2 className="w-3 h-3" />
+              <span>Gestionar</span>
+            </button>
+          )}
+
           <span className="text-[11px] font-bold text-blue-600 group-hover:underline">
             Ver Ficha
           </span>
-          <div className="w-6 h-6 rounded-full bg-blue-50 group-hover:bg-blue-600 text-blue-600 group-hover:text-white flex items-center justify-center transition-colors">
+          <div className="w-5 h-5 rounded-full bg-blue-50 group-hover:bg-blue-600 text-blue-600 group-hover:text-white flex items-center justify-center text-xs transition-colors">
             →
           </div>
         </div>
@@ -239,6 +276,7 @@ interface WarrantyFormViewProps {
   onRejectByMatriz?: (id: string, reason: string) => void;
   onApproveByGarante?: (id: string, notes: string) => void;
   onRejectByGarante?: (id: string, reason: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
@@ -249,6 +287,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   onRejectByMatriz,
   onApproveByGarante,
   onRejectByGarante,
+  onDelete,
 }) => {
   const statusInfo = getWarrantyStatusInfo(warranty.status);
 
@@ -369,6 +408,23 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               <MessageCircle className="w-4 h-4" />
               <span>WhatsApp Cliente</span>
             </a>
+          )}
+
+          {viewerRole === 'admin' && onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber} de ${warranty.clientName}?`)) {
+                  onDelete(warranty.id);
+                  onBack();
+                }
+              }}
+              className="px-3.5 py-2 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Eliminar esta garantía"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminar Solicitud</span>
+            </button>
           )}
         </div>
       </div>
@@ -951,24 +1007,48 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       return;
     }
 
-    const found = clients.find(
+    const foundClient = clients.find(
       (c) =>
         c.idNumber?.toLowerCase() === term ||
         c.idNumber?.toLowerCase().includes(term) ||
         (c.phone && c.phone.includes(term))
     );
 
-    if (found) {
+    const alistamientos = getStoredFullAlistamientos();
+    const foundAlist = alistamientos.find(
+      (r) =>
+        r.cedulaRuc?.toLowerCase() === term ||
+        r.cedulaRuc?.toLowerCase().includes(term) ||
+        (r.celular1 && r.celular1.includes(term))
+    );
+
+    if (foundClient || foundAlist) {
+      const clientName = foundClient?.fullName || (foundAlist ? `${foundAlist.nombres} ${foundAlist.apellidos}`.trim() : '');
+      const clientIdNumber = foundClient?.idNumber || foundAlist?.cedulaRuc || '';
+      const clientPhone = foundClient?.phone || foundAlist?.celular1 || '';
+      const motorcycleBrand = foundClient?.motorcycleBrand || (foundAlist?.modeloMarca ? foundAlist.modeloMarca.split(' ')[0] : 'Benelli');
+      const motorcycleModel = foundClient?.motorcycleModel || foundAlist?.modeloMarca || '';
+      const motorcyclePlate = (foundClient?.motorcyclePlate || foundAlist?.placa || '').toUpperCase();
+      const motorcycleVin = foundClient?.motorcycleVin || foundAlist?.chasis || '';
+      const motorcycleMileage = foundClient?.motorcycleMileage !== undefined
+        ? foundClient.motorcycleMileage
+        : (foundAlist?.kilometraje !== undefined ? foundAlist.kilometraje : 1000);
+
       setFormData((prev) => ({
         ...prev,
-        clientName: found.fullName || prev.clientName,
-        clientIdNumber: found.idNumber || prev.clientIdNumber,
-        clientPhone: found.phone || prev.clientPhone,
-        motorcycleBrand: found.motorcycleBrand || prev.motorcycleBrand,
-        motorcycleModel: found.motorcycleModel || prev.motorcycleModel,
-        motorcyclePlate: (found.motorcyclePlate || prev.motorcyclePlate).toUpperCase(),
+        clientName: clientName || prev.clientName,
+        clientIdNumber: clientIdNumber || prev.clientIdNumber,
+        clientPhone: clientPhone || prev.clientPhone,
+        motorcycleBrand: motorcycleBrand || prev.motorcycleBrand,
+        motorcycleModel: motorcycleModel || prev.motorcycleModel,
+        motorcyclePlate: motorcyclePlate || prev.motorcyclePlate,
+        motorcycleVin: motorcycleVin || prev.motorcycleVin,
+        motorcycleMileage: motorcycleMileage !== undefined ? motorcycleMileage : prev.motorcycleMileage,
       }));
-      setSearchStatus({ type: 'success', message: `✓ Cliente cargado: ${found.fullName}` });
+      setSearchStatus({
+        type: 'success',
+        message: `✓ Datos cargados: ${clientName || clientIdNumber} (${motorcyclePlate || motorcycleVin || 'S/P'})`,
+      });
     } else {
       setSearchStatus({
         type: 'warning',

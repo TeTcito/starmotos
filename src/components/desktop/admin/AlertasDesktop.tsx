@@ -8,6 +8,7 @@ import {
   FileText,
   AlertTriangle,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import { SystemAlert } from '../../../types/customer';
 
@@ -15,6 +16,8 @@ interface Props {
   alerts: SystemAlert[];
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
   title?: string;
   subtitle?: string;
 }
@@ -23,6 +26,8 @@ export const AlertasDesktop: React.FC<Props> = ({
   alerts,
   onMarkAsRead,
   onMarkAllAsRead,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
   title = 'Centro de Notificaciones & Alertas en Vivo',
   subtitle = 'Registro cronológico de eventos operacionales, cambios de estado y aprobaciones.',
 }) => {
@@ -42,11 +47,12 @@ export const AlertasDesktop: React.FC<Props> = ({
   };
 
   const unreadCount = alerts.filter((a) => !a.read).length;
+  const readCount = alerts.filter((a) => a.read).length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
             <Bell className="w-6 h-6 text-blue-600" />
@@ -57,16 +63,30 @@ export const AlertasDesktop: React.FC<Props> = ({
           </p>
         </div>
 
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            onClick={onMarkAllAsRead}
-            className="px-3.5 py-1.5 rounded-xl border border-zinc-300 hover:bg-zinc-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-          >
-            <CheckCheck className="w-4 h-4 text-blue-600" />
-            <span>Marcar todas como leídas</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={onMarkAllAsRead}
+              className="px-3.5 py-1.5 rounded-xl border border-zinc-300 hover:bg-zinc-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <CheckCheck className="w-4 h-4 text-blue-600" />
+              <span>Marcar todas como leídas</span>
+            </button>
+          )}
+
+          {onDeleteAllReadAlerts && readCount > 0 && (
+            <button
+              type="button"
+              onClick={onDeleteAllReadAlerts}
+              className="px-3.5 py-1.5 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Eliminar todas las notificaciones que ya fueron leídas"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Limpiar leídas ({readCount})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Listado de Alertas */}
@@ -106,6 +126,20 @@ export const AlertasDesktop: React.FC<Props> = ({
                 </div>
                 <p className="text-xs text-zinc-600 mt-0.5 leading-relaxed">{alt.message}</p>
               </div>
+
+              {onDeleteAlert && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteAlert(alt.id);
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                  title="Eliminar notificación"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))
         )}

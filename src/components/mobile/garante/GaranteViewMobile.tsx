@@ -27,6 +27,7 @@ import { HistorialGarantiasMobile } from './HistorialGarantiasMobile';
 import { ReportesGaranteMobile } from './ReportesGaranteMobile';
 import { PerfilGaranteMobile } from './PerfilGaranteMobile';
 import { ClientesModule } from '../../common/ClientesModule';
+import { TalleresGaranteMobile } from './TalleresGaranteMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
@@ -55,6 +56,8 @@ interface Props {
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
 }
 
 export const GaranteViewMobile: React.FC<Props> = ({
@@ -82,12 +85,14 @@ export const GaranteViewMobile: React.FC<Props> = ({
   alerts,
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'solicitudes_garante', label: 'Bandeja', icon: <Inbox className="w-4 h-4" />, badge: `${pendingRequests.length || ''}` },
-    { id: 'clientes_garante', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
+    { id: 'clientes_garante', label: 'Talleres B2B', icon: <Building2 className="w-4 h-4" /> },
     { id: 'historial_garantias', label: 'Historial', icon: <History className="w-4 h-4" /> },
     { id: 'reportes_garante', label: 'Reportes', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'perfil_garante', label: 'Ficha Marca', icon: <Building2 className="w-4 h-4" /> },
@@ -101,7 +106,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
 
   const sectionTitles: Record<GaranteSection, string> = {
     solicitudes_garante: 'Bandeja de Entrada',
-    clientes_garante: 'Clientes & Flota',
+    clientes_garante: 'Red de Talleres & Concesionarios',
     historial_garantias: 'Historial Dictámenes',
     reportes_garante: 'Reportes Técnicos',
     perfil_garante: 'Ficha de Marca',
@@ -142,6 +147,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
             }}
             onMarkAlertAsRead={onMarkAlertAsRead}
             onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         </div>
       </header>
@@ -205,11 +212,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
           />
         )}
         {activeSection === 'clientes_garante' && (
-          <ClientesModule
-            role="garante"
+          <TalleresGaranteMobile
             workshops={workshops}
-            fullAlistamientos={fullAlistamientos}
-            clients={clients}
             warranties={warranties}
           />
         )}
@@ -225,6 +229,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
             alerts={alerts}
             onMarkAsRead={onMarkAlertAsRead}
             onMarkAllAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         )}
       </main>

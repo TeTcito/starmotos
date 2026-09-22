@@ -356,6 +356,8 @@ export async function cloudSaveClient(c: TallerClient) {
       phone: c.phone || null,
       workshop_id: c.workshopId || 'taller-principal',
       workshop_name: c.workshopName || 'StarMotos',
+      motorcycle_plate: c.motorcyclePlate || null,
+      motorcycle_vin: c.motorcycleVin || null,
       data: c,
       updated_at: new Date().toISOString(),
     };
@@ -368,6 +370,57 @@ export async function cloudSaveClient(c: TallerClient) {
     console.error('[Supabase] Excepción guardando cliente:', err);
   }
 }
+
+// =========================================================================
+// ELIMINACIONES EN LA NUBE
+// =========================================================================
+
+export async function cloudDeleteWarranty(id: string) {
+  try {
+    const { error } = await supabase.from('warranties').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando garantía:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando garantía:', err);
+  }
+}
+
+export async function cloudDeleteAlistamiento(id: string) {
+  try {
+    const { error } = await supabase.from('full_alistamientos').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando alistamiento:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando alistamiento:', err);
+  }
+}
+
+export async function cloudDeleteClient(id: string) {
+  try {
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando cliente:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando cliente:', err);
+  }
+}
+
+export async function cloudDeleteAlert(id: string) {
+  try {
+    const { error } = await supabase.from('alerts').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando alerta:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando alerta:', err);
+  }
+}
+
+export async function cloudDeleteAlerts(ids: string[]) {
+  if (!ids || ids.length === 0) return;
+  try {
+    const { error } = await supabase.from('alerts').delete().in('id', ids);
+    if (error) console.error('[Supabase] Error eliminando alertas:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando alertas:', err);
+  }
+}
+
 
 export async function cloudSaveAlert(alt: SystemAlert) {
   try {

@@ -497,6 +497,11 @@ export interface TallerClient {
   motorcycleBrand: string;
   motorcycleModel: string;
   motorcyclePlate: string;
+  motorcycleVin?: string;
+  motorcycleMileage?: number;
+  address?: string;
+  color?: string;
+  year?: number;
   lastVisit: string;
   totalVisits: number;
   workshopId?: string;

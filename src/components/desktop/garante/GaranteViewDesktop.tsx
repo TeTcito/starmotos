@@ -29,6 +29,7 @@ import { HistorialGarantiasDesktop } from './HistorialGarantiasDesktop';
 import { ReportesGaranteDesktop } from './ReportesGaranteDesktop';
 import { PerfilGaranteDesktop } from './PerfilGaranteDesktop';
 import { ClientesModule } from '../../common/ClientesModule';
+import { TalleresGaranteDesktop } from './TalleresGaranteDesktop';
 import { AlertasDesktop } from '../admin/AlertasDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
@@ -57,6 +58,8 @@ interface Props {
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
 }
 
 export const GaranteViewDesktop: React.FC<Props> = ({
@@ -84,6 +87,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
   alerts,
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
 }) => {
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -162,6 +167,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               onViewAll={() => setActiveSection('alertas_garante')}
               onMarkAlertAsRead={onMarkAlertAsRead}
               onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+              onDeleteAlert={onDeleteAlert}
+              onDeleteAllReadAlerts={onDeleteAllReadAlerts}
             />
 
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
@@ -275,11 +282,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               />
             )}
             {activeSection === 'clientes_garante' && (
-              <ClientesModule
-                role="garante"
+              <TalleresGaranteDesktop
                 workshops={workshops}
-                fullAlistamientos={fullAlistamientos}
-                clients={clients}
                 warranties={warranties}
               />
             )}
@@ -295,6 +299,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
                 alerts={alerts}
                 onMarkAsRead={onMarkAlertAsRead}
                 onMarkAllAsRead={onMarkAllAlertsAsRead}
+                onDeleteAlert={onDeleteAlert}
+                onDeleteAllReadAlerts={onDeleteAllReadAlerts}
                 title="Auditoría de Alertas & Eventos del Garante"
                 subtitle="Registro de solicitudes ingresadas, validaciones y dictámenes técnicos de garantías Benelli & CFMOTO."
               />

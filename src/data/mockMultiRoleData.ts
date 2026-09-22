@@ -18,10 +18,16 @@ import {
   cloudSaveAlistamiento,
   cloudSaveOrder,
   cloudSaveInvoice,
+  cloudDeleteWarranty,
+  cloudDeleteAlistamiento,
+  cloudDeleteClient,
+  cloudDeleteAlert,
+  cloudDeleteAlerts,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 export { STORAGE_KEYS };
+
 
 // --- Talleres y Sucursales Oficiales de StarMotos (11 Ubicaciones Oficiales) ---
 export const INITIAL_WORKSHOPS: Workshop[] = [
@@ -395,6 +401,17 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
   }
 }
 
+export function deleteStoredWarranty(id: string) {
+  try {
+    const current = getStoredWarranties().filter((w) => w.id !== id);
+    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
+    window.dispatchEvent(new Event('starmotos_warranties_updated'));
+    cloudDeleteWarranty(id);
+  } catch (e) {
+    console.error('Error deleting warranty', e);
+  }
+}
+
 // Alertas
 export function getStoredAlerts(): SystemAlert[] {
   try {
@@ -415,6 +432,30 @@ export function saveStoredAlerts(alerts: SystemAlert[]) {
     }
   } catch (e) {
     console.error('Error saving alerts to localStorage', e);
+  }
+}
+
+export function deleteStoredAlert(id: string) {
+  try {
+    const current = getStoredAlerts().filter((a) => a.id !== id);
+    localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(current));
+    window.dispatchEvent(new Event('starmotos_alerts_updated'));
+    cloudDeleteAlert(id);
+  } catch (e) {
+    console.error('Error deleting alert', e);
+  }
+}
+
+export function deleteStoredAlerts(ids: string[]) {
+  if (!ids || ids.length === 0) return;
+  try {
+    const idSet = new Set(ids);
+    const current = getStoredAlerts().filter((a) => !idSet.has(a.id));
+    localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(current));
+    window.dispatchEvent(new Event('starmotos_alerts_updated'));
+    cloudDeleteAlerts(ids);
+  } catch (e) {
+    console.error('Error deleting alerts', e);
   }
 }
 
@@ -505,6 +546,20 @@ export function saveStoredClients(clients: TallerClient[]) {
     console.error('Error saving clients to localStorage', e);
   }
 }
+
+export function deleteStoredClient(idOrCedula: string) {
+  try {
+    const current = getStoredClients().filter(
+      (c) => c.id !== idOrCedula && c.idNumber !== idOrCedula
+    );
+    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(current));
+    window.dispatchEvent(new Event('starmotos_clients_updated'));
+    cloudDeleteClient(idOrCedula);
+  } catch (e) {
+    console.error('Error deleting client', e);
+  }
+}
+
 
 // Inventario
 export function getStoredInventory(): InventoryItem[] {
@@ -671,6 +726,18 @@ export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
     console.error('Error saving alistamientos to localStorage', e);
   }
 }
+
+export function deleteStoredAlistamiento(id: string) {
+  try {
+    const current = getStoredFullAlistamientos().filter((r) => r.id !== id);
+    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(current));
+    window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+    cloudDeleteAlistamiento(id);
+  } catch (e) {
+    console.error('Error deleting alistamiento', e);
+  }
+}
+
 
 // Función para reiniciar todos los módulos a vacío en pruebas
 export function resetAllSystemData() {

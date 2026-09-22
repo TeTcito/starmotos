@@ -35,6 +35,13 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     addTechnician,
     addOrigin,
     saveFullAlistamiento,
+    deleteFullAlistamiento,
+    deleteClient,
+    deleteWarranty,
+    createWarrantyRequest,
+    quickUpdateWarrantyStatus,
+    deleteAlert,
+    deleteAllReadAlerts,
     alistamientoClient,
     setAlistamientoClient,
     alistamientoMoto,
@@ -59,9 +66,14 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onRejectWarranty={rejectWarrantyByMatriz}
           onSendToGarante={sendWarrantyToGarante}
           onCompleteRepair={completeWarrantyRepair}
+          onCreateWarranty={createWarrantyRequest}
+          onDeleteWarranty={deleteWarranty}
+          onQuickUpdateWarrantyStatus={quickUpdateWarrantyStatus}
           alerts={alerts}
           onMarkAlertAsRead={markAlertAsRead}
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
+          onDeleteAlert={deleteAlert}
+          onDeleteAllReadAlerts={deleteAllReadAlerts}
           invoices={invoices}
           technicians={technicians}
           origins={origins}
@@ -70,6 +82,8 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onAddTechnician={addTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}
+          onDeleteFullAlistamiento={deleteFullAlistamiento}
+          onDeleteClient={deleteClient}
           alistamientoClient={alistamientoClient}
           setAlistamientoClient={setAlistamientoClient}
           alistamientoMoto={alistamientoMoto}
@@ -90,9 +104,14 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onValidateWarranty={validateWarrantyByMatriz}
           onSendToGarante={sendWarrantyToGarante}
           onCompleteRepair={completeWarrantyRepair}
+          onCreateWarranty={createWarrantyRequest}
+          onDeleteWarranty={deleteWarranty}
+          onQuickUpdateWarrantyStatus={quickUpdateWarrantyStatus}
           alerts={alerts}
           onMarkAlertAsRead={markAlertAsRead}
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
+          onDeleteAlert={deleteAlert}
+          onDeleteAllReadAlerts={deleteAllReadAlerts}
           invoices={invoices}
           technicians={technicians}
           origins={origins}
@@ -101,6 +120,8 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onAddTechnician={addTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}
+          onDeleteFullAlistamiento={deleteFullAlistamiento}
+          onDeleteClient={deleteClient}
           alistamientoClient={alistamientoClient}
           setAlistamientoClient={setAlistamientoClient}
           alistamientoMoto={alistamientoMoto}

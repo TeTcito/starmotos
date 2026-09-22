@@ -55,6 +55,8 @@ interface Props {
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
 }
 
 export const TallerViewMobile: React.FC<Props> = ({
@@ -79,6 +81,8 @@ export const TallerViewMobile: React.FC<Props> = ({
   alerts,
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeWorkshopId, setActiveWorkshopId] = useState<string>(() => {
@@ -152,6 +156,8 @@ export const TallerViewMobile: React.FC<Props> = ({
             }}
             onMarkAlertAsRead={onMarkAlertAsRead}
             onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         </div>
       </header>
@@ -290,6 +296,8 @@ export const TallerViewMobile: React.FC<Props> = ({
             alerts={alerts}
             onMarkAsRead={onMarkAlertAsRead}
             onMarkAllAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         )}
       </main>

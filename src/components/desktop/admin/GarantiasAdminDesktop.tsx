@@ -10,33 +10,71 @@ import {
   Inbox,
   Sparkles,
   Navigation,
+  Plus,
+  X,
+  Send,
+  Trash2,
+  FileCheck2,
 } from 'lucide-react';
-import { WarrantyRequest } from '../../../types/customer';
+import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../../types/customer';
 import {
   WarrantySquareCard,
   WarrantyFormView,
+  NewWarrantyFormView,
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
 
 interface Props {
   warranties: WarrantyRequest[];
+  clients?: TallerClient[];
   onValidateWarranty: (id: string, notes: string) => void;
   onRejectWarranty?: (id: string, reason: string) => void;
   onSendToGarante?: (id: string, notes?: string) => void;
   onCompleteRepair?: (id: string, invoiceNumber?: string) => void;
+  onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onDeleteWarranty?: (id: string) => void;
+  onQuickUpdateStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
 }
 
 export const GarantiasAdminDesktop: React.FC<Props> = ({
   warranties,
+  clients = [],
   onValidateWarranty,
   onRejectWarranty,
   onSendToGarante,
   onCompleteRepair,
+  onCreateWarranty,
+  onDeleteWarranty,
+  onQuickUpdateStatus,
 }) => {
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_revision' | 'en_proceso' | 'aceptada' | 'denegada'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'marca' | 'plus_taller' | 'gps'>('all');
+
+  // Estado para emisión de garantías desde Matriz
+  const [isEmittingWarranty, setIsEmittingWarranty] = useState(false);
+
+  // Estado para modal emergente de gestión rápida de estado
+  const [quickModalWarranty, setQuickModalWarranty] = useState<WarrantyRequest | null>(null);
+  const [quickTargetStatus, setQuickTargetStatus] = useState<WarrantyRequestStatus>('en_proceso');
+  const [quickAdminNotes, setQuickAdminNotes] = useState('');
+
+  // Si está en modo emisión de nueva garantía
+  if (isEmittingWarranty) {
+    return (
+      <NewWarrantyFormView
+        onCancel={() => setIsEmittingWarranty(false)}
+        onSubmit={(newReq) => {
+          if (onCreateWarranty) onCreateWarranty(newReq);
+          setIsEmittingWarranty(false);
+        }}
+        clients={clients}
+        defaultTallerOrigin="StarMotos Sede Matriz"
+        defaultTallerOriginId="sede-matriz"
+      />
+    );
+  }
 
   // Filtrado reactivo de solicitudes
   const filteredWarranties = warranties.filter((w) => {
@@ -78,7 +116,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
   ).length;
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5 animate-fade-in relative">
       {/* 1. VISTA DE DETALLE: FICHA EN FORMATO FORMULARIO */}
       {selectedWarranty ? (
         <WarrantyFormView
@@ -91,6 +129,10 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
           }}
           onRejectByMatriz={(id, reason) => {
             if (onRejectWarranty) onRejectWarranty(id, reason);
+            setSelectedWarranty(null);
+          }}
+          onDelete={(id) => {
+            if (onDeleteWarranty) onDeleteWarranty(id);
             setSelectedWarranty(null);
           }}
         />
@@ -114,8 +156,19 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* Indicadores Numéricos */}
+              {/* Acciones y Métricas */}
               <div className="flex items-center gap-2 flex-wrap">
+                {onCreateWarranty && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEmittingWarranty(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 active:scale-98"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Emitir Solicitud</span>
+                  </button>
+                )}
+
                 <span className="px-3 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-amber-600" />
                   <span>{countRevision} En Revisión</span>
@@ -151,7 +204,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setSearchTerm('')}
-                    className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1"
+                    className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1 cursor-pointer"
                   >
                     ✕
                   </button>
@@ -240,7 +293,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setTypeFilter('all')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
                   typeFilter === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -249,7 +302,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setTypeFilter('marca')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
                   typeFilter === 'marca' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -258,7 +311,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setTypeFilter('plus_taller')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
                   typeFilter === 'plus_taller' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -267,7 +320,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setTypeFilter('gps')}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold transition ${
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition cursor-pointer ${
                   typeFilter === 'gps' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -293,10 +346,112 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                   warranty={w}
                   onClick={() => setSelectedWarranty(w)}
                   viewerRole="admin"
+                  onDelete={onDeleteWarranty}
+                  onQuickStatusChange={(item) => {
+                    setQuickModalWarranty(item);
+                    setQuickTargetStatus(item.status === 'enviada_matriz' ? 'en_proceso' : 'validada_matriz');
+                    setQuickAdminNotes(item.matrizNotes || 'Revisado y aprobado técnicamente en Sede Matriz.');
+                  }}
                 />
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Emergente de Gestión Rápida de Estado */}
+      {quickModalWarranty && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-lg w-full overflow-hidden animate-scale-in">
+            <div className="flex items-center justify-between p-4 bg-zinc-900 text-white">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h3 className="text-sm font-black">
+                    Gestión Rápida de Garantía
+                  </h3>
+                  <span className="font-mono text-[11px] text-zinc-300">
+                    N° {quickModalWarranty.requestNumber}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickModalWarranty(null)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1">
+                <p className="font-bold text-zinc-900">
+                  {quickModalWarranty.clientName} ({quickModalWarranty.motorcycleBrand} {quickModalWarranty.motorcycleModel})
+                </p>
+                <p className="text-zinc-500 text-[11px]">
+                  <strong>Taller:</strong> {quickModalWarranty.tallerOrigin} • <strong>Placa:</strong> {quickModalWarranty.motorcyclePlate || 'S/P'}
+                </p>
+                <p className="text-zinc-600 text-[11px] line-clamp-2">
+                  <strong>Falla reportada:</strong> {quickModalWarranty.issueDescription}
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1.5 uppercase text-[10px]">
+                  Cambiar Estado a:
+                </label>
+                <select
+                  value={quickTargetStatus}
+                  onChange={(e) => setQuickTargetStatus(e.target.value as WarrantyRequestStatus)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none focus:border-blue-600"
+                >
+                  <option value="en_proceso">⏳ En Proceso (Enviar a Garante de Marca)</option>
+                  <option value="validada_matriz">✓ Validada por Matriz</option>
+                  <option value="rechazada_matriz">✕ Rechazada por Matriz</option>
+                  <option value="reparacion_completada">🛠 Reparación Completada</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 mb-1.5 uppercase text-[10px]">
+                  Observaciones de Matriz (para Garante o Taller):
+                </label>
+                <textarea
+                  rows={3}
+                  value={quickAdminNotes}
+                  onChange={(e) => setQuickAdminNotes(e.target.value)}
+                  placeholder="Ingrese justificación técnica o instrucciones..."
+                  className="w-full p-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-blue-600 resize-none font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setQuickModalWarranty(null)}
+                  className="px-4 py-2 rounded-xl text-zinc-600 hover:bg-zinc-100 text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onQuickUpdateStatus) {
+                      onQuickUpdateStatus(quickModalWarranty.id, quickTargetStatus, quickAdminNotes);
+                    } else if (quickTargetStatus === 'en_proceso' || quickTargetStatus === 'validada_matriz') {
+                      onValidateWarranty(quickModalWarranty.id, quickAdminNotes);
+                    }
+                    setQuickModalWarranty(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Confirmar y Enviar</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

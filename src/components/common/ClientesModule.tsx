@@ -38,6 +38,7 @@ import {
   ArrowUpDown,
   Maximize2,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -129,6 +130,7 @@ interface Props {
   clients: TallerClient[];
   warranties?: WarrantyRequest[];
   onNavigateToAlistamiento?: (clientCedula?: string) => void;
+  onDeleteClient?: (idOrCedula: string) => void;
 }
 
 export const ClientesModule: React.FC<Props> = ({
@@ -139,6 +141,7 @@ export const ClientesModule: React.FC<Props> = ({
   clients = [],
   warranties = [],
   onNavigateToAlistamiento,
+  onDeleteClient,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
@@ -283,6 +286,7 @@ export const ClientesModule: React.FC<Props> = ({
           cedulaRuc: cedula,
           phone: c.phone,
           email: c.email,
+          address: c.address,
           workshopId: c.workshopId || currentWorkshopId || 'taller-quevedo',
           workshopName: c.workshopName || 'StarMotos Sucursal Quevedo',
           motorcycles: [
@@ -290,7 +294,8 @@ export const ClientesModule: React.FC<Props> = ({
               model: `${c.motorcycleBrand} ${c.motorcycleModel}`.trim(),
               brand: c.motorcycleBrand,
               plate: c.motorcyclePlate,
-              chasis: 'S/N',
+              chasis: c.motorcycleVin || 'S/N',
+              lastMileage: c.motorcycleMileage,
             },
           ],
           pdiCompleted: false,
@@ -554,8 +559,12 @@ export const ClientesModule: React.FC<Props> = ({
           fullName: `${clientFormData.nombres} ${clientFormData.apellidos}`.trim(),
           phone: clientFormData.phone,
           email: clientFormData.email,
+          address: clientFormData.address,
+          motorcycleBrand: clientFormData.motoModel.split(' ')[0] || updatedClients[existingIdx].motorcycleBrand,
           motorcycleModel: clientFormData.motoModel,
           motorcyclePlate: clientFormData.motoPlate,
+          motorcycleVin: clientFormData.motoChasis,
+          motorcycleMileage: Number(clientFormData.motoMileage) || undefined,
           workshopName: clientFormData.workshopName,
         };
       } else {
@@ -566,9 +575,12 @@ export const ClientesModule: React.FC<Props> = ({
             idNumber: clientFormData.cedulaRuc,
             phone: clientFormData.phone,
             email: clientFormData.email,
+            address: clientFormData.address,
             motorcycleBrand: clientFormData.motoModel.split(' ')[0] || 'Moto',
             motorcycleModel: clientFormData.motoModel,
             motorcyclePlate: clientFormData.motoPlate,
+            motorcycleVin: clientFormData.motoChasis,
+            motorcycleMileage: Number(clientFormData.motoMileage) || undefined,
             lastVisit: new Date().toLocaleDateString('es-EC'),
             totalVisits: selectedClientForDetail.records.length || 1,
             workshopName: clientFormData.workshopName,
@@ -595,6 +607,7 @@ export const ClientesModule: React.FC<Props> = ({
             modeloMarca: clientFormData.motoModel,
             placa: clientFormData.motoPlate,
             chasis: clientFormData.motoChasis,
+            kilometraje: Number(clientFormData.motoMileage) || rec.kilometraje,
           };
         }
         return rec;
@@ -726,6 +739,24 @@ export const ClientesModule: React.FC<Props> = ({
               <Save className="w-3.5 h-3.5" />
               <span>Guardar Cambios</span>
             </button>
+
+            {onDeleteClient && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`¿Está seguro de eliminar permanentemente al cliente ${clientFormData.nombres} ${clientFormData.apellidos} (${clientFormData.cedulaRuc})?`)) {
+                    onDeleteClient(clientFormData.cedulaRuc);
+                    setSelectedClientForDetail(null);
+                    setClientFormData(null);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                title="Eliminar este cliente"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar Cliente</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1748,6 +1779,21 @@ export const ClientesModule: React.FC<Props> = ({
                               title="Nuevo Alistamiento / Servicio para este cliente"
                             >
                               <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteClient && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`¿Está seguro de eliminar al cliente ${data.nombre} ${data.apellido} (${client.cedulaRuc})?`)) {
+                                  onDeleteClient(client.cedulaRuc);
+                                }
+                              }}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Eliminar Cliente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>

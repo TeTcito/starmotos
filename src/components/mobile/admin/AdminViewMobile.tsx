@@ -26,6 +26,7 @@ import {
   Technician,
   AlistamientoFullRecord,
   TallerClient,
+  WarrantyRequestStatus,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -56,6 +57,13 @@ interface Props {
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
+  onDeleteFullAlistamiento?: (id: string) => void;
+  onDeleteClient?: (idOrCedula: string) => void;
+  onDeleteWarranty?: (id: string) => void;
+  onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onQuickUpdateWarrantyStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
+  onDeleteAlert?: (id: string) => void;
+  onDeleteAllReadAlerts?: () => void;
   alistamientoClient: AlistamientoClient;
   setAlistamientoClient: React.Dispatch<React.SetStateAction<AlistamientoClient>>;
   alistamientoMoto: AlistamientoMotorcycle;
@@ -87,6 +95,13 @@ export const AdminViewMobile: React.FC<Props> = ({
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
+  onDeleteFullAlistamiento,
+  onDeleteClient,
+  onDeleteWarranty,
+  onCreateWarranty,
+  onQuickUpdateWarrantyStatus,
+  onDeleteAlert,
+  onDeleteAllReadAlerts,
   alistamientoClient,
   setAlistamientoClient,
   alistamientoMoto,
@@ -154,6 +169,8 @@ export const AdminViewMobile: React.FC<Props> = ({
             }}
             onMarkAlertAsRead={onMarkAlertAsRead}
             onMarkAllAlertsAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         </div>
       </header>
@@ -229,7 +246,9 @@ export const AdminViewMobile: React.FC<Props> = ({
             onAddTechnician={onAddTechnician}
             onAddOrigin={onAddOrigin}
             onSaveRecord={onSaveFullAlistamiento}
+            onDeleteRecord={onDeleteFullAlistamiento}
             recentRecords={fullAlistamientos}
+            isMatriz={true}
           />
         )}
         {activeSection === 'clientes_admin' && (
@@ -239,6 +258,7 @@ export const AdminViewMobile: React.FC<Props> = ({
             fullAlistamientos={fullAlistamientos}
             clients={clients}
             warranties={warranties}
+            onDeleteClient={onDeleteClient}
             onNavigateToAlistamiento={() => {
               setActiveSection('alistamiento');
             }}
@@ -255,9 +275,13 @@ export const AdminViewMobile: React.FC<Props> = ({
         {activeSection === 'garantias_admin' && (
           <GarantiasAdminMobile
             warranties={warranties}
+            clients={clients}
             onValidateWarranty={onValidateWarranty}
             onSendToGarante={onSendToGarante}
             onCompleteRepair={onCompleteRepair}
+            onCreateWarranty={onCreateWarranty}
+            onDeleteWarranty={onDeleteWarranty}
+            onQuickUpdateStatus={onQuickUpdateWarrantyStatus}
           />
         )}
         {activeSection === 'facturacion' && <FacturacionMobile invoices={invoices} />}
@@ -266,6 +290,8 @@ export const AdminViewMobile: React.FC<Props> = ({
             alerts={alerts}
             onMarkAsRead={onMarkAlertAsRead}
             onMarkAllAsRead={onMarkAllAlertsAsRead}
+            onDeleteAlert={onDeleteAlert}
+            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
           />
         )}
       </main>

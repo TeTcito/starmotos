@@ -37,6 +37,8 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     markAllAlertsAsRead,
     deleteAlert,
     deleteAllReadAlerts,
+    currentWorkshop,
+    updateWorkshopProfile,
     toastMessage,
   } = portal;
 
@@ -44,8 +46,8 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {isDesktop ? (
         <TallerViewDesktop
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
+          activeSection={activeSection as any}
+          setActiveSection={setActiveSection as any}
           onLogout={onLogout}
           orders={orders}
           onUpdateOrderStatus={updateOrderStatus}
@@ -93,6 +95,8 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
           onDeleteAlert={deleteAlert}
           onDeleteAllReadAlerts={deleteAllReadAlerts}
+          currentWorkshop={currentWorkshop}
+          onUpdateWorkshop={updateWorkshopProfile}
         />
       )}
 

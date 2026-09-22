@@ -24,6 +24,7 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
     clients,
     workshops,
     profile,
+    updateGaranteProfile,
     selectedWarranty,
     reviewNotes,
     setReviewNotes,
@@ -102,6 +103,7 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
           onDeleteAlert={deleteAlert}
           onDeleteAllReadAlerts={deleteAllReadAlerts}
+          onUpdateProfile={updateGaranteProfile}
         />
       )}
 

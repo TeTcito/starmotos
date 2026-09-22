@@ -40,6 +40,7 @@ interface Props {
   warranties: WarrantyRequest[];
   clients?: TallerClient[];
   currentWorkshopName?: string;
+  currentWorkshopId?: string;
   newForm?: any;
   setNewForm?: React.Dispatch<React.SetStateAction<any>>;
   onCreateRequest?: () => boolean;
@@ -49,6 +50,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
   warranties: initialWarranties,
   clients = [],
   currentWorkshopName = 'StarMotos Taller',
+  currentWorkshopId,
   onCreateRequest,
 }) => {
   // Lista local reactiva
@@ -213,7 +215,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
       ],
       status: 'en_revision',
       tallerOrigin: currentWorkshopName,
-      tallerOriginId: 'taller-actual',
+      tallerOriginId: currentWorkshopId || 'matriz-la-mana',
       estimatedCost: Number(newRequestData.estimatedCost) || 80,
     };
 
@@ -280,7 +282,12 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
         <NewWarrantyFormMobile
           onCancel={() => setShowCreateModal(false)}
           onSubmit={(newReq) => {
-            const updated = [newReq, ...localWarranties];
+            const reqWithOrigin: WarrantyRequest = {
+              ...newReq,
+              tallerOrigin: currentWorkshopName,
+              tallerOriginId: currentWorkshopId || newReq.tallerOriginId || 'matriz-la-mana',
+            };
+            const updated = [reqWithOrigin, ...localWarranties];
             setLocalWarranties(updated);
             saveStoredWarranties(updated);
 
@@ -289,10 +296,10 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               id: `alt-${Date.now()}`,
               type: 'estado_cambiado',
               title: 'Nueva Solicitud de Garantía',
-              message: `${newReq.tallerOrigin} generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}.`,
+              message: `${reqWithOrigin.tallerOrigin} generó la solicitud ${reqWithOrigin.requestNumber} para ${reqWithOrigin.clientName}.`,
               timestamp: 'Ahora mismo',
               read: false,
-              relatedId: newReq.id,
+              relatedId: reqWithOrigin.id,
             };
             saveStoredAlerts([newAlert, ...getStoredAlerts()]);
 
@@ -300,7 +307,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
           }}
           clients={clients}
           defaultTallerOrigin={currentWorkshopName}
-          defaultTallerOriginId="taller-actual"
+          defaultTallerOriginId={currentWorkshopId || 'matriz-la-mana'}
         />
       )}
 

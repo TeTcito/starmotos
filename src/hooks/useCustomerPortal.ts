@@ -13,8 +13,11 @@ import {
   ClientProfile,
   MotorcycleClientData,
   ScheduledMaintenance,
+  TallerClient,
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
+import { getStoredClients, saveStoredClients } from '../data/mockMultiRoleData';
+import { cloudSaveClient } from '../services/supabaseService';
 
 // Sucursales Oficiales StarMotos
 export const BRANCH_MATRIZ: Branch = {
@@ -487,6 +490,12 @@ export function useCustomerPortal() {
     } catch (_) {}
     return INITIAL_MOTORCYCLE;
   });
+
+  // Sucursal activa actual
+  const activeBranch = useMemo(() => {
+    return ALL_BRANCHES.find((b) => b.id === motorcycle.preferredBranchId) || BRANCH_MATRIZ;
+  }, [motorcycle.preferredBranchId]);
+
   const [scheduledMaintenances, setScheduledMaintenances] = useState<ScheduledMaintenance[]>(INITIAL_SCHEDULED_MAINTENANCES);
 
   // Orden de Trabajo y otros datos
@@ -521,8 +530,65 @@ export function useCustomerPortal() {
     try {
       localStorage.setItem('starmotos_current_client_profile', JSON.stringify(updated));
     } catch (_) {}
-    showToast('Tus datos de perfil y facturación se han guardado exitosamente.', 'success');
-  }, [showToast]);
+
+    try {
+      const stored = getStoredClients();
+      let matched = false;
+      const updatedList: TallerClient[] = stored.map((c) => {
+        const matchId = updated.idNumber && c.idNumber && c.idNumber.trim() === updated.idNumber.trim();
+        const matchEmail = updated.email && c.email && c.email.trim().toLowerCase() === updated.email.trim().toLowerCase();
+        if (matchId || matchEmail) {
+          matched = true;
+          return {
+            ...c,
+            fullName: updated.fullName,
+            idNumber: updated.idNumber || c.idNumber,
+            phone: updated.phone || c.phone,
+            email: updated.email || c.email,
+            address: updated.address || c.address,
+          };
+        }
+        return c;
+      });
+
+      if (!matched) {
+        const newClient: TallerClient = {
+          id: updated.idNumber || `cli-${Date.now()}`,
+          fullName: updated.fullName,
+          idNumber: updated.idNumber,
+          phone: updated.phone,
+          email: updated.email,
+          address: updated.address,
+          motorcycleBrand: motorcycle.brand || 'StarMotos',
+          motorcycleModel: motorcycle.model || 'Scooter / Moto',
+          motorcyclePlate: motorcycle.plate || 'SIN PLACA',
+          motorcycleVin: motorcycle.vin || '',
+          motorcycleMileage: motorcycle.currentKm || 0,
+          workshopId: motorcycle.preferredBranchId || 'matriz-la-mana',
+          workshopName: activeBranch?.name || 'StarMotos Matriz La Maná',
+          lastVisit: new Date().toISOString().split('T')[0],
+          totalVisits: 1,
+        };
+        updatedList.unshift(newClient);
+        cloudSaveClient(newClient).catch(() => {});
+      } else {
+        const found = updatedList.find(
+          (c) =>
+            (updated.idNumber && c.idNumber === updated.idNumber) ||
+            (updated.email && c.email.toLowerCase() === updated.email.toLowerCase())
+        );
+        if (found) {
+          cloudSaveClient(found).catch(() => {});
+        }
+      }
+
+      saveStoredClients(updatedList);
+    } catch (e) {
+      console.error('Error syncing client profile to network storage:', e);
+    }
+
+    showToast('Tus datos de perfil se han sincronizado con la red de talleres.', 'success');
+  }, [motorcycle, activeBranch, showToast]);
 
   // Actualizar datos técnicos de la moto
   const updateMotorcycle = useCallback((updated: MotorcycleClientData) => {
@@ -530,8 +596,37 @@ export function useCustomerPortal() {
     try {
       localStorage.setItem('starmotos_current_client_moto', JSON.stringify(updated));
     } catch (_) {}
-    showToast('Ficha técnica para el taller actualizada correctamente.', 'success');
-  }, [showToast]);
+
+    try {
+      const stored = getStoredClients();
+      const updatedList: TallerClient[] = stored.map((c) => {
+        const matchId = profile.idNumber && c.idNumber && c.idNumber.trim() === profile.idNumber.trim();
+        const matchEmail = profile.email && c.email && c.email.trim().toLowerCase() === profile.email.trim().toLowerCase();
+        if (matchId || matchEmail) {
+          const updatedClient: TallerClient = {
+            ...c,
+            motorcycleBrand: updated.brand || c.motorcycleBrand,
+            motorcycleModel: updated.model || c.motorcycleModel,
+            motorcyclePlate: updated.plate || c.motorcyclePlate,
+            motorcycleVin: updated.vin || c.motorcycleVin,
+            motorcycleMileage: updated.currentKm ?? c.motorcycleMileage,
+            workshopId: updated.preferredBranchId || c.workshopId,
+            color: updated.color || c.color,
+            year: updated.year || c.year,
+          };
+          cloudSaveClient(updatedClient).catch(() => {});
+          return updatedClient;
+        }
+        return c;
+      });
+
+      saveStoredClients(updatedList);
+    } catch (e) {
+      console.error('Error syncing motorcycle data to network storage:', e);
+    }
+
+    showToast('Ficha técnica de la moto sincronizada con la red de talleres.', 'success');
+  }, [profile, showToast]);
 
   // Agendar nuevo mantenimiento
   const addScheduledMaintenance = useCallback((maintenance: ScheduledMaintenance) => {
@@ -574,11 +669,6 @@ export function useCustomerPortal() {
       showToast('¡Presupuesto aprobado con éxito! Tu moto ha ingresado a montaje técnico.', 'success');
     }, 1000);
   }, [profile.fullName, showToast]);
-
-  // Sucursal activa actual
-  const activeBranch = useMemo(() => {
-    return ALL_BRANCHES.find((b) => b.id === motorcycle.preferredBranchId) || BRANCH_MATRIZ;
-  }, [motorcycle.preferredBranchId]);
 
   return {
     isAuthenticated,

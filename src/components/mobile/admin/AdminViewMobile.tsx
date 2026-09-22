@@ -13,9 +13,11 @@ import {
   ChevronRight,
   Wrench,
   Users,
+  User,
 } from 'lucide-react';
 import {
   AdminSection,
+  AdminSectionMobile,
   Workshop,
   WarrantyRequest,
   SystemAlert,
@@ -29,6 +31,7 @@ import {
   WarrantyRequestStatus,
   TallerOrder,
   InventoryItem,
+  AdminProfile,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
@@ -37,12 +40,15 @@ import { TecnicosMobile } from '../common/TecnicosMobile';
 import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
+import { PerfilAdminMobile } from './PerfilAdminMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
-  activeSection: AdminSection;
-  setActiveSection: (section: AdminSection) => void;
+  activeSection: AdminSectionMobile;
+  setActiveSection: (section: AdminSectionMobile) => void;
   onLogout: () => void;
+  adminProfile?: AdminProfile;
+  onUpdateProfile?: (updated: AdminProfile) => void;
   workshops: Workshop[];
   warranties: WarrantyRequest[];
   onValidateWarranty: (id: string, notes: string) => void;
@@ -83,6 +89,8 @@ export const AdminViewMobile: React.FC<Props> = ({
   activeSection,
   setActiveSection,
   onLogout,
+  adminProfile,
+  onUpdateProfile,
   workshops,
   warranties,
   onValidateWarranty,
@@ -120,7 +128,7 @@ export const AdminViewMobile: React.FC<Props> = ({
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const menuItems: { id: AdminSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'talleres', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
     { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
@@ -128,9 +136,10 @@ export const AdminViewMobile: React.FC<Props> = ({
     { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" />, badge: `${warranties.filter((w) => w.status === 'en_revision' || w.status === 'enviada_matriz').length || ''}` },
     { id: 'facturacion', label: 'Facturación', icon: <Receipt className="w-4 h-4" /> },
     { id: 'alertas', label: 'Alertas', icon: <Bell className="w-4 h-4" />, badge: `${alerts.filter((a) => !a.read).length || ''}` },
+    { id: 'perfil_admin', label: 'Mi Perfil', icon: <User className="w-4 h-4" /> },
   ];
 
-  const sectionTitles: Record<AdminSection, string> = {
+  const sectionTitles: Record<AdminSectionMobile, string> = {
     talleres: 'Control de Talleres',
     alistamiento: 'Alistamiento & PDI',
     clientes_admin: 'Clientes & Flota',
@@ -138,6 +147,7 @@ export const AdminViewMobile: React.FC<Props> = ({
     garantias_admin: 'Garantías & Pólizas',
     facturacion: 'Facturación SRI',
     alertas: 'Alertas del Sistema',
+    perfil_admin: 'Mi Perfil Oficial',
   };
 
   return (
@@ -191,7 +201,9 @@ export const AdminViewMobile: React.FC<Props> = ({
           <aside className="relative w-72 max-w-[85vw] h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between shadow-2xl z-10 p-4">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-[#b8d1ea]">
-                <span className="text-xs font-bold text-zinc-900">Ing. Mateo Enríquez (Matriz)</span>
+                <span className="text-xs font-bold text-zinc-900 truncate max-w-[200px]">
+                  {adminProfile?.fullName || 'Ing. Mateo Enríquez'} (Matriz)
+                </span>
                 <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600">
                   <X className="w-4 h-4" />
                 </button>
@@ -309,6 +321,21 @@ export const AdminViewMobile: React.FC<Props> = ({
             onMarkAllAsRead={onMarkAllAlertsAsRead}
             onDeleteAlert={onDeleteAlert}
             onDeleteAllReadAlerts={onDeleteAllReadAlerts}
+          />
+        )}
+        {activeSection === 'perfil_admin' && (
+          <PerfilAdminMobile
+            profile={adminProfile || {
+              id: 'admin_master',
+              fullName: 'Ing. Mateo Enríquez',
+              firstNames: 'Mateo',
+              lastNames: 'Enríquez',
+              email: 'admin@starmotos.com',
+              phone: '0991234567',
+              roleName: 'Administrador General de Matriz',
+              organization: 'StarMotos Ecuador',
+            }}
+            onUpdateProfile={onUpdateProfile || (() => {})}
           />
         )}
       </main>

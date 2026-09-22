@@ -30,6 +30,7 @@ import { ClientesModule } from '../../common/ClientesModule';
 import { TalleresGaranteMobile } from './TalleresGaranteMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
+import { WarrantyDetailViewMobile } from '../common/WarrantyDetailViewMobile';
 
 interface Props {
   activeSection: GaranteSection;
@@ -58,6 +59,7 @@ interface Props {
   onMarkAllAlertsAsRead: () => void;
   onDeleteAlert?: (id: string) => void;
   onDeleteAllReadAlerts?: () => void;
+  onUpdateProfile?: (updated: GaranteProfile) => void;
 }
 
 export const GaranteViewMobile: React.FC<Props> = ({
@@ -87,9 +89,11 @@ export const GaranteViewMobile: React.FC<Props> = ({
   onMarkAllAlertsAsRead,
   onDeleteAlert,
   onDeleteAllReadAlerts,
+  onUpdateProfile,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileResolution, setMobileResolution] = useState<'encargar_taller' | 'envio_repuesto'>('encargar_taller');
+  const [selectedWarrantyForDetail, setSelectedWarrantyForDetail] = useState<WarrantyRequest | null>(null);
 
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'solicitudes_garante', label: 'Bandeja', icon: <Inbox className="w-4 h-4" />, badge: `${pendingRequests.length || ''}` },
@@ -135,14 +139,15 @@ export const GaranteViewMobile: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-white truncate max-w-[110px]">
-            {sectionTitles[activeSection]}
+          <span className="text-xs font-bold text-white truncate max-w-[130px]">
+            {selectedWarrantyForDetail ? 'Ficha de Garantía' : sectionTitles[activeSection]}
           </span>
           <NotificationsPopover
             role="garante"
             alerts={alerts}
             warranties={warranties}
             onViewAll={() => {
+              setSelectedWarrantyForDetail(null);
               setActiveSection('alertas_garante');
               setDrawerOpen(false);
             }}
@@ -171,11 +176,14 @@ export const GaranteViewMobile: React.FC<Props> = ({
                   <button
                     key={item.id}
                     onClick={() => {
+                      setSelectedWarrantyForDetail(null);
                       setActiveSection(item.id);
                       setDrawerOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left ${
-                      activeSection === item.id ? 'bg-blue-600 text-white shadow-xs' : 'text-zinc-800 hover:bg-white/60'
+                      activeSection === item.id && !selectedWarrantyForDetail
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-zinc-800 hover:bg-white/60'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -206,33 +214,57 @@ export const GaranteViewMobile: React.FC<Props> = ({
       )}
 
       <main className="max-w-md mx-auto px-4 py-4">
-        {activeSection === 'solicitudes_garante' && (
-          <SolicitudesGaranteMobile
-            pendingRequests={pendingRequests}
-            onOpenDecisionModal={onOpenDecisionModal}
+        {selectedWarrantyForDetail ? (
+          <WarrantyDetailViewMobile
+            warranty={selectedWarrantyForDetail}
+            onBack={() => setSelectedWarrantyForDetail(null)}
+            viewerRole="garante"
+            onApproveWarranty={(id, notes, resolutionType) => {
+              onApproveWarranty(id, notes, resolutionType);
+              setSelectedWarrantyForDetail(null);
+            }}
+            onRejectWarranty={(id, reason) => {
+              onRejectWarranty(id, reason);
+              setSelectedWarrantyForDetail(null);
+            }}
           />
-        )}
-        {activeSection === 'clientes_garante' && (
-          <TalleresGaranteMobile
-            workshops={workshops}
-            warranties={warranties}
-          />
-        )}
-        {activeSection === 'historial_garantias' && (
-          <HistorialGarantiasMobile historyRequests={historyRequests} />
-        )}
-        {activeSection === 'reportes_garante' && (
-          <ReportesGaranteMobile warranties={warranties} />
-        )}
-        {activeSection === 'perfil_garante' && <PerfilGaranteMobile profile={profile} />}
-        {activeSection === 'alertas_garante' && (
-          <AlertasMobile
-            alerts={alerts}
-            onMarkAsRead={onMarkAlertAsRead}
-            onMarkAllAsRead={onMarkAllAlertsAsRead}
-            onDeleteAlert={onDeleteAlert}
-            onDeleteAllReadAlerts={onDeleteAllReadAlerts}
-          />
+        ) : (
+          <>
+            {activeSection === 'solicitudes_garante' && (
+              <SolicitudesGaranteMobile
+                pendingRequests={pendingRequests}
+                onOpenDecisionModal={onOpenDecisionModal}
+                onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
+              />
+            )}
+            {activeSection === 'clientes_garante' && (
+              <TalleresGaranteMobile
+                workshops={workshops}
+                warranties={warranties}
+              />
+            )}
+            {activeSection === 'historial_garantias' && (
+              <HistorialGarantiasMobile
+                historyRequests={historyRequests}
+                onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
+              />
+            )}
+            {activeSection === 'reportes_garante' && (
+              <ReportesGaranteMobile warranties={warranties} />
+            )}
+            {activeSection === 'perfil_garante' && (
+              <PerfilGaranteMobile profile={profile} onUpdateProfile={onUpdateProfile} />
+            )}
+            {activeSection === 'alertas_garante' && (
+              <AlertasMobile
+                alerts={alerts}
+                onMarkAsRead={onMarkAlertAsRead}
+                onMarkAllAsRead={onMarkAllAlertsAsRead}
+                onDeleteAlert={onDeleteAlert}
+                onDeleteAllReadAlerts={onDeleteAllReadAlerts}
+              />
+            )}
+          </>
         )}
       </main>
 

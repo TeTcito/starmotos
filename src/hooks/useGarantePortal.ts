@@ -12,6 +12,8 @@ import {
   getStoredWarranties,
   saveStoredWarranties,
   INITIAL_GARANTE_PROFILE,
+  getStoredGaranteProfile,
+  saveStoredGaranteProfile,
   saveStoredAlerts,
   getStoredAlerts,
   deleteStoredAlert,
@@ -51,7 +53,7 @@ export function useGarantePortal() {
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
   const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
   const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
-  const [profile, setProfile] = useState<GaranteProfile>(INITIAL_GARANTE_PROFILE);
+  const [profile, setProfile] = useState<GaranteProfile>(getStoredGaranteProfile);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Modal de revisión de garantía
@@ -68,12 +70,26 @@ export function useGarantePortal() {
     const handleClientsUpdate = () => setClients(getStoredClients());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
     const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
+    const handleGaranteProfileUpdate = () => setProfile(getStoredGaranteProfile());
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith('starmotos_shared_')) {
+        handleWarrantiesUpdate();
+        handleAlistamientosUpdate();
+        handleClientsUpdate();
+        handleWorkshopsUpdate();
+        handleAlertsUpdate();
+        handleGaranteProfileUpdate();
+      }
+    };
 
     window.addEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+    window.addEventListener('starmotos_garante_profile_updated', handleGaranteProfileUpdate);
+    window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -81,8 +97,23 @@ export function useGarantePortal() {
       window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
       window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+      window.removeEventListener('starmotos_garante_profile_updated', handleGaranteProfileUpdate);
+      window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
+
+  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  }, []);
+
+  const updateGaranteProfile = useCallback((updated: GaranteProfile) => {
+    setProfile(updated);
+    saveStoredGaranteProfile(updated);
+    showToast('Perfil de garante oficial guardado correctamente.', 'success');
+  }, [showToast]);
 
   const markAlertAsRead = useCallback((id: string) => {
     setAlerts((prev) => {
@@ -98,13 +129,6 @@ export function useGarantePortal() {
       saveStoredAlerts(updated);
       return updated;
     });
-  }, []);
-
-  const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
   }, []);
 
   const deleteAlert = useCallback((id: string) => {
@@ -293,6 +317,7 @@ export function useGarantePortal() {
     workshops,
     profile,
     setProfile,
+    updateGaranteProfile,
     alerts,
     markAlertAsRead,
     markAllAlertsAsRead,

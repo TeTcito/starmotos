@@ -98,6 +98,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Fecha de hoy por defecto en formato YYYY-MM-DD
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Hora actual por defecto en formato HH:mm
+  const getCurrentTimeStr = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
   // Estado del formulario completo
   const [formData, setFormData] = useState<AlistamientoFullRecord>({
     id: '',
@@ -105,6 +111,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     sede: defaultSede,
     sedeId: defaultSedeId,
     fechaServicio: todayStr,
+    horaServicio: getCurrentTimeStr(),
     nombres: '',
     apellidos: '',
     cedulaRuc: '',
@@ -398,6 +405,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       sede: defaultSede,
       sedeId: defaultSedeId,
       fechaServicio: todayStr,
+      horaServicio: getCurrentTimeStr(),
       nombres: '',
       apellidos: '',
       cedulaRuc: cedula,
@@ -450,6 +458,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       sede: defaultSede,
       sedeId: defaultSedeId,
       fechaServicio: todayStr,
+      horaServicio: getCurrentTimeStr(),
       nombres: record.nombres,
       apellidos: record.apellidos,
       cedulaRuc: record.cedulaRuc,
@@ -758,7 +767,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
                 <p className="text-xs text-zinc-500">
                   Sede: <strong className="text-zinc-700">{detailFormData.sede}</strong> • Fecha:{' '}
-                  <strong className="text-zinc-700">{detailFormData.fechaServicio}</strong> • Atendido por:{' '}
+                  <strong className="text-zinc-700">{detailFormData.fechaServicio}</strong>
+                  {detailFormData.horaServicio ? (
+                    <> • Hora: <strong className="text-zinc-700 font-mono">{detailFormData.horaServicio}</strong></>
+                  ) : null} • Atendido por:{' '}
                   <strong className="text-zinc-700">{detailFormData.atendidoPor || 'StarMotos'}</strong>
                 </p>
               </div>
@@ -1075,6 +1087,38 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <option value="Castrol Actevo 20W50">Castrol 20W50</option>
                       <option value="Sin Tipo">N/A</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Fecha y Hora en Detalle */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span>Fecha de Servicio</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={detailFormData.fechaServicio || ''}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })
+                      }
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-600" />
+                      <span>Hora de Servicio</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={detailFormData.horaServicio || ''}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, horaServicio: e.target.value })
+                      }
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 font-mono"
+                    />
                   </div>
                 </div>
 
@@ -1584,7 +1628,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
                           {/* 5. Fecha */}
                           <td className="px-1.5 py-2 text-center whitespace-nowrap font-mono text-zinc-600 text-[11px]" title={record.fechaServicio}>
-                            {record.fechaServicio}
+                            <div className="font-semibold text-zinc-800">{record.fechaServicio}</div>
+                            {record.horaServicio && (
+                              <div className="text-[10px] text-zinc-400">{record.horaServicio}</div>
+                            )}
                           </td>
 
                           {/* 6. Motocicleta */}
@@ -2194,6 +2241,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Fecha de Servicio *</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fechaServicio || todayStr}
+                      onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold text-zinc-900 outline-none focus:border-emerald-600 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Hora de Servicio *</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.horaServicio || getCurrentTimeStr()}
+                      onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold text-zinc-900 outline-none focus:border-emerald-600 focus:bg-white font-mono"
+                    />
+                  </div>
                 </div>
 
                 {/* Aceite: 3 datos seguidos en una fila (Estado | Nivel | Tipo) */}
@@ -2954,6 +3031,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span>Fecha *</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fechaServicio || todayStr}
+                      onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-600" />
+                      <span>Hora *</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.horaServicio || getCurrentTimeStr()}
+                      onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white font-mono"
+                    />
+                  </div>
                 </div>
 
                 {formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (

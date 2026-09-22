@@ -271,6 +271,8 @@ export type AdminSection =
   | 'facturacion'
   | 'alertas';
 
+export type AdminSectionMobile = AdminSection | 'perfil_admin';
+
 export type TallerSection =
   | 'ordenes_taller'
   | 'alistamiento_taller'
@@ -279,6 +281,22 @@ export type TallerSection =
   | 'tecnicos'
   | 'inventario'
   | 'alertas_taller';
+
+export type TallerSectionMobile = TallerSection | 'perfil_taller';
+
+export interface AdminProfile {
+  id?: string;
+  fullName: string;
+  firstNames: string;
+  lastNames: string;
+  email: string;
+  phone: string;
+  roleTitle?: string;
+  companyName?: string;
+  roleName?: string;
+  organization?: string;
+  updatedAt?: string;
+}
 
 export type GaranteSection =
   | 'solicitudes_garante'
@@ -377,6 +395,7 @@ export interface AlistamientoFullRecord {
   sede: string;
   sedeId: string;
   fechaServicio: string;
+  horaServicio?: string;
   // Paso 1: Datos del cliente
   nombres: string;
   apellidos: string;
@@ -526,6 +545,7 @@ export interface TallerClient {
   workshopName?: string;
   mustChangePassword?: boolean;
   createdManually?: boolean;
+  password?: string;
 }
 
 // --- Orden de Taller ---
@@ -541,6 +561,8 @@ export interface TallerOrder {
   mechanicName: string;
   estimatedDelivery: string;
   totalCost: number;
+  workshopId?: string;
+  workshopName?: string;
 }
 
 // --- Perfil Garante ---

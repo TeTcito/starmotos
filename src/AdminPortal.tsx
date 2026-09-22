@@ -27,6 +27,8 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     clients,
     orders,
     inventory,
+    adminProfile,
+    updateAdminProfile,
     toastMessage,
     validateWarrantyByMatriz,
     rejectWarrantyByMatriz,
@@ -60,8 +62,8 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {isDesktop ? (
         <AdminViewDesktop
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
+          activeSection={activeSection as any}
+          setActiveSection={setActiveSection as any}
           onLogout={onLogout}
           workshops={workshops}
           warranties={warranties}
@@ -105,6 +107,8 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           activeSection={activeSection}
           setActiveSection={setActiveSection}
           onLogout={onLogout}
+          adminProfile={adminProfile}
+          onUpdateProfile={updateAdminProfile}
           workshops={workshops}
           warranties={warranties}
           onValidateWarranty={validateWarrantyByMatriz}

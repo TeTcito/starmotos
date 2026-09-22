@@ -10,6 +10,7 @@ import {
   GaranteProfile,
   Technician,
   AlistamientoFullRecord,
+  AdminProfile,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -532,6 +533,61 @@ export function getStoredWorkshops(): Workshop[] {
     localStorage.setItem(STORAGE_KEYS.WORKSHOPS, JSON.stringify(INITIAL_WORKSHOPS));
   } catch (_) {}
   return INITIAL_WORKSHOPS;
+}
+
+export function saveStoredWorkshops(workshops: Workshop[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.WORKSHOPS, JSON.stringify(workshops));
+    window.dispatchEvent(new Event('starmotos_workshops_updated'));
+  } catch (e) {
+    console.error('Error saving workshops to localStorage', e);
+  }
+}
+
+// ===================== PERFIL DE ADMINISTRADOR =====================
+export const INITIAL_ADMIN_PROFILE: AdminProfile = {
+  fullName: 'William Daniel Meza Chicaiza',
+  firstNames: 'William Daniel',
+  lastNames: 'Meza Chicaiza',
+  email: 'admin@starmotos.com',
+  phone: '0939316698',
+  roleTitle: 'Administrador General & Gerente Matriz',
+  companyName: 'StarMotos Ecuador',
+};
+
+export function getStoredAdminProfile(): AdminProfile {
+  try {
+    const raw = localStorage.getItem('starmotos_admin_profile');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return INITIAL_ADMIN_PROFILE;
+}
+
+export function saveStoredAdminProfile(profile: AdminProfile) {
+  try {
+    localStorage.setItem('starmotos_admin_profile', JSON.stringify(profile));
+    window.dispatchEvent(new Event('starmotos_admin_profile_updated'));
+  } catch (e) {
+    console.error('Error saving admin profile', e);
+  }
+}
+
+// ===================== PERFIL DE GARANTE =====================
+export function getStoredGaranteProfile(): GaranteProfile {
+  try {
+    const raw = localStorage.getItem('starmotos_shared_garante_profile');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return INITIAL_GARANTE_PROFILE;
+}
+
+export function saveStoredGaranteProfile(profile: GaranteProfile) {
+  try {
+    localStorage.setItem('starmotos_shared_garante_profile', JSON.stringify(profile));
+    window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
+  } catch (e) {
+    console.error('Error saving garante profile', e);
+  }
 }
 
 // Facturas

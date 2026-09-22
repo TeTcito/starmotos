@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   AdminSection,
+  AdminSectionMobile,
   Workshop,
   WarrantyRequest,
   SystemAlert,
@@ -16,6 +17,7 @@ import {
   WarrantyRequestStatus,
   TallerOrder,
   InventoryItem,
+  AdminProfile,
 } from '../types/customer';
 import {
   getStoredWarranties,
@@ -41,10 +43,12 @@ import {
   querySriMock,
   getStoredOrders,
   getStoredInventory,
+  getStoredAdminProfile,
+  saveStoredAdminProfile,
 } from '../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../services/supabaseService';
 
-export const ADMIN_SECTIONS: AdminSection[] = [
+export const ADMIN_SECTIONS: AdminSectionMobile[] = [
   'talleres',
   'alistamiento',
   'clientes_admin',
@@ -52,21 +56,22 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   'tecnicos',
   'facturacion',
   'alertas',
+  'perfil_admin',
 ];
 
-const getSectionFromHash = (): AdminSection => {
+const getSectionFromHash = (): AdminSectionMobile => {
   if (typeof window === 'undefined') return 'talleres';
   const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
-  if (ADMIN_SECTIONS.includes(cleanHash as AdminSection)) {
-    return cleanHash as AdminSection;
+  if (ADMIN_SECTIONS.includes(cleanHash as AdminSectionMobile)) {
+    return cleanHash as AdminSectionMobile;
   }
   return 'talleres';
 };
 
 export function useAdminPortal() {
-  const [activeSection, setActiveSectionState] = useState<AdminSection>(getSectionFromHash);
+  const [activeSection, setActiveSectionState] = useState<AdminSectionMobile>(getSectionFromHash);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const activeSectionRef = useRef<AdminSection>(activeSection);
+  const activeSectionRef = useRef<AdminSectionMobile>(activeSection);
   activeSectionRef.current = activeSection;
 
   // Estado compartido
@@ -80,6 +85,7 @@ export function useAdminPortal() {
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
   const [orders] = useState<TallerOrder[]>(getStoredOrders);
   const [inventory] = useState<InventoryItem[]>(getStoredInventory);
+  const [adminProfile, setAdminProfile] = useState<AdminProfile>(getStoredAdminProfile);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
@@ -90,6 +96,7 @@ export function useAdminPortal() {
     const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
+    const handleAdminProfileUpdate = () => setAdminProfile(getStoredAdminProfile());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -99,6 +106,7 @@ export function useAdminPortal() {
         handleOriginsUpdate();
         handleAlistamientosUpdate();
         handleClientsUpdate();
+        handleAdminProfileUpdate();
       }
     };
 
@@ -108,6 +116,7 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_origins_updated', handleOriginsUpdate);
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
+    window.addEventListener('starmotos_admin_profile_updated', handleAdminProfileUpdate);
     window.addEventListener('storage', handleStorageEvent);
 
     return () => {
@@ -117,8 +126,15 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_origins_updated', handleOriginsUpdate);
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
       window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
+      window.removeEventListener('starmotos_admin_profile_updated', handleAdminProfileUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
+  }, []);
+
+  const updateAdminProfile = useCallback((newProfile: AdminProfile) => {
+    setAdminProfile(newProfile);
+    saveStoredAdminProfile(newProfile);
+    showToast('Perfil de administración guardado con éxito.', 'success');
   }, []);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -129,7 +145,7 @@ export function useAdminPortal() {
   }, []);
 
   // Navegación hash
-  const setActiveSection = useCallback((newSection: AdminSection, replace = false) => {
+  const setActiveSection = useCallback((newSection: AdminSectionMobile, replace = false) => {
     if (!ADMIN_SECTIONS.includes(newSection)) return;
     setActiveSectionState((current) => {
       if (current === newSection) return current;
@@ -750,6 +766,8 @@ export function useAdminPortal() {
     clients,
     orders,
     inventory,
+    adminProfile,
+    updateAdminProfile,
     toastMessage,
     showToast,
     // Garantías

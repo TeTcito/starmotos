@@ -19,11 +19,20 @@ interface Props {
 
 export const ProfileMobile: React.FC<Props> = ({ profile, onUpdateProfile }) => {
   const [profileForm, setProfileForm] = useState<ClientProfile>(profile);
+  const [firstNames, setFirstNames] = useState(() => {
+    return (profile.fullName || '').split(' ')[0] || '';
+  });
+  const [lastNames, setLastNames] = useState(() => {
+    return (profile.fullName || '').split(' ').slice(1).join(' ') || '';
+  });
   const [isProfileSaved, setIsProfileSaved] = useState(false);
 
   // Sincronizar si cambian las props
   useEffect(() => {
     setProfileForm(profile);
+    const parts = (profile.fullName || '').split(' ');
+    setFirstNames(parts[0] || '');
+    setLastNames(parts.slice(1).join(' ') || '');
   }, [profile]);
 
   // Detectar cambios en el formulario
@@ -75,18 +84,48 @@ export const ProfileMobile: React.FC<Props> = ({ profile, onUpdateProfile }) => 
       <form onSubmit={handleSaveProfile} className="space-y-3.5">
         <div className="space-y-3">
           {/* Nombres y Apellidos */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 mb-1">
-              Nombres y Apellidos
-            </label>
-            <div className="relative">
-              <User className="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-400" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                Nombres
+              </label>
+              <div className="relative">
+                <User className="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-400" />
+                <input
+                  type="text"
+                  value={firstNames}
+                  onChange={(e) => {
+                    const fn = e.target.value;
+                    setFirstNames(fn);
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      fullName: `${fn.trim()} ${lastNames.trim()}`.trim(),
+                    }));
+                  }}
+                  required
+                  placeholder="Ej: Daniel"
+                  className="w-full bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-9 pr-2.5 py-2 text-xs font-medium placeholder:text-zinc-400"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                Apellidos
+              </label>
               <input
                 type="text"
-                value={profileForm.fullName}
-                onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
+                value={lastNames}
+                onChange={(e) => {
+                  const ln = e.target.value;
+                  setLastNames(ln);
+                  setProfileForm((prev) => ({
+                    ...prev,
+                    fullName: `${firstNames.trim()} ${ln.trim()}`.trim(),
+                  }));
+                }}
                 required
-                className="w-full bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-9 pr-3 py-2 text-xs font-medium placeholder:text-zinc-400"
+                placeholder="Ej: Meza"
+                className="w-full bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl px-3 py-2 text-xs font-medium placeholder:text-zinc-400"
               />
             </div>
           </div>

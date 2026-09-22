@@ -10,9 +10,12 @@ import {
   LogOut,
   UserCheck,
   Bell,
+  Building2,
+  User,
 } from 'lucide-react';
 import {
   TallerSection,
+  TallerSectionMobile,
   TallerOrder,
   WarrantyRequest,
   TallerClient,
@@ -31,11 +34,12 @@ import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
 import { ClientesModuleMobile } from '../common/ClientesModuleMobile';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
+import { PerfilTallerMobile } from './PerfilTallerMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
-  activeSection: TallerSection;
-  setActiveSection: (section: TallerSection) => void;
+  activeSection: TallerSectionMobile;
+  setActiveSection: (section: TallerSectionMobile) => void;
   onLogout: () => void;
   orders: TallerOrder[];
   onUpdateOrderStatus: (orderId: string, nextStatus: WorkOrderStatus) => void;
@@ -57,6 +61,8 @@ interface Props {
   onMarkAllAlertsAsRead: () => void;
   onDeleteAlert?: (id: string) => void;
   onDeleteAllReadAlerts?: () => void;
+  currentWorkshop?: Workshop;
+  onUpdateWorkshop?: (updated: Partial<Workshop>) => void;
 }
 
 export const TallerViewMobile: React.FC<Props> = ({
@@ -83,18 +89,21 @@ export const TallerViewMobile: React.FC<Props> = ({
   onMarkAllAlertsAsRead,
   onDeleteAlert,
   onDeleteAllReadAlerts,
+  currentWorkshop,
+  onUpdateWorkshop,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeWorkshopId, setActiveWorkshopId] = useState<string>(() => {
-    return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
+  const [activeWorkshopId] = useState<string>(() => {
+    return localStorage.getItem('starmotos_taller_active_ws') || 'matriz-la-mana';
   });
 
   const currentWs =
+    currentWorkshop ||
     workshops.find((w) => w.id === activeWorkshopId) ||
-    workshops.find((w) => w.id === 'taller-quevedo') ||
+    workshops.find((w) => w.id === 'matriz-la-mana') ||
     workshops[0];
 
-  const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const menuItems: { id: TallerSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
     { id: 'alistamiento_taller', label: 'Alistamiento PDI', icon: <UserCheck className="w-4 h-4" />, badge: 'Nuevo' },
     { id: 'solicitudes_garantia', label: 'Solicitudes Garantía', icon: <ShieldAlert className="w-4 h-4" /> },
@@ -107,9 +116,10 @@ export const TallerViewMobile: React.FC<Props> = ({
       icon: <Bell className="w-4 h-4" />,
       badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
     },
+    { id: 'perfil_taller', label: 'Mi Perfil de Sede', icon: <User className="w-4 h-4" /> },
   ];
 
-  const sectionTitles: Record<TallerSection, string> = {
+  const sectionTitles: Record<TallerSectionMobile, string> = {
     ordenes_taller: 'Órdenes en Taller',
     alistamiento_taller: 'Alistamiento PDI',
     solicitudes_garantia: 'Solicitudes Garantía',
@@ -117,6 +127,7 @@ export const TallerViewMobile: React.FC<Props> = ({
     tecnicos: 'Equipo Técnico',
     inventario: 'Inventario Repuestos',
     alertas_taller: 'Alertas & Eventos',
+    perfil_taller: 'Perfil de Sede',
   };
 
   return (
@@ -177,25 +188,25 @@ export const TallerViewMobile: React.FC<Props> = ({
                 </button>
               </div>
 
-              {/* Selector de Sucursal Móvil */}
-              <div className="mt-3 p-2.5 bg-white/70 rounded-xl border border-blue-200">
-                <span className="text-[9px] font-bold text-blue-900 uppercase block mb-1">
-                  Cambiar Sucursal ({workshops.length} sedes):
-                </span>
-                <select
-                  value={currentWs.id}
-                  onChange={(e) => {
-                    setActiveWorkshopId(e.target.value);
-                    localStorage.setItem('starmotos_taller_active_ws', e.target.value);
-                  }}
-                  className="w-full text-xs font-bold bg-white border border-blue-300 rounded-lg px-2 py-1 text-zinc-900"
-                >
-                  {workshops.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
+              {/* Sede Oficial Asignada - Acceso Exclusivo de Taller */}
+              <div className="mt-3 p-2.5 bg-white/80 rounded-xl border border-blue-200 shadow-2xs">
+                <div className="flex items-center justify-between text-blue-900 mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-700" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">
+                      Sede Oficial
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 text-[8px] font-black bg-blue-100 text-blue-800 rounded uppercase">
+                    Exclusivo
+                  </span>
+                </div>
+                <h5 className="text-xs font-black text-zinc-900 truncate">
+                  {currentWs.name}
+                </h5>
+                <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                  Código: {currentWs.code} • {currentWs.city}
+                </p>
               </div>
 
               <nav className="mt-4 space-y-1">
@@ -266,6 +277,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             warranties={warranties}
             clients={clients}
             currentWorkshopName={currentWs.name}
+            currentWorkshopId={currentWs.id}
             newForm={newWarrantyForm}
             setNewForm={setNewWarrantyForm}
             onCreateRequest={onCreateWarrantyRequest}
@@ -300,6 +312,12 @@ export const TallerViewMobile: React.FC<Props> = ({
             onMarkAllAsRead={onMarkAllAlertsAsRead}
             onDeleteAlert={onDeleteAlert}
             onDeleteAllReadAlerts={onDeleteAllReadAlerts}
+          />
+        )}
+        {activeSection === 'perfil_taller' && (
+          <PerfilTallerMobile
+            workshop={currentWs}
+            onUpdateWorkshop={onUpdateWorkshop || (() => {})}
           />
         )}
       </main>

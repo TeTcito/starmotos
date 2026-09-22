@@ -65,6 +65,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [tallerScope, setTallerScope] = useState<'all' | 'local'>('all');
 
   // Cliente seleccionado para ver la Ficha Técnica / Detalle
   const [selectedClientForDetail, setSelectedClientForDetail] = useState<UnifiedClient | null>(null);
@@ -276,14 +277,15 @@ export const ClientesModuleMobile: React.FC<Props> = ({
       const wsId = client.workshopId;
 
       // Filtro de Sede / Taller
-      if (role === 'taller' && currentWorkshopId) {
-        if (wsId !== currentWorkshopId && !wsName.toLowerCase().includes(currentWorkshopId.toLowerCase())) {
-          return false;
-        }
+      if (role === 'taller' && tallerScope === 'local' && currentWorkshopId) {
+        const isMatchLocal =
+          wsId === currentWorkshopId ||
+          (wsName && wsName.toLowerCase().includes(currentWorkshopId.toLowerCase()));
+        if (!isMatchLocal) return false;
       } else if (selectedWorkshopFilter !== 'all') {
         const matchFilter =
           wsId === selectedWorkshopFilter ||
-          wsName.toLowerCase().includes(selectedWorkshopFilter.toLowerCase());
+          (wsName && wsName.toLowerCase().includes(selectedWorkshopFilter.toLowerCase()));
         if (!matchFilter) return false;
       }
 
@@ -311,7 +313,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
 
       return true;
     });
-  }, [unifiedClients, role, currentWorkshopId, selectedWorkshopFilter, searchTerm, clientOverrides]);
+  }, [unifiedClients, role, currentWorkshopId, tallerScope, selectedWorkshopFilter, searchTerm, clientOverrides]);
 
   // Abrir Ficha de Detalle de Cliente
   const handleOpenClientDetail = (client: UnifiedClient) => {
@@ -1319,6 +1321,34 @@ export const ClientesModuleMobile: React.FC<Props> = ({
             </span>
           </div>
 
+          {/* Selector de Ámbito para Taller (Red Nacional vs Sede Local) */}
+          {role === 'taller' && (
+            <div className="flex bg-zinc-100 p-1 rounded-xl gap-1 shrink-0 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setTallerScope('all')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition text-center cursor-pointer ${
+                  tallerScope === 'all'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                Red Nacional ({unifiedClients.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTallerScope('local')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition text-center cursor-pointer ${
+                  tallerScope === 'local'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                Solo Sede Local
+              </button>
+            </div>
+          )}
+
           {/* Barra de Herramientas: [+ Nuevo] + [Buscador Aumentado] + [Filtro] */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Botón "+ Nuevo" al lado izquierdo del buscador */}
@@ -1422,8 +1452,27 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                     {/* Fila 1: Nombre + Badges */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="font-bold text-xs text-zinc-900 truncate">
-                          {displayName}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-zinc-900 truncate">
+                            {displayName}
+                          </span>
+                          {currentWorkshopId ? (
+                            client.workshopId === currentWorkshopId ||
+                            (workshop && workshop.toLowerCase().includes(currentWorkshopId.toLowerCase())) ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                Sede Local
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 shrink-0">
+                                <Building2 className="w-2.5 h-2.5 text-blue-600" />
+                                Sede: {workshop || 'Red StarMotos'}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200 shrink-0">
+                              {workshop || 'Sede StarMotos'}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
                           C.I. {client.cedulaRuc}

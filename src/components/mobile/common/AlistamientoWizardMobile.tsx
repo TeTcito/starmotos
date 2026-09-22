@@ -99,6 +99,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   // Fecha de hoy por defecto en formato YYYY-MM-DD
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Hora actual por defecto en formato HH:mm
+  const getCurrentTimeStr = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
   // Estado del formulario para nuevo registro
   const [formData, setFormData] = useState<AlistamientoFullRecord>({
     id: '',
@@ -106,6 +112,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     sede: defaultSede,
     sedeId: defaultSedeId,
     fechaServicio: todayStr,
+    horaServicio: getCurrentTimeStr(),
     nombres: '',
     apellidos: '',
     cedulaRuc: '',
@@ -393,6 +400,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       sede: defaultSede,
       sedeId: defaultSedeId,
       fechaServicio: todayStr,
+      horaServicio: getCurrentTimeStr(),
       nombres: '',
       apellidos: '',
       cedulaRuc: cedula,
@@ -445,6 +453,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       sede: defaultSede,
       sedeId: defaultSedeId,
       fechaServicio: todayStr,
+      horaServicio: getCurrentTimeStr(),
       nombres: record.nombres,
       apellidos: record.apellidos,
       cedulaRuc: record.cedulaRuc,
@@ -1245,14 +1254,31 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Fecha de Atención</label>
-                    <input
-                      type="date"
-                      value={detailFormData.fechaServicio || ''}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })}
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
-                    />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-blue-600" />
+                        <span>Fecha Atención</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={detailFormData.fechaServicio || ''}
+                        onChange={(e) => setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-indigo-600" />
+                        <span>Hora Atención</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={detailFormData.horaServicio || ''}
+                        onChange={(e) => setDetailFormData({ ...detailFormData, horaServicio: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1882,7 +1908,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   <div className="flex items-center justify-between text-[11px] pt-1 border-t border-zinc-100">
                     <div className="flex items-center gap-1 text-zinc-500 font-mono text-[10px]">
                       <Calendar className="w-3 h-3 text-zinc-400 shrink-0" />
-                      <span>{record.fechaServicio}</span>
+                      <span>{record.fechaServicio}{record.horaServicio ? ` ${record.horaServicio}` : ''}</span>
                       {record.tecnicoResponsable && (
                         <>
                           <span>•</span>
@@ -2419,6 +2445,36 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-blue-600" />
+                    <span>Fecha *</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fechaServicio || todayStr}
+                    onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                    required
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-indigo-600" />
+                    <span>Hora *</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.horaServicio || getCurrentTimeStr()}
+                    onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                    required
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white font-mono"
+                  />
+                </div>
               </div>
 
               {/* Control de Aceite (Estado, Nivel, Tipo) */}

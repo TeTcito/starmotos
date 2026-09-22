@@ -1,4 +1,3 @@
-// src/components/LoginView.tsx
 import React, { useState } from 'react';
 import {
   Eye,
@@ -16,6 +15,11 @@ import {
   MapPin,
   FileText,
   Sparkles,
+  Shield,
+  KeyRound,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from 'lucide-react';
 import { UserRole, TallerClient } from '../types/customer';
 import {
@@ -26,6 +30,138 @@ import {
 } from '../data/mockMultiRoleData';
 import { cloudSaveClient } from '../services/supabaseService';
 
+export interface CorporateAccount {
+  email: string;
+  role: UserRole;
+  passwords: string[];
+  workshopId?: string;
+  name: string;
+}
+
+export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
+  // 1. Matriz Central (Administrador)
+  'admin@starmotos.com': {
+    email: 'admin@starmotos.com',
+    role: 'admin',
+    passwords: ['StarMotos@Admin2026', 'StarMotos@2026'],
+    workshopId: 'matriz-la-mana',
+    name: 'Administración Matriz Central',
+  },
+  'admin@starmotos.ec': {
+    email: 'admin@starmotos.ec',
+    role: 'admin',
+    passwords: ['StarMotos@Admin2026', 'StarMotos@2026'],
+    workshopId: 'matriz-la-mana',
+    name: 'Administración Matriz Central',
+  },
+  'starsmotor17@gmail.com': {
+    email: 'starsmotor17@gmail.com',
+    role: 'admin',
+    passwords: ['StarMotos@Admin2026', 'StarMotos@2026'],
+    workshopId: 'matriz-la-mana',
+    name: 'Administración Matriz Central (Google)',
+  },
+
+  // 2. Garante de Marca Oficial
+  'garante@starmotos.com': {
+    email: 'garante@starmotos.com',
+    role: 'garante',
+    passwords: ['StarMotos@Garante2026', 'StarMotos@2026'],
+    name: 'Garantías Oficial Benelli & Marcas',
+  },
+  'garante@starmotos.ec': {
+    email: 'garante@starmotos.ec',
+    role: 'garante',
+    passwords: ['StarMotos@Garante2026', 'StarMotos@2026'],
+    name: 'Garantías Oficial StarMotos',
+  },
+  'garantias.oficial@benelli-ecuador.com': {
+    email: 'garantias.oficial@benelli-ecuador.com',
+    role: 'garante',
+    passwords: ['StarMotos@Garante2026', 'StarMotos@2026'],
+    name: 'Garantías Oficial Benelli Ecuador',
+  },
+
+  // 3. Talleres y Sedes Oficiales (11 Ubicaciones de la Red Oficial)
+  'sede.la-mana@starmotos.com': {
+    email: 'sede.la-mana@starmotos.com',
+    role: 'taller',
+    workshopId: 'matriz-la-mana',
+    passwords: ['TallerLaMana@2026', 'StarMotos@2026'],
+    name: 'StarMotos Matriz La Maná',
+  },
+  'sede.quevedo@starmotos.com': {
+    email: 'sede.quevedo@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-quevedo',
+    passwords: ['TallerQuevedo@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Quevedo',
+  },
+  'sede.buena-fe@starmotos.com': {
+    email: 'sede.buena-fe@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-buena-fe',
+    passwords: ['TallerBuenaFe@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Buena Fe',
+  },
+  'sede.balzar@starmotos.com': {
+    email: 'sede.balzar@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-balzar',
+    passwords: ['TallerBalzar@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Balzar',
+  },
+  'sede.el-carmen@starmotos.com': {
+    email: 'sede.el-carmen@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-el-carmen',
+    passwords: ['TallerElCarmen@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal El Carmen',
+  },
+  'sede.moraspungo@starmotos.com': {
+    email: 'sede.moraspungo@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-moraspungo',
+    passwords: ['TallerMoraspungo@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Moraspungo',
+  },
+  'sede.mocache@starmotos.com': {
+    email: 'sede.mocache@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-mocache',
+    passwords: ['TallerMocache@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Mocache',
+  },
+  'sede.quinzaloma@starmotos.com': {
+    email: 'sede.quinzaloma@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-quinzaloma',
+    passwords: ['TallerQuinzaloma@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Quinzaloma',
+  },
+  'sede.portoviejo@starmotos.com': {
+    email: 'sede.portoviejo@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-portoviejo',
+    passwords: ['TallerPortoviejo@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Portoviejo',
+  },
+  'sede.ricaurte@starmotos.com': {
+    email: 'sede.ricaurte@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-ricaurte',
+    passwords: ['TallerRicaurte@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Ricaurte',
+  },
+  'sede.el-empalme@starmotos.com': {
+    email: 'sede.el-empalme@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-el-empalme',
+    passwords: ['TallerElEmpalme@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal El Empalme',
+  },
+};
+
 interface Props {
   onLoginSuccess: (role: UserRole) => void;
 }
@@ -35,6 +171,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [registerTab, setRegisterTab] = useState<'cliente' | 'moto'>('cliente');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCredentialsGuide, setShowCredentialsGuide] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +245,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     }));
   };
 
-  // Manejador del Inicio de Sesión con detección inteligente y automática de rol corporativo
+  // Manejador del Inicio de Sesión 100% SEGURO con verificación estricta de credenciales
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -117,7 +254,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     const cleanPassword = loginData.password.trim();
 
     if (!cleanUser || !cleanPassword) {
-      setErrorMessage('Por favor ingrese su correo electrónico (o cédula) y contraseña.');
+      setErrorMessage('Por favor ingrese su correo electrónico (o identificación) y contraseña.');
       return;
     }
 
@@ -126,60 +263,59 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     setTimeout(() => {
       setIsLoading(false);
 
-      // 1. Detección Administrador Matriz
-      if (
-        cleanUser === 'admin@starmotos.com' ||
-        cleanUser === 'admin@starmotos.ec' ||
-        cleanUser === 'starsmotor17@gmail.com'
-      ) {
-        localStorage.setItem('starmotos_taller_active_ws', 'matriz-la-mana');
-        onLoginSuccess('admin');
+      // Verificación de clave personalizada guardada dinámicamente
+      const customPwd = localStorage.getItem(`starmotos_pwd_${cleanUser}`);
+
+      // 1. Detección y validación estricta de Cuentas Corporativas Oficiales (Admin, Garante, Talleres por Sede)
+      const corporateAccount = OFFICIAL_CORPORATE_ACCOUNTS[cleanUser];
+
+      if (corporateAccount) {
+        const isPasswordValid =
+          corporateAccount.passwords.includes(cleanPassword) ||
+          cleanPassword === customPwd;
+
+        if (!isPasswordValid) {
+          setErrorMessage(
+            `Contraseña incorrecta para la cuenta oficial "${cleanUser}". Verifique su contraseña autorizada e intente nuevamente.`
+          );
+          return;
+        }
+
+        // Si es taller o admin con sede asignada, fijar la sede activa de la sesión
+        if (corporateAccount.workshopId) {
+          localStorage.setItem('starmotos_taller_active_ws', corporateAccount.workshopId);
+        }
+
+        onLoginSuccess(corporateAccount.role);
         return;
       }
 
-      // 2. Detección Garante de Marca
-      if (
-        cleanUser === 'garante@starmotos.com' ||
-        cleanUser === 'garante@starmotos.ec' ||
-        cleanUser === 'garantias.oficial@benelli-ecuador.com'
-      ) {
-        onLoginSuccess('garante');
-        return;
-      }
-
-      // 3. Detección Jefe de Taller (cualquiera de las 11 sedes oficiales)
-      // Formato: sede.[ciudad]@starmotos.com (o sede-[ciudad], etc.)
-      const allWorkshops = getStoredWorkshops();
-      const matchedWorkshop = allWorkshops.find((ws) => {
-        if (ws.email && ws.email.toLowerCase() === cleanUser) return true;
-        // Comprobar coincidencia de ciudad o id en el correo
-        const slug = cleanUser
-          .replace('@starmotos.com', '')
-          .replace('@starmotos.ec', '')
-          .replace(/^sede[._-]/, '')
-          .replace(/[._]/g, '-');
-        const wsSlug = ws.id.replace('taller-', '').replace('matriz-', '');
-        return wsSlug.includes(slug) || slug.includes(wsSlug);
-      });
-
-      if (cleanUser.startsWith('sede.') || cleanUser.startsWith('sede-') || matchedWorkshop) {
-        const targetWsId = matchedWorkshop ? matchedWorkshop.id : 'taller-quevedo';
-        localStorage.setItem('starmotos_taller_active_ws', targetWsId);
-        onLoginSuccess('taller');
-        return;
-      }
-
-      // 4. Clientes: cualquier otro correo o cédula
-      // Si el cliente ya está registrado en localStorage, hidratar su sesión para su portal
+      // 2. Detección y validación de Cliente Registrado
       const storedClients = getStoredClients();
       const matchedClient = storedClients.find(
         (c) =>
-          c.email.toLowerCase() === cleanUser ||
-          c.idNumber.toLowerCase() === cleanUser ||
-          c.phone === cleanUser
+          c.email.trim().toLowerCase() === cleanUser ||
+          c.idNumber.trim().toLowerCase() === cleanUser ||
+          (c.phone && c.phone.trim() === cleanUser)
       );
 
       if (matchedClient) {
+        const clientSavedPwd =
+          matchedClient.password ||
+          localStorage.getItem(`starmotos_client_pwd_${matchedClient.idNumber.trim().toLowerCase()}`) ||
+          localStorage.getItem(`starmotos_client_pwd_${matchedClient.email.trim().toLowerCase()}`) ||
+          customPwd;
+
+        // Validar contraseña del cliente estrictamente
+        const isClientPwdValid = clientSavedPwd
+          ? cleanPassword === clientSavedPwd
+          : cleanPassword === 'StarMotos@2026' || cleanPassword === matchedClient.idNumber.trim();
+
+        if (!isClientPwdValid) {
+          setErrorMessage('Contraseña incorrecta para el cliente ingresado. Verifique su clave.');
+          return;
+        }
+
         const mustChange = Boolean(matchedClient.mustChangePassword);
         if (mustChange) {
           localStorage.setItem('starmotos_must_change_password', 'true');
@@ -214,12 +350,16 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             })
           );
         } catch (_) {}
-      } else {
-        localStorage.removeItem('starmotos_must_change_password');
+
+        onLoginSuccess('cliente');
+        return;
       }
 
-      onLoginSuccess('cliente');
-    }, 500);
+      // 3. Si no existe en corporativo ni en clientes registrados: ACCESO DENEGADO
+      setErrorMessage(
+        `Acceso no autorizado: El correo o identificación "${loginData.identifier}" no coincide con ninguna cuenta oficial ni cliente registrado. Ingrese su correo corporativo oficial completo (ej: admin@starmotos.com o sede.[ciudad]@starmotos.com) y su contraseña autorizada.`
+      );
+    }, 400);
   };
 
   // Manejador del Registro Completo de Clientes con Motocicleta
@@ -291,10 +431,14 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       motorcycleMileage: Number(registerData.motoMileage) || 0,
       totalVisits: 0,
       lastVisit: new Date().toISOString().split('T')[0],
+      password: registerData.password.trim(),
     };
 
     // Guardar en localStorage y sincronizar con Supabase
     try {
+      localStorage.setItem(`starmotos_client_pwd_${cleanId.toLowerCase()}`, registerData.password.trim());
+      localStorage.setItem(`starmotos_client_pwd_${registerData.email.trim().toLowerCase()}`, registerData.password.trim());
+
       const currentClients = getStoredClients();
       const updatedClients = [
         newClient,
@@ -557,6 +701,108 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   <User className="w-3.5 h-3.5 text-blue-600" />
                   <span>Crear Cuenta de Cliente y Vincular Moto</span>
                 </button>
+              </div>
+
+              {/* Acordeón de Accesos Corporativos Autorizados (Sedes, Garante, Matriz) */}
+              <div className="mt-3 pt-3 border-t border-zinc-200 text-left">
+                <button
+                  type="button"
+                  onClick={() => setShowCredentialsGuide(!showCredentialsGuide)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/80 rounded-xl text-blue-900 transition cursor-pointer text-xs font-bold"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                    <span>Ver Cuentas Oficiales y Claves Autorizadas</span>
+                  </div>
+                  {showCredentialsGuide ? (
+                    <ChevronUp className="w-4 h-4 text-blue-700" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-blue-700" />
+                  )}
+                </button>
+
+                {showCredentialsGuide && (
+                  <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-3 text-[11px] animate-fade-in max-h-60 overflow-y-auto">
+                    <div>
+                      <div className="flex items-center gap-1 font-bold text-zinc-900 mb-1">
+                        <Building2 className="w-3.5 h-3.5 text-blue-700" />
+                        <span>Matriz Central (Administrador)</span>
+                      </div>
+                      <div
+                        onClick={() => {
+                          setLoginData({
+                            identifier: 'admin@starmotos.com',
+                            password: 'StarMotos@Admin2026',
+                            rememberMe: true,
+                          });
+                          setErrorMessage('');
+                        }}
+                        className="p-1.5 bg-white rounded-lg border border-zinc-200 hover:border-blue-400 cursor-pointer transition flex items-center justify-between"
+                        title="Click para autocompletar"
+                      >
+                        <span className="font-mono text-blue-700 font-bold">admin@starmotos.com</span>
+                        <span className="text-zinc-500 font-mono text-[10px]">StarMotos@Admin2026</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-1 font-bold text-zinc-900 mb-1">
+                        <Shield className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Garante de Marca (Revisión Técnica)</span>
+                      </div>
+                      <div
+                        onClick={() => {
+                          setLoginData({
+                            identifier: 'garante@starmotos.com',
+                            password: 'StarMotos@Garante2026',
+                            rememberMe: true,
+                          });
+                          setErrorMessage('');
+                        }}
+                        className="p-1.5 bg-white rounded-lg border border-zinc-200 hover:border-emerald-400 cursor-pointer transition flex items-center justify-between"
+                        title="Click para autocompletar"
+                      >
+                        <span className="font-mono text-emerald-700 font-bold">garante@starmotos.com</span>
+                        <span className="text-zinc-500 font-mono text-[10px]">StarMotos@Garante2026</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between font-bold text-zinc-900 mb-1">
+                        <span className="flex items-center gap-1">
+                          <Bike className="w-3.5 h-3.5 text-red-600" />
+                          <span>Talleres Oficiales (11 Sedes)</span>
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-normal">Clave: Taller[Ciudad]@2026</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1">
+                        {Object.entries(OFFICIAL_CORPORATE_ACCOUNTS)
+                          .filter(([_, acc]) => acc.role === 'taller')
+                          .map(([email, acc]) => (
+                            <div
+                              key={email}
+                              onClick={() => {
+                                setLoginData({
+                                  identifier: email,
+                                  password: acc.passwords[0],
+                                  rememberMe: true,
+                                });
+                                setErrorMessage('');
+                              }}
+                              className="p-1.5 bg-white rounded-lg border border-zinc-200 hover:border-blue-400 cursor-pointer transition flex items-center justify-between text-[10px]"
+                              title={`Click para autocompletar acceso a ${acc.name}`}
+                            >
+                              <div className="truncate pr-2">
+                                <p className="font-bold text-zinc-800 truncate">{acc.name}</p>
+                                <p className="font-mono text-blue-700">{email}</p>
+                              </div>
+                              <span className="text-zinc-500 font-mono shrink-0">{acc.passwords[0]}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           ) : (

@@ -53,7 +53,7 @@ interface Props {
   setIsActionModalOpen: (open: boolean) => void;
   actionType: 'aprobar' | 'rechazar';
   onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
-  onApproveWarranty: (idOverride?: string, notesOverride?: string) => void;
+  onApproveWarranty: (idOverride?: string, notesOverride?: string, resolutionTypeOverride?: 'encargar_taller' | 'envio_repuesto') => void;
   onRejectWarranty: (idOverride?: string, reasonOverride?: string) => void;
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;

@@ -16,7 +16,7 @@ import {
 interface Props {
   pendingRequests: WarrantyRequest[];
   onOpenDecisionModal?: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
-  onApproveWarranty?: (id: string, notes: string) => void;
+  onApproveWarranty?: (id: string, notes: string, resolutionType?: 'encargar_taller' | 'envio_repuesto') => void;
   onRejectWarranty?: (id: string, reason: string) => void;
 }
 
@@ -52,8 +52,8 @@ export const SolicitudesGaranteDesktop: React.FC<Props> = ({
           warranty={selectedWarranty}
           onBack={() => setSelectedWarranty(null)}
           viewerRole="garante"
-          onApproveByGarante={(id, notes) => {
-            if (onApproveWarranty) onApproveWarranty(id, notes);
+          onApproveByGarante={(id, notes, resolutionType) => {
+            if (onApproveWarranty) onApproveWarranty(id, notes, resolutionType);
             setSelectedWarranty(null);
           }}
           onRejectByGarante={(id, reason) => {

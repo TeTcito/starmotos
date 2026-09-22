@@ -190,7 +190,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             <div className="flex items-center justify-center gap-2 mb-0.5 sm:mb-1">
               <span className="h-px w-5 sm:w-6 bg-gradient-to-r from-transparent to-blue-400" />
               <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-zinc-500 font-mono">
-                Taller Mecánico Especializado
+                Servicio Técnico Autorizado
               </span>
               <span className="h-px w-5 sm:w-6 bg-gradient-to-l from-transparent to-red-400" />
             </div>
@@ -313,7 +313,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 >
                   <option value="cliente">Cliente</option>
                   <option value="admin">Administrador Matriz</option>
-                  <option value="taller">Jefe de Taller</option>
+                  <option value="taller">Servicio Técnico Autorizado (Jefe de Taller)</option>
                   <option value="garante">Garante / Marca</option>
                 </select>
               </div>

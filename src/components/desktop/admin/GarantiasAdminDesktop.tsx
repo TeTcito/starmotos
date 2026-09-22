@@ -32,6 +32,7 @@ interface Props {
   onSendToGarante?: (id: string, notes?: string) => void;
   onCompleteRepair?: (id: string, invoiceNumber?: string) => void;
   onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onUpdateWarranty?: (updated: WarrantyRequest) => void;
   onDeleteWarranty?: (id: string) => void;
   onQuickUpdateStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
 }
@@ -44,6 +45,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
   onSendToGarante,
   onCompleteRepair,
   onCreateWarranty,
+  onUpdateWarranty,
   onDeleteWarranty,
   onQuickUpdateStatus,
 }) => {
@@ -134,6 +136,10 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
           onDelete={(id) => {
             if (onDeleteWarranty) onDeleteWarranty(id);
             setSelectedWarranty(null);
+          }}
+          onUpdateWarranty={(updated) => {
+            setSelectedWarranty(updated);
+            if (onUpdateWarranty) onUpdateWarranty(updated);
           }}
         />
       ) : (

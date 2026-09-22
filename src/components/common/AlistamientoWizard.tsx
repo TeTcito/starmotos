@@ -24,6 +24,10 @@ import {
   ArrowLeft,
   MessageCircle,
   Save,
+  DollarSign,
+  TrendingUp,
+  Clock,
+  CreditCard,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -113,17 +117,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
     chasis: '',
     placa: '',
     modeloMarca: '',
+    color: '',
     serviciosRealizados: ['alistamiento_pdi'],
     tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
     tecnicoId: technicians[0]?.id || 'tec-01',
     kilometraje: 0,
     aceite: 'con_aceite',
     nivelAceite: 'optimo',
-    tipoAceite: '4T Mineral 20W50',
+    tipoAceite: 'Katana 20W50',
     numeroFactura: '',
     numeroTicket: '',
     valorServicio: 35.0,
     montoPagado: 35.0,
+    abono: 35.0,
+    saldoPendiente: 0,
+    esCredito: false,
+    mesesCredito: 3,
     metodoPago: 'Efectivo',
     observaciones: '',
     proximoMantenimientoKm: 1000,
@@ -197,6 +206,42 @@ export const AlistamientoWizard: React.FC<Props> = ({
       );
     });
   }, [recentRecords, searchTerm, selectedWorkshopFilter]);
+
+  // Métricas financieras y operativas del listado (Ingresos cobrados vs Pendientes por cobrar)
+  const statsMetrics = useMemo(() => {
+    let totalRecaudado = 0;
+    let totalPendiente = 0;
+    let totalFacturado = 0;
+    let countPdi = 0;
+    let countMantenimiento = 0;
+    let countConSaldo = 0;
+
+    filteredRecords.forEach((r) => {
+      const valor = Number(r.valorServicio) || 0;
+      const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
+      const pendiente = r.saldoPendiente !== undefined 
+        ? Number(r.saldoPendiente) 
+        : Math.max(0, valor - pagado);
+
+      totalFacturado += valor;
+      totalRecaudado += pagado;
+      totalPendiente += pendiente;
+
+      if (pendiente > 0) countConSaldo++;
+      if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
+      if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
+    });
+
+    return {
+      totalRecaudado,
+      totalPendiente,
+      totalFacturado,
+      countPdi,
+      countMantenimiento,
+      countConSaldo,
+      totalOperaciones: filteredRecords.length,
+    };
+  }, [filteredRecords]);
 
   // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
   const clientHistoricalRecords = useMemo(() => {
@@ -365,17 +410,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
       chasis: '',
       placa: '',
       modeloMarca: '',
+      color: '',
       serviciosRealizados: ['alistamiento_pdi'],
       tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
       tecnicoId: technicians[0]?.id || 'tec-01',
       kilometraje: 0,
       aceite: 'con_aceite',
       nivelAceite: 'optimo',
-      tipoAceite: '4T Mineral 20W50',
+      tipoAceite: 'Katana 20W50',
       numeroFactura: '',
       numeroTicket: '',
       valorServicio: 35.0,
       montoPagado: 35.0,
+      abono: 35.0,
+      saldoPendiente: 0,
+      esCredito: false,
+      mesesCredito: 3,
       metodoPago: 'Efectivo',
       observaciones: '',
       proximoMantenimientoKm: 1000,
@@ -412,17 +462,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
       chasis: record.chasis,
       placa: record.placa,
       modeloMarca: record.modeloMarca,
+      color: record.color || '',
       serviciosRealizados: ['mantenimiento'],
       tecnicoResponsable: record.tecnicoResponsable || technicians[0]?.name || 'WILLIAM MEZA',
       tecnicoId: record.tecnicoId || technicians[0]?.id || 'tec-01',
       kilometraje: record.kilometraje ? record.kilometraje + 500 : 500,
       aceite: record.aceite || 'con_aceite',
       nivelAceite: record.nivelAceite || 'optimo',
-      tipoAceite: record.tipoAceite || '4T Mineral 20W50',
+      tipoAceite: record.tipoAceite || 'Katana 20W50',
       numeroFactura: '',
       numeroTicket: '',
       valorServicio: 35.0,
       montoPagado: 35.0,
+      abono: 35.0,
+      saldoPendiente: 0,
+      esCredito: false,
+      mesesCredito: 3,
       metodoPago: 'Efectivo',
       observaciones: `Mantenimiento subsecuente. Cliente C.I. ${record.cedulaRuc}.`,
       proximoMantenimientoKm: (record.kilometraje || 0) + 1500,
@@ -572,7 +627,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     if (!formData.serviciosRealizados || formData.serviciosRealizados.length === 0) {
       missingStep3.push('¿Qué se realizó?');
     }
-    if (formData.valorServicio === undefined || formData.valorServicio === null || isNaN(formData.valorServicio)) {
+    const isPdiOnly = formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi';
+    if (!isPdiOnly && (formData.valorServicio === undefined || formData.valorServicio === null || isNaN(formData.valorServicio))) {
       missingStep3.push('Valor del servicio ($)');
     }
 
@@ -609,8 +665,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
     // Limpiar alerta y procesar guardado
     setValidationAlert(null);
 
+    const finalValor = isPdiOnly ? 0 : (formData.valorServicio || 0);
+    const finalAbono = isPdiOnly ? 0 : (formData.abono !== undefined ? formData.abono : (formData.montoPagado || 0));
+    const finalSaldo = isPdiOnly ? 0 : (formData.saldoPendiente !== undefined ? formData.saldoPendiente : Math.max(0, finalValor - finalAbono));
+
     const fullRecord: AlistamientoFullRecord = {
       ...formData,
+      valorServicio: finalValor,
+      montoPagado: finalAbono,
+      abono: finalAbono,
+      saldoPendiente: finalSaldo,
       id: `als-${Date.now()}`,
       createdAt: new Date().toLocaleString('es-EC', {
         dateStyle: 'medium',
@@ -898,8 +962,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Color de la Motocicleta</label>
+                  <input
+                    type="text"
+                    value={detailFormData.color || ''}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, color: e.target.value })}
+                    placeholder="Ej: Negro / Rojo / Azul"
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-semibold text-zinc-900 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Número de Chasis / VIN *
+                    Serie o Chasis (VIN) *
                   </label>
                   <input
                     type="text"
@@ -979,51 +1054,148 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Estado Aceite</label>
-                    <input
-                      type="text"
-                      value={
-                        detailFormData.aceite === 'sin_aceite'
-                          ? 'Sin Aceite'
-                          : `${detailFormData.aceite} (${detailFormData.nivelAceite || 'Óptimo'})`
-                      }
-                      onChange={(e) => setDetailFormData({ ...detailFormData, aceite: e.target.value })}
-                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium text-zinc-900 outline-none focus:border-blue-600"
-                    />
-                  </div>
-                </div>
-
-                {/* Cobro y Factura */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Monto Cobrado ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={detailFormData.montoPagado || detailFormData.valorServicio || 35.0}
-                      onChange={(e) =>
-                        setDetailFormData({
-                          ...detailFormData,
-                          montoPagado: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-emerald-800 outline-none focus:border-blue-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Método de Pago</label>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Tipo de Aceite</label>
                     <select
-                      value={detailFormData.metodoPago || 'Efectivo'}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, metodoPago: e.target.value as any })}
-                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
+                      value={detailFormData.tipoAceite || 'Katana 20W50'}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, tipoAceite: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
                     >
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Transferencia">Transferencia</option>
-                      <option value="Tarjeta">Tarjeta</option>
+                      <option value="Katana 10W30">Katana 10/30</option>
+                      <option value="Katana 20W50">Katana 20/50</option>
+                      <option value="Katana 15W40">Katana 15/40</option>
+                      <option value="Motul 5000">Motul 5000</option>
+                      <option value="Motul 7100">Motul 7100</option>
+                      <option value="Motor 1 20W50">Motor 1 20/50</option>
+                      <option value="Shineray 20W50">Shineray 20/50</option>
+                      <option value="4T Mineral 20W50">20W50 Mineral</option>
+                      <option value="4T Semi 10W40">10W40 Semi</option>
+                      <option value="Castrol Actevo 20W50">Castrol 20W50</option>
+                      <option value="Sin Tipo">N/A</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Si solo es PDI en detalle: Sin cobro */}
+                {detailFormData.serviciosRealizados?.length === 1 && detailFormData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-xs text-blue-900 font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Alistamiento PDI (Cero costo al cliente / Cubierto por Fábrica)</span>
+                  </div>
+                ) : (
+                  /* Cobro y Facturación en Detalle */
+                  <div className="space-y-2 bg-zinc-50/80 p-2.5 rounded-xl border border-zinc-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-700 mb-1">Valor Servicio ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={detailFormData.valorServicio || 0}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const ab = detailFormData.abono !== undefined ? detailFormData.abono : (detailFormData.montoPagado || 0);
+                            setDetailFormData({
+                              ...detailFormData,
+                              valorServicio: val,
+                              saldoPendiente: Math.max(0, val - ab),
+                            });
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-700 mb-1">Método de Pago</label>
+                        <select
+                          value={detailFormData.metodoPago || 'Efectivo'}
+                          onChange={(e) => {
+                            const met = e.target.value as any;
+                            const isCred = met === 'Crédito Directo';
+                            setDetailFormData({
+                              ...detailFormData,
+                              metodoPago: met,
+                              esCredito: isCred ? true : detailFormData.esCredito,
+                            });
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                          <option value="Crédito Directo">Crédito Directo</option>
+                          <option value="Mixto">Mixto</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Check Crédito en detalle */}
+                    <div className="flex items-center justify-between pt-1 border-t border-zinc-200 text-[11px]">
+                      <label className="flex items-center gap-1.5 font-bold text-zinc-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!detailFormData.esCredito || detailFormData.metodoPago === 'Crédito Directo'}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setDetailFormData({
+                              ...detailFormData,
+                              esCredito: checked,
+                              metodoPago: checked ? 'Crédito Directo' : (detailFormData.metodoPago === 'Crédito Directo' ? 'Efectivo' : detailFormData.metodoPago),
+                            });
+                          }}
+                          className="w-3.5 h-3.5 rounded text-blue-600 accent-blue-600 cursor-pointer"
+                        />
+                        <span>A Crédito Directo</span>
+                      </label>
+                      {detailFormData.esCredito && (
+                        <select
+                          value={detailFormData.mesesCredito || 3}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, mesesCredito: parseInt(e.target.value) || 3 })}
+                          className="px-2 py-0.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900 outline-none"
+                        >
+                          <option value={1}>1 Mes</option>
+                          <option value={2}>2 Meses</option>
+                          <option value={3}>3 Meses</option>
+                          <option value={6}>6 Meses</option>
+                          <option value={12}>12 Meses</option>
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Si no es crédito: Abono y Saldo */}
+                    {!detailFormData.esCredito && detailFormData.metodoPago !== 'Crédito Directo' && (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">Abono ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={detailFormData.abono !== undefined ? detailFormData.abono : detailFormData.montoPagado}
+                            onChange={(e) => {
+                              const abVal = parseFloat(e.target.value) || 0;
+                              const valServ = detailFormData.valorServicio || 0;
+                              setDetailFormData({
+                                ...detailFormData,
+                                abono: abVal,
+                                montoPagado: abVal,
+                                saldoPendiente: Math.max(0, valServ - abVal),
+                              });
+                            }}
+                            className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente ($)</label>
+                          <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between">
+                            <span>
+                              ${(detailFormData.saldoPendiente ?? Math.max(0, (detailFormData.valorServicio || 0) - (detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
+                            </span>
+                            <span className="text-[9px] text-amber-700">Saldo</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1">N° Factura o Ticket</label>
@@ -1240,6 +1412,77 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <Plus className="w-4.5 h-4.5" />
                 <span>+ Nuevo Alistamiento</span>
               </button>
+            </div>
+
+            {/* Fila 3: Bloques Estadísticos Reactivos (Ingresos Cobrados vs Pendientes por Cobrar) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+              {/* Bloque 1: Total Cobrado / Abonos */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-emerald-50 transition-colors">
+                <div className="flex items-center justify-between text-emerald-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Ingresos Cobrados</span>
+                  <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
+                    <DollarSign className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <div className="text-lg sm:text-xl font-black font-mono text-emerald-900 leading-tight">
+                    ${statsMetrics.totalRecaudado.toFixed(2)}
+                  </div>
+                  <span className="text-[10px] font-semibold text-emerald-700">Abonos y cobros liquidados</span>
+                </div>
+              </div>
+
+              {/* Bloque 2: Pendientes por Cobrar */}
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-amber-50 transition-colors">
+                <div className="flex items-center justify-between text-amber-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Pendiente por Cobrar</span>
+                  <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <div className="text-lg sm:text-xl font-black font-mono text-amber-900 leading-tight">
+                    ${statsMetrics.totalPendiente.toFixed(2)}
+                  </div>
+                  <span className="text-[10px] font-semibold text-amber-700">
+                    {statsMetrics.countConSaldo > 0 ? `${statsMetrics.countConSaldo} cliente(s) con saldo` : 'Al día / Sin deudas'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bloque 3: Total Facturado en Servicios */}
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-blue-50 transition-colors">
+                <div className="flex items-center justify-between text-blue-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
+                  <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <div className="text-lg sm:text-xl font-black font-mono text-blue-900 leading-tight">
+                    ${statsMetrics.totalFacturado.toFixed(2)}
+                  </div>
+                  <span className="text-[10px] font-semibold text-blue-700">Volumen total de servicios</span>
+                </div>
+              </div>
+
+              {/* Bloque 4: Operaciones en Taller */}
+              <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-purple-50 transition-colors">
+                <div className="flex items-center justify-between text-purple-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Operaciones</span>
+                  <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
+                    <Wrench className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <div className="text-lg sm:text-xl font-black text-purple-900 leading-tight">
+                    {statsMetrics.totalOperaciones} <span className="text-xs font-bold text-purple-700">motos</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-purple-700">
+                    {statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mantenimientos
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Aviso o Sugerencia reactiva si escribe una cédula no existente */}
@@ -1750,10 +1993,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                {/* Chasis (VIN) (1 por fila) */}
+                {/* Color de la Moto (1 por fila) */}
                 <div>
                   <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
-                    Chasis (VIN)
+                    Color de la Moto
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.color || ''}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    placeholder="Ej: Negro / Rojo / Azul / Blanco"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
+                  />
+                </div>
+
+                {/* Serie o Chasis (VIN) (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Serie o Chasis (VIN)
                   </label>
                   <input
                     type="text"
@@ -1953,60 +2210,217 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
                     <div>
                       <select
-                        value={formData.tipoAceite || '4T Mineral 20W50'}
+                        value={formData.tipoAceite || 'Katana 20W50'}
                         onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
                         className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
+                        <option value="Katana 10W30">Katana 10/30</option>
+                        <option value="Katana 20W50">Katana 20/50</option>
+                        <option value="Katana 15W40">Katana 15/40</option>
+                        <option value="Motul 5000">Motul 5000</option>
+                        <option value="Motul 7100">Motul 7100</option>
+                        <option value="Motor 1 20W50">Motor 1 20/50</option>
+                        <option value="Shineray 20W50">Shineray 20/50</option>
                         <option value="4T Mineral 20W50">20W50 Mineral</option>
                         <option value="4T Semi 10W40">10W40 Semi</option>
-                        <option value="4T Sintético 10W50">10W50 Sint</option>
                         <option value="Castrol Actevo 20W50">Castrol 20W50</option>
-                        <option value="Motul 5100 15W50">Motul 5100</option>
                         <option value="Sin Tipo">N/A</option>
                       </select>
                     </div>
                   </div>
                 </div>
 
-                {/* Valor Servicio y Método de Pago (2 datos seguidos en una fila) */}
-                <div className="grid grid-cols-2 gap-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                      Valor Servicio ($) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorServicio}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, valorServicio: val, montoPagado: val });
-                      }}
-                      className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
-                      required
-                    />
+                {/* Si se selecciona únicamente Alistamiento PDI: NO se muestran bloques de cobro ni método de pago */}
+                {formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-xl flex items-center gap-2.5 text-xs text-blue-900 font-semibold shadow-2xs">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div>
+                      <span className="font-bold block">Alistamiento PDI de Fábrica / Concesionario</span>
+                      <span className="text-[11px] text-blue-700 font-normal">
+                        Servicio oficial de cortesía sin cobro al cliente (Cubierto por Garantía PDI de Entrega).
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                      Método de Pago
-                    </label>
-                    <select
-                      value={formData.metodoPago}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
-                        })
-                      }
-                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Transferencia">Transferencia</option>
-                      <option value="Tarjeta">Tarjeta Déb/Créd</option>
-                      <option value="Crédito Directo">Crédito Directo</option>
-                    </select>
+                ) : (
+                  /* Bloque de Cobro: Valor, Método de Pago, Abono y Crédito */
+                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2.5 shadow-2xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Valor Servicio ($) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.valorServicio}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const abonoVal = formData.abono !== undefined ? formData.abono : val;
+                            setFormData({
+                              ...formData,
+                              valorServicio: val,
+                              saldoPendiente: Math.max(0, val - abonoVal),
+                            });
+                          }}
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Método de Pago
+                        </label>
+                        <select
+                          value={formData.metodoPago}
+                          onChange={(e) => {
+                            const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
+                            const isCred = newMetodo === 'Crédito Directo';
+                            setFormData({
+                              ...formData,
+                              metodoPago: newMetodo,
+                              esCredito: isCred ? true : formData.esCredito,
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta Déb/Créd</option>
+                          <option value="Crédito Directo">Crédito Directo</option>
+                          <option value="Mixto">Mixto</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Checkbox de Crédito Directo */}
+                    <div className="flex items-center justify-between pt-1 border-t border-emerald-200/70">
+                      <label className="flex items-center gap-2 text-xs font-bold text-emerald-950 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!formData.esCredito || formData.metodoPago === 'Crédito Directo'}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData({
+                              ...formData,
+                              esCredito: checked,
+                              metodoPago: checked ? 'Crédito Directo' : (formData.metodoPago === 'Crédito Directo' ? 'Efectivo' : formData.metodoPago),
+                            });
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
+                        />
+                        <span>Servicio a Crédito Directo</span>
+                      </label>
+                      {(formData.esCredito || formData.metodoPago === 'Crédito Directo') && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                          Crédito Activo
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Fila Dinámica: Abono vs Crédito con Tiempo en Meses */}
+                    {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                            Monto a Crédito ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.valorServicio}
+                            readOnly
+                            className="w-full px-3 py-1.5 bg-blue-50/60 border border-blue-300 rounded-xl text-sm font-mono font-bold text-blue-900 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                            Tiempo (Meses)
+                          </label>
+                          <select
+                            value={formData.mesesCredito || 3}
+                            onChange={(e) => setFormData({ ...formData, mesesCredito: parseInt(e.target.value) || 3 })}
+                            className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value={1}>1 Mes</option>
+                            <option value={2}>2 Meses</option>
+                            <option value={3}>3 Meses</option>
+                            <option value={6}>6 Meses</option>
+                            <option value={9}>9 Meses</option>
+                            <option value={12}>12 Meses</option>
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Si NO es crédito: Abono y Saldo Pendiente */
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-black uppercase text-emerald-900">
+                              Abono ($)
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  abono: formData.valorServicio,
+                                  montoPagado: formData.valorServicio,
+                                  saldoPendiente: 0,
+                                });
+                              }}
+                              className="text-[10px] text-emerald-700 underline font-semibold cursor-pointer"
+                            >
+                              Total
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.abono !== undefined ? formData.abono : formData.montoPagado}
+                            onChange={(e) => {
+                              const abonoVal = parseFloat(e.target.value) || 0;
+                              const pendiente = Math.max(0, formData.valorServicio - abonoVal);
+                              setFormData({
+                                ...formData,
+                                abono: abonoVal,
+                                montoPagado: abonoVal,
+                                saldoPendiente: pendiente,
+                              });
+                            }}
+                            className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-amber-900 mb-1">
+                            Saldo Pendiente ($)
+                          </label>
+                          <div
+                            className={`w-full px-3 py-1.5 rounded-xl border text-sm font-mono font-bold flex items-center justify-between ${
+                              (formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))) > 0
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            }`}
+                          >
+                            <span>
+                              ${(formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))).toFixed(2)}
+                            </span>
+                            {(formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))) > 0 ? (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-sans">
+                                Pendiente
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-900 font-sans">
+                                Pagado
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
 
                 {/* Factura y Ticket (2 datos seguidos en una fila) */}
                 <div className="grid grid-cols-2 gap-2">
@@ -2340,22 +2754,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                    Placa
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.placa}
-                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
-                    placeholder="KX284T"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Placa
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.placa}
+                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                      placeholder="KX284T"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Color
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.color}
+                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                      placeholder="Negro / Rojo"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                    Chasis (VIN)
+                    Serie o Chasis (VIN)
                   </label>
                   <input
                     type="text"
@@ -2503,43 +2931,160 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                      Valor ($) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorServicio}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, valorServicio: val, montoPagado: val });
-                      }}
-                      className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
-                    />
+                {formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                    <span className="text-xs text-blue-900 font-bold">
+                      Alistamiento PDI es un servicio oficial previo a la venta. No genera cobro directo al cliente ($0.00).
+                    </span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                      Método
-                    </label>
-                    <select
-                      value={formData.metodoPago}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          metodoPago: e.target.value as AlistamientoFullRecord['metodoPago'],
-                        })
-                      }
-                      className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
-                    >
-                      <option value="Efectivo">Efectivo</option>
-                      <option value="Transferencia">Transferencia</option>
-                      <option value="Tarjeta">Tarjeta</option>
-                      <option value="Crédito Directo">Crédito</option>
-                    </select>
+                ) : (
+                  <div className="space-y-2.5 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Valor ($) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.valorServicio}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setFormData((prev) => ({
+                              ...prev,
+                              valorServicio: val,
+                              abono: prev.esCredito ? 0 : ((prev.abono ?? 0) > val ? val : prev.abono),
+                            }));
+                          }}
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Método
+                        </label>
+                        <select
+                          value={formData.metodoPago}
+                          onChange={(e) => {
+                            const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
+                            const isCred = newMetodo === 'Crédito Directo';
+                            setFormData((prev) => ({
+                              ...prev,
+                              metodoPago: newMetodo,
+                              esCredito: isCred ? true : prev.esCredito,
+                              abono: isCred ? 0 : prev.abono,
+                            }));
+                          }}
+                          className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                          <option value="Crédito Directo">Crédito Directo</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? 'Crédito' : 'Abono ($)'}
+                        </label>
+                        {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? (
+                          <div className="h-8 px-2.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
+                            <span>Total a Crédito</span>
+                            <span>${formData.valorServicio.toFixed(2)}</span>
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={formData.valorServicio}
+                            value={formData.abono ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setFormData((prev) => ({
+                                ...prev,
+                                abono: val,
+                                montoPagado: val,
+                              }));
+                            }}
+                            placeholder="0.00"
+                            className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800"
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-zinc-500 mb-1">
+                          Pendiente por Cobrar
+                        </label>
+                        <div className="h-8 px-2.5 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
+                          <span
+                            className={
+                              (formData.esCredito || formData.metodoPago === 'Crédito Directo'
+                                ? formData.valorServicio
+                                : Math.max(0, formData.valorServicio - (formData.abono ?? 0))) > 0
+                                ? 'text-amber-600'
+                                : 'text-emerald-600'
+                            }
+                          >
+                            $
+                            {(formData.esCredito || formData.metodoPago === 'Crédito Directo'
+                              ? formData.valorServicio
+                              : Math.max(0, formData.valorServicio - (formData.abono ?? 0))
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-between border-t border-emerald-100">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={formData.esCredito}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev) => ({
+                              ...prev,
+                              esCredito: checked,
+                              metodoPago: checked
+                                ? 'Crédito Directo'
+                                : prev.metodoPago === 'Crédito Directo'
+                                ? 'Efectivo'
+                                : prev.metodoPago,
+                              abono: checked ? 0 : prev.abono || 0,
+                            }));
+                          }}
+                          className="w-3.5 h-3.5 text-blue-600 rounded cursor-pointer"
+                        />
+                        <span className="text-[11px] font-bold text-zinc-800">Crédito Directo</span>
+                      </label>
+
+                      {(formData.esCredito || formData.metodoPago === 'Crédito Directo') && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-zinc-500 font-medium">Plazo:</span>
+                          <select
+                            value={formData.mesesCredito}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) }))
+                            }
+                            className="h-7 px-2 bg-white border border-zinc-300 rounded-lg text-xs font-bold"
+                          >
+                            <option value={1}>1 mes</option>
+                            <option value={2}>2 meses</option>
+                            <option value={3}>3 meses</option>
+                            <option value={6}>6 meses</option>
+                            <option value={12}>12 meses</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <div className="flex items-center justify-between mb-1">

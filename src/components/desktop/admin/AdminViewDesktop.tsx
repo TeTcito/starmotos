@@ -66,6 +66,7 @@ interface Props {
   onDeleteClient?: (idOrCedula: string) => void;
   onDeleteWarranty?: (id: string) => void;
   onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onUpdateWarranty?: (updated: WarrantyRequest) => void;
   onQuickUpdateWarrantyStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
   onDeleteAlert?: (id: string) => void;
   onDeleteAllReadAlerts?: () => void;
@@ -107,6 +108,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onDeleteClient,
   onDeleteWarranty,
   onCreateWarranty,
+  onUpdateWarranty,
   onQuickUpdateWarrantyStatus,
   onDeleteAlert,
   onDeleteAllReadAlerts,
@@ -397,6 +399,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 onSendToGarante={onSendToGarante}
                 onCompleteRepair={onCompleteRepair}
                 onCreateWarranty={onCreateWarranty}
+                onUpdateWarranty={onUpdateWarranty}
                 onDeleteWarranty={onDeleteWarranty}
                 onQuickUpdateStatus={onQuickUpdateWarrantyStatus}
               />

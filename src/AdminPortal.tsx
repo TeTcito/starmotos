@@ -41,6 +41,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     deleteClient,
     deleteWarranty,
     createWarrantyRequest,
+    updateWarranty,
     quickUpdateWarrantyStatus,
     deleteAlert,
     deleteAllReadAlerts,
@@ -69,6 +70,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onSendToGarante={sendWarrantyToGarante}
           onCompleteRepair={completeWarrantyRepair}
           onCreateWarranty={createWarrantyRequest}
+          onUpdateWarranty={updateWarranty}
           onDeleteWarranty={deleteWarranty}
           onQuickUpdateWarrantyStatus={quickUpdateWarrantyStatus}
           alerts={alerts}

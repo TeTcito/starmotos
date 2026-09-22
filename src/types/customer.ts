@@ -291,6 +291,7 @@ export type GaranteSection =
 export type WarrantyRequestStatus =
   | 'en_revision'
   | 'en_proceso'
+  | 'en_proceso_aceptacion_2'
   | 'aceptada'
   | 'denegada'
   | 'enviada_matriz'
@@ -313,13 +314,21 @@ export interface WarrantyRequest {
   motorcyclePlate: string;
   motorcycleVin: string;
   motorcycleMileage?: number;
-  warrantyType: 'marca' | 'plus_taller' | 'gps';
+  motorNumber?: string;
+  ramvNumber?: string;
+  warrantyType: 'marca' | 'plus_taller' | 'gps' | string;
   issueDescription: string;
   diagnosticPhotos: string[];
   status: WarrantyRequestStatus;
   tallerOrigin: string;
   tallerOriginId: string;
   partsRequired?: string;
+  partsTags?: string[];
+  resolutionType?: 'encargar_taller' | 'envio_repuesto';
+  partsBudget?: Record<string, number> | Array<{ name: string; cost: number }>;
+  laborTime?: string;
+  laborCost?: number;
+  totalBudget?: number;
   mechanicDiagnosis?: string;
   matrizNotes?: string;
   garanteNotes?: string;
@@ -379,6 +388,8 @@ export interface AlistamientoFullRecord {
   // Paso 2: Datos de la moto
   motoPreviaId?: string;
   chasis: string; // VIN
+  numeroMotor?: string;
+  ramv?: string;
   placa: string;
   modeloMarca: string;
   color?: string;
@@ -395,6 +406,10 @@ export interface AlistamientoFullRecord {
   numeroTicket: string;
   valorServicio: number;
   montoPagado: number;
+  abono?: number;
+  saldoPendiente?: number;
+  esCredito?: boolean;
+  mesesCredito?: number;
   metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito Directo';
   observaciones: string;
   proximoMantenimientoKm: number;
@@ -498,6 +513,8 @@ export interface TallerClient {
   motorcycleModel: string;
   motorcyclePlate: string;
   motorcycleVin?: string;
+  motorNumber?: string;
+  ramvNumber?: string;
   motorcycleMileage?: number;
   address?: string;
   color?: string;

@@ -51,8 +51,8 @@ interface Props {
   setIsActionModalOpen: (open: boolean) => void;
   actionType: 'aprobar' | 'rechazar';
   onOpenDecisionModal: (warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => void;
-  onApproveWarranty: () => void;
-  onRejectWarranty: () => void;
+  onApproveWarranty: (idOverride?: string, notesOverride?: string, resolutionTypeOverride?: 'encargar_taller' | 'envio_repuesto') => void;
+  onRejectWarranty: (idOverride?: string, reasonOverride?: string) => void;
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
@@ -275,7 +275,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={actionType === 'aprobar' ? onApproveWarranty : onRejectWarranty}
+                onClick={actionType === 'aprobar' ? () => onApproveWarranty() : () => onRejectWarranty()}
                 className={`flex-1 py-1.5 text-white rounded-lg text-xs font-bold ${
                   actionType === 'aprobar' ? 'bg-emerald-600' : 'bg-red-600'
                 }`}

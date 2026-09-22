@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import {
   GaranteSection,
   WarrantyRequest,
+  WarrantyRequestStatus,
   GaranteProfile,
   SystemAlert,
 } from '../types/customer';
@@ -161,10 +162,10 @@ export function useGarantePortal() {
     );
   }, [warranties]);
 
-  // Historial (aceptada, aprobada, denegada, rechazada, completada)
+  // Historial (aceptada, aprobada, denegada, rechazada, completada, en_proceso_aceptacion_2)
   const historyRequests = useMemo(() => {
     return warranties.filter((w) =>
-      ['aceptada', 'aprobada', 'denegada', 'rechazada', 'completada'].includes(w.status)
+      ['aceptada', 'aprobada', 'denegada', 'rechazada', 'completada', 'en_proceso_aceptacion_2'].includes(w.status)
     );
   }, [warranties]);
 
@@ -178,18 +179,25 @@ export function useGarantePortal() {
   }, []);
 
   // Aprobar solicitud
-  const approveWarranty = useCallback((idOverride?: string, notesOverride?: string) => {
+  const approveWarranty = useCallback((
+    idOverride?: string,
+    notesOverride?: string,
+    resolutionTypeOverride?: 'encargar_taller' | 'envio_repuesto'
+  ) => {
     const targetWarranty = idOverride ? warranties.find((w) => w.id === idOverride) : selectedWarranty;
     if (!targetWarranty) return;
 
     const finalNotes = notesOverride || reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.';
+    const finalResolution = resolutionTypeOverride || targetWarranty.resolutionType || 'envio_repuesto';
+    const newStatus: WarrantyRequestStatus = finalResolution === 'encargar_taller' ? 'en_proceso_aceptacion_2' : 'aceptada';
 
     setWarranties((prev) => {
       const updated = prev.map((w) =>
         w.id === targetWarranty.id
           ? {
               ...w,
-              status: 'aceptada' as const,
+              status: newStatus,
+              resolutionType: finalResolution,
               garanteNotes: finalNotes,
               approvedAt: 'Hoy, Autorización Digital Garante de Marca',
             }
@@ -203,8 +211,10 @@ export function useGarantePortal() {
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'garantia_aprobada',
-      title: 'Garantía Aprobada por Garante de Marca',
-      message: `El Garante oficial autorizó la cobertura de la solicitud ${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand} ${targetWarranty.motorcycleModel}). Procede a Matriz y Taller.`,
+      title: finalResolution === 'encargar_taller'
+        ? 'Garantía Encargada a Taller (Aceptación 2)'
+        : 'Garantía Aprobada por Garante de Marca',
+      message: `El Garante oficial autorizó la cobertura de la solicitud ${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand} ${targetWarranty.motorcycleModel}). Resolución: ${finalResolution === 'encargar_taller' ? 'Encargar a Taller' : 'Envío de Repuestos'}. Procede a Matriz y Taller.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: targetWarranty.id,
@@ -215,11 +225,16 @@ export function useGarantePortal() {
       particleCount: 75,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#16a34a', '#2563eb', '#ffffff'],
+      colors: ['#16a34a', '#2563eb', '#6366f1'],
     });
 
     setIsActionModalOpen(false);
-    showToast(`Garantía ${targetWarranty.requestNumber} ACEPTADA con éxito. Notificado a Matriz y Taller.`, 'success');
+    showToast(
+      finalResolution === 'encargar_taller'
+        ? `Garantía ${targetWarranty.requestNumber} procesada: ENCARGADA A TALLER (Aceptación 2).`
+        : `Garantía ${targetWarranty.requestNumber} ACEPTADA: Envío de Repuesto.`,
+      'success'
+    );
   }, [selectedWarranty, reviewNotes, warranties, showToast]);
 
   // Rechazar solicitud

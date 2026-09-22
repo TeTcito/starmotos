@@ -42,7 +42,7 @@ import {
   getStoredOrders,
   getStoredInventory,
 } from '../data/mockMultiRoleData';
-
+import { cloudSaveWarranty } from '../services/supabaseService';
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   'talleres',
@@ -333,6 +333,24 @@ export function useAdminPortal() {
     });
     deleteStoredWarranty(id);
     showToast('Solicitud de garantía eliminada.', 'info');
+  }, [showToast]);
+
+  // Actualizar datos completos de garantía (edición y presupuesto)
+  const updateWarranty = useCallback((updatedReq: WarrantyRequest) => {
+    setWarranties((prev) => {
+      const exists = prev.some((w) => w.id === updatedReq.id);
+      const updated = exists
+        ? prev.map((w) => (w.id === updatedReq.id ? updatedReq : w))
+        : [updatedReq, ...prev];
+      saveStoredWarranties(updated);
+      return updated;
+    });
+    try {
+      cloudSaveWarranty(updatedReq);
+    } catch (e) {
+      console.warn('Error saving warranty to cloud', e);
+    }
+    showToast(`Solicitud ${updatedReq.requestNumber} actualizada con éxito.`, 'success');
   }, [showToast]);
 
   // Cambio rápido de estado con observación del Administrador
@@ -722,6 +740,7 @@ export function useAdminPortal() {
     showToast,
     // Garantías
     createWarrantyRequest,
+    updateWarranty,
     deleteWarranty,
     quickUpdateWarrantyStatus,
     validateWarrantyByMatriz,

@@ -492,8 +492,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             <input
               type="text"
               value={formData.tallerOrigin}
-              onChange={(e) => setFormData({ ...formData, tallerOrigin: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white"
+              readOnly
+              className="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 outline-none cursor-not-allowed select-none"
             />
           </div>
 

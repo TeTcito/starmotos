@@ -12,6 +12,7 @@ import {
   UserCheck,
   ArrowLeft,
   Bell,
+  Building2,
 } from 'lucide-react';
 import {
   TallerSection,
@@ -59,6 +60,8 @@ interface Props {
   onMarkAllAlertsAsRead: () => void;
   onDeleteAlert?: (id: string) => void;
   onDeleteAllReadAlerts?: () => void;
+  currentWorkshop?: Workshop;
+  onUpdateWorkshop?: (updated: Partial<Workshop>) => void;
 }
 
 export const TallerViewDesktop: React.FC<Props> = ({
@@ -85,15 +88,14 @@ export const TallerViewDesktop: React.FC<Props> = ({
   onMarkAllAlertsAsRead,
   onDeleteAlert,
   onDeleteAllReadAlerts,
+  currentWorkshop,
 }) => {
-  const [activeWorkshopId, setActiveWorkshopId] = React.useState<string>(() => {
-    return localStorage.getItem('starmotos_taller_active_ws') || 'taller-quevedo';
-  });
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
 
   const currentWs =
-    workshops.find((w) => w.id === activeWorkshopId) ||
-    workshops.find((w) => w.id === 'taller-quevedo') ||
+    currentWorkshop ||
+    workshops.find((w) => w.id === localStorage.getItem('starmotos_taller_active_ws')) ||
+    workshops.find((w) => w.id === 'matriz-la-mana') ||
     workshops[0];
 
   const tallerTechs = technicians.filter(
@@ -218,25 +220,27 @@ export const TallerViewDesktop: React.FC<Props> = ({
       {/* 2. BODY */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         <aside className="w-72 shrink-0 h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between z-20 select-none shadow-xs">
-          {/* Selector de Sucursal Activa */}
-          <div className="shrink-0 p-3 bg-white/50 border-b border-[#b8d1ea]">
-            <label className="text-[10px] font-extrabold uppercase tracking-wider text-blue-950/80 block mb-1">
-              Sucursal Activa ({workshops.length} sedes):
-            </label>
-            <select
-              value={currentWs.id}
-              onChange={(e) => {
-                setActiveWorkshopId(e.target.value);
-                localStorage.setItem('starmotos_taller_active_ws', e.target.value);
-              }}
-              className="w-full text-xs font-bold bg-white border border-blue-400/80 rounded-xl px-2.5 py-1.5 text-zinc-900 shadow-xs cursor-pointer focus:ring-2 focus:ring-blue-600 focus:outline-none"
-            >
-              {workshops.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name} — {w.province || w.city}
-                </option>
-              ))}
-            </select>
+          {/* Sede Oficial Asignada - Acceso Exclusivo de Taller */}
+          <div className="shrink-0 p-3 bg-white/70 border-b border-[#b8d1ea]">
+            <div className="flex items-center justify-between text-blue-950 mb-1">
+              <div className="flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-700" />
+                <span className="text-[10px] font-black uppercase tracking-wider">
+                  Sede Oficial Asignada
+                </span>
+              </div>
+              <span className="px-1.5 py-0.5 text-[8px] font-black bg-blue-100 text-blue-800 rounded uppercase">
+                Exclusivo
+              </span>
+            </div>
+            <div className="p-2.5 bg-white rounded-xl border border-blue-200/80 shadow-2xs">
+              <h5 className="text-xs font-black text-zinc-900 truncate">
+                {currentWs.name}
+              </h5>
+              <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                Código: {currentWs.code} • {currentWs.city}
+              </p>
+            </div>
           </div>
 
           {/* Info Jefe de Taller */}

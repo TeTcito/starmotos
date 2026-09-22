@@ -69,6 +69,8 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           onMarkAllAlertsAsRead={markAllAlertsAsRead}
           onDeleteAlert={deleteAlert}
           onDeleteAllReadAlerts={deleteAllReadAlerts}
+          currentWorkshop={currentWorkshop}
+          onUpdateWorkshop={updateWorkshopProfile}
         />
       ) : (
         <TallerViewMobile

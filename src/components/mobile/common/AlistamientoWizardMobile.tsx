@@ -70,6 +70,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   recentRecords = [],
   viewMode: externalViewMode,
   onViewModeChange,
+  isMatriz = false,
 }) => {
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
@@ -1533,10 +1534,46 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Próximo Mantenimiento Sugerido</label>
-                    <div className="px-2.5 py-1.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs font-mono font-bold text-blue-700 flex items-center justify-between">
-                      <span>A los {detailFormData.proximoMantenimientoKm || 1000} km</span>
-                      <span className="text-[10px] font-sans font-normal text-blue-600">Sugerido</span>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[11px] font-bold text-zinc-700">Próximo Mantenimiento Sugerido</label>
+                      <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={detailFormData.proximoMantenimientoKm || ''}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                          setDetailFormData({
+                            ...detailFormData,
+                            proximoMantenimientoKm: isNaN(val) ? 0 : val,
+                          });
+                        }}
+                        placeholder="Ej: 1000"
+                        className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                        KM
+                      </span>
+                    </div>
+                    {/* Botones de sugerencias rápidas */}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-zinc-500 font-semibold">Sugeridos:</span>
+                      {[1000, 2500, 3000, 5000].map((km) => (
+                        <button
+                          key={km}
+                          type="button"
+                          onClick={() => setDetailFormData({ ...detailFormData, proximoMantenimientoKm: km })}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                            detailFormData.proximoMantenimientoKm === km
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
+                          }`}
+                        >
+                          {km.toLocaleString()} km
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -2118,25 +2155,31 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Sede / Taller</label>
-                  <select
-                    value={formData.sede}
-                    onChange={(e) => {
-                      const sName = e.target.value;
-                      const sObj = workshops.find((w) => w.name === sName);
-                      setFormData({
-                        ...formData,
-                        sede: sName,
-                        sedeId: sObj?.id || defaultSedeId,
-                      });
-                    }}
-                    className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
-                  >
-                    {workshops.map((w) => (
-                      <option key={w.id} value={w.name}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
+                  {isMatriz ? (
+                    <select
+                      value={formData.sede}
+                      onChange={(e) => {
+                        const sName = e.target.value;
+                        const sObj = workshops.find((w) => w.name === sName);
+                        setFormData({
+                          ...formData,
+                          sede: sName,
+                          sedeId: sObj?.id || defaultSedeId,
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                    >
+                      {workshops.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-800 truncate">
+                      {formData.sede || defaultSede}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2712,6 +2755,53 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     placeholder="TCK-2026-..."
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono"
                   />
+                </div>
+              </div>
+
+              {/* Próximo Mantenimiento Sugerido */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                    Próximo Mantenimiento Sugerido
+                  </label>
+                  <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.proximoMantenimientoKm || ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                      setFormData({
+                        ...formData,
+                        proximoMantenimientoKm: isNaN(val) ? 0 : val,
+                      });
+                    }}
+                    placeholder="Ej: 1000"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                    KM
+                  </span>
+                </div>
+                {/* Botones de sugerencias rápidas */}
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] text-zinc-500 font-semibold">Sugeridos:</span>
+                  {[1000, 2500, 3000, 5000].map((km) => (
+                    <button
+                      key={km}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, proximoMantenimientoKm: km })}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                        formData.proximoMantenimientoKm === km
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
+                      }`}
+                    >
+                      {km.toLocaleString()} km
+                    </button>
+                  ))}
                 </div>
               </div>
 

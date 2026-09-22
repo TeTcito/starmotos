@@ -28,9 +28,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'William Daniel Meza Chicaiza (Gerente)',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 8,
-    completedToday: 5,
-    pendingWarranties: 2,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 6,
   },
   {
@@ -47,9 +47,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Buena Fe',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 4,
-    completedToday: 3,
-    pendingWarranties: 1,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 3,
   },
   {
@@ -66,8 +66,8 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Balzar',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 3,
-    completedToday: 2,
+    activeOrders: 0,
+    completedToday: 0,
     pendingWarranties: 0,
     mechanics: 2,
   },
@@ -85,9 +85,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller El Carmen',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 6,
-    completedToday: 4,
-    pendingWarranties: 1,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 4,
   },
   {
@@ -104,9 +104,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Daniel Meza Quevedo',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 7,
-    completedToday: 5,
-    pendingWarranties: 2,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 5,
   },
   {
@@ -123,8 +123,8 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Moraspungo',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 2,
-    completedToday: 2,
+    activeOrders: 0,
+    completedToday: 0,
     pendingWarranties: 0,
     mechanics: 2,
   },
@@ -142,9 +142,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Mocache',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 3,
-    completedToday: 3,
-    pendingWarranties: 1,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 2,
   },
   {
@@ -161,8 +161,8 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Quinzaloma',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 2,
-    completedToday: 1,
+    activeOrders: 0,
+    completedToday: 0,
     pendingWarranties: 0,
     mechanics: 2,
   },
@@ -180,9 +180,9 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Portoviejo',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 5,
-    completedToday: 4,
-    pendingWarranties: 1,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 4,
   },
   {
@@ -199,8 +199,8 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller Ricaurte',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 2,
-    completedToday: 2,
+    activeOrders: 0,
+    completedToday: 0,
     pendingWarranties: 0,
     mechanics: 2,
   },
@@ -218,412 +218,30 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     manager: 'Jefe de Taller El Empalme',
     email: 'starsmotor17@gmail.com',
     status: 'operativo',
-    activeOrders: 4,
-    completedToday: 3,
-    pendingWarranties: 1,
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
     mechanics: 3,
   },
 ];
 
-// --- Solicitudes de Garantía Iniciales (En los distintos estados de la máquina de estados) ---
-export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [
-  {
-    id: 'gar-001',
-    requestNumber: 'GAR-2026-0042',
-    createdAt: '21 Sep 2026, 09:30 AM',
-    clientName: 'Fernando Vaca',
-    clientIdNumber: '1724890123',
-    motorcycleBrand: 'Benelli',
-    motorcycleModel: 'TRK 502X ABS',
-    motorcyclePlate: 'PBX-8492',
-    motorcycleVin: 'LBBP57008PA049182',
-    warrantyType: 'marca',
-    issueDescription: 'Fallo en sensor de presión de aceite y ligera fuga en retenedor de barra delantera izquierda con solo 14,850 km.',
-    diagnosticPhotos: [
-      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=600&q=80',
-    ],
-    status: 'enviada_matriz',
-    tallerOrigin: 'StarMotos Express Norte',
-    tallerOriginId: 'taller-norte',
-    estimatedCost: 185.0,
-    invoiceNumber: 'FAC-002-001-0003421',
-  },
-  {
-    id: 'gar-002',
-    requestNumber: 'GAR-2026-0041',
-    createdAt: '20 Sep 2026, 14:15 PM',
-    clientName: 'Esteban Paredes Moreno',
-    clientIdNumber: '1718903452',
-    motorcycleBrand: 'CFMOTO',
-    motorcycleModel: '450MT Adventure',
-    motorcyclePlate: 'PCW-9021',
-    motorcycleVin: 'LC6PC8901PA112390',
-    warrantyType: 'marca',
-    issueDescription: 'Pantalla TFT TFT parpadea en frío y pierde sincronización Bluetooth con switch encendido.',
-    diagnosticPhotos: [
-      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-    ],
-    status: 'enviada_garante',
-    tallerOrigin: 'StarMotos Matriz La Maná',
-    tallerOriginId: 'matriz-la-mana',
-    matrizNotes: 'Validado por Ing. Enríquez. Diagnóstico electrónico confirma código de error CAN-Bus B102. Aplica garantía de fábrica.',
-    estimatedCost: 320.0,
-    invoiceNumber: 'FAC-001-002-0008891',
-  },
-  {
-    id: 'gar-003',
-    requestNumber: 'GAR-2026-0040',
-    createdAt: '19 Sep 2026, 11:00 AM',
-    clientName: 'Lucía Santillán Mora',
-    clientIdNumber: '1715678901',
-    motorcycleBrand: 'Royal Enfield',
-    motorcycleModel: 'Himalayan 450 Sherpa',
-    motorcyclePlate: 'PDJ-4431',
-    motorcycleVin: 'ME3HIM450PA778812',
-    warrantyType: 'plus_taller',
-    issueDescription: 'Juego excesivo en rodamiento de dirección y ajuste de kit de pernos reforzado StarMotos Plus.',
-    diagnosticPhotos: [
-      'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80',
-    ],
-    status: 'aprobada',
-    tallerOrigin: 'StarMotos Valle de Cumbayá',
-    tallerOriginId: 'taller-cumbaya',
-    matrizNotes: 'Cubierto al 100% por Póliza Garantía Plus StarMotos.',
-    garanteNotes: 'Aprobación autorizada por Gerencia de Garantías Benelli/CFMOTO Ecuador.',
-    approvedAt: '20 Sep 2026, 16:30 PM',
-    estimatedCost: 95.0,
-    invoiceNumber: 'FAC-003-001-0001209',
-  },
-  {
-    id: 'gar-004',
-    requestNumber: 'GAR-2026-0039',
-    createdAt: '18 Sep 2026, 16:45 PM',
-    clientName: 'Jorge Vinicio Caicedo',
-    clientIdNumber: '0923456781',
-    motorcycleBrand: 'Bajaj',
-    motorcycleModel: 'Dominar 400 UG',
-    motorcyclePlate: 'GLR-7721',
-    motorcycleVin: 'MD2DOMIN4PA456711',
-    warrantyType: 'gps',
-    issueDescription: 'Dispositivo GPS Satelital StarMotos con batería de respaldo degradada y pérdida de señal en túneles prolongados.',
-    diagnosticPhotos: [
-      'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80',
-    ],
-    status: 'completada',
-    tallerOrigin: 'StarMotos Matriz La Maná',
-    tallerOriginId: 'matriz-la-mana',
-    matrizNotes: 'Módulo GPS reemplazado con unidad 4G LTE homologada Arcotel.',
-    garanteNotes: 'Proveedor Satelital autorizó recambio inmediato.',
-    approvedAt: '19 Sep 2026, 10:00 AM',
-    estimatedCost: 120.0,
-    invoiceNumber: 'FAC-001-002-0008740',
-  },
-  {
-    id: 'gar-005',
-    requestNumber: 'GAR-2026-0038',
-    createdAt: '17 Sep 2026, 10:20 AM',
-    clientName: 'Diego Sebastián Viteri',
-    clientIdNumber: '1709845123',
-    motorcycleBrand: 'KTM',
-    motorcycleModel: '390 Adventure',
-    motorcyclePlate: 'PDI-1190',
-    motorcycleVin: 'VBK390ADVPA889921',
-    warrantyType: 'marca',
-    issueDescription: 'Reclamo por desgaste de pastillas a los 3,000 km tras caída en off-road.',
-    diagnosticPhotos: [
-      'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=600&q=80',
-    ],
-    status: 'rechazada',
-    tallerOrigin: 'StarMotos Express Norte',
-    tallerOriginId: 'taller-norte',
-    matrizNotes: 'Elevado al garante con informe de inspección técnica.',
-    garanteNotes: 'Rechazado: El daño obedece a impacto físico y contaminación externa con lodo/arena, no defecto de fábrica.',
-    rejectedAt: '18 Sep 2026, 14:00 PM',
-    rejectionReason: 'Uso indebido fuera de especificación y daño por impacto externo.',
-    estimatedCost: 75.0,
-  },
-];
+// --- Solicitudes de Garantía Iniciales ---
+export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [];
 
 // --- Alertas del Sistema ---
-export const INITIAL_ALERTS: SystemAlert[] = [
-  {
-    id: 'alt-01',
-    type: 'orden_creada',
-    title: 'Nueva Orden de Alistamiento',
-    message: 'Se ha registrado el alistamiento de la moto Benelli TRK 502X (PBX-8492) en Matriz.',
-    timestamp: 'Hace 15 minutos',
-    read: false,
-    relatedId: 'OT-2026-0841',
-  },
-  {
-    id: 'alt-02',
-    type: 'garantia_aprobada',
-    title: 'Garantía Aprobada por Garante',
-    message: 'El Garante oficial Benelli aprobó la solicitud GAR-2026-0040 por $95.00 USD.',
-    timestamp: 'Hace 1 hora',
-    read: false,
-    relatedId: 'GAR-2026-0040',
-  },
-  {
-    id: 'alt-03',
-    type: 'estado_cambiado',
-    title: 'Taller Norte Operatividad',
-    message: 'Taller Express Norte completó 3 mantenimientos preventivos hoy.',
-    timestamp: 'Hace 3 horas',
-    read: true,
-  },
-  {
-    id: 'alt-04',
-    type: 'factura_emitida',
-    title: 'Factura SRI Autorizada',
-    message: 'Comprobante FAC-001-002-0008891 emitido con éxito al SRI (Clave de acceso generada).',
-    timestamp: 'Ayer, 18:30 PM',
-    read: true,
-  },
-];
+export const INITIAL_ALERTS: SystemAlert[] = [];
 
 // --- Facturas Administrador SRI ---
-export const INITIAL_INVOICES: AdminInvoice[] = [
-  {
-    id: 'inv-101',
-    invoiceNumber: '001-002-0008891',
-    clientName: 'Fernando Vaca',
-    clientIdNumber: '1724890123',
-    date: '20 Sep 2026',
-    subtotal: 260.0,
-    iva: 39.0,
-    total: 299.0,
-    status: 'emitida',
-    workshopName: 'StarMotos Matriz Central',
-  },
-  {
-    id: 'inv-102',
-    invoiceNumber: '001-002-0008890',
-    clientName: 'Esteban Paredes Moreno',
-    clientIdNumber: '1718903452',
-    date: '20 Sep 2026',
-    subtotal: 120.0,
-    iva: 18.0,
-    total: 138.0,
-    status: 'emitida',
-    workshopName: 'StarMotos Matriz Central',
-  },
-  {
-    id: 'inv-103',
-    invoiceNumber: '002-001-0003421',
-    clientName: 'Camila Torres Vega',
-    clientIdNumber: '1723456789',
-    date: '19 Sep 2026',
-    subtotal: 85.0,
-    iva: 12.75,
-    total: 97.75,
-    status: 'emitida',
-    workshopName: 'StarMotos Express Norte',
-  },
-  {
-    id: 'inv-104',
-    invoiceNumber: '003-001-0001209',
-    clientName: 'Lucía Santillán Mora',
-    clientIdNumber: '1715678901',
-    date: '19 Sep 2026',
-    subtotal: 145.0,
-    iva: 21.75,
-    total: 166.75,
-    status: 'emitida',
-    workshopName: 'StarMotos Valle de Cumbayá',
-  },
-  {
-    id: 'inv-105',
-    invoiceNumber: '001-002-0008889',
-    clientName: 'Transportes Rápidos Pichincha Cía. Ltda.',
-    clientIdNumber: '1792345678001',
-    date: '18 Sep 2026',
-    subtotal: 450.0,
-    iva: 67.5,
-    total: 517.5,
-    status: 'emitida',
-    workshopName: 'StarMotos Matriz Central',
-  },
-];
+export const INITIAL_INVOICES: AdminInvoice[] = [];
 
 // --- Inventario Taller ---
-export const INITIAL_INVENTORY: InventoryItem[] = [
-  {
-    id: 'inv-01',
-    code: 'LUB-MOT-7100',
-    name: 'Aceite Sintético Motul 7100 10W-40 4T (1L)',
-    brand: 'Motul',
-    category: 'Lubricantes',
-    stock: 48,
-    minStock: 15,
-    unitPrice: 16.5,
-    lastRestocked: '18 Sep 2026',
-  },
-  {
-    id: 'inv-02',
-    code: 'LUB-MOT-5100',
-    name: 'Aceite Semi-Sintético Motul 5100 15W-50 4T',
-    brand: 'Motul',
-    category: 'Lubricantes',
-    stock: 32,
-    minStock: 12,
-    unitPrice: 13.0,
-    lastRestocked: '15 Sep 2026',
-  },
-  {
-    id: 'inv-03',
-    code: 'FIL-BEN-OEM',
-    name: 'Filtro de Aceite Benelli TRK 502 / Leoncino',
-    brand: 'Benelli OEM',
-    category: 'Filtros',
-    stock: 14,
-    minStock: 8,
-    unitPrice: 14.5,
-    lastRestocked: '20 Sep 2026',
-  },
-  {
-    id: 'inv-04',
-    code: 'BRK-BREM-02',
-    name: 'Juego Pastillas Delanteras Sinterizadas Benelli',
-    brand: 'Brembo',
-    category: 'Frenos',
-    stock: 6,
-    minStock: 10,
-    unitPrice: 24.0,
-    lastRestocked: '10 Sep 2026',
-  },
-  {
-    id: 'inv-05',
-    code: 'REP-REG-525',
-    name: 'Cadena Reforzada Regina O-Ring 525 120 Eslabones',
-    brand: 'Regina Italy',
-    category: 'Transmisión',
-    stock: 8,
-    minStock: 5,
-    unitPrice: 85.0,
-    lastRestocked: '12 Sep 2026',
-  },
-  {
-    id: 'inv-06',
-    code: 'GPS-STAR-4G',
-    name: 'Dispositivo GPS Satelital StarMotos 4G LTE',
-    brand: 'StarMotos GPS',
-    category: 'Electrónica',
-    stock: 18,
-    minStock: 6,
-    unitPrice: 95.0,
-    lastRestocked: '21 Sep 2026',
-  },
-];
+export const INITIAL_INVENTORY: InventoryItem[] = [];
 
 // --- Clientes del Taller ---
-export const INITIAL_TALLER_CLIENTS: TallerClient[] = [
-  {
-    id: 'tc-01',
-    fullName: 'Fernando Vaca',
-    idNumber: '1724890123',
-    phone: '+593 99 874 5612',
-    email: 'cliente@starmotos.ec',
-    motorcycleBrand: 'Benelli',
-    motorcycleModel: 'TRK 502X ABS',
-    motorcyclePlate: 'PBX-8492',
-    lastVisit: '20 Sep 2026',
-    totalVisits: 4,
-  },
-  {
-    id: 'tc-02',
-    fullName: 'Esteban Paredes Moreno',
-    idNumber: '1718903452',
-    phone: '+593 98 443 2190',
-    email: 'eparedes@gmail.com',
-    motorcycleBrand: 'CFMOTO',
-    motorcycleModel: '450MT Adventure',
-    motorcyclePlate: 'PCW-9021',
-    lastVisit: '20 Sep 2026',
-    totalVisits: 2,
-  },
-  {
-    id: 'tc-03',
-    fullName: 'Camila Torres Vega',
-    idNumber: '1723456789',
-    phone: '+593 99 112 3344',
-    email: 'ctorres@hotmail.com',
-    motorcycleBrand: 'Yamaha',
-    motorcycleModel: 'MT-03 ABS',
-    motorcyclePlate: 'IC-451K',
-    lastVisit: '19 Sep 2026',
-    totalVisits: 5,
-  },
-  {
-    id: 'tc-04',
-    fullName: 'Jorge Vinicio Caicedo',
-    idNumber: '0923456781',
-    phone: '+593 97 998 8776',
-    email: 'jorge.caicedo@ecuaexpress.com',
-    motorcycleBrand: 'Bajaj',
-    motorcycleModel: 'Dominar 400 UG',
-    motorcyclePlate: 'GLR-7721',
-    lastVisit: '18 Sep 2026',
-    totalVisits: 7,
-  },
-];
+export const INITIAL_TALLER_CLIENTS: TallerClient[] = [];
 
 // --- Órdenes de Taller Activas ---
-export const INITIAL_TALLER_ORDERS: TallerOrder[] = [
-  {
-    id: 'ord-01',
-    otNumber: 'OT-2026-0841',
-    clientName: 'Fernando Vaca',
-    clientIdNumber: '1724890123',
-    motorcycleInfo: 'Benelli TRK 502X ABS 2024',
-    plate: 'PBX-8492',
-    entryDate: '20 Sep 2026, 08:30 AM',
-    status: 'cotizacion_pendiente',
-    mechanicName: 'Carlos "Charly" Morales',
-    estimatedDelivery: 'Hoy, 17:00 PM',
-    totalCost: 299.0,
-  },
-  {
-    id: 'ord-02',
-    otNumber: 'OT-2026-0842',
-    clientName: 'Esteban Paredes Moreno',
-    clientIdNumber: '1718903452',
-    motorcycleInfo: 'CFMOTO 450MT Adventure 2024',
-    plate: 'PCW-9021',
-    entryDate: '20 Sep 2026, 11:15 AM',
-    status: 'en_reparacion',
-    mechanicName: 'David Carrera',
-    estimatedDelivery: 'Mañana, 12:00 PM',
-    totalCost: 138.0,
-  },
-  {
-    id: 'ord-03',
-    otNumber: 'OT-2026-0843',
-    clientName: 'Camila Torres Vega',
-    clientIdNumber: '1723456789',
-    motorcycleInfo: 'Yamaha MT-03 ABS 2023',
-    plate: 'IC-451K',
-    entryDate: '19 Sep 2026, 14:00 PM',
-    status: 'control_calidad',
-    mechanicName: 'Carlos "Charly" Morales',
-    estimatedDelivery: 'Hoy, 15:30 PM',
-    totalCost: 97.75,
-  },
-  {
-    id: 'ord-04',
-    otNumber: 'OT-2026-0840',
-    clientName: 'Mauricio Noboa',
-    clientIdNumber: '1708891234',
-    motorcycleInfo: 'KTM Duke 390 2022',
-    plate: 'PDF-3320',
-    entryDate: '19 Sep 2026, 09:00 AM',
-    status: 'lista_retiro',
-    mechanicName: 'Andrés Guano',
-    estimatedDelivery: 'Listo para retiro',
-    totalCost: 175.0,
-  },
-];
+export const INITIAL_TALLER_ORDERS: TallerOrder[] = [];
 
 // --- Perfil del Garante ---
 export const INITIAL_GARANTE_PROFILE: GaranteProfile = {
@@ -727,14 +345,30 @@ export function querySriMock(idNumber: string) {
 // GESTOR DE ALMACENAMIENTO COMPARTIDO (LOCALSTORAGE) PARA LA DEMO EN VIVO
 // =========================================================================
 
+// Limpieza automática de datos demo antiguos en navegadores existentes
+try {
+  const legacyKeys = [
+    'starmotos_shared_warranties',
+    'starmotos_shared_alerts',
+    'starmotos_shared_invoices',
+    'starmotos_shared_orders',
+    'starmotos_shared_clients',
+    'starmotos_shared_inventory',
+    'starmotos_shared_alistamientos',
+    'starmotos_shared_workshops_v3',
+    'starmotos_shared_technicians_v2',
+  ];
+  legacyKeys.forEach((k) => localStorage.removeItem(k));
+} catch (_) {}
+
 const STORAGE_KEYS = {
-  WARRANTIES: 'starmotos_shared_warranties',
-  WORKSHOPS: 'starmotos_shared_workshops_v3',
-  ALERTS: 'starmotos_shared_alerts',
-  INVOICES: 'starmotos_shared_invoices',
-  ORDERS: 'starmotos_shared_orders',
-  CLIENTS: 'starmotos_shared_clients',
-  INVENTORY: 'starmotos_shared_inventory',
+  WARRANTIES: 'starmotos_shared_warranties_v4',
+  WORKSHOPS: 'starmotos_shared_workshops_v4',
+  ALERTS: 'starmotos_shared_alerts_v4',
+  INVOICES: 'starmotos_shared_invoices_v4',
+  ORDERS: 'starmotos_shared_orders_v4',
+  CLIENTS: 'starmotos_shared_clients_v4',
+  INVENTORY: 'starmotos_shared_inventory_v4',
 };
 
 // Garantías
@@ -865,6 +499,15 @@ export function getStoredInventory(): InventoryItem[] {
   return INITIAL_INVENTORY;
 }
 
+export function saveStoredInventory(inventory: InventoryItem[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(inventory));
+    window.dispatchEvent(new Event('starmotos_inventory_updated'));
+  } catch (e) {
+    console.error('Error saving inventory to localStorage', e);
+  }
+}
+
 // ===================== TÉCNICOS =====================
 export const INITIAL_TECHNICIANS: Technician[] = [
   {
@@ -875,7 +518,7 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Mecánica Integral & Ajuste PDI',
     phone: '0982852456',
     status: 'activo',
-    activeOrdersCount: 2,
+    activeOrdersCount: 0,
   },
   {
     id: 'tec-02',
@@ -885,7 +528,7 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Diagnóstico Electrónico & Escáner Delphi',
     phone: '0939316698',
     status: 'activo',
-    activeOrdersCount: 4,
+    activeOrdersCount: 0,
   },
   {
     id: 'tec-03',
@@ -895,7 +538,7 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Inyección Electrónica & Frenos ABS',
     phone: '0939316698',
     status: 'activo',
-    activeOrdersCount: 3,
+    activeOrdersCount: 0,
   },
   {
     id: 'tec-04',
@@ -905,7 +548,7 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Suspensiones & Chasis Multimarca',
     phone: '0939317809',
     status: 'activo',
-    activeOrdersCount: 2,
+    activeOrdersCount: 0,
   },
   {
     id: 'tec-05',
@@ -915,7 +558,7 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Mantenimiento Preventivo & Lubricación',
     phone: '0939316698',
     status: 'activo',
-    activeOrdersCount: 1,
+    activeOrdersCount: 0,
   },
   {
     id: 'tec-06',
@@ -925,13 +568,13 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     specialty: 'Auditoría Técnica PDI & Gestión Matriz',
     phone: '0939317809',
     status: 'activo',
-    activeOrdersCount: 2,
+    activeOrdersCount: 0,
   },
 ];
 
 export function getStoredTechnicians(): Technician[] {
   try {
-    const stored = localStorage.getItem('starmotos_shared_technicians_v2');
+    const stored = localStorage.getItem('starmotos_shared_technicians_v4');
     if (stored) return JSON.parse(stored);
   } catch (e) {
     console.error('Error reading technicians from localStorage', e);
@@ -941,7 +584,7 @@ export function getStoredTechnicians(): Technician[] {
 
 export function saveStoredTechnicians(technicians: Technician[]) {
   try {
-    localStorage.setItem('starmotos_shared_technicians_v2', JSON.stringify(technicians));
+    localStorage.setItem('starmotos_shared_technicians_v4', JSON.stringify(technicians));
     window.dispatchEvent(new Event('starmotos_technicians_updated'));
   } catch (e) {
     console.error('Error saving technicians to localStorage', e);
@@ -987,78 +630,11 @@ export function saveStoredOrigins(origins: string[]) {
 }
 
 // ===================== REGISTROS COMPLETOS DE ALISTAMIENTO =====================
-export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [
-  {
-    id: 'als-001',
-    atendidoPor: 'Daniel Meza Quevedo',
-    sede: 'StarMotos Sede Quevedo',
-    sedeId: 'taller-quevedo',
-    fechaServicio: '2026-09-21',
-    nombres: 'Felix Rafael',
-    apellidos: 'Gracia Guato',
-    cedulaRuc: '2350999252',
-    celular1: '0982852456',
-    email: 'felix.graciag.r@gmail.com',
-    direccion: 'Quevedo Av.quito frente a la planta de agua',
-    origen: 'almacen Tenso santo domingo',
-    chasis: 'LBBP57008PA049182',
-    placa: 'KX284T',
-    modeloMarca: 'Tundra r200',
-    serviciosRealizados: ['alistamiento_pdi', 'engrasado'],
-    tecnicoResponsable: 'WILLIAM MEZA',
-    tecnicoId: 'tec-01',
-    kilometraje: 450,
-    aceite: 'sin_aceite',
-    numeroFactura: '005-001-0004521',
-    numeroTicket: 'TCK-2026-9921',
-    valorServicio: 35.0,
-    montoPagado: 35.0,
-    metodoPago: 'Efectivo',
-    observaciones: 'Alistamiento PDI completado con lubricación de guayas, torque de pernos y revisión de presión de neumáticos.',
-    proximoMantenimientoKm: 1000,
-    fotos: [
-      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-    ],
-    createdAt: '21 Sep 2026, 10:15 AM',
-  },
-  {
-    id: 'als-002',
-    atendidoPor: 'Ing. Mateo Enríquez',
-    sede: 'StarMotos Matriz La Maná',
-    sedeId: 'matriz-la-mana',
-    fechaServicio: '2026-09-20',
-    nombres: 'Fernando Xavier',
-    apellidos: 'Vaca Morales',
-    cedulaRuc: '1724890123',
-    celular1: '0998745612',
-    email: 'cliente@starmotos.ec',
-    direccion: 'Av. Brasil N39-122 y Edmundo Carvajal, Quito',
-    origen: 'Almacén Matriz La Maná',
-    chasis: 'LBBP57008PA049182',
-    placa: 'PBX-8492',
-    modeloMarca: 'Benelli TRK 502X ABS',
-    serviciosRealizados: ['alistamiento_pdi', 'mantenimiento'],
-    tecnicoResponsable: 'CARLOS "CHARLY" MORALES',
-    tecnicoId: 'tec-02',
-    kilometraje: 14850,
-    aceite: 'con_aceite',
-    numeroFactura: '001-002-0008891',
-    numeroTicket: 'TCK-2026-8841',
-    valorServicio: 45.0,
-    montoPagado: 45.0,
-    metodoPago: 'Transferencia',
-    observaciones: 'Mantenimiento preventivo oficial y escaneo con diagnóstico OBD.',
-    proximoMantenimientoKm: 18000,
-    fotos: [
-      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-    ],
-    createdAt: '20 Sep 2026, 16:20 PM',
-  },
-];
+export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [];
 
 export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
   try {
-    const stored = localStorage.getItem('starmotos_shared_alistamientos');
+    const stored = localStorage.getItem('starmotos_shared_alistamientos_v4');
     if (stored) return JSON.parse(stored);
   } catch (e) {
     console.error('Error reading alistamientos from localStorage', e);
@@ -1068,10 +644,21 @@ export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
 
 export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
   try {
-    localStorage.setItem('starmotos_shared_alistamientos', JSON.stringify(records));
+    localStorage.setItem('starmotos_shared_alistamientos_v4', JSON.stringify(records));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
   } catch (e) {
     console.error('Error saving alistamientos to localStorage', e);
   }
+}
+
+// Función para reiniciar todos los módulos a vacío en pruebas
+export function resetAllSystemData() {
+  saveStoredWarranties([]);
+  saveStoredAlerts([]);
+  saveStoredInvoices([]);
+  saveStoredOrders([]);
+  saveStoredClients([]);
+  saveStoredInventory([]);
+  saveStoredFullAlistamientos([]);
 }
 

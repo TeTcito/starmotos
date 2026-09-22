@@ -410,7 +410,7 @@ export interface AlistamientoFullRecord {
   saldoPendiente?: number;
   esCredito?: boolean;
   mesesCredito?: number;
-  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito Directo';
+  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito' | 'Crédito Directo';
   observaciones: string;
   proximoMantenimientoKm: number;
   fotos: string[];

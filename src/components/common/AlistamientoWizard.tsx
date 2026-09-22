@@ -665,12 +665,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
     // Limpiar alerta y procesar guardado
     setValidationAlert(null);
 
+    const isCred = formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito;
     const finalValor = isPdiOnly ? 0 : (formData.valorServicio || 0);
-    const finalAbono = isPdiOnly ? 0 : (formData.abono !== undefined ? formData.abono : (formData.montoPagado || 0));
-    const finalSaldo = isPdiOnly ? 0 : (formData.saldoPendiente !== undefined ? formData.saldoPendiente : Math.max(0, finalValor - finalAbono));
+    const finalAbono = isPdiOnly ? 0 : (isCred ? 0 : (formData.abono !== undefined ? formData.abono : (formData.montoPagado || 0)));
+    const finalSaldo = isPdiOnly ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined ? formData.saldoPendiente : Math.max(0, finalValor - finalAbono)));
 
     const fullRecord: AlistamientoFullRecord = {
       ...formData,
+      esCredito: isCred,
+      metodoPago: isCred ? 'Crédito' : formData.metodoPago,
       valorServicio: finalValor,
       montoPagado: finalAbono,
       abono: finalAbono,
@@ -1107,63 +1110,78 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <div>
                         <label className="block text-[10px] font-bold text-zinc-700 mb-1">Método de Pago</label>
                         <select
-                          value={detailFormData.metodoPago || 'Efectivo'}
+                          value={detailFormData.metodoPago === 'Crédito Directo' ? 'Crédito' : (detailFormData.metodoPago || 'Efectivo')}
                           onChange={(e) => {
                             const met = e.target.value as any;
-                            const isCred = met === 'Crédito Directo';
+                            const isCred = met === 'Crédito';
+                            const valServ = detailFormData.valorServicio || 0;
                             setDetailFormData({
                               ...detailFormData,
                               metodoPago: met,
-                              esCredito: isCred ? true : detailFormData.esCredito,
+                              esCredito: isCred,
+                              abono: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
+                              montoPagado: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
+                              saldoPendiente: isCred ? valServ : Math.max(0, valServ - (detailFormData.abono || valServ)),
                             });
                           }}
-                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600"
+                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 cursor-pointer"
                         >
                           <option value="Efectivo">Efectivo</option>
                           <option value="Transferencia">Transferencia</option>
                           <option value="Tarjeta">Tarjeta</option>
-                          <option value="Crédito Directo">Crédito Directo</option>
+                          <option value="Crédito">Crédito</option>
                           <option value="Mixto">Mixto</option>
                         </select>
                       </div>
                     </div>
 
-                    {/* Check Crédito en detalle */}
-                    <div className="flex items-center justify-between pt-1 border-t border-zinc-200 text-[11px]">
-                      <label className="flex items-center gap-1.5 font-bold text-zinc-800 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!detailFormData.esCredito || detailFormData.metodoPago === 'Crédito Directo'}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setDetailFormData({
-                              ...detailFormData,
-                              esCredito: checked,
-                              metodoPago: checked ? 'Crédito Directo' : (detailFormData.metodoPago === 'Crédito Directo' ? 'Efectivo' : detailFormData.metodoPago),
-                            });
-                          }}
-                          className="w-3.5 h-3.5 rounded text-blue-600 accent-blue-600 cursor-pointer"
-                        />
-                        <span>A Crédito Directo</span>
-                      </label>
-                      {detailFormData.esCredito && (
-                        <select
-                          value={detailFormData.mesesCredito || 3}
-                          onChange={(e) => setDetailFormData({ ...detailFormData, mesesCredito: parseInt(e.target.value) || 3 })}
-                          className="px-2 py-0.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900 outline-none"
-                        >
-                          <option value={1}>1 Mes</option>
-                          <option value={2}>2 Meses</option>
-                          <option value={3}>3 Meses</option>
-                          <option value={6}>6 Meses</option>
-                          <option value={12}>12 Meses</option>
-                        </select>
-                      )}
-                    </div>
-
-                    {/* Si no es crédito: Abono y Saldo */}
-                    {!detailFormData.esCredito && detailFormData.metodoPago !== 'Crédito Directo' && (
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                    {/* Fila Dinámica según Método de Pago: Crédito Activo vs Abono y Saldo */}
+                    {detailFormData.metodoPago === 'Crédito' || detailFormData.metodoPago === 'Crédito Directo' || detailFormData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 font-bold">Tiempo:</span>
+                            <select
+                              value={detailFormData.mesesCredito || 3}
+                              onChange={(e) => setDetailFormData({ ...detailFormData, mesesCredito: parseInt(e.target.value) || 3 })}
+                              className="px-2 py-0.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900 outline-none"
+                            >
+                              <option value={1}>1 Mes</option>
+                              <option value={2}>2 Meses</option>
+                              <option value={3}>3 Meses</option>
+                              <option value={6}>6 Meses</option>
+                              <option value={9}>9 Meses</option>
+                              <option value={12}>12 Meses</option>
+                              <option value={18}>18 Meses</option>
+                              <option value={24}>24 Meses</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-blue-900 mb-0.5">Monto a Crédito ($)</label>
+                            <input
+                              type="number"
+                              value={(detailFormData.valorServicio || 0).toFixed(2)}
+                              readOnly
+                              className="w-full px-2 py-1 bg-blue-50/70 border border-blue-300 rounded-lg text-xs font-mono font-bold text-blue-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente por Cobrar ($)</label>
+                            <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between items-center">
+                              <span>${(detailFormData.valorServicio || 0).toFixed(2)}</span>
+                              <span className="text-[9px] text-amber-700 font-bold">Crédito</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-100">
                         <div>
                           <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">Abono ($)</label>
                           <input
@@ -2272,14 +2290,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           Método de Pago
                         </label>
                         <select
-                          value={formData.metodoPago}
+                          value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
                           onChange={(e) => {
                             const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
-                            const isCred = newMetodo === 'Crédito Directo';
+                            const isCred = newMetodo === 'Crédito';
                             setFormData({
                               ...formData,
                               metodoPago: newMetodo,
-                              esCredito: isCred ? true : formData.esCredito,
+                              esCredito: isCred,
+                              abono: isCred ? 0 : formData.valorServicio,
+                              montoPagado: isCred ? 0 : formData.valorServicio,
+                              saldoPendiente: isCred ? formData.valorServicio : 0,
                             });
                           }}
                           className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
@@ -2287,68 +2308,62 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <option value="Efectivo">Efectivo</option>
                           <option value="Transferencia">Transferencia</option>
                           <option value="Tarjeta">Tarjeta Déb/Créd</option>
-                          <option value="Crédito Directo">Crédito Directo</option>
+                          <option value="Crédito">Crédito</option>
                           <option value="Mixto">Mixto</option>
                         </select>
                       </div>
                     </div>
 
-                    {/* Checkbox de Crédito Directo */}
-                    <div className="flex items-center justify-between pt-1 border-t border-emerald-200/70">
-                      <label className="flex items-center gap-2 text-xs font-bold text-emerald-950 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!formData.esCredito || formData.metodoPago === 'Crédito Directo'}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setFormData({
-                              ...formData,
-                              esCredito: checked,
-                              metodoPago: checked ? 'Crédito Directo' : (formData.metodoPago === 'Crédito Directo' ? 'Efectivo' : formData.metodoPago),
-                            });
-                          }}
-                          className="w-4 h-4 rounded text-emerald-600 accent-emerald-600 cursor-pointer"
-                        />
-                        <span>Servicio a Crédito Directo</span>
-                      </label>
-                      {(formData.esCredito || formData.metodoPago === 'Crédito Directo') && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                          Crédito Activo
-                        </span>
-                      )}
-                    </div>
-
                     {/* Fila Dinámica: Abono vs Crédito con Tiempo en Meses */}
-                    {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? (
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                          <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
-                            Monto a Crédito ($)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formData.valorServicio}
-                            readOnly
-                            className="w-full px-3 py-1.5 bg-blue-50/60 border border-blue-300 rounded-xl text-sm font-mono font-bold text-blue-900 outline-none"
-                          />
+                    {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                            Financiamiento Directo
+                          </span>
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
-                            Tiempo (Meses)
-                          </label>
-                          <select
-                            value={formData.mesesCredito || 3}
-                            onChange={(e) => setFormData({ ...formData, mesesCredito: parseInt(e.target.value) || 3 })}
-                            className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value={1}>1 Mes</option>
-                            <option value={2}>2 Meses</option>
-                            <option value={3}>3 Meses</option>
-                            <option value={6}>6 Meses</option>
-                            <option value={9}>9 Meses</option>
-                            <option value={12}>12 Meses</option>
-                          </select>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Monto a Crédito ($)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.valorServicio}
+                              readOnly
+                              className="w-full px-3 py-1.5 bg-blue-50/60 border border-blue-300 rounded-xl text-sm font-mono font-bold text-blue-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Tiempo (Meses)
+                            </label>
+                            <select
+                              value={formData.mesesCredito || 3}
+                              onChange={(e) => setFormData({ ...formData, mesesCredito: parseInt(e.target.value) || 3 })}
+                              className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                              <option value={1}>1 Mes</option>
+                              <option value={2}>2 Meses</option>
+                              <option value={3}>3 Meses</option>
+                              <option value={6}>6 Meses</option>
+                              <option value={9}>9 Meses</option>
+                              <option value={12}>12 Meses</option>
+                              <option value={18}>18 Meses</option>
+                              <option value={24}>24 Meses</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+                          <span className="font-bold text-amber-900">Total Pendiente por Cobrar:</span>
+                          <span className="font-mono font-black text-amber-700 text-sm">
+                            ${formData.valorServicio.toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     ) : (
@@ -2965,15 +2980,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           Método
                         </label>
                         <select
-                          value={formData.metodoPago}
+                          value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
                           onChange={(e) => {
                             const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
-                            const isCred = newMetodo === 'Crédito Directo';
+                            const isCred = newMetodo === 'Crédito';
                             setFormData((prev) => ({
                               ...prev,
                               metodoPago: newMetodo,
-                              esCredito: isCred ? true : prev.esCredito,
-                              abono: isCred ? 0 : prev.abono,
+                              esCredito: isCred,
+                              abono: isCred ? 0 : prev.valorServicio,
+                              montoPagado: isCred ? 0 : prev.valorServicio,
+                              saldoPendiente: isCred ? prev.valorServicio : 0,
                             }));
                           }}
                           className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
@@ -2981,22 +2998,68 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <option value="Efectivo">Efectivo</option>
                           <option value="Transferencia">Transferencia</option>
                           <option value="Tarjeta">Tarjeta</option>
-                          <option value="Crédito Directo">Crédito Directo</option>
+                          <option value="Crédito">Crédito</option>
+                          <option value="Mixto">Mixto</option>
                         </select>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                          {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? 'Crédito' : 'Abono ($)'}
-                        </label>
-                        {formData.esCredito || formData.metodoPago === 'Crédito Directo' ? (
-                          <div className="h-8 px-2.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
-                            <span>Total a Crédito</span>
-                            <span>${formData.valorServicio.toFixed(2)}</span>
+                    {/* Fila Dinámica: Abono vs Crédito con Tiempo en Meses (Móvil) */}
+                    {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 font-bold">Plazo:</span>
+                            <select
+                              value={formData.mesesCredito || 3}
+                              onChange={(e) =>
+                                setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) || 3 }))
+                              }
+                              className="h-7 px-2 bg-white border border-blue-300 rounded-lg text-xs font-bold text-blue-900 outline-none"
+                            >
+                              <option value={1}>1 mes</option>
+                              <option value={2}>2 meses</option>
+                              <option value={3}>3 meses</option>
+                              <option value={6}>6 meses</option>
+                              <option value={9}>9 meses</option>
+                              <option value={12}>12 meses</option>
+                              <option value={18}>18 meses</option>
+                              <option value={24}>24 meses</option>
+                            </select>
                           </div>
-                        ) : (
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Monto a Crédito ($)
+                            </label>
+                            <div className="h-8 px-2.5 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-between text-blue-900 text-xs font-black">
+                              <span>Total</span>
+                              <span>${formData.valorServicio.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-amber-800 mb-1">
+                              Pendiente ($)
+                            </label>
+                            <div className="h-8 px-2.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
+                              <span>${formData.valorServicio.toFixed(2)}</span>
+                              <span className="text-[9px] text-amber-700">Crédito</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                            Abono ($)
+                          </label>
                           <input
                             type="number"
                             step="0.01"
@@ -3009,80 +3072,32 @@ export const AlistamientoWizard: React.FC<Props> = ({
                                 ...prev,
                                 abono: val,
                                 montoPagado: val,
+                                saldoPendiente: Math.max(0, prev.valorServicio - val),
                               }));
                             }}
                             placeholder="0.00"
                             className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800"
                           />
-                        )}
-                      </div>
+                        </div>
 
-                      <div>
-                        <label className="block text-[11px] font-black uppercase text-zinc-500 mb-1">
-                          Pendiente por Cobrar
-                        </label>
-                        <div className="h-8 px-2.5 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
-                          <span
-                            className={
-                              (formData.esCredito || formData.metodoPago === 'Crédito Directo'
-                                ? formData.valorServicio
-                                : Math.max(0, formData.valorServicio - (formData.abono ?? 0))) > 0
-                                ? 'text-amber-600'
-                                : 'text-emerald-600'
-                            }
-                          >
-                            $
-                            {(formData.esCredito || formData.metodoPago === 'Crédito Directo'
-                              ? formData.valorServicio
-                              : Math.max(0, formData.valorServicio - (formData.abono ?? 0))
-                            ).toFixed(2)}
-                          </span>
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-zinc-500 mb-1">
+                            Pendiente por Cobrar
+                          </label>
+                          <div className="h-8 px-2.5 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
+                            <span
+                              className={
+                                Math.max(0, formData.valorServicio - (formData.abono ?? 0)) > 0
+                                  ? 'text-amber-600'
+                                  : 'text-emerald-600'
+                              }
+                            >
+                              ${Math.max(0, formData.valorServicio - (formData.abono ?? 0)).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-1 flex items-center justify-between border-t border-emerald-100">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={formData.esCredito}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setFormData((prev) => ({
-                              ...prev,
-                              esCredito: checked,
-                              metodoPago: checked
-                                ? 'Crédito Directo'
-                                : prev.metodoPago === 'Crédito Directo'
-                                ? 'Efectivo'
-                                : prev.metodoPago,
-                              abono: checked ? 0 : prev.abono || 0,
-                            }));
-                          }}
-                          className="w-3.5 h-3.5 text-blue-600 rounded cursor-pointer"
-                        />
-                        <span className="text-[11px] font-bold text-zinc-800">Crédito Directo</span>
-                      </label>
-
-                      {(formData.esCredito || formData.metodoPago === 'Crédito Directo') && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-zinc-500 font-medium">Plazo:</span>
-                          <select
-                            value={formData.mesesCredito}
-                            onChange={(e) =>
-                              setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) }))
-                            }
-                            className="h-7 px-2 bg-white border border-zinc-300 rounded-lg text-xs font-bold"
-                          >
-                            <option value={1}>1 mes</option>
-                            <option value={2}>2 meses</option>
-                            <option value={3}>3 meses</option>
-                            <option value={6}>6 meses</option>
-                            <option value={12}>12 meses</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 )}
 

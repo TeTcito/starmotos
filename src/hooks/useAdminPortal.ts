@@ -710,15 +710,44 @@ export function useAdminPortal() {
     showToast('Alistamiento eliminado correctamente.', 'info');
   }, [showToast]);
 
-  // Eliminar cliente
+  // Eliminar cliente y cuenta de usuario de forma definitiva
   const deleteClient = useCallback((idOrCedula: string) => {
+    // 1. Eliminar de la lista de clientes de taller
     setClients((prev) => {
       const updated = prev.filter((c) => c.id !== idOrCedula && c.idNumber !== idOrCedula);
       saveStoredClients(updated);
       return updated;
     });
     deleteStoredClient(idOrCedula);
-    showToast('Cliente eliminado del registro.', 'info');
+
+    // 2. Eliminar de registros de alistamiento para evitar que vuelva a aparecer como cliente unificado
+    setFullAlistamientos((prev) => {
+      const updated = prev.filter((r) => r.cedulaRuc !== idOrCedula && r.id !== idOrCedula);
+      saveStoredFullAlistamientos(updated);
+      return updated;
+    });
+
+    // 3. Eliminar cuenta de credenciales de login si existía
+    try {
+      const accounts = JSON.parse(localStorage.getItem('starmotos_registered_accounts') || '{}');
+      let changed = false;
+      Object.keys(accounts).forEach((key) => {
+        if (
+          key === idOrCedula ||
+          key.toLowerCase() === idOrCedula.toLowerCase() ||
+          accounts[key]?.cedula === idOrCedula ||
+          accounts[key]?.idNumber === idOrCedula
+        ) {
+          delete accounts[key];
+          changed = true;
+        }
+      });
+      if (changed) {
+        localStorage.setItem('starmotos_registered_accounts', JSON.stringify(accounts));
+      }
+    } catch (_) {}
+
+    showToast('Cliente y cuenta de usuario eliminados correctamente del sistema.', 'info');
   }, [showToast]);
 
   return {

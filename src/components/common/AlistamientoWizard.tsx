@@ -2769,31 +2769,41 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                {/* Placa Vehicular (Bloque independiente) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
                       Placa
                     </label>
-                    <input
-                      type="text"
-                      value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
-                      placeholder="KX284T"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                      className="text-[10px] text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
+                    >
+                      En trámite
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                      Color
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.color}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
-                      placeholder="Negro / Rojo"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                    placeholder="Ej: KX284T"
+                  />
+                </div>
+
+                {/* Color de la Moto (Bloque independiente) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Color de la Moto
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.color || ''}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Negro / Rojo / Azul / Blanco"
+                  />
                 </div>
 
                 <div>

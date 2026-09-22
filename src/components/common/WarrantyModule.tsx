@@ -334,6 +334,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   const [garanteInputNotes, setGaranteInputNotes] = useState(
     currentWarranty.garanteNotes || 'Dictamen oficial favorable emitido por la Gerencia de Garantías de la Marca.'
   );
+  const [garanteSelectedResolution, setGaranteSelectedResolution] = useState<'encargar_taller' | 'envio_repuesto'>(
+    currentWarranty.resolutionType || 'encargar_taller'
+  );
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1238,18 +1241,24 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Modalidad de Resolución</label>
                 <div className="h-11 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl flex items-center justify-between text-xs font-bold">
-                  <span className="text-zinc-600">Resolución solicitada:</span>
-                  <span
-                    className={`px-2.5 py-1 rounded-lg text-xs font-black ${
-                      currentWarranty.resolutionType === 'encargar_taller'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    {currentWarranty.resolutionType === 'encargar_taller'
-                      ? '🔧 Encargar a Taller'
-                      : '📦 Envío de Repuesto'}
-                  </span>
+                  <span className="text-zinc-600">Resolución:</span>
+                  {currentWarranty.resolutionType ? (
+                    <span
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black ${
+                        currentWarranty.resolutionType === 'encargar_taller'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {currentWarranty.resolutionType === 'encargar_taller'
+                        ? '🔧 Encargar a Taller'
+                        : '📦 Envío de Repuesto'}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      ⏳ Pendiente de dictamen de Garante
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1260,7 +1269,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <div className="flex items-center gap-2 h-11 sm:h-12 px-4 bg-emerald-50 border border-emerald-200 rounded-xl text-base font-black font-mono text-emerald-800">
                   <DollarSign className="w-5 h-5 text-emerald-600" />
                   <span>
-                    ${((currentWarranty.totalBudget && currentWarranty.totalBudget > 0) ? currentWarranty.totalBudget : (currentWarranty.estimatedCost || 60)).toFixed(2)} USD
+                    ${((currentWarranty.totalBudget && currentWarranty.totalBudget > 0) ? currentWarranty.totalBudget : (grandTotalBudget > 0 ? grandTotalBudget : (currentWarranty.estimatedCost || 60))).toFixed(2)} USD
                   </span>
                 </div>
               </div>
@@ -1271,7 +1280,62 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
       {/* SECCIÓN DE PRESUPUESTO OFICIAL PARA ADMINISTRADOR MATRIZ */}
       {viewerRole === 'admin' && !isEditing && (
-        <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-5">
+        <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
+          {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
+          {currentWarranty.garanteNotes && (
+            <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border-2 border-indigo-300 rounded-2xl p-5 shadow-xs space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-indigo-950">
+                      Dictamen & Observación Oficial del Garante de Marca
+                    </h4>
+                    <p className="text-[11px] text-indigo-700 font-medium">
+                      Instrucción técnica enviada por la Gerencia de Garantías para proceder con la liquidación
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-600">Resolución Garante:</span>
+                  <span
+                    className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs ${
+                      currentWarranty.resolutionType === 'encargar_taller'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-emerald-600 text-white'
+                    }`}
+                  >
+                    {currentWarranty.resolutionType === 'encargar_taller' ? (
+                      <>
+                        <Wrench className="w-3.5 h-3.5" />
+                        <span>Encargar a Taller</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Envío de Repuesto</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white/95 backdrop-blur-xs p-3.5 rounded-xl border border-indigo-200">
+                <p className="text-xs sm:text-sm font-semibold text-zinc-900 leading-relaxed">
+                  "{currentWarranty.garanteNotes}"
+                </p>
+                {currentWarranty.approvedAt && (
+                  <p className="text-[10px] text-zinc-400 font-mono mt-1 text-right">
+                    {currentWarranty.approvedAt}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-zinc-100">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
@@ -1401,12 +1465,67 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
 
-          {/* Resumen y Botón Guardar Presupuesto */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-100">
-            <div className="flex items-center gap-4 text-xs font-medium text-zinc-600">
-              <span>Subtotal Repuestos: <strong className="font-mono text-zinc-900">${partsTotal.toFixed(2)}</strong></span>
-              <span>•</span>
-              <span>Mano de Obra ({laborTime}): <strong className="font-mono text-zinc-900">${laborCost.toFixed(2)}</strong></span>
+          {/* 3. CAMPO / BLOQUE DE TOTAL DE TODO (LIQUIDACIÓN COMPLETA) */}
+          <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 text-white p-5 rounded-2xl shadow-md border border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black tracking-wide text-white uppercase">
+                    Total de Todo — Presupuesto General Autorizado
+                  </h4>
+                  <p className="text-[11px] text-zinc-400">
+                    Consolidado total de repuestos desglosados + costo oficial de mano de obra
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold font-mono px-2.5 py-1 bg-zinc-800 text-zinc-300 rounded-lg border border-zinc-700">
+                Valores en USD ($)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {/* Subtotal Repuestos */}
+              <div className="p-3 bg-zinc-800/80 rounded-xl border border-zinc-700/60 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-zinc-400">Subtotal Repuestos ({parsedPartsList.length})</span>
+                <span className="text-base sm:text-lg font-black font-mono text-zinc-100 mt-1">
+                  ${partsTotal.toFixed(2)} USD
+                </span>
+              </div>
+
+              {/* Subtotal Mano de Obra */}
+              <div className="p-3 bg-zinc-800/80 rounded-xl border border-zinc-700/60 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-zinc-400">Mano de Obra ({laborTime})</span>
+                <span className="text-base sm:text-lg font-black font-mono text-zinc-100 mt-1">
+                  ${laborCost.toFixed(2)} USD
+                </span>
+              </div>
+
+              {/* TOTAL DE TODO */}
+              <div className="p-3 bg-emerald-950/70 rounded-xl border-2 border-emerald-500/60 flex flex-col justify-between shadow-inner">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">Total de Todo</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                </div>
+                <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1">
+                  ${grandTotalBudget.toFixed(2)} USD
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón Guardar Presupuesto */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
+              <span>Repuestos: <strong className="text-zinc-900 font-mono">${partsTotal.toFixed(2)}</strong></span>
+              <span>+</span>
+              <span>Mano de Obra: <strong className="text-zinc-900 font-mono">${laborCost.toFixed(2)}</strong></span>
+              <span>=</span>
+              <span className="text-emerald-700 font-bold font-mono text-sm bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                ${grandTotalBudget.toFixed(2)} USD
+              </span>
             </div>
 
             <button
@@ -1561,7 +1680,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
       {/* 2. SECCIÓN DE ACCIONES PARA EL GARANTE DE LA MARCA */}
       {viewerRole === 'garante' && (statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'en_revision') && (
-        <div className="bg-purple-50/50 border-2 border-purple-300 rounded-2xl p-5 space-y-3">
+        <div className="bg-purple-50/50 border-2 border-purple-300 rounded-2xl p-5 space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 text-xs font-black uppercase text-purple-950 tracking-wider">
             <Building2 className="w-4 h-4 text-purple-700" />
             <span>Resolución Oficial del Garante de Marca</span>
@@ -1569,24 +1688,84 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
           <p className="text-xs text-zinc-600">
             Como Garante Oficial de Fábrica / Importador, revise el informe técnico remitido por Matriz.
-            Estipule la resolución y dictamine <strong>Encargar a Taller</strong>, <strong>Envío de Repuesto</strong> o <strong>Denegar</strong> la garantía.
+            Seleccione la modalidad de resolución (<strong>Encargar a Taller</strong> o <strong>Envío de Repuesto</strong>),
+            escriba sus observaciones técnicas y confirme el dictamen oficial.
           </p>
 
           {currentWarranty.matrizNotes && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-950">
-              <span className="font-bold block mb-0.5">Informe Técnico de Matriz:</span>
+              <span className="font-bold block mb-0.5">Informe Técnico Remitido por Matriz:</span>
               <p>{currentWarranty.matrizNotes}</p>
             </div>
           )}
 
+          {/* Selector de Modalidad de Resolución por el Garante de Marca */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-800 mb-1.5">
+              Modalidad de Resolución Dictaminada <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setGaranteSelectedResolution('encargar_taller')}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  garanteSelectedResolution === 'encargar_taller'
+                    ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
+                    : 'border-zinc-200 bg-white hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-black text-zinc-900">Encargar a Taller</span>
+                  </div>
+                  {garanteSelectedResolution === 'encargar_taller' && (
+                    <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-600 leading-tight">
+                  Autoriza al taller oficial a ejecutar el servicio. Matriz procederá a valorizar repuestos y mano de obra para liquidación.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setGaranteSelectedResolution('envio_repuesto')}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  garanteSelectedResolution === 'envio_repuesto'
+                    ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
+                    : 'border-zinc-200 bg-white hover:bg-zinc-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-black text-zinc-900">Envío de Repuesto</span>
+                  </div>
+                  {garanteSelectedResolution === 'envio_repuesto' && (
+                    <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-600 leading-tight">
+                  La Fábrica / Importador despacha físicamente los repuestos requeridos a la sede solicitante sin cobro al cliente.
+                </p>
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-              Notas de Resolución del Garante de Marca
+              Observaciones / Dictamen Técnico del Garante de Marca <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={2}
               value={garanteInputNotes}
               onChange={(e) => setGaranteInputNotes(e.target.value)}
+              placeholder="Describa las directrices técnicas para Matriz y el Taller sobre esta garantía..."
               className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs text-zinc-900 outline-none focus:border-purple-600"
             />
           </div>
@@ -1626,22 +1805,25 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
             <button
               type="button"
-              onClick={handleGaranteApproveEncargar}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Autoriza la garantía y la encarga al taller para cotizar repuestos y mano de obra (Pasa a En Proceso de Aceptación 2)"
-            >
-              <Wrench className="w-4 h-4" />
-              <span>Encargar a Taller (Aceptación 2)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleGaranteApproveEnvio}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Autoriza la garantía y aprueba el despacho físico de repuestos desde bodega/marca"
+              onClick={() => {
+                if (garanteSelectedResolution === 'encargar_taller') {
+                  handleGaranteApproveEncargar();
+                } else {
+                  handleGaranteApproveEnvio();
+                }
+              }}
+              className={`px-5 py-2.5 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer transition ${
+                garanteSelectedResolution === 'encargar_taller'
+                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
+                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+              }`}
             >
               <Check className="w-4 h-4" />
-              <span>Aprobar Envío de Repuesto</span>
+              <span>
+                {garanteSelectedResolution === 'encargar_taller'
+                  ? 'Aprobar Dictamen: Encargar a Taller'
+                  : 'Aprobar Dictamen: Envío de Repuesto'}
+              </span>
             </button>
           </div>
         </div>
@@ -1735,7 +1917,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     warrantyType: 'marca' as 'marca' | 'plus_taller' | 'gps',
     issueDescription: '',
     partsRequired: '',
-    resolutionType: 'encargar_taller' as 'encargar_taller' | 'envio_repuesto',
+    resolutionType: undefined as 'encargar_taller' | 'envio_repuesto' | undefined,
     photos: [] as string[],
   });
 
@@ -1919,7 +2101,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       issueDescription: formData.issueDescription.trim(),
       partsTags: partsTags.length > 0 ? partsTags : (formData.partsRequired ? [formData.partsRequired] : []),
       partsRequired: partsTags.join(', ') || formData.partsRequired.trim(),
-      resolutionType: formData.resolutionType,
+      resolutionType: undefined,
       diagnosticPhotos:
         formData.photos.length > 0
           ? formData.photos
@@ -2236,57 +2418,6 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   ))}
                 </div>
               )}
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                Modalidad de Resolución Solicitada <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, resolutionType: 'encargar_taller' })}
-                  className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    formData.resolutionType === 'encargar_taller'
-                      ? 'border-blue-600 bg-blue-50/70 shadow-xs'
-                      : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-zinc-900">Encargar a taller</span>
-                    {formData.resolutionType === 'encargar_taller' && (
-                      <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                        <Check className="w-3 h-3" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-zinc-500 leading-tight">
-                    El taller oficial realiza el trabajo y factura repuestos / mano de obra.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, resolutionType: 'envio_repuesto' })}
-                  className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    formData.resolutionType === 'envio_repuesto'
-                      ? 'border-blue-600 bg-blue-50/70 shadow-xs'
-                      : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-black text-zinc-900">Envío de repuesto</span>
-                    {formData.resolutionType === 'envio_repuesto' && (
-                      <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                        <Check className="w-3 h-3" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-zinc-500 leading-tight">
-                    Matriz o Marca despacha los repuestos físicos correspondientes.
-                  </p>
-                </button>
-              </div>
             </div>
           </div>
         </div>

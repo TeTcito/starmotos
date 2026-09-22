@@ -203,6 +203,17 @@ export const AlistamientoMobile: React.FC<Props> = ({
               </div>
 
               <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Color</label>
+                <input
+                  type="text"
+                  value={motorcycle.color || ''}
+                  onChange={(e) => setMotorcycle({ ...motorcycle, color: e.target.value })}
+                  placeholder="Ej: Rojo / Negro / Blanco"
+                  className="w-full px-3 py-1.5 text-xs font-bold bg-zinc-50 border border-zinc-300 rounded-lg"
+                />
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Chasis (VIN)</label>
                 <input
                   type="text"

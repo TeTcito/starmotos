@@ -89,6 +89,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
   onDeleteAllReadAlerts,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileResolution, setMobileResolution] = useState<'encargar_taller' | 'envio_repuesto'>('encargar_taller');
 
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'solicitudes_garante', label: 'Bandeja', icon: <Inbox className="w-4 h-4" />, badge: `${pendingRequests.length || ''}` },
@@ -247,13 +248,50 @@ export const GaranteViewMobile: React.FC<Props> = ({
             </p>
 
             {actionType === 'aprobar' ? (
-              <textarea
-                rows={2}
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Notas de aprobación..."
-                className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-300 rounded-lg"
-              />
+              <div className="space-y-2.5">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Modalidad Dictaminada:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMobileResolution('encargar_taller')}
+                      className={`p-2 rounded-xl border text-left text-xs font-bold transition ${
+                        mobileResolution === 'encargar_taller'
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-200'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-700'
+                      }`}
+                    >
+                      🔧 Encargar Taller
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileResolution('envio_repuesto')}
+                      className={`p-2 rounded-xl border text-left text-xs font-bold transition ${
+                        mobileResolution === 'envio_repuesto'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-200'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-700'
+                      }`}
+                    >
+                      📦 Envío Repuesto
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-600 mb-1">
+                    Observaciones Técnicas:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="Notas o directrices técnicas..."
+                    className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-300 rounded-lg"
+                  />
+                </div>
+              </div>
             ) : (
               <textarea
                 rows={2}
@@ -275,7 +313,17 @@ export const GaranteViewMobile: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={actionType === 'aprobar' ? () => onApproveWarranty() : () => onRejectWarranty()}
+                onClick={
+                  actionType === 'aprobar'
+                    ? () => {
+                        onApproveWarranty(selectedWarranty.id, reviewNotes, mobileResolution);
+                        setIsActionModalOpen(false);
+                      }
+                    : () => {
+                        onRejectWarranty(selectedWarranty.id, rejectionReason);
+                        setIsActionModalOpen(false);
+                      }
+                }
                 className={`flex-1 py-1.5 text-white rounded-lg text-xs font-bold ${
                   actionType === 'aprobar' ? 'bg-emerald-600' : 'bg-red-600'
                 }`}

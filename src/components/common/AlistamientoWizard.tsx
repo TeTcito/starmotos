@@ -2062,7 +2062,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           handleConsultar();
                         }
                       }}
-                      placeholder="Ej: 2350999252 o RUC..."
+                      placeholder="Ejemplo: 1723456789 o RUC..."
                       className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
@@ -2099,7 +2099,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.nombres}
                     onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                    placeholder="Ej: Felix Rafael"
+                    placeholder="Ejemplo: Juan Carlos"
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
@@ -2114,7 +2114,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.apellidos}
                     onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
-                    placeholder="Ej: Gracia Guato"
+                    placeholder="Ejemplo: Mendoza Zambrano"
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     required
                   />
@@ -2130,7 +2130,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="text"
                       value={formData.celular1}
                       onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                      placeholder="0982852456"
+                      placeholder="Ejemplo: 0987654321"
                       className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                       required
                     />
@@ -2143,7 +2143,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="text"
                       value={formData.celular2}
                       onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
-                      placeholder="0991234567"
+                      placeholder="Ejemplo: 0991234567"
                       className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                     />
                   </div>
@@ -2158,7 +2158,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="ejemplo@starmotos.ec"
+                    placeholder="Ejemplo: usuario.cliente99@gmail.com"
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
@@ -2172,7 +2172,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.direccion}
                     onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    placeholder="Av. Principal y Secundaria, Ciudad"
+                    placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
@@ -2236,7 +2236,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.modeloMarca}
                     onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                    placeholder="Ej: Tundra r200 / Bajaj Pulsar NS 200"
+                    placeholder="Ejemplo: Thunder 200 / Pulsar NS 200"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
                     required
                   />
@@ -2260,7 +2260,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.placa}
                     onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                    placeholder="Ej: KX284T"
+                    placeholder="Ejemplo: AB123C o EN TRÁMITE"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
@@ -2274,7 +2274,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.color || ''}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    placeholder="Ej: Negro / Rojo / Azul / Blanco"
+                    placeholder="Ejemplo: Negro Mate / Rojo Racing"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
@@ -2288,7 +2288,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     type="text"
                     value={formData.chasis}
                     onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                    placeholder="LBBP57008PA049182"
+                    placeholder="Ejemplo: 3SCBP123456789012"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
                 </div>
@@ -2314,7 +2314,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           kilometraje: km,
                         }));
                       }}
-                      placeholder="0"
+                      placeholder="Ejemplo: 0 km"
                       className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">

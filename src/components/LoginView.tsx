@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Eye,
   EyeOff,
@@ -186,8 +186,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     rememberMe: true,
   });
 
-  // Formulario de registro con Datos del Cliente y Datos de la Moto
-  const [registerData, setRegisterData] = useState({
+  // Formulario de registro con Datos del Cliente y Datos de la Moto (100% vacíos inicialmente)
+  const initialRegisterState = {
     // Pestaña 1: Datos del Cliente y Cuenta
     firstNames: '',
     lastNames: '',
@@ -200,14 +200,43 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     confirmPassword: '',
 
     // Pestaña 2: Datos de la Motocicleta
-    motoBrand: 'StarMotos',
+    motoBrand: '',
     motoModel: '',
     motoPlate: '',
     motoColor: '',
     motoVin: '',
     motorNumber: '',
     motoMileage: '',
-  });
+  };
+
+  const [registerData, setRegisterData] = useState(initialRegisterState);
+
+  // Función para reiniciar el formulario de registro a vacío absoluto
+  const resetRegisterForm = () => {
+    setRegisterData({
+      ...initialRegisterState,
+      workshopId: workshops[0]?.id || 'matriz-la-mana',
+    });
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  // Limpiar cualquier residuo o autocompletado del navegador al entrar al modo registro
+  useEffect(() => {
+    if (isRegisterMode) {
+      resetRegisterForm();
+      const timer = setTimeout(() => {
+        setRegisterData((prev) => ({
+          ...prev,
+          email: '',
+          password: '',
+          confirmPassword: '',
+          motoBrand: '',
+        }));
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [isRegisterMode]);
 
   // Validaciones dinámicas de contraseña
   const hasMinLength = registerData.password.length >= 8;
@@ -548,10 +577,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => {
+                      resetRegisterForm();
                       setIsRegisterMode(true);
                       setRegisterTab('cliente');
-                      setErrorMessage('');
-                      setSuccessMessage('');
                     }}
                     className="text-blue-700 hover:text-blue-900 font-black underline cursor-pointer"
                   >
@@ -691,10 +719,9 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={() => {
+                    resetRegisterForm();
                     setIsRegisterMode(true);
                     setRegisterTab('cliente');
-                    setErrorMessage('');
-                    setSuccessMessage('');
                   }}
                   className="mt-1.5 w-full py-2 px-3 bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 rounded-xl text-xs font-bold text-blue-700 hover:text-blue-900 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
@@ -809,7 +836,11 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             /* ===================================================================== */
             /* MODO 2: REGISTRO CON 2 PESTAÑAS (DATOS CLIENTE & DATOS MOTO)          */
             /* ===================================================================== */
-            <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in text-left">
+            <form onSubmit={handleRegisterSubmit} autoComplete="off" className="space-y-3 animate-fade-in text-left">
+              {/* Trampa anti-autocompletado agresivo del navegador */}
+              <input type="text" name="fake_username_anti_autofill" className="hidden" tabIndex={-1} autoComplete="off" />
+              <input type="password" name="fake_password_anti_autofill" className="hidden" tabIndex={-1} autoComplete="new-password" />
+
               {/* Botones de Navegación entre Pestañas Superiores */}
               <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 rounded-xl border border-zinc-200 mb-2">
                 <button
@@ -858,7 +889,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="firstNames"
                         value={registerData.firstNames}
                         onChange={handleRegisterChange}
-                        placeholder="Ej: Fernando David"
+                        placeholder="Ejemplo: Juan Carlos"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                         required
                       />
@@ -873,7 +905,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="lastNames"
                         value={registerData.lastNames}
                         onChange={handleRegisterChange}
-                        placeholder="Ej: Paredes Zambrano"
+                        placeholder="Ejemplo: Mendoza Zambrano"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                         required
                       />
@@ -891,7 +924,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="idNumber"
                         value={registerData.idNumber}
                         onChange={handleRegisterChange}
-                        placeholder="10 o 13 dígitos"
+                        placeholder="Ejemplo: 1723456789"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono rounded-xl"
                         required
                       />
@@ -906,7 +940,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="phone"
                         value={registerData.phone}
                         onChange={handleRegisterChange}
-                        placeholder="0991234567"
+                        placeholder="Ejemplo: 0987654321"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono rounded-xl"
                         required
                       />
@@ -923,7 +958,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                       name="email"
                       value={registerData.email}
                       onChange={handleRegisterChange}
-                      placeholder="correo@ejemplo.com"
+                      placeholder="Ejemplo: usuario.cliente99@gmail.com"
+                      autoComplete="off"
                       className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                       required
                     />
@@ -940,7 +976,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="address"
                         value={registerData.address}
                         onChange={handleRegisterChange}
-                        placeholder="Ciudad / Barrio / Calle"
+                        placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                       />
                     </div>
@@ -975,7 +1012,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="password"
                         value={registerData.password}
                         onChange={handleRegisterChange}
-                        placeholder="••••••••"
+                        placeholder="Ejemplo: ClaveSegura*2026"
+                        autoComplete="new-password"
                         className="w-full px-3 py-2 pr-9 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                         required
                       />
@@ -1027,7 +1065,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="confirmPassword"
                         value={registerData.confirmPassword}
                         onChange={handleRegisterChange}
-                        placeholder="Repite tu contraseña"
+                        placeholder="Ejemplo: ClaveSegura*2026"
+                        autoComplete="new-password"
                         className={`w-full px-3 py-2 pr-9 bg-white border ${
                           registerData.confirmPassword.length > 0
                             ? passwordsMatch
@@ -1098,7 +1137,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motoBrand"
                         value={registerData.motoBrand}
                         onChange={handleRegisterChange}
-                        placeholder="Ej: StarMotos, Benelli..."
+                        placeholder="Ejemplo: Shineray, Daytona, Loncin..."
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl font-medium"
                         required
                       />
@@ -1113,7 +1153,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motoModel"
                         value={registerData.motoModel}
                         onChange={handleRegisterChange}
-                        placeholder="Ej: Tekken 250, CR5..."
+                        placeholder="Ejemplo: Thunder 200, Tekken 250, CR5..."
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl font-medium"
                         required
                       />
@@ -1139,7 +1180,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                       name="motoPlate"
                       value={registerData.motoPlate}
                       onChange={handleRegisterChange}
-                      placeholder="Ej: AB123C o EN TRÁMITE"
+                      placeholder="Ejemplo: AB123C o EN TRÁMITE"
+                      autoComplete="off"
                       className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono uppercase font-bold rounded-xl"
                     />
                   </div>
@@ -1155,7 +1197,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motoColor"
                         value={registerData.motoColor}
                         onChange={handleRegisterChange}
-                        placeholder="Ej: Negro / Rojo"
+                        placeholder="Ejemplo: Negro Mate / Rojo Racing"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs rounded-xl"
                       />
                     </div>
@@ -1169,7 +1212,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motoVin"
                         value={registerData.motoVin}
                         onChange={handleRegisterChange}
-                        placeholder="Serie o VIN"
+                        placeholder="Ejemplo: 3SCBP123456789012"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono uppercase rounded-xl"
                         required
                       />
@@ -1187,7 +1231,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motorNumber"
                         value={registerData.motorNumber}
                         onChange={handleRegisterChange}
-                        placeholder="Opcional"
+                        placeholder="Ejemplo: 167FMM-8472910"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono uppercase rounded-xl"
                       />
                     </div>
@@ -1202,7 +1247,8 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                         name="motoMileage"
                         value={registerData.motoMileage}
                         onChange={handleRegisterChange}
-                        placeholder="0 km"
+                        placeholder="Ejemplo: 0 km (o kilometraje de odómetro)"
+                        autoComplete="off"
                         className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none text-zinc-800 text-xs font-mono rounded-xl"
                       />
                     </div>

@@ -2234,7 +2234,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                         handleConsultar();
                       }
                     }}
-                    placeholder="Ej: 2350999252..."
+                    placeholder="Ejemplo: 1723456789"
                     className="flex-1 px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
                     required
                   />
@@ -2268,6 +2268,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="text"
                     value={formData.nombres}
                     onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                    placeholder="Ejemplo: Juan Carlos"
                     required
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
                   />
@@ -2278,6 +2279,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="text"
                     value={formData.apellidos}
                     onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                    placeholder="Ejemplo: Mendoza Zambrano"
                     required
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
                   />
@@ -2291,7 +2293,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="tel"
                     value={formData.celular1}
                     onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                    placeholder="0990000000"
+                    placeholder="Ejemplo: 0987654321"
                     required
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold"
                   />
@@ -2302,7 +2304,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="tel"
                     value={formData.celular2 || ''}
                     onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
-                    placeholder="0991234567"
+                    placeholder="Ejemplo: 0991234567"
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono"
                   />
                 </div>
@@ -2314,7 +2316,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   type="email"
                   value={formData.email || ''}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="cliente@ejemplo.com"
+                  placeholder="Ejemplo: usuario.cliente99@gmail.com"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs"
                 />
               </div>
@@ -2325,7 +2327,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   type="text"
                   value={formData.direccion}
                   onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                  placeholder="Ej: Av. 19 de Mayo y Guayas"
+                  placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs"
                 />
               </div>
@@ -2423,7 +2425,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="text"
                     value={formData.modeloMarca}
                     onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                    placeholder="Ej: Daytona 250"
+                    placeholder="Ejemplo: Thunder 200, Daytona 250..."
                     required
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
                   />
@@ -2443,7 +2445,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="text"
                     value={formData.placa}
                     onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                    placeholder="SIN PLACA"
+                    placeholder="Ejemplo: AB123C o EN TRÁMITE"
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
                   />
                 </div>
@@ -2455,7 +2457,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   type="text"
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  placeholder="Rojo / Negro / Blanco"
+                  placeholder="Ejemplo: Negro Mate / Rojo Racing"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs"
                 />
               </div>
@@ -2479,7 +2481,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       kilometraje: km,
                     }));
                   }}
-                  placeholder="0"
+                  placeholder="Ejemplo: 0 km"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold"
                 />
               </div>
@@ -2490,7 +2492,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   type="text"
                   value={formData.chasis}
                   onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                  placeholder="Ej: LBBP57008PA049182"
+                  placeholder="Ejemplo: 3SCBP123456789012"
                   required
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
                 />
@@ -2503,7 +2505,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     type="text"
                     value={formData.numeroMotor || ''}
                     onChange={(e) => setFormData({ ...formData, numeroMotor: e.target.value.toUpperCase() })}
-                    placeholder="Opcional"
+                    placeholder="Ejemplo: 167FMM-8472910"
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono uppercase"
                   />
                 </div>
@@ -2517,7 +2519,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       const clean = cleanNumberInput(e.target.value);
                       setFormData({ ...formData, year: clean === '' ? undefined : parseInt(clean) });
                     }}
-                    placeholder="2026"
+                    placeholder="Ejemplo: 2026"
                     className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono"
                   />
                 </div>

@@ -194,7 +194,7 @@ export const ClientesModule: React.FC<Props> = ({
     email: '',
     address: '',
     workshopId: currentWorkshopId || (workshops[0]?.id || 'matriz-la-mana'),
-    motoBrand: 'StarMotos',
+    motoBrand: '',
     motoModel: '',
     motoPlate: '',
     motoColor: '',
@@ -969,7 +969,7 @@ export const ClientesModule: React.FC<Props> = ({
                           handleConsultarSriNewClient();
                         }
                       }}
-                      placeholder="10 o 13 dígitos numéricos"
+                      placeholder="Ejemplo: 1723456789 (10 o 13 dígitos)"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none transition"
                       required
                     />
@@ -987,7 +987,7 @@ export const ClientesModule: React.FC<Props> = ({
                         onChange={(e) =>
                           setNewClientData({ ...newClientData, phone: e.target.value })
                         }
-                        placeholder="Ej: 0991234567"
+                        placeholder="Ejemplo: 0987654321"
                         className="w-full pl-8 pr-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-mono text-zinc-900 outline-none transition"
                         required
                       />
@@ -1007,7 +1007,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, firstNames: e.target.value })
                       }
-                      placeholder="Ej: Fernando David"
+                      placeholder="Ejemplo: Juan Carlos"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-medium text-zinc-900 outline-none transition"
                       required
                     />
@@ -1023,7 +1023,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, lastNames: e.target.value })
                       }
-                      placeholder="Ej: Paredes Zambrano"
+                      placeholder="Ejemplo: Mendoza Zambrano"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs font-medium text-zinc-900 outline-none transition"
                       required
                     />
@@ -1046,7 +1046,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, email: e.target.value })
                       }
-                      placeholder="cliente@ejemplo.com"
+                      placeholder="Ejemplo: usuario.cliente99@gmail.com"
                       className="w-full pl-8 pr-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-900 outline-none transition font-medium"
                       required
                     />
@@ -1089,7 +1089,7 @@ export const ClientesModule: React.FC<Props> = ({
                         onChange={(e) =>
                           setNewClientData({ ...newClientData, address: e.target.value })
                         }
-                        placeholder="Calle, sector o referencia"
+                        placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
                         className="w-full pl-8 pr-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl text-xs text-zinc-900 outline-none transition font-medium"
                       />
                     </div>
@@ -1157,7 +1157,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoBrand: e.target.value })
                       }
-                      placeholder="StarMotos, Benelli..."
+                      placeholder="Ejemplo: Shineray, Daytona, Loncin..."
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-medium text-zinc-900 outline-none transition"
                       required
                     />
@@ -1173,7 +1173,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoModel: e.target.value })
                       }
-                      placeholder="Ej: Loncin CR5 250cc, Tekken 250..."
+                      placeholder="Ejemplo: Thunder 200, Tekken 250, CR5..."
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-medium text-zinc-900 outline-none transition"
                       required
                     />
@@ -1203,7 +1203,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase() })
                       }
-                      placeholder="Ej: AB123C o EN TRÁMITE"
+                      placeholder="Ejemplo: AB123C o EN TRÁMITE"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono font-bold uppercase text-zinc-900 outline-none transition"
                     />
                   </div>
@@ -1218,7 +1218,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoColor: e.target.value })
                       }
-                      placeholder="Ej: Negro / Rojo, Azul..."
+                      placeholder="Ejemplo: Negro Mate / Rojo Racing"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs text-zinc-900 outline-none transition font-medium"
                     />
                   </div>
@@ -1236,7 +1236,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase() })
                       }
-                      placeholder="LBBP57008PA049182"
+                      placeholder="Ejemplo: 3SCBP123456789012"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono uppercase text-zinc-900 outline-none transition font-bold"
                       required
                     />
@@ -1252,7 +1252,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motorNumber: e.target.value.toUpperCase() })
                       }
-                      placeholder="Ej: 165FMM-12345"
+                      placeholder="Ejemplo: 167FMM-8472910"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono uppercase text-zinc-900 outline-none transition font-medium"
                     />
                   </div>
@@ -1272,7 +1272,7 @@ export const ClientesModule: React.FC<Props> = ({
                       onChange={(e) =>
                         setNewClientData({ ...newClientData, motoMileage: cleanNumberInput(e.target.value) })
                       }
-                      placeholder="0"
+                      placeholder="Ejemplo: 0 km (o kilometraje de odómetro)"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none transition"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-zinc-400 font-mono">
@@ -2116,6 +2116,22 @@ export const ClientesModule: React.FC<Props> = ({
               onClick={() => {
                 setNewClientError('');
                 setSriFeedbackNewClient(null);
+                setNewClientData({
+                  firstNames: '',
+                  lastNames: '',
+                  idNumber: '',
+                  phone: '',
+                  email: '',
+                  address: '',
+                  workshopId: currentWorkshopId || (workshops[0]?.id || 'matriz-la-mana'),
+                  motoBrand: '',
+                  motoModel: '',
+                  motoPlate: '',
+                  motoColor: '',
+                  motoVin: '',
+                  motorNumber: '',
+                  motoMileage: '',
+                });
                 setIsCreatingNewClient(true);
               }}
               className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-lg font-bold text-xs shadow-sm transition-all cursor-pointer shrink-0"

@@ -115,13 +115,13 @@ export const ClientesModuleMobile: React.FC<Props> = ({
     address: '',
     origin: 'Almacén Oficial',
     workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
-    motoBrand: 'StarMotos',
+    motoBrand: '',
     motoModel: '',
     motoPlate: '',
-    motoColor: 'Negro',
+    motoColor: '',
     motoVin: '',
     motorNumber: '',
-    motoYear: '2026',
+    motoYear: '',
     motoMileage: '',
     observaciones: '',
   });
@@ -1150,7 +1150,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 type="text"
                 value={newClientData.idNumber}
                 onChange={(e) => setNewClientData({ ...newClientData, idNumber: e.target.value })}
-                placeholder="0912345678"
+                placeholder="Ejemplo: 1723456789"
                 className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold outline-none focus:border-blue-600"
                 required
               />
@@ -1176,7 +1176,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 type="text"
                 value={newClientData.firstNames}
                 onChange={(e) => setNewClientData({ ...newClientData, firstNames: e.target.value })}
-                placeholder="Nombres"
+                placeholder="Ejemplo: Juan Carlos"
                 className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600"
                 required
               />
@@ -1187,7 +1187,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 type="text"
                 value={newClientData.lastNames}
                 onChange={(e) => setNewClientData({ ...newClientData, lastNames: e.target.value })}
-                placeholder="Apellidos"
+                placeholder="Ejemplo: Mendoza Zambrano"
                 className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600"
                 required
               />
@@ -1201,7 +1201,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 type="tel"
                 value={newClientData.phone}
                 onChange={(e) => setNewClientData({ ...newClientData, phone: e.target.value })}
-                placeholder="0991234567"
+                placeholder="Ejemplo: 0987654321"
                 className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600"
                 required
               />
@@ -1212,7 +1212,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 type="email"
                 value={newClientData.email}
                 onChange={(e) => setNewClientData({ ...newClientData, email: e.target.value })}
-                placeholder="cliente@correo.com"
+                placeholder="Ejemplo: usuario.cliente99@gmail.com"
                 className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
               />
             </div>
@@ -1224,7 +1224,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
               type="text"
               value={newClientData.address}
               onChange={(e) => setNewClientData({ ...newClientData, address: e.target.value })}
-              placeholder="Ciudad, dirección"
+              placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
               className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
             />
           </div>
@@ -1258,7 +1258,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                   type="text"
                   value={newClientData.motoModel}
                   onChange={(e) => setNewClientData({ ...newClientData, motoModel: e.target.value })}
-                  placeholder="Ej: StarMotos 200cc"
+                  placeholder="Ejemplo: Thunder 200, Daytona 250..."
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600"
                   required
                 />
@@ -1269,7 +1269,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                   type="text"
                   value={newClientData.motoPlate}
                   onChange={(e) => setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase() })}
-                  placeholder="SIN PLACA"
+                  placeholder="Ejemplo: AB123C o EN TRÁMITE"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono uppercase outline-none focus:border-blue-600"
                 />
               </div>
@@ -1282,7 +1282,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                   type="text"
                   value={newClientData.motoVin}
                   onChange={(e) => setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase() })}
-                  placeholder="VIN-XXXXXXX"
+                  placeholder="Ejemplo: 3SCBP123456789012"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono uppercase outline-none focus:border-blue-600"
                   required
                 />
@@ -1293,7 +1293,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                   type="text"
                   value={newClientData.motoColor}
                   onChange={(e) => setNewClientData({ ...newClientData, motoColor: e.target.value })}
-                  placeholder="Negro"
+                  placeholder="Ejemplo: Negro Mate / Rojo Racing"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
                 />
               </div>
@@ -1372,7 +1372,31 @@ export const ClientesModuleMobile: React.FC<Props> = ({
             {/* Botón "+ Nuevo" al lado izquierdo del buscador */}
             <button
               type="button"
-              onClick={() => setIsCreatingNewClient(true)}
+              onClick={() => {
+                setNewClientError('');
+                setSriFeedback(null);
+                setNewClientData({
+                  firstNames: '',
+                  lastNames: '',
+                  idNumber: '',
+                  phone: '',
+                  phone2: '',
+                  email: '',
+                  address: '',
+                  origin: 'Almacén Oficial',
+                  workshopId: currentWorkshopId || workshops[0]?.id || 'matriz-la-mana',
+                  motoBrand: '',
+                  motoModel: '',
+                  motoPlate: '',
+                  motoColor: '',
+                  motoVin: '',
+                  motorNumber: '',
+                  motoYear: '',
+                  motoMileage: '',
+                  observaciones: '',
+                });
+                setIsCreatingNewClient(true);
+              }}
               className="h-11 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 cursor-pointer transition-all shrink-0"
               title="Registrar nuevo cliente"
             >

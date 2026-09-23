@@ -82,118 +82,138 @@ export const EventsMobile: React.FC<Props> = ({ history, motorcycle, profile }) 
 
       {/* Contenido según pestaña */}
       {activeTab === 'mantenimientos' ? (
-        <div className="space-y-3">
-          {history.map((record) => (
-            <div
-              key={record.id}
-              className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-2.5"
-            >
-              <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2">
-                <div>
-                  <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                    {record.otNumber}
-                  </span>
-                  <h4 className="text-xs font-bold text-zinc-900 mt-1">
-                    {record.workSummary[0]}
-                  </h4>
-                  <span className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
-                    <Calendar className="w-3 h-3" />
-                    {record.date} • {record.mileage.toLocaleString()} km
-                  </span>
+        history.length === 0 ? (
+          <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
+            <Wrench className="w-8 h-8 text-zinc-400 mx-auto" />
+            <p className="text-xs font-semibold text-zinc-700">Sin mantenimientos registrados</p>
+            <p className="text-[11px] text-zinc-500">
+              Aún no tienes mantenimientos realizados en la red oficial de talleres StarMotos.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {history.map((record) => (
+              <div
+                key={record.id}
+                className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2">
+                  <div>
+                    <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                      {record.otNumber}
+                    </span>
+                    <h4 className="text-xs font-bold text-zinc-900 mt-1">
+                      {record.workSummary[0]}
+                    </h4>
+                    <span className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
+                      <Calendar className="w-3 h-3" />
+                      {record.date} • {record.mileage.toLocaleString()} km
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-extrabold text-zinc-900 font-mono">
+                      ${record.totalPaid.toFixed(2)}
+                    </span>
+                    <span className="block text-[9px] text-emerald-700 font-bold">Pagado</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-extrabold text-zinc-900 font-mono">
-                    ${record.totalPaid.toFixed(2)}
-                  </span>
-                  <span className="block text-[9px] text-emerald-700 font-bold">Pagado</span>
+
+                {/* Tareas */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-zinc-400 uppercase">Trabajos:</span>
+                  <ul className="space-y-1">
+                    {record.workSummary.map((task, idx) => (
+                      <li key={idx} className="flex items-center gap-1.5 text-[11px] text-zinc-700">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{task}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Botón ver factura vinculada */}
+                <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-500 truncate max-w-[170px]">{record.branchName}</span>
+                  <button
+                    onClick={() => setSelectedInvoice(record)}
+                    className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Receipt className="w-3 h-3" />
+                    <span>Ver Factura</span>
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
+        )
+      ) : (
+        history.length === 0 ? (
+          <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
+            <FileText className="w-8 h-8 text-zinc-400 mx-auto" />
+            <p className="text-xs font-semibold text-zinc-700">Sin facturas emitidas</p>
+            <p className="text-[11px] text-zinc-500">
+              No registras comprobantes electrónicos SRI de servicios de taller por el momento.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {history.map((record) => (
+              <div
+                key={`mob-inv-${record.id}`}
+                className="bg-white border border-zinc-200 rounded-2xl p-4.5 shadow-xs space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2 px-0.5">
+                  <div>
+                    <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {record.invoiceNumber}
+                    </span>
+                    <p className="text-[10px] text-zinc-500 mt-1">Fecha: {record.date}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-extrabold text-emerald-700 font-mono">
+                      ${record.totalPaid.toFixed(2)}
+                    </span>
+                    <span className="block text-[9px] text-emerald-800 font-bold flex items-center gap-0.5 justify-end">
+                      <ShieldCheck className="w-2.5 h-2.5" />
+                      SRI OK
+                    </span>
+                  </div>
+                </div>
 
-              {/* Tareas */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase">Trabajos:</span>
-                <ul className="space-y-1">
-                  {record.workSummary.map((task, idx) => (
-                    <li key={idx} className="flex items-center gap-1.5 text-[11px] text-zinc-700">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                      <span>{task}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                <div className="bg-zinc-50 px-3.5 py-3 rounded-xl border border-zinc-200/80 text-[11px] space-y-1.5">
+                  <div className="flex items-center justify-between text-zinc-600">
+                    <span className="text-zinc-500">Cliente:</span>
+                    <strong className="text-zinc-900">{profile.fullName}</strong>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-600">
+                    <span className="text-zinc-500">Orden:</span>
+                    <span className="font-mono text-blue-700 font-bold">{record.otNumber}</span>
+                  </div>
+                  <div className="pt-1 border-t border-zinc-200/70 flex items-center justify-between text-zinc-600">
+                    <span className="text-zinc-500">Subtotal 15%:</span>
+                    <span className="font-mono">${(record.totalPaid / 1.15).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-600">
+                    <span className="text-zinc-500">IVA 15%:</span>
+                    <span className="font-mono">${(record.totalPaid - record.totalPaid / 1.15).toFixed(2)}</span>
+                  </div>
+                  <div className="pt-1 border-t border-zinc-200 flex items-center justify-between font-bold text-zinc-900 text-xs">
+                    <span>Total:</span>
+                    <span className="font-mono text-emerald-700 font-extrabold">${record.totalPaid.toFixed(2)} USD</span>
+                  </div>
+                </div>
 
-              {/* Botón ver factura vinculada */}
-              <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
-                <span className="text-zinc-500 truncate max-w-[170px]">{record.branchName}</span>
                 <button
                   onClick={() => setSelectedInvoice(record)}
-                  className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Receipt className="w-3 h-3" />
-                  <span>Ver Factura</span>
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ver RIDE Oficial SRI</span>
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {history.map((record) => (
-            <div
-              key={`mob-inv-${record.id}`}
-              className="bg-white border border-zinc-200 rounded-2xl p-4.5 shadow-xs space-y-3"
-            >
-              <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2 px-0.5">
-                <div>
-                  <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    {record.invoiceNumber}
-                  </span>
-                  <p className="text-[10px] text-zinc-500 mt-1">Fecha: {record.date}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-extrabold text-emerald-700 font-mono">
-                    ${record.totalPaid.toFixed(2)}
-                  </span>
-                  <span className="block text-[9px] text-emerald-800 font-bold flex items-center gap-0.5 justify-end">
-                    <ShieldCheck className="w-2.5 h-2.5" />
-                    SRI OK
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-zinc-50 px-3.5 py-3 rounded-xl border border-zinc-200/80 text-[11px] space-y-1.5">
-                <div className="flex items-center justify-between text-zinc-600">
-                  <span className="text-zinc-500">Cliente:</span>
-                  <strong className="text-zinc-900">Fernando Vaca</strong>
-                </div>
-                <div className="flex items-center justify-between text-zinc-600">
-                  <span className="text-zinc-500">Orden:</span>
-                  <span className="font-mono text-blue-700 font-bold">{record.otNumber}</span>
-                </div>
-                <div className="pt-1 border-t border-zinc-200/70 flex items-center justify-between text-zinc-600">
-                  <span className="text-zinc-500">Subtotal 15%:</span>
-                  <span className="font-mono">${(record.totalPaid / 1.15).toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-zinc-600">
-                  <span className="text-zinc-500">IVA 15%:</span>
-                  <span className="font-mono">${(record.totalPaid - record.totalPaid / 1.15).toFixed(2)}</span>
-                </div>
-                <div className="pt-1 border-t border-zinc-200 flex items-center justify-between font-bold text-zinc-900 text-xs">
-                  <span>Total:</span>
-                  <span className="font-mono text-emerald-700 font-extrabold">${record.totalPaid.toFixed(2)} USD</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setSelectedInvoice(record)}
-                className="w-full py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>Ver RIDE Oficial SRI</span>
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Modal Factura Móvil */}
@@ -222,7 +242,7 @@ export const EventsMobile: React.FC<Props> = ({ history, motorcycle, profile }) 
               <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 space-y-1 text-[11px]">
                 <p className="font-bold text-zinc-900">STARMOTOS S.A.</p>
                 <p className="text-zinc-600">RUC: 1792489012001</p>
-                <p className="text-zinc-600">Cliente: Fernando Vaca (C.I. {profile.idNumber})</p>
+                <p className="text-zinc-600">Cliente: {profile.fullName} (C.I. {profile.idNumber})</p>
                 <p className="text-zinc-600">Moto: {motorcycle.brand} {motorcycle.model} ({motorcycle.plate})</p>
                 <p className="text-zinc-600">Fecha: {selectedInvoice.date}</p>
               </div>

@@ -7,6 +7,7 @@ import {
   SystemAlert,
   TallerOrder,
   AdminInvoice,
+  Technician,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
@@ -130,48 +131,9 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        const localWarranties: WarrantyRequest[] = (() => {
-          try {
-            const raw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
-            const parsed: WarrantyRequest[] = raw ? JSON.parse(raw) : [];
-            return parsed.filter(
-              (w) =>
-                w &&
-                w.id &&
-                !tombstones.has(w.id) &&
-                (!w.requestNumber || !tombstones.has(w.requestNumber)) &&
-                (!w.clientIdNumber || !tombstones.has(w.clientIdNumber))
-            );
-          } catch {
-            return [];
-          }
-        })();
-
-        // Reconciliación: Subir a la nube los registros locales válidos que falten en Supabase
-        const cloudIds = new Set(cloudWarranties.map((w) => w.id));
-        const missingInCloud = localWarranties.filter(
-          (w) => w && w.id && !cloudIds.has(w.id) && !tombstones.has(w.id)
-        );
-        if (missingInCloud.length > 0) {
-          console.log(`[Supabase] Subiendo ${missingInCloud.length} garantías locales a la nube...`);
-          for (const w of missingInCloud) {
-            await cloudSaveWarranty(w);
-          }
-        }
-
-        // Unificar (los remotos mandan, pero se preservan los locales válidos que no choquen)
-        const mergedMap = new Map<string, WarrantyRequest>();
-        cloudWarranties.forEach((w) => mergedMap.set(w.id, w));
-        localWarranties.forEach((w) => {
-          if (w && w.id && !mergedMap.has(w.id) && !tombstones.has(w.id)) {
-            mergedMap.set(w.id, w);
-          }
-        });
-
-        const mergedList = Array.from(mergedMap.values());
-        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(mergedList));
+        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cloudWarranties));
         window.dispatchEvent(new Event('starmotos_warranties_updated'));
-        warrantiesCount = mergedList.length;
+        warrantiesCount = cloudWarranties.length;
       }
     } catch (e) {
       console.warn('Error sincronizando garantías:', e);
@@ -207,47 +169,9 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        const localAlistamientos: AlistamientoFullRecord[] = (() => {
-          try {
-            const raw = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
-            const parsed: AlistamientoFullRecord[] = raw ? JSON.parse(raw) : [];
-            return parsed.filter(
-              (a) =>
-                a &&
-                a.id &&
-                !tombstones.has(a.id) &&
-                (!a.cedulaRuc || !tombstones.has(a.cedulaRuc.trim()))
-            );
-          } catch {
-            return [];
-          }
-        })();
-
-        // Subir a la nube los alistamientos locales válidos que no existan aún
-        const cloudIds = new Set(cloudAlistamientos.map((a) => a.id));
-        const missingInCloud = localAlistamientos.filter(
-          (a) => a && a.id && !cloudIds.has(a.id) && !tombstones.has(a.id)
-        );
-        if (missingInCloud.length > 0) {
-          console.log(`[Supabase] Subiendo ${missingInCloud.length} alistamientos locales a la nube...`);
-          for (const a of missingInCloud) {
-            await cloudSaveAlistamiento(a);
-          }
-        }
-
-        // Unificar
-        const mergedMap = new Map<string, AlistamientoFullRecord>();
-        cloudAlistamientos.forEach((a) => mergedMap.set(a.id, a));
-        localAlistamientos.forEach((a) => {
-          if (a && a.id && !mergedMap.has(a.id) && !tombstones.has(a.id)) {
-            mergedMap.set(a.id, a);
-          }
-        });
-
-        const mergedList = Array.from(mergedMap.values());
-        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(mergedList));
+        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(cloudAlistamientos));
         window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
-        alistamientosCount = mergedList.length;
+        alistamientosCount = cloudAlistamientos.length;
       }
     } catch (e) {
       console.warn('Error sincronizando alistamientos:', e);
@@ -283,60 +207,9 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        const localClients: TallerClient[] = (() => {
-          try {
-            const raw = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-            const parsed: TallerClient[] = raw ? JSON.parse(raw) : [];
-            return parsed.filter(
-              (c) =>
-                c &&
-                c.id &&
-                !tombstones.has(c.id) &&
-                (!c.idNumber || !tombstones.has(c.idNumber.trim()))
-            );
-          } catch {
-            return [];
-          }
-        })();
-
-        // Subir clientes locales no presentes en nube (por ID o por cédula) siempre que no estén eliminados
-        const cloudIds = new Set(cloudClients.map((c) => c.id));
-        const cloudIdNumbers = new Set(cloudClients.map((c) => c.idNumber));
-        const missingInCloud = localClients.filter(
-          (c) =>
-            c &&
-            c.id &&
-            !cloudIds.has(c.id) &&
-            !cloudIdNumbers.has(c.idNumber) &&
-            !tombstones.has(c.id) &&
-            (!c.idNumber || !tombstones.has(c.idNumber.trim()))
-        );
-        if (missingInCloud.length > 0) {
-          console.log(`[Supabase] Subiendo ${missingInCloud.length} clientes locales a la nube...`);
-          for (const c of missingInCloud) {
-            await cloudSaveClient(c);
-          }
-        }
-
-        // Unificar clientes
-        const mergedMap = new Map<string, TallerClient>();
-        cloudClients.forEach((c) => mergedMap.set(c.idNumber || c.id, c));
-        localClients.forEach((c) => {
-          const key = c.idNumber || c.id;
-          if (
-            key &&
-            !mergedMap.has(key) &&
-            !tombstones.has(c.id) &&
-            (!c.idNumber || !tombstones.has(c.idNumber.trim()))
-          ) {
-            mergedMap.set(key, c);
-          }
-        });
-
-        const mergedList = Array.from(mergedMap.values());
-        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(mergedList));
+        localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(cloudClients));
         window.dispatchEvent(new Event('starmotos_clients_updated'));
-        clientsCount = mergedList.length;
+        clientsCount = cloudClients.length;
       }
     } catch (e) {
       console.warn('Error sincronizando clientes:', e);
@@ -368,40 +241,9 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        const localAlerts: SystemAlert[] = (() => {
-          try {
-            const raw = localStorage.getItem(STORAGE_KEYS.ALERTS);
-            const parsed: SystemAlert[] = raw ? JSON.parse(raw) : [];
-            return parsed.filter((a) => a && a.id && !tombstones.has(a.id));
-          } catch {
-            return [];
-          }
-        })();
-
-        // Subir alertas locales que falten y no estén eliminadas
-        const cloudIds = new Set(cloudAlerts.map((a) => a.id));
-        const missingInCloud = localAlerts.filter(
-          (a) => a && a.id && !cloudIds.has(a.id) && !tombstones.has(a.id)
-        );
-        if (missingInCloud.length > 0) {
-          for (const a of missingInCloud) {
-            await cloudSaveAlert(a);
-          }
-        }
-
-        // Unificar alertas
-        const mergedMap = new Map<string, SystemAlert>();
-        cloudAlerts.forEach((a) => mergedMap.set(a.id, a));
-        localAlerts.forEach((a) => {
-          if (a && a.id && !mergedMap.has(a.id) && !tombstones.has(a.id)) {
-            mergedMap.set(a.id, a);
-          }
-        });
-
-        const mergedList = Array.from(mergedMap.values());
-        localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(mergedList));
+        localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(cloudAlerts));
         window.dispatchEvent(new Event('starmotos_alerts_updated'));
-        alertsCount = mergedList.length;
+        alertsCount = cloudAlerts.length;
       }
     } catch (e) {
       console.warn('Error sincronizando alertas:', e);
@@ -416,7 +258,7 @@ export async function syncAllFromSupabase(): Promise<{
         .select('data')
         .order('updated_at', { ascending: false });
 
-      if (!ordErr && ordersData && ordersData.length > 0) {
+      if (!ordErr && ordersData) {
         const items: TallerOrder[] = ordersData.map((row) => row.data as TallerOrder).filter(Boolean);
         localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(items));
         window.dispatchEvent(new Event('starmotos_orders_updated'));
@@ -434,13 +276,31 @@ export async function syncAllFromSupabase(): Promise<{
         .select('data')
         .order('created_at', { ascending: false });
 
-      if (!invErr && invoicesData && invoicesData.length > 0) {
+      if (!invErr && invoicesData) {
         const items: AdminInvoice[] = invoicesData.map((row) => row.data as AdminInvoice).filter(Boolean);
         localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(items));
         window.dispatchEvent(new Event('starmotos_invoices_updated'));
       }
     } catch (e) {
       console.warn('Error sincronizando facturas:', e);
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. TÉCNICOS & MECÁNICOS POR SEDE
+    // -----------------------------------------------------------------------
+    try {
+      const { data: techsData, error: techErr } = await supabase
+        .from('technicians')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!techErr && techsData) {
+        const items: Technician[] = techsData.map((row) => row.data as Technician).filter(Boolean);
+        localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(items));
+        window.dispatchEvent(new Event('starmotos_technicians_updated'));
+      }
+    } catch (e) {
+      console.warn('Error sincronizando técnicos:', e);
     }
 
     return {
@@ -687,6 +547,39 @@ export async function cloudSaveInvoice(inv: AdminInvoice) {
   }
 }
 
+export async function cloudSaveTechnician(tech: Technician) {
+  try {
+    const payload = {
+      id: tech.id,
+      name: tech.name || null,
+      specialty: tech.specialty || null,
+      phone: tech.phone || null,
+      workshop_id: tech.workshopId || null,
+      workshop_name: tech.workshopName || null,
+      status: tech.status || 'activo',
+      data: tech,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('technicians').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('[Supabase] Error guardando técnico:', error);
+    }
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando técnico:', err);
+  }
+}
+
+export async function cloudDeleteTechnician(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('technicians').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando técnico:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando técnico:', err);
+  }
+}
+
 // =========================================================================
 // 3. SUSCRIPCIÓN EN TIEMPO REAL (REALTIME BROADCAST MULTI-DISPOSITIVO)
 // =========================================================================
@@ -917,6 +810,37 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_orders_updated'));
         } catch (e) {
           console.error('Error procesando realtime orders:', e);
+        }
+      }
+    )
+    // Técnicos & Mecánicos
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'technicians' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.TECHNICIANS);
+          let current: Technician[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as Technician;
+            if (newDoc && !current.some((t) => t.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as Technician;
+            if (updatedDoc) {
+              current = current.map((t) => (t.id === updatedDoc.id ? updatedDoc : t));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            current = current.filter((t) => t.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_technicians_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime technicians:', e);
         }
       }
     )

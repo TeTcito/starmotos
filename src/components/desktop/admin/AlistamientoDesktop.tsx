@@ -19,6 +19,7 @@ import {
   AlistamientoService,
   MaintenanceType,
 } from '../../../types/customer';
+import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 
 interface Props {
   client: AlistamientoClient;
@@ -339,7 +340,11 @@ export const AlistamientoDesktop: React.FC<Props> = ({
                 <input
                   type="number"
                   value={motorcycle.year}
-                  onChange={(e) => setMotorcycle({ ...motorcycle, year: Number(e.target.value) })}
+                  onFocus={selectOnFocus}
+                  onChange={(e) => {
+                    const clean = cleanNumberInput(e.target.value);
+                    setMotorcycle({ ...motorcycle, year: clean === '' ? 0 : Number(clean) });
+                  }}
                   className="w-full px-3.5 py-2 text-xs font-mono text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-blue-600 focus:bg-white outline-none"
                 />
               </div>
@@ -422,7 +427,11 @@ export const AlistamientoDesktop: React.FC<Props> = ({
                     type="number"
                     step="0.01"
                     value={service.cost}
-                    onChange={(e) => setService({ ...service, cost: Number(e.target.value) })}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const clean = cleanNumberInput(e.target.value);
+                      setService({ ...service, cost: clean === '' ? 0 : Number(clean) });
+                    }}
                     className="w-full pl-8 pr-3.5 py-2 text-xs font-bold font-mono text-blue-600 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-blue-600 focus:bg-white outline-none"
                     required
                   />

@@ -85,71 +85,87 @@ export function useTallerPortal() {
   }, [workshops, activeWorkshopId]);
 
   // --- FILTRADO ESTRICTO MULTI-TENANT POR SEDE ---
-  // El usuario de taller solo puede ver los datos correspondientes a su propio taller
+  // Cada taller solo puede ver los datos correspondientes a su propio taller.
+  // El admin tiene su propio portal separado (useAdminPortal) y no pasa por aquí.
+
   const filteredOrders = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
     return orders.filter((o) => {
-      if (!o.workshopId) return true;
-      return o.workshopId === activeWorkshopId || o.workshopId === currentWorkshop?.id;
+      if (o.workshopId) {
+        return o.workshopId === targetWsId;
+      }
+      return false;
     });
   }, [orders, activeWorkshopId, currentWorkshop]);
 
   const filteredWarranties = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
     return warranties.filter((w) => {
-      if (w.tallerOriginId && (w.tallerOriginId === activeWorkshopId || w.tallerOriginId === currentWorkshop?.id)) {
-        return true;
+      if (w.tallerOriginId) {
+        return w.tallerOriginId === targetWsId;
       }
       if (w.tallerOrigin && currentWorkshop) {
-        const wsName = currentWorkshop.name.toLowerCase();
-        const origin = w.tallerOrigin.toLowerCase();
+        const cleanOrigin = w.tallerOrigin.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
         const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
-        return origin.includes(wsName) || wsName.includes(origin) || (cityPart && origin.includes(cityPart));
+        return cleanOrigin && (cleanOrigin.includes(cleanWs) || cleanWs.includes(cleanOrigin) || (cityPart && cleanOrigin.includes(cityPart)));
       }
       return false;
     });
   }, [warranties, activeWorkshopId, currentWorkshop]);
 
   const filteredFullAlistamientos = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
     return fullAlistamientos.filter((a) => {
-      if (a.sedeId && (a.sedeId === activeWorkshopId || a.sedeId === currentWorkshop?.id)) {
-        return true;
+      // 1. Si tiene sedeId explícito, DEBE coincidir con la sede activa
+      if (a.sedeId) {
+        return a.sedeId === targetWsId;
       }
+      // 2. Si no tiene sedeId, comparar estrictamente por nombre específico o ciudad (nunca por la palabra genérica "starmotos")
       if (a.sede && currentWorkshop) {
-        const wsName = currentWorkshop.name.toLowerCase();
-        const sede = a.sede.toLowerCase();
+        const cleanSede = a.sede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
         const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
-        return sede.includes(wsName) || wsName.includes(sede) || (cityPart && sede.includes(cityPart));
+        return cleanSede && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede) || (cityPart && cleanSede.includes(cityPart)));
       }
       return false;
     });
   }, [fullAlistamientos, activeWorkshopId, currentWorkshop]);
 
   const filteredClients = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
     const cedulasInSede = new Set(
       filteredFullAlistamientos.map((a) => a.cedulaRuc.trim().toLowerCase()).filter(Boolean)
     );
     return clients.filter((c) => {
-      if (c.workshopId && (c.workshopId === activeWorkshopId || c.workshopId === currentWorkshop?.id)) {
-        return true;
+      // 1. Si tiene workshopId explícito, DEBE coincidir con la sede activa
+      if (c.workshopId) {
+        return c.workshopId === targetWsId;
       }
-      if (c.workshopName && currentWorkshop) {
-        const wsName = currentWorkshop.name.toLowerCase();
-        const cWs = c.workshopName.toLowerCase();
-        const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
-        if (cWs.includes(wsName) || wsName.includes(cWs) || (cityPart && cWs.includes(cityPart))) {
-          return true;
-        }
-      }
+      // 2. Si el cliente tiene un alistamiento realizado en esta sede
       if (c.idNumber && cedulasInSede.has(c.idNumber.trim().toLowerCase())) {
         return true;
+      }
+      // 3. Fallback: comparar estrictamente por nombre de sede o ciudad
+      if (c.workshopName && currentWorkshop) {
+        const cleanCws = c.workshopName.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
+        if (cleanCws && (cleanCws.includes(cleanWs) || cleanWs.includes(cleanCws) || (cityPart && cleanCws.includes(cityPart)))) {
+          return true;
+        }
       }
       return false;
     });
   }, [clients, filteredFullAlistamientos, activeWorkshopId, currentWorkshop]);
 
   const filteredTechnicians = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
     return technicians.filter((t) => {
-      if (!t.workshopId) return true;
-      return t.workshopId === activeWorkshopId || t.workshopId === currentWorkshop?.id;
+      if (t.workshopId) {
+        return t.workshopId === targetWsId;
+      }
+      return false;
     });
   }, [technicians, activeWorkshopId, currentWorkshop]);
 
@@ -426,11 +442,13 @@ export function useTallerPortal() {
     const wsId = currentWorkshop?.id || activeWorkshopId;
     const wsName = currentWorkshop?.name || 'StarMotos Sede Oficial';
 
-    // 1. Asegurar pertenencia inmutable al taller activo
+    // 1. Asegurar pertenencia al taller asignado (conservar taller de origen si ya existe)
+    const targetWsId = record.sedeId || wsId;
+    const targetWsName = record.sede || wsName;
     const securedRecord: AlistamientoFullRecord = {
       ...record,
-      sedeId: wsId,
-      sede: wsName,
+      sedeId: targetWsId,
+      sede: targetWsName,
       atendidoPor: record.atendidoPor || currentWorkshop?.manager || 'Jefe de Taller',
     };
 
@@ -459,14 +477,14 @@ export function useTallerPortal() {
       motorcycleModel: securedRecord.modeloMarca,
       motorcyclePlate: securedRecord.placa,
       motorcycleVin: securedRecord.chasis,
-      motorcycleMileage: securedRecord.kilometraje,
+      motorcycleMileage: Number(securedRecord.kilometraje) || 0,
       address: securedRecord.direccion,
       color: securedRecord.color,
       year: securedRecord.year,
       lastVisit: securedRecord.fechaServicio,
       totalVisits: 1,
-      workshopId: wsId,
-      workshopName: wsName,
+      workshopId: targetWsId,
+      workshopName: targetWsName,
     };
 
     setClients((prev) => {
@@ -483,7 +501,7 @@ export function useTallerPortal() {
           motorcycleModel: securedRecord.modeloMarca || updated[existingIdx].motorcycleModel,
           motorcyclePlate: securedRecord.placa || updated[existingIdx].motorcyclePlate,
           motorcycleVin: securedRecord.chasis || updated[existingIdx].motorcycleVin,
-          motorcycleMileage: securedRecord.kilometraje !== undefined ? securedRecord.kilometraje : updated[existingIdx].motorcycleMileage,
+          motorcycleMileage: securedRecord.kilometraje !== undefined ? (Number(securedRecord.kilometraje) || 0) : updated[existingIdx].motorcycleMileage,
           address: securedRecord.direccion || updated[existingIdx].address,
           color: securedRecord.color || updated[existingIdx].color,
           year: securedRecord.year || updated[existingIdx].year,
@@ -499,12 +517,56 @@ export function useTallerPortal() {
       return updated;
     });
 
-    // 4. Crear Alerta de sistema
+    // 4. AUTO-GENERAR ORDEN DE TRABAJO desde alistamiento
+    const serviceLabels: Record<string, string> = {
+      alistamiento_pdi: 'PDI',
+      engrasado: 'Engrasado',
+      mantenimiento: 'Mantenimiento',
+    };
+    const servicesSummary = (securedRecord.serviciosRealizados || [])
+      .map((s) => serviceLabels[s] || s)
+      .join(', ') || 'Servicio General';
+
+    const otNumber = `OT-${Date.now().toString(36).toUpperCase()}`;
+    const newOrder: TallerOrder = {
+      id: `ord-${Date.now()}`,
+      otNumber,
+      clientName: `${securedRecord.nombres} ${securedRecord.apellidos}`.trim(),
+      clientIdNumber: securedRecord.cedulaRuc,
+      motorcycleInfo: securedRecord.modeloMarca,
+      plate: securedRecord.placa,
+      entryDate: securedRecord.fechaServicio || new Date().toISOString().split('T')[0],
+      status: 'inicio',
+      mechanicName: securedRecord.tecnicoResponsable || 'Sin asignar',
+      estimatedDelivery: '',
+      totalCost: securedRecord.valorServicio || 0,
+      workshopId: wsId,
+      workshopName: wsName,
+      alistamientoId: securedRecord.id,
+      servicesSummary,
+    };
+
+    setOrders((prev) => {
+      // Evitar duplicar si ya existe orden para este alistamiento
+      const alreadyExists = prev.some((o) => o.alistamientoId === securedRecord.id);
+      if (alreadyExists) {
+        const updated = prev.map((o) =>
+          o.alistamientoId === securedRecord.id ? { ...o, ...newOrder, id: o.id, otNumber: o.otNumber } : o
+        );
+        saveStoredOrders(updated);
+        return updated;
+      }
+      const updated = [newOrder, ...prev];
+      saveStoredOrders(updated);
+      return updated;
+    });
+
+    // 5. Crear Alerta de sistema
     const newAlert: SystemAlert = {
       id: `alt-${Date.now()}`,
       type: 'orden_creada',
-      title: 'Alistamiento Guardado',
-      message: `${wsName}: Cliente ${securedRecord.nombres} ${securedRecord.apellidos} — Moto ${securedRecord.modeloMarca} (${securedRecord.placa}). Factura ${securedRecord.numeroFactura}.`,
+      title: 'Orden de Trabajo Generada',
+      message: `${wsName}: ${otNumber} — ${securedRecord.nombres} ${securedRecord.apellidos} — ${securedRecord.modeloMarca} (${securedRecord.placa}). Servicios: ${servicesSummary}.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: securedRecord.id,
@@ -531,7 +593,7 @@ export function useTallerPortal() {
     orders: filteredOrders,
     updateOrderStatus,
     warranties: filteredWarranties,
-    clients,
+    clients: filteredClients,
     localClients: filteredClients,
     inventory,
     workshops,

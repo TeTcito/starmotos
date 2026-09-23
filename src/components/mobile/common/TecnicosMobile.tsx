@@ -8,6 +8,7 @@ interface Props {
   workshops: Workshop[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   currentWorkshopId?: string;
+  isMatriz?: boolean;
 }
 
 export const TecnicosMobile: React.FC<Props> = ({
@@ -15,6 +16,7 @@ export const TecnicosMobile: React.FC<Props> = ({
   workshops,
   onAddTechnician,
   currentWorkshopId,
+  isMatriz = false,
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,12 +29,13 @@ export const TecnicosMobile: React.FC<Props> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
-    const targetWs = workshops.find((w) => w.id === formData.workshopId);
+    const targetWsId = (!isMatriz && currentWorkshopId) ? currentWorkshopId : formData.workshopId;
+    const targetWs = workshops.find((w) => w.id === targetWsId);
     onAddTechnician({
       name: formData.name.toUpperCase(),
       specialty: formData.specialty,
       phone: formData.phone || '0990000000',
-      workshopId: formData.workshopId,
+      workshopId: targetWsId,
       workshopName: targetWs?.name || 'StarMotos Taller',
       status: 'activo',
     });
@@ -56,26 +59,38 @@ export const TecnicosMobile: React.FC<Props> = ({
         <span>Agregar Técnico</span>
       </button>
 
-      <div className="space-y-2.5">
-        {technicians.map((tech) => (
-          <div key={tech.id} className="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-xs space-y-2">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="text-xs font-bold text-zinc-900">{tech.name}</h4>
-                <p className="text-[10px] text-zinc-500">{tech.specialty}</p>
-              </div>
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                Activo
-              </span>
-            </div>
-
-            <div className="text-[11px] text-zinc-600 flex justify-between items-center pt-1 border-t border-zinc-100">
-              <span className="truncate max-w-[170px]">{tech.workshopName.replace('StarMotos ', '')}</span>
-              <span className="font-mono text-zinc-800">{tech.phone}</span>
-            </div>
+      {technicians.length === 0 ? (
+        <div className="bg-white border border-zinc-200 rounded-xl p-6 text-center space-y-2">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <Wrench className="w-5 h-5" />
           </div>
-        ))}
-      </div>
+          <h4 className="text-xs font-bold text-zinc-900">No hay técnicos registrados</h4>
+          <p className="text-[10px] text-zinc-500">
+            Esta sede aún no cuenta con técnicos o mecánicos en plantilla. Pulsa "Agregar Técnico" para dar de alta al personal.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {technicians.map((tech) => (
+            <div key={tech.id} className="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-xs space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900">{tech.name}</h4>
+                  <p className="text-[10px] text-zinc-500">{tech.specialty}</p>
+                </div>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  Activo
+                </span>
+              </div>
+
+              <div className="text-[11px] text-zinc-600 flex justify-between items-center pt-1 border-t border-zinc-100">
+                <span className="truncate max-w-[170px]">{tech.workshopName.replace('StarMotos ', '')}</span>
+                <span className="font-mono text-zinc-800">{tech.phone}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -110,17 +125,26 @@ export const TecnicosMobile: React.FC<Props> = ({
                 placeholder="Teléfono"
                 className="w-full px-3 py-1.5 font-mono bg-zinc-50 border border-zinc-300 rounded-lg"
               />
-              <select
-                value={formData.workshopId}
-                onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
-                className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg"
-              >
-                {workshops.map((ws) => (
-                  <option key={ws.id} value={ws.id}>
-                    {ws.name}
-                  </option>
-                ))}
-              </select>
+              {isMatriz ? (
+                <select
+                  value={formData.workshopId}
+                  onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg"
+                >
+                  {workshops.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="bg-zinc-50 border border-zinc-200 p-2 rounded-lg text-left">
+                  <span className="block text-[9px] font-bold uppercase text-zinc-500">Sede Asignada</span>
+                  <span className="text-[11px] font-bold text-zinc-800">
+                    {workshops.find((w) => w.id === (currentWorkshopId || formData.workshopId))?.name || 'Taller Local'}
+                  </span>
+                </div>
+              )}
 
               <div className="pt-2 flex gap-2">
                 <button

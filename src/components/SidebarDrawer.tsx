@@ -151,7 +151,7 @@ export const SidebarDrawer: React.FC<Props> = ({
               className="w-9 h-9 rounded-full object-cover border-2 border-blue-600 shadow-xs"
             />
             <div className="min-w-0 flex-1">
-              <h3 className="text-xs font-bold text-zinc-900 truncate">Fernando Vaca</h3>
+              <h3 className="text-xs font-bold text-zinc-900 truncate">{profile.fullName}</h3>
               <p className="text-[10px] text-zinc-600 font-mono">C.I: {profile.idNumber}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

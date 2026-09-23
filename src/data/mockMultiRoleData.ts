@@ -19,6 +19,8 @@ import {
   cloudSaveAlistamiento,
   cloudSaveOrder,
   cloudSaveInvoice,
+  cloudSaveTechnician,
+  cloudDeleteTechnician,
   cloudDeleteWarranty,
   cloudDeleteAlistamiento,
   cloudDeleteClient,
@@ -345,27 +347,14 @@ export const SRI_MOCK_DATABASE: Record<string, { razonSocial: string; tipoContri
   },
 };
 
-// Función auxiliar para consultar SRI simulada (genera un nombre realista si no existe)
+// Función auxiliar para consultar SRI simulada
 export function querySriMock(idNumber: string) {
   const cleanId = idNumber.trim();
   if (SRI_MOCK_DATABASE[cleanId]) {
     return SRI_MOCK_DATABASE[cleanId];
   }
 
-  // Generador de fallback dinámico para cualquier cédula válida de 10 o 13 dígitos
-  if (cleanId.length === 10 || cleanId.length === 13) {
-    const isRuc = cleanId.length === 13;
-    return {
-      razonSocial: isRuc
-        ? `EMPRESA COMERCIAL MOTOS DEL ECUADOR CIA. LTDA. (RUC ${cleanId})`
-        : `CLIENTE REGISTRADO SRI #${cleanId.slice(0, 4)} (C.I. ${cleanId})`,
-      tipoContribuyente: isRuc ? 'SOCIEDAD' : 'PERSONA NATURAL',
-      address: 'Pichincha, Quito, Av. Amazonas y República',
-      email: `contacto.${cleanId.slice(-4)}@sri-ecuador.ec`,
-      phone: '0991234567',
-    };
-  }
-
+  // Sin API externa conectada: no inventar datos ficticios para cédulas no registradas
   return null;
 }
 
@@ -385,6 +374,8 @@ try {
     'starmotos_shared_alistamientos',
     'starmotos_shared_workshops_v3',
     'starmotos_shared_technicians_v2',
+    'starmotos_shared_technicians_v3',
+    'starmotos_shared_technicians_v4',
   ];
   legacyKeys.forEach((k) => localStorage.removeItem(k));
 } catch (_) {}
@@ -778,26 +769,6 @@ export function saveStoredInventory(inventory: InventoryItem[]) {
 // ===================== TÉCNICOS =====================
 export const INITIAL_TECHNICIANS: Technician[] = [
   {
-    id: 'tec-01',
-    name: 'WILLIAM MEZA',
-    workshopId: 'taller-quevedo',
-    workshopName: 'StarMotos Sucursal Quevedo',
-    specialty: 'Mecánica Integral & Ajuste PDI',
-    phone: '0982852456',
-    status: 'activo',
-    activeOrdersCount: 0,
-  },
-  {
-    id: 'tec-02',
-    name: 'CARLOS "CHARLY" MORALES',
-    workshopId: 'matriz-la-mana',
-    workshopName: 'StarMotos Matriz La Maná',
-    specialty: 'Diagnóstico Electrónico & Escáner Delphi',
-    phone: '0939316698',
-    status: 'activo',
-    activeOrdersCount: 0,
-  },
-  {
     id: 'tec-03',
     name: 'DAVID CARRERA',
     workshopId: 'taller-buena-fe',
@@ -807,41 +778,11 @@ export const INITIAL_TECHNICIANS: Technician[] = [
     status: 'activo',
     activeOrdersCount: 0,
   },
-  {
-    id: 'tec-04',
-    name: 'ROBERTO ALMEIDA',
-    workshopId: 'taller-el-carmen',
-    workshopName: 'StarMotos Sucursal El Carmen',
-    specialty: 'Suspensiones & Chasis Multimarca',
-    phone: '0939317809',
-    status: 'activo',
-    activeOrdersCount: 0,
-  },
-  {
-    id: 'tec-05',
-    name: 'ANDRÉS GUANO',
-    workshopId: 'taller-portoviejo',
-    workshopName: 'StarMotos Sucursal Portoviejo',
-    specialty: 'Mantenimiento Preventivo & Lubricación',
-    phone: '0939316698',
-    status: 'activo',
-    activeOrdersCount: 0,
-  },
-  {
-    id: 'tec-06',
-    name: 'ING. MATEO ENRÍQUEZ',
-    workshopId: 'matriz-la-mana',
-    workshopName: 'StarMotos Matriz La Maná',
-    specialty: 'Auditoría Técnica PDI & Gestión Matriz',
-    phone: '0939317809',
-    status: 'activo',
-    activeOrdersCount: 0,
-  },
 ];
 
 export function getStoredTechnicians(): Technician[] {
   try {
-    const stored = localStorage.getItem('starmotos_shared_technicians_v4');
+    const stored = localStorage.getItem(STORAGE_KEYS.TECHNICIANS);
     if (stored) return JSON.parse(stored);
   } catch (e) {
     console.error('Error reading technicians from localStorage', e);
@@ -851,10 +792,24 @@ export function getStoredTechnicians(): Technician[] {
 
 export function saveStoredTechnicians(technicians: Technician[]) {
   try {
-    localStorage.setItem('starmotos_shared_technicians_v4', JSON.stringify(technicians));
+    localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(technicians));
     window.dispatchEvent(new Event('starmotos_technicians_updated'));
+    // Persistir cada técnico a Supabase
+    technicians.forEach((t) => cloudSaveTechnician(t));
   } catch (e) {
     console.error('Error saving technicians to localStorage', e);
+  }
+}
+
+export function deleteStoredTechnician(id: string) {
+  try {
+    const current = getStoredTechnicians();
+    const updated = current.filter((t) => t.id !== id);
+    localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(updated));
+    window.dispatchEvent(new Event('starmotos_technicians_updated'));
+    cloudDeleteTechnician(id);
+  } catch (e) {
+    console.error('Error deleting technician from localStorage', e);
   }
 }
 
@@ -947,15 +902,16 @@ export function deleteStoredAlistamiento(id: string) {
   try {
     const clean = id.trim();
     const stored = getStoredFullAlistamientos();
-    const target = stored.find((r) => r.id === clean || r.cedulaRuc === clean);
-    addDeletedTombstone(clean, target?.id, target?.cedulaRuc);
+    const target = stored.find((r) => r.id === clean);
 
-    const current = stored.filter(
-      (r) =>
-        r.id !== clean &&
-        r.cedulaRuc !== clean &&
-        (target ? r.id !== target.id : true)
-    );
+    // Si es un ID de alistamiento específico, sólo lapidar ese ID (nunca la cédula del cliente)
+    if (clean.startsWith('als-')) {
+      addDeletedTombstone(clean, target?.id);
+    } else {
+      addDeletedTombstone(clean, target?.id, target?.cedulaRuc);
+    }
+
+    const current = stored.filter((r) => r.id !== clean);
     localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(current));
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
     cloudDeleteAlistamiento(clean);

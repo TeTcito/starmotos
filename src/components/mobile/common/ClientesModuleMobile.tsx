@@ -37,9 +37,12 @@ import {
 import {
   getStoredClients,
   saveStoredClients,
+  getStoredFullAlistamientos,
+  saveStoredFullAlistamientos,
   querySriMock,
 } from '../../../data/mockMultiRoleData';
 import { cloudSaveClient } from '../../../services/supabaseService';
+import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 
 interface Props {
   role: 'admin' | 'taller' | 'garante';
@@ -65,7 +68,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [tallerScope, setTallerScope] = useState<'all' | 'local'>('all');
+  const [tallerScope, setTallerScope] = useState<'all' | 'local'>('local');
 
   // Cliente seleccionado para ver la Ficha Técnica / Detalle
   const [selectedClientForDetail, setSelectedClientForDetail] = useState<UnifiedClient | null>(null);
@@ -119,7 +122,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
     motoVin: '',
     motorNumber: '',
     motoYear: '2026',
-    motoMileage: '0',
+    motoMileage: '',
     observaciones: '',
   });
 
@@ -175,7 +178,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
           email: rec.email,
           address: rec.direccion,
           origin: rec.origen,
-          workshopId: rec.sedeId || ws?.id || 'matriz-la-mana',
+          workshopId: rec.sedeId || ws?.id || '',
           workshopName: rec.sede || ws?.name || 'StarMotos Sede',
           motorcycles: [
             {
@@ -202,10 +205,14 @@ export const ClientesModuleMobile: React.FC<Props> = ({
         if (isEngrasado) existing.engrasadoCompleted = true;
         if (isMant) existing.maintenanceCount += 1;
 
-        const hasMoto = existing.motorcycles.some(
+        const existingMotoIdx = existing.motorcycles.findIndex(
           (m) => (m.chasis && m.chasis === rec.chasis) || (m.plate && m.plate === rec.placa)
         );
-        if (!hasMoto && (rec.chasis || rec.placa)) {
+        if (existingMotoIdx >= 0) {
+          if (rec.kilometraje !== undefined && (rec.kilometraje > (existing.motorcycles[existingMotoIdx].lastMileage || 0) || existing.motorcycles[existingMotoIdx].lastMileage === undefined)) {
+            existing.motorcycles[existingMotoIdx].lastMileage = rec.kilometraje;
+          }
+        } else if (rec.chasis || rec.placa) {
           existing.motorcycles.push({
             model: rec.modeloMarca,
             plate: rec.placa,
@@ -244,7 +251,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
           email: c.email,
           address: c.address,
           origin: 'Almacén Oficial',
-          workshopId: c.workshopId || 'matriz-la-mana',
+          workshopId: c.workshopId || '',
           workshopName: c.workshopName || 'StarMotos Sede',
           motorcycles: [
             {
@@ -386,7 +393,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
           motorcycleVin: detailFormData.motoChasis,
           motorNumber: detailFormData.motorNumber,
           color: detailFormData.motoColor,
-          motorcycleMileage: Number(detailFormData.motoMileage) || undefined,
+          motorcycleMileage: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : (storedClients[existingIdx]?.motorcycleMileage ?? 0),
           workshopName: detailFormData.workshopName,
           workshopId: detailFormData.workshopId,
         };
@@ -404,7 +411,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
           motorcycleVin: detailFormData.motoChasis,
           motorNumber: detailFormData.motorNumber,
           color: detailFormData.motoColor,
-          motorcycleMileage: Number(detailFormData.motoMileage) || undefined,
+          motorcycleMileage: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : 0,
           workshopName: detailFormData.workshopName,
           workshopId: detailFormData.workshopId,
           totalVisits: selectedClientForDetail.records.length || 1,
@@ -415,6 +422,28 @@ export const ClientesModuleMobile: React.FC<Props> = ({
 
       saveStoredClients(updated);
       cloudSaveClient(updated[existingIdx >= 0 ? existingIdx : 0]);
+
+      // Sincronizar también en registros de alistamiento de este cliente
+      const storedAlistamientos = getStoredFullAlistamientos();
+      let hasUpdatedAlistamientos = false;
+      const updatedAlistamientos = storedAlistamientos.map((rec) => {
+        if (rec.cedulaRuc === cleanCedula) {
+          hasUpdatedAlistamientos = true;
+          return {
+            ...rec,
+            modeloMarca: detailFormData.motoModel || rec.modeloMarca,
+            placa: detailFormData.motoPlate || rec.placa,
+            chasis: detailFormData.motoChasis || rec.chasis,
+            color: detailFormData.motoColor || rec.color,
+            kilometraje: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : rec.kilometraje,
+          };
+        }
+        return rec;
+      });
+
+      if (hasUpdatedAlistamientos) {
+        saveStoredFullAlistamientos(updatedAlistamientos);
+      }
     } catch (err) {
       console.error('Error guardando cliente móvil:', err);
     }
@@ -543,7 +572,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
       motoVin: '',
       motorNumber: '',
       motoYear: '2026',
-      motoMileage: '0',
+      motoMileage: '',
       observaciones: '',
     });
   };
@@ -950,22 +979,11 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                       type="number"
                       min="0"
                       value={detailFormData.motoMileage}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, motoMileage: e.target.value })}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, motoMileage: cleanNumberInput(e.target.value) })}
+                      placeholder="0"
                       className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
                     />
-                  </div>
-
-                  {/* Resumen del Vehículo */}
-                  <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 text-xs">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
-                      Resumen del Vehículo:
-                    </span>
-                    <div className="text-zinc-800 font-bold">{detailFormData.motoModel || 'Sin modelo'}</div>
-                    <div className="text-[11px] text-zinc-600 font-mono mt-0.5">
-                      Placa: <strong>{detailFormData.motoPlate || 'SIN PLACA'}</strong> • Km:{' '}
-                      <strong>{detailFormData.motoMileage} km</strong> • Color:{' '}
-                      <strong>{detailFormData.motoColor || 'No especificado'}</strong>
-                    </div>
                   </div>
                 </div>
               </div>

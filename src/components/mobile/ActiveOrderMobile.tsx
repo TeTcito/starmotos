@@ -19,6 +19,32 @@ export const ActiveOrderMobile: React.FC<Props> = ({
   motorcycle,
   onOpenApprovalModal,
 }) => {
+  if (!activeOrder || !activeOrder.otNumber) {
+    return (
+      <div className="space-y-4 animate-fade-in pb-12">
+        <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
+          <Clock className="w-5 h-5 text-blue-600" />
+          <h2 className="text-base font-bold text-zinc-900">Orden de Trabajo</h2>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-dashed border-zinc-300 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+            <Wrench className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-900">Sin orden de trabajo activa</h3>
+            <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
+              Tu motocicleta {motorcycle.brand} {motorcycle.model} ({motorcycle.plate}) no se encuentra actualmente en taller ni tiene cotizaciones pendientes.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 font-medium">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Vehículo operativo y al día</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isQuotationPending = activeOrder.quotation.status === 'pendiente_aprobacion';
 
   return (

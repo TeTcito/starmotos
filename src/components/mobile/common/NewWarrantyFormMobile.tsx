@@ -21,6 +21,9 @@ import {
   AlertCircle,
   X,
   Sparkles,
+  Play,
+  Film,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -28,6 +31,14 @@ import {
 } from '../../../types/customer';
 import { getStoredFullAlistamientos } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
+
+export const isVideoUrl = (url?: string): boolean => {
+  if (!url) return false;
+  return (
+    url.startsWith('data:video/') ||
+    /\.(mp4|webm|ogg|mov|m4v|quicktime)(\?.*)?$/i.test(url)
+  );
+};
 
 interface Props {
   onCancel: () => void;
@@ -44,7 +55,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   defaultTallerOrigin = 'StarMotos Sede Matriz',
   defaultTallerOriginId = 'sede-matriz',
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   // Pestañas activas: cliente, moto, reclamo, fotos
   const [activeTab, setActiveTab] = useState<'cliente' | 'moto' | 'reclamo' | 'fotos'>('cliente');
@@ -171,22 +184,50 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     }
   };
 
-  // Subir fotos desde archivos o cámara
+  // Subir fotos o videos desde archivos o cámara
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
-      const compressed = await compressImageBase64(file);
-      if (compressed) {
+    setIsUploadingMedia(true);
+    try {
+      const newItems: string[] = [];
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('video/')) {
+          if (file.size > 50 * 1024 * 1024) {
+            alert(`El video "${file.name}" supera los 50 MB. Por favor seleccione un video más corto.`);
+            continue;
+          }
+          const base64Video = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          if (base64Video) {
+            newItems.push(base64Video);
+          }
+        } else if (file.type.startsWith('image/')) {
+          const compressed = await compressImageBase64(file);
+          if (compressed) {
+            newItems.push(compressed);
+          }
+        }
+      }
+
+      if (newItems.length > 0) {
         setFormData((prev) => ({
           ...prev,
-          photos: [...prev.photos, compressed],
+          photos: [...prev.photos, ...newItems],
         }));
       }
+    } catch (err) {
+      console.error('Error al procesar archivo multimedia:', err);
+      alert('Ocurrió un error al procesar el archivo seleccionado.');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
     }
-    e.target.value = '';
   };
 
   // Agregar imagen por URL
@@ -290,10 +331,21 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
 
   return (
     <div className="w-full flex flex-col min-h-0 space-y-3 -mt-1.5 animate-fade-in">
+      {/* Selector para Cámara directa (Foto / Video) */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Selector para Galería / Archivos existentes */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*,video/*"
         multiple
         onChange={handleFileSelect}
         className="hidden"
@@ -927,42 +979,65 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 <Camera className="w-4 h-4" />
               </div>
               <span>
-                Evidencias Fotográficas ({formData.photos.length})
+                Evidencias de la Falla ({formData.photos.length})
               </span>
             </h4>
-            <span className="text-[10px] text-zinc-400">Clic para ampliar</span>
+            <span className="text-[10px] text-zinc-400">Fotos & Videos</span>
           </div>
 
-          {/* Botones para agregar fotos */}
-          <div className="flex items-center gap-2">
+          {/* Botones principales: Cámara y Galería */}
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isUploadingMedia}
+              className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
             >
-              <Upload className="w-4 h-4" />
-              <span>Subir Foto / Cámara</span>
+              <Camera className="w-4 h-4 shrink-0" />
+              <span>Cámara (Foto / Video)</span>
             </button>
 
             <button
               type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={isUploadingMedia}
+              className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
+            >
+              <ImageIcon className="w-4 h-4 shrink-0" />
+              <span>Galería / Archivos</span>
+            </button>
+          </div>
+
+          {/* Opciones secundarias: URL y Muestra */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
               onClick={() => setShowUrlInput(!showUrlInput)}
-              className="py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 border border-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+              className="flex-1 py-1.5 px-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
               title="Agregar por URL"
             >
-              <LinkIcon className="w-4 h-4 text-zinc-500" />
+              <LinkIcon className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Pegar URL</span>
             </button>
 
             <button
               type="button"
               onClick={handleAddSamplePhotos}
-              className="py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
+              className="flex-1 py-1.5 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
               title="Cargar Fotos de Muestra"
             >
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span className="hidden sm:inline">Muestra</span>
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Fotos Muestra</span>
             </button>
           </div>
+
+          {/* Indicador de carga de archivo */}
+          {isUploadingMedia && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-700 animate-pulse">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+              <span>Procesando archivo multimedia (comprimiendo foto / cargando video)...</span>
+            </div>
+          )}
 
           {/* Input de URL si está activo */}
           {showUrlInput && (
@@ -971,7 +1046,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 type="url"
                 value={urlInputValue}
                 onChange={(e) => setUrlInputValue(e.target.value)}
-                placeholder="https://ejemplo.com/foto.jpg"
+                placeholder="https://ejemplo.com/foto.jpg o .mp4"
                 className="flex-1 px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600"
               />
               <button
@@ -984,73 +1059,128 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Galería de fotos agregadas */}
+          {/* Galería de fotos y videos agregados */}
           {formData.photos.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              {formData.photos.map((url, idx) => (
-                <div
-                  key={idx}
-                  className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs bg-zinc-100"
-                >
-                  <img
-                    src={url}
-                    alt={`Evidencia ${idx + 1}`}
-                    onClick={() => setZoomImage(url)}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-                  />
-                  <div className="absolute top-1 right-1 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePhoto(idx)}
-                      className="w-6 h-6 rounded-full bg-red-600/90 text-white flex items-center justify-center cursor-pointer hover:bg-red-700 transition shadow-2xs"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+              {formData.photos.map((url, idx) => {
+                const isVideo = isVideoUrl(url);
+                return (
+                  <div
+                    key={idx}
+                    className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs bg-zinc-900"
+                  >
+                    {isVideo ? (
+                      <div
+                        onClick={() => setZoomImage(url)}
+                        className="w-full h-full relative cursor-pointer flex items-center justify-center bg-black"
+                      >
+                        <video
+                          src={url}
+                          className="w-full h-full object-cover opacity-80"
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
+                            <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
+                          </div>
+                        </div>
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
+                          <Film className="w-2.5 h-2.5" /> Video
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={url}
+                        alt={`Evidencia ${idx + 1}`}
+                        onClick={() => setZoomImage(url)}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                      />
+                    )}
+
+                    <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(idx)}
+                        className="w-6 h-6 rounded-full bg-red-600/90 text-white flex items-center justify-center cursor-pointer hover:bg-red-700 transition shadow-2xs"
+                        title="Eliminar evidencia"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[9px] font-mono font-bold z-10">
+                      #{idx + 1}
+                    </span>
                   </div>
-                  <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[9px] font-mono font-bold">
-                    #{idx + 1}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="py-6 border-2 border-dashed border-zinc-300 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center text-center bg-zinc-50/70 cursor-pointer transition"
-            >
-              <Camera className="w-7 h-7 text-zinc-400 mb-1" />
-              <span className="text-xs font-bold text-zinc-700">Toca para agregar evidencias fotográficas</span>
-              <span className="text-[10px] text-zinc-400 mt-0.5">Permite fotos desde la cámara o galería del teléfono</span>
+            <div className="py-6 border-2 border-dashed border-zinc-300 rounded-xl flex flex-col items-center justify-center text-center bg-zinc-50/70 p-4 space-y-2.5">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Camera className="w-6 h-6" />
+                <Film className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-zinc-700 block">Adjunta fotos o videos de la falla</span>
+                <span className="text-[10px] text-zinc-400">Toma foto/video directo con la cámara o selecciona desde tus archivos</span>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Usar Cámara</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Abrir Galería</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 7. LIGHTBOX MODAL PARA VER IMAGEN EN PANTALLA COMPLETA                    */}
+      {/* 7. LIGHTBOX MODAL PARA VER IMAGEN O VIDEO EN PANTALLA COMPLETA             */}
       {/* ========================================================================= */}
       {zoomImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setZoomImage(null)}
         >
           <div
-            className="relative max-w-lg max-h-[85vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700"
+            className="relative max-w-lg max-h-[85vh] bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700 flex flex-col items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setZoomImage(null)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-xs font-bold"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-20 text-xs font-bold"
             >
               ✕
             </button>
-            <img
-              src={zoomImage}
-              alt="Evidencia ampliada"
-              className="max-h-[80vh] w-auto object-contain mx-auto"
-            />
+            {isVideoUrl(zoomImage) ? (
+              <video
+                src={zoomImage}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[80vh] w-auto max-w-full rounded-lg"
+              />
+            ) : (
+              <img
+                src={zoomImage}
+                alt="Evidencia ampliada"
+                className="max-h-[80vh] w-auto object-contain mx-auto"
+              />
+            )}
           </div>
         </div>
       )}

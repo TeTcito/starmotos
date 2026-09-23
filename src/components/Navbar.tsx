@@ -104,7 +104,7 @@ export const Navbar: React.FC<Props> = ({
           </div>
 
           <a
-            href={`https://wa.me/${activeBranch.whatsapp || '593939316698'}?text=${encodeURIComponent(`Hola StarMotos ${activeBranch.name}, soy el cliente Fernando Vaca.`)}`}
+            href={`https://wa.me/${activeBranch.whatsapp || '593939316698'}?text=${encodeURIComponent(`Hola StarMotos ${activeBranch.name}, soy el cliente ${profile.fullName}.`)}`}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 px-2.5 py-1.5 rounded-lg text-xs font-bold transition shadow-xs"

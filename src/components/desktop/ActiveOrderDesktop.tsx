@@ -19,6 +19,42 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
   motorcycle,
   onOpenApprovalModal,
 }) => {
+  if (!activeOrder || !activeOrder.otNumber) {
+    return (
+      <div className="w-full space-y-6 animate-fade-in pb-16">
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-200">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-6 h-6 text-blue-600" />
+              <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
+                Seguimiento de Orden de Trabajo
+              </h2>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1">
+              Estado de reparación en tiempo real, fases técnicas y cotización de mano de obra y repuestos
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-12 rounded-2xl border border-dashed border-zinc-300 text-center space-y-4 max-w-2xl mx-auto my-8">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
+            <Wrench className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-zinc-900">No tienes una orden de trabajo activa</h3>
+            <p className="text-sm text-zinc-500 mt-1.5 max-w-md mx-auto">
+              Tu motocicleta <strong className="text-zinc-800">{motorcycle.brand} {motorcycle.model} ({motorcycle.plate})</strong> se encuentra fuera de taller y no presenta trabajos en curso ni presupuestos por autorizar.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 font-medium">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Vehículo operativo y sin reparaciones pendientes</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isQuotationPending = activeOrder.quotation.status === 'pendiente_aprobacion';
 
   return (

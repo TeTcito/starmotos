@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { MotorcycleClientData } from '../../types/customer';
+import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
 
 interface Props {
   motorcycle: MotorcycleClientData;
@@ -143,7 +144,11 @@ export const MotorcycleDesktop: React.FC<Props> = ({ motorcycle, onUpdateMotorcy
               <input
                 type="number"
                 value={motoForm.year}
-                onChange={(e) => setMotoForm({ ...motoForm, year: Number(e.target.value) })}
+                onFocus={selectOnFocus}
+                onChange={(e) => {
+                  const clean = cleanNumberInput(e.target.value);
+                  setMotoForm({ ...motoForm, year: clean === '' ? 0 : Number(clean) });
+                }}
                 placeholder="2024"
                 className="w-full bg-white border border-zinc-300 hover:border-zinc-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono transition placeholder:text-zinc-400"
               />
@@ -211,7 +216,11 @@ export const MotorcycleDesktop: React.FC<Props> = ({ motorcycle, onUpdateMotorcy
               <input
                 type="number"
                 value={motoForm.currentKm}
-                onChange={(e) => setMotoForm({ ...motoForm, currentKm: Number(e.target.value) })}
+                onFocus={selectOnFocus}
+                onChange={(e) => {
+                  const clean = cleanNumberInput(e.target.value);
+                  setMotoForm({ ...motoForm, currentKm: clean === '' ? 0 : Number(clean) });
+                }}
                 className="w-full bg-white border border-zinc-300 hover:border-zinc-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-zinc-900 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono font-bold transition"
               />
             </div>

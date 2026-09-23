@@ -300,7 +300,9 @@ export const TalleresDesktop: React.FC<Props> = ({
                         <div className="text-[11px] text-zinc-400 mb-1">
                           {new Date(a.createdAt).toLocaleDateString()}
                         </div>
-                        <div className="text-sm font-bold text-emerald-700">USD {(a.valorServicio || 0).toFixed(2)}</div>
+                        <div className="text-sm font-bold text-emerald-700">
+                          {((a.serviciosRealizados?.length === 1 && a.serviciosRealizados[0] === 'alistamiento_pdi') || Number(a.valorServicio || 0) === 0) ? '-' : `USD ${(a.valorServicio || 0).toFixed(2)}`}
+                        </div>
                       </div>
                     </div>
                   ))

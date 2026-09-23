@@ -23,6 +23,8 @@ import {
   DollarSign,
   X,
   Building2,
+  Play,
+  Film,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -33,6 +35,7 @@ import {
   getStoredWarranties,
 } from '../../../data/mockMultiRoleData';
 import { getWarrantyStatusInfo } from '../../common/WarrantyModule';
+import { isVideoUrl } from './NewWarrantyFormMobile';
 
 interface Props {
   warranty: WarrantyRequest;
@@ -998,27 +1001,50 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
           {formData.diagnosticPhotos.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              {formData.diagnosticPhotos.map((url, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setZoomImage(url)}
-                  className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs cursor-pointer bg-zinc-100"
-                >
-                  <img
-                    src={url}
-                    alt={`Evidencia ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="w-7 h-7 bg-white/90 rounded-lg flex items-center justify-center text-zinc-900 shadow-xs">
-                      <ZoomIn className="w-3.5 h-3.5" />
-                    </div>
+              {formData.diagnosticPhotos.map((url, idx) => {
+                const isVideo = isVideoUrl(url);
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setZoomImage(url)}
+                    className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs cursor-pointer bg-zinc-900"
+                  >
+                    {isVideo ? (
+                      <div className="w-full h-full relative flex items-center justify-center bg-black">
+                        <video
+                          src={url}
+                          className="w-full h-full object-cover opacity-80"
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
+                            <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
+                          </div>
+                        </div>
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
+                          <Film className="w-2.5 h-2.5" /> Video
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <img
+                          src={url}
+                          alt={`Evidencia ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="w-7 h-7 bg-white/90 rounded-lg flex items-center justify-center text-zinc-900 shadow-xs">
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[9px] font-mono font-bold z-10">
+                      #{idx + 1}
+                    </span>
                   </div>
-                  <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[9px] font-mono font-bold">
-                    #{idx + 1}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="py-6 border-2 border-dashed border-zinc-200 rounded-xl flex flex-col items-center justify-center text-center bg-zinc-50/50">
@@ -1291,15 +1317,25 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => setZoomImage(null)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-xs font-bold"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-20 text-xs font-bold"
             >
               ✕
             </button>
-            <img
-              src={zoomImage}
-              alt="Evidencia ampliada"
-              className="max-h-[80vh] w-auto object-contain mx-auto"
-            />
+            {isVideoUrl(zoomImage) ? (
+              <video
+                src={zoomImage}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[80vh] w-auto max-w-full rounded-lg"
+              />
+            ) : (
+              <img
+                src={zoomImage}
+                alt="Evidencia ampliada"
+                className="max-h-[80vh] w-auto object-contain mx-auto"
+              />
+            )}
           </div>
         </div>
       )}

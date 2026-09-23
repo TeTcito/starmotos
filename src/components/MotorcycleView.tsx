@@ -14,6 +14,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { MotorcycleClientData } from '../types/customer';
+import { cleanNumberInput, selectOnFocus } from '../utils/numberUtils';
 
 interface Props {
   motorcycle: MotorcycleClientData;
@@ -122,7 +123,11 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
               <input
                 type="number"
                 value={motoForm.year}
-                onChange={(e) => setMotoForm({ ...motoForm, year: Number(e.target.value) })}
+                onFocus={selectOnFocus}
+                onChange={(e) => {
+                  const clean = cleanNumberInput(e.target.value);
+                  setMotoForm({ ...motoForm, year: clean === '' ? 0 : Number(clean) });
+                }}
                 placeholder="2024"
                 className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono"
               />
@@ -190,7 +195,11 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
               <input
                 type="number"
                 value={motoForm.currentKm}
-                onChange={(e) => setMotoForm({ ...motoForm, currentKm: Number(e.target.value) })}
+                onFocus={selectOnFocus}
+                onChange={(e) => {
+                  const clean = cleanNumberInput(e.target.value);
+                  setMotoForm({ ...motoForm, currentKm: clean === '' ? 0 : Number(clean) });
+                }}
                 className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-bold"
               />
             </div>

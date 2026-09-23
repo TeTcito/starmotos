@@ -17,25 +17,35 @@ export const HistoryMobile: React.FC<Props> = ({ history }) => {
         </h2>
       </div>
 
-      <div className="space-y-3">
-        {history.map((record) => (
-          <div key={record.id} className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm space-y-1.5 text-xs">
-            <div className="flex justify-between items-center border-b border-zinc-100 pb-1.5">
-              <div>
-                <span className="font-bold text-zinc-900">{record.date}</span>
-                <span className="text-blue-600 font-mono font-medium text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+      {history.length === 0 ? (
+        <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
+          <History className="w-8 h-8 text-zinc-400 mx-auto" />
+          <p className="text-xs font-semibold text-zinc-700">Sin historial registrado</p>
+          <p className="text-[11px] text-zinc-500">
+            Aún no tienes mantenimientos realizados en la red oficial de talleres StarMotos.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {history.map((record) => (
+            <div key={record.id} className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm space-y-1.5 text-xs">
+              <div className="flex justify-between items-center border-b border-zinc-100 pb-1.5">
+                <div>
+                  <span className="font-bold text-zinc-900">{record.date}</span>
+                  <span className="text-blue-600 font-mono font-medium text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+                </div>
+                <span className="font-bold text-emerald-700 font-mono">${record.totalPaid.toFixed(2)}</span>
               </div>
-              <span className="font-bold text-emerald-700 font-mono">${record.totalPaid.toFixed(2)}</span>
+              <div className="text-[11px] text-zinc-500">
+                {record.branchName} • Mecánico: {record.technicianName}
+              </div>
+              <div className="text-[11px] text-zinc-600">
+                {record.workSummary.join(' • ')}
+              </div>
             </div>
-            <div className="text-[11px] text-zinc-500">
-              {record.branchName} • Mecánico: {record.technicianName}
-            </div>
-            <div className="text-[11px] text-zinc-600">
-              {record.workSummary.join(' • ')}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -31,12 +31,20 @@ import {
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
+  AlistamientoFormData,
   Technician,
   ServiceActionType,
   Workshop,
+  TallerClient,
 } from '../../types/customer';
-import { querySriMock } from '../../data/mockMultiRoleData';
+import {
+  querySriMock,
+  getStoredClients,
+  saveStoredClients,
+  getStoredFullAlistamientos,
+} from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
+import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
 
 interface Props {
   defaultAtendidoPor: string;
@@ -54,6 +62,14 @@ interface Props {
   onViewModeChange?: (mode: 'list' | 'form') => void;
   isMatriz?: boolean;
 }
+
+export const isPdiOnlyRecord = (record: AlistamientoFullRecord | AlistamientoFormData): boolean => {
+  const services = record.serviciosRealizados || [];
+  const hasPdi = services.includes('alistamiento_pdi');
+  const hasOtherPaidServices = services.some((s) => s === 'mantenimiento' || s === 'engrasado');
+  if (hasPdi && !hasOtherPaidServices) return true;
+  return Number(record.valorServicio || 0) === 0 && Number(record.montoPagado || 0) === 0 && hasPdi;
+};
 
 export const AlistamientoWizard: React.FC<Props> = ({
   defaultAtendidoPor,
@@ -89,7 +105,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
   // Registro seleccionado para ver detalle en formulario
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<AlistamientoFullRecord | null>(null);
-  const [detailFormData, setDetailFormData] = useState<AlistamientoFullRecord | null>(null);
+  const [detailFormData, setDetailFormData] = useState<AlistamientoFormData | null>(null);
   const [detailSuccessToast, setDetailSuccessToast] = useState<string | null>(null);
 
   // Paso para vista móvil (1: Cliente, 2: Moto, 3: Servicio)
@@ -105,7 +121,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   };
 
   // Estado del formulario completo
-  const [formData, setFormData] = useState<AlistamientoFullRecord>({
+  const [formData, setFormData] = useState<AlistamientoFormData>({
     id: '',
     atendidoPor: defaultAtendidoPor,
     sede: defaultSede,
@@ -119,30 +135,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
     celular2: '',
     email: '',
     direccion: '',
-    origen: origins[0] || 'almacen Tenso santo domingo',
+    origen:
+      origins.find((o) =>
+        defaultSede &&
+        (o.toLowerCase().includes(defaultSede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim()) ||
+          defaultSede.toLowerCase().includes(o.toLowerCase().replace(/almacén|almacen/gi, '').trim()))
+      ) ||
+      (defaultSede ? `Almacén ${defaultSede.replace(/StarMotos\s*/i, '')}` : origins[0] || 'Almacén Principal'),
     motoPreviaId: '',
     chasis: '',
     placa: '',
     modeloMarca: '',
     color: '',
     serviciosRealizados: ['alistamiento_pdi'],
-    tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
-    tecnicoId: technicians[0]?.id || 'tec-01',
-    kilometraje: 0,
+    tecnicoResponsable: technicians[0]?.name || '',
+    tecnicoId: technicians[0]?.id || '',
+    kilometraje: '',
     aceite: 'con_aceite',
     nivelAceite: 'optimo',
     tipoAceite: 'Katana 20W50',
     numeroFactura: '',
     numeroTicket: '',
-    valorServicio: 35.0,
-    montoPagado: 35.0,
-    abono: 35.0,
-    saldoPendiente: 0,
+    valorServicio: '',
+    montoPagado: '',
+    abono: '',
+    saldoPendiente: '',
     esCredito: false,
     mesesCredito: 3,
     metodoPago: 'Efectivo',
     observaciones: '',
-    proximoMantenimientoKm: 1000,
+    proximoMantenimientoKm: '',
     fotos: [],
     createdAt: '',
   });
@@ -192,8 +214,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Filtrado de alistamientos existentes por Sede y término de búsqueda
   const filteredRecords = useMemo(() => {
     return recentRecords.filter((r) => {
-      // Filtro de Sede / Taller
-      if (selectedWorkshopFilter !== 'all') {
+      // Si no es Matriz, restringir estrictamente a la sede asignada
+      if (!isMatriz && defaultSedeId) {
+        const matchesSede = r.sedeId === defaultSedeId || r.sede === defaultSede;
+        if (!matchesSede) return false;
+      } else if (selectedWorkshopFilter !== 'all') {
         const matchesWs = r.sedeId === selectedWorkshopFilter || r.sede === selectedWorkshopFilter;
         if (!matchesWs) return false;
       }
@@ -212,7 +237,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
         r.tecnicoResponsable.toLowerCase().includes(term)
       );
     });
-  }, [recentRecords, searchTerm, selectedWorkshopFilter]);
+  }, [recentRecords, searchTerm, selectedWorkshopFilter, defaultSedeId, defaultSede, isMatriz]);
 
   // Métricas financieras y operativas del listado (Ingresos cobrados vs Pendientes por cobrar)
   const statsMetrics = useMemo(() => {
@@ -320,7 +345,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   }, [isPdiBlocked, isEngrasadoBlocked]);
 
-  // Consultar Cédula o RUC (busca en registros existentes o padrón público)
+  // Consultar Cédula o RUC (busca en registros existentes o clientes guardados)
   const handleConsultar = (idToSearch?: string) => {
     const cleanId = (idToSearch || formData.cedulaRuc).trim();
     if (!cleanId) return;
@@ -328,10 +353,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setIsSearching(true);
     setSearchFeedback(null);
 
-    // 1. Primero verificar si ya existe en el historial local de alistamientos
-    const existingRec = recentRecords.find(
+    // 1. Primero verificar si ya existe en el historial local de alistamientos de esta sede
+    const allAlistamientos = isMatriz
+      ? [...recentRecords, ...getStoredFullAlistamientos()]
+      : recentRecords.filter((r) => r.sedeId === defaultSedeId || r.sede === defaultSede);
+    const existingRec = allAlistamientos.find(
       (r) =>
-        r.cedulaRuc.trim().toLowerCase() === cleanId.toLowerCase() ||
+        (r.cedulaRuc && r.cedulaRuc.trim().toLowerCase() === cleanId.toLowerCase()) ||
         (r.chasis && r.chasis.trim().toUpperCase() === cleanId.toUpperCase())
     );
 
@@ -339,61 +367,147 @@ export const AlistamientoWizard: React.FC<Props> = ({
       setIsSearching(false);
       setFormData((prev) => ({
         ...prev,
-        cedulaRuc: existingRec.cedulaRuc,
-        nombres: existingRec.nombres,
-        apellidos: existingRec.apellidos,
+        cedulaRuc: existingRec.cedulaRuc || cleanId,
+        nombres: existingRec.nombres || prev.nombres,
+        apellidos: existingRec.apellidos || prev.apellidos,
         celular1: existingRec.celular1 || prev.celular1,
         celular2: existingRec.celular2 || prev.celular2,
         email: existingRec.email || prev.email,
         direccion: existingRec.direccion || prev.direccion,
         origen: existingRec.origen || prev.origen,
-        motoPreviaId: existingRec.chasis || existingRec.placa,
+        motoPreviaId: existingRec.chasis || existingRec.placa || prev.motoPreviaId,
         chasis: existingRec.chasis || prev.chasis,
         placa: existingRec.placa || prev.placa,
         modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
-        kilometraje: existingRec.kilometraje ? existingRec.kilometraje + 500 : prev.kilometraje,
+        color: existingRec.color || prev.color,
+        kilometraje: existingRec.kilometraje || prev.kilometraje,
       }));
       setSearchFeedback(`✓ Cliente registrado encontrado: ${existingRec.nombres} ${existingRec.apellidos}`);
       return;
     }
 
-    // 2. Si es cliente nuevo en el taller, consultar padrón
-    setTimeout(() => {
-      const padronData = querySriMock(cleanId);
+    // 2. Buscar en base de datos de clientes registrados de esta sede
+    const storedClients = isMatriz
+      ? getStoredClients()
+      : getStoredClients().filter((c) => c.workshopId === defaultSedeId || c.workshopName === defaultSede);
+    const existingClient = storedClients.find(
+      (c) =>
+        (c.idNumber && c.idNumber.trim().toLowerCase() === cleanId.toLowerCase()) ||
+        (c.motorcycleVin && c.motorcycleVin.trim().toUpperCase() === cleanId.toUpperCase()) ||
+        (c.motorcyclePlate && c.motorcyclePlate.trim().toUpperCase() === cleanId.toUpperCase())
+    );
+
+    if (existingClient) {
       setIsSearching(false);
-
-      if (padronData) {
-        const parts = padronData.razonSocial.split(' ');
-        let nombres = '';
-        let apellidos = '';
-
-        if (parts.length >= 4) {
-          apellidos = `${parts[0]} ${parts[1]}`;
-          nombres = parts.slice(2).join(' ');
-        } else if (parts.length === 3) {
-          apellidos = `${parts[0]} ${parts[1]}`;
-          nombres = parts[2];
-        } else if (parts.length === 2) {
-          apellidos = parts[0];
-          nombres = parts[1];
-        } else {
-          nombres = padronData.razonSocial;
-          apellidos = '';
-        }
-
-        setFormData((prev) => ({
-          ...prev,
-          cedulaRuc: cleanId,
-          nombres: nombres || prev.nombres,
-          apellidos: apellidos || prev.apellidos,
-          direccion: padronData.address || prev.direccion,
-          email: padronData.email || prev.email,
-        }));
-        setSearchFeedback(`✓ Datos verificados: ${padronData.razonSocial}`);
+      const parts = (existingClient.fullName || '').trim().split(' ');
+      let cNombres = '';
+      let cApellidos = '';
+      if (parts.length >= 4) {
+        cApellidos = `${parts[0]} ${parts[1]}`;
+        cNombres = parts.slice(2).join(' ');
+      } else if (parts.length === 3) {
+        cApellidos = `${parts[0]} ${parts[1]}`;
+        cNombres = parts[2];
+      } else if (parts.length === 2) {
+        cApellidos = parts[0];
+        cNombres = parts[1];
       } else {
-        setSearchFeedback(`Información: No registrado en el padrón local. Ingrese los datos manualmente.`);
+        cNombres = existingClient.fullName;
       }
-    }, 350);
+
+      setFormData((prev) => ({
+        ...prev,
+        cedulaRuc: existingClient.idNumber || cleanId,
+        nombres: cNombres || prev.nombres,
+        apellidos: cApellidos || prev.apellidos,
+        celular1: existingClient.phone || prev.celular1,
+        email: existingClient.email || prev.email,
+        direccion: existingClient.address || prev.direccion,
+        motoPreviaId: existingClient.motorcycleVin || existingClient.motorcyclePlate || prev.motoPreviaId,
+        chasis: existingClient.motorcycleVin || prev.chasis,
+        placa: existingClient.motorcyclePlate || prev.placa,
+        modeloMarca: existingClient.motorcycleModel
+          ? `${existingClient.motorcycleBrand || ''} ${existingClient.motorcycleModel}`.trim()
+          : prev.modeloMarca,
+        numeroMotor: existingClient.motorNumber || prev.numeroMotor,
+        ramv: existingClient.ramvNumber || prev.ramv,
+        color: existingClient.color || prev.color,
+        year: existingClient.year || prev.year,
+        kilometraje: existingClient.motorcycleMileage !== undefined ? existingClient.motorcycleMileage : prev.kilometraje,
+      }));
+      setSearchFeedback(`✓ Cliente registrado encontrado: ${existingClient.fullName}`);
+      return;
+    }
+
+    // 3. No encontrado en la base de datos (y actualmente sin API externa conectada)
+    // NO rellenar ni inventar datos ficticios: el usuario debe poder continuar llenando los datos manualmente
+    setTimeout(() => {
+      setIsSearching(false);
+      setSearchFeedback('ℹ Cédula no registrada en el sistema. Puedes continuar completando los datos manualmente.');
+    }, 250);
+  };
+
+  // Guardar datos del cliente ingresado en la base de datos de la red
+  const handleSaveClientToDatabase = () => {
+    const cleanId = formData.cedulaRuc.trim();
+    const cleanNombres = formData.nombres.trim();
+    const cleanApellidos = formData.apellidos.trim();
+
+    if (!cleanId) {
+      setSearchFeedback('⚠️ Ingrese el número de Cédula o RUC para guardar al cliente.');
+      return;
+    }
+    if (!cleanNombres) {
+      setSearchFeedback('⚠️ Ingrese los nombres del cliente para poder registrarlo.');
+      return;
+    }
+
+    const fullName = `${cleanNombres} ${cleanApellidos}`.trim();
+    const currentClients = getStoredClients();
+    const existingIndex = currentClients.findIndex(
+      (c) => c.idNumber && c.idNumber.trim().toLowerCase() === cleanId.toLowerCase()
+    );
+
+    const clientToSave: TallerClient = {
+      id: existingIndex >= 0 ? currentClients[existingIndex].id : `cli-${Date.now()}`,
+      fullName,
+      idNumber: cleanId,
+      phone: formData.celular1.trim() || formData.celular2?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].phone : ''),
+      email: formData.email.trim() || (existingIndex >= 0 ? currentClients[existingIndex].email : ''),
+      address: formData.direccion.trim() || (existingIndex >= 0 ? currentClients[existingIndex].address : ''),
+      motorcycleBrand: formData.modeloMarca ? formData.modeloMarca.split(' ')[0] : (existingIndex >= 0 ? currentClients[existingIndex].motorcycleBrand : 'Benelli'),
+      motorcycleModel: formData.modeloMarca.trim() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleModel : 'Modelo por definir'),
+      motorcyclePlate: formData.placa.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcyclePlate : 'S/P'),
+      motorcycleVin: formData.chasis.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleVin : undefined),
+      motorNumber: formData.numeroMotor?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorNumber : undefined),
+      ramvNumber: formData.ramv?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].ramvNumber : undefined),
+      color: formData.color?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].color : undefined),
+      motorcycleMileage: Number(formData.kilometraje) > 0
+        ? Number(formData.kilometraje)
+        : (existingIndex >= 0 && currentClients[existingIndex].motorcycleMileage !== undefined
+            ? currentClients[existingIndex].motorcycleMileage
+            : (Number(formData.kilometraje) || 0)),
+      lastVisit: todayStr,
+      totalVisits: existingIndex >= 0 ? (currentClients[existingIndex].totalVisits || 1) + 1 : 1,
+      workshopId: formData.sedeId || defaultSedeId,
+      workshopName: formData.sede || defaultSede,
+    };
+
+    let updatedClients: TallerClient[];
+    if (existingIndex >= 0) {
+      updatedClients = [...currentClients];
+      updatedClients[existingIndex] = clientToSave;
+    } else {
+      updatedClients = [clientToSave, ...currentClients];
+    }
+
+    saveStoredClients(updatedClients);
+
+    try {
+      confetti({ particleCount: 25, spread: 50, origin: { y: 0.3 } });
+    } catch (_) {}
+
+    setSearchFeedback(`✓ Cliente "${fullName}" guardado exitosamente en la base de datos.`);
   };
 
   // Iniciar nuevo alistamiento con o sin cédula previa
@@ -420,23 +534,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
       modeloMarca: '',
       color: '',
       serviciosRealizados: ['alistamiento_pdi'],
-      tecnicoResponsable: technicians[0]?.name || 'WILLIAM MEZA',
-      tecnicoId: technicians[0]?.id || 'tec-01',
-      kilometraje: 0,
+      tecnicoResponsable: technicians[0]?.name || '',
+      tecnicoId: technicians[0]?.id || '',
+      kilometraje: '',
       aceite: 'con_aceite',
       nivelAceite: 'optimo',
       tipoAceite: 'Katana 20W50',
       numeroFactura: '',
       numeroTicket: '',
-      valorServicio: 35.0,
-      montoPagado: 35.0,
-      abono: 35.0,
-      saldoPendiente: 0,
+      valorServicio: '',
+      montoPagado: '',
+      abono: '',
+      saldoPendiente: '',
       esCredito: false,
       mesesCredito: 3,
       metodoPago: 'Efectivo',
       observaciones: '',
-      proximoMantenimientoKm: 1000,
+      proximoMantenimientoKm: '',
       fotos: [],
       createdAt: '',
     });
@@ -451,7 +565,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   };
 
   // Reusar datos de un cliente existente para nuevo servicio
-  const handleNewServiceForExisting = (record: AlistamientoFullRecord) => {
+  const handleNewServiceForExisting = (record: AlistamientoFullRecord | AlistamientoFormData) => {
     setFormData({
       id: '',
       atendidoPor: defaultAtendidoPor,
@@ -473,9 +587,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
       modeloMarca: record.modeloMarca,
       color: record.color || '',
       serviciosRealizados: ['mantenimiento'],
-      tecnicoResponsable: record.tecnicoResponsable || technicians[0]?.name || 'WILLIAM MEZA',
-      tecnicoId: record.tecnicoId || technicians[0]?.id || 'tec-01',
-      kilometraje: record.kilometraje ? record.kilometraje + 500 : 500,
+      tecnicoResponsable: (record.tecnicoResponsable && technicians.some((t) => t.name === record.tecnicoResponsable))
+        ? record.tecnicoResponsable
+        : (technicians[0]?.name || ''),
+      tecnicoId: (record.tecnicoId && technicians.some((t) => t.id === record.tecnicoId))
+        ? record.tecnicoId
+        : (technicians[0]?.id || ''),
+      kilometraje: record.kilometraje || '',
       aceite: record.aceite || 'con_aceite',
       nivelAceite: record.nivelAceite || 'optimo',
       tipoAceite: record.tipoAceite || 'Katana 20W50',
@@ -489,7 +607,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       mesesCredito: 3,
       metodoPago: 'Efectivo',
       observaciones: `Mantenimiento subsecuente. Cliente C.I. ${record.cedulaRuc}.`,
-      proximoMantenimientoKm: (record.kilometraje || 0) + 1500,
+      proximoMantenimientoKm: '',
       fotos: [],
       createdAt: '',
     });
@@ -510,8 +628,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
   const handleSaveRecordDetail = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!detailFormData) return;
+    const valServ = Number(detailFormData.valorServicio) || 0;
+    const valAbono = detailFormData.abono !== undefined && detailFormData.abono !== '' ? Number(detailFormData.abono) : (detailFormData.montoPagado !== '' ? Number(detailFormData.montoPagado) : 0);
+    const securedDetail: AlistamientoFullRecord = {
+      ...detailFormData,
+      kilometraje: Number(detailFormData.kilometraje) || 0,
+      valorServicio: valServ,
+      montoPagado: valAbono,
+      abono: valAbono,
+      saldoPendiente: detailFormData.saldoPendiente !== undefined && detailFormData.saldoPendiente !== '' ? Number(detailFormData.saldoPendiente) : Math.max(0, valServ - valAbono),
+      proximoMantenimientoKm: Number(detailFormData.proximoMantenimientoKm) || 0,
+      year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
+      mesesCredito: Number(detailFormData.mesesCredito) || 3,
+    };
+    setSelectedRecordForDetail(securedDetail);
+    setDetailFormData(securedDetail);
     if (onSaveRecord) {
-      onSaveRecord(detailFormData);
+      onSaveRecord(securedDetail);
     }
     setDetailSuccessToast('✓ Ficha técnica y datos de alistamiento actualizados correctamente.');
     setTimeout(() => setDetailSuccessToast(null), 3500);
@@ -529,18 +662,40 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     setFormData((prev) => {
       const exists = prev.serviciosRealizados.includes(servicio);
+      let updatedServicios: ServiceActionType[];
       if (exists) {
         if (prev.serviciosRealizados.length === 1) return prev; // Mantener al menos uno seleccionado
-        return {
-          ...prev,
-          serviciosRealizados: prev.serviciosRealizados.filter((s) => s !== servicio),
-        };
+        updatedServicios = prev.serviciosRealizados.filter((s) => s !== servicio);
       } else {
-        return {
-          ...prev,
-          serviciosRealizados: [...prev.serviciosRealizados, servicio],
-        };
+        updatedServicios = [...prev.serviciosRealizados, servicio];
       }
+
+      const isPdiOnly = updatedServicios.length === 1 && updatedServicios[0] === 'alistamiento_pdi';
+      let valor = prev.valorServicio;
+      let pagado = prev.montoPagado;
+      let abono = prev.abono;
+      let saldo = prev.saldoPendiente;
+
+      if (isPdiOnly) {
+        valor = 0;
+        pagado = 0;
+        abono = 0;
+        saldo = 0;
+      } else if (valor === 0 && updatedServicios.some((s) => s === 'mantenimiento' || s === 'engrasado')) {
+        valor = 35.0;
+        pagado = 35.0;
+        abono = 35.0;
+        saldo = 0;
+      }
+
+      return {
+        ...prev,
+        serviciosRealizados: updatedServicios,
+        valorServicio: valor,
+        montoPagado: pagado,
+        abono: abono,
+        saldoPendiente: saldo,
+      };
     });
   };
 
@@ -577,12 +732,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
     e.preventDefault();
     if (!newTechData.name.trim()) return;
 
-    const targetWorkshop = workshops.find((w) => w.id === newTechData.workshopId);
+    const wsId = (!isMatriz || !newTechData.workshopId) ? defaultSedeId : newTechData.workshopId;
+    const targetWorkshop = workshops.find((w) => w.id === wsId) || workshops.find((w) => w.id === defaultSedeId);
     onAddTechnician({
       name: newTechData.name.toUpperCase(),
       specialty: newTechData.specialty,
       phone: newTechData.phone || '0990000000',
-      workshopId: newTechData.workshopId,
+      workshopId: wsId,
       workshopName: targetWorkshop?.name || defaultSede,
       status: 'activo',
     });
@@ -637,7 +793,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       missingStep3.push('¿Qué se realizó?');
     }
     const isPdiOnly = formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi';
-    if (!isPdiOnly && (formData.valorServicio === undefined || formData.valorServicio === null || isNaN(formData.valorServicio))) {
+    if (!isPdiOnly && (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio)))) {
       missingStep3.push('Valor del servicio ($)');
     }
 
@@ -675,12 +831,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setValidationAlert(null);
 
     const isCred = formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito;
-    const finalValor = isPdiOnly ? 0 : (formData.valorServicio || 0);
-    const finalAbono = isPdiOnly ? 0 : (isCred ? 0 : (formData.abono !== undefined ? formData.abono : (formData.montoPagado || 0)));
-    const finalSaldo = isPdiOnly ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined ? formData.saldoPendiente : Math.max(0, finalValor - finalAbono)));
+    const numVal = Number(formData.valorServicio) || 0;
+    const numAbono = formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal);
+    const finalValor = isPdiOnly ? 0 : numVal;
+    const finalAbono = isPdiOnly ? 0 : (isCred ? 0 : numAbono);
+    const finalSaldo = isPdiOnly ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono)));
 
     const fullRecord: AlistamientoFullRecord = {
       ...formData,
+      kilometraje: Number(formData.kilometraje) || 0,
+      proximoMantenimientoKm: Number(formData.proximoMantenimientoKm) || 0,
+      year: formData.year !== undefined && formData.year !== '' ? Number(formData.year) : undefined,
+      mesesCredito: Number(formData.mesesCredito) || 3,
       esCredito: isCred,
       metodoPago: isCred ? 'Crédito' : formData.metodoPago,
       valorServicio: finalValor,
@@ -736,7 +898,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       {currentViewMode === 'list' && selectedRecordForDetail && detailFormData && (
         <form
           onSubmit={handleSaveRecordDetail}
-          className="h-full w-full flex flex-col overflow-hidden gap-3 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs"
+          className="w-full flex flex-col gap-4 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs"
         >
           {/* Cabecera del Formulario de Alistamiento */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
@@ -852,7 +1014,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
           )}
 
           {/* Formulario en 3 Columnas Simétricas */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+          <div className="w-full space-y-4 pr-1">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               {/* COLUMNA 1: DATOS DEL CLIENTE */}
               <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
@@ -1003,29 +1165,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-                    Kilometraje de Recepción (km) *
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1 flex items-center justify-between">
+                    <span>Kilometraje de Recepción (km) *</span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                      {detailFormData.kilometraje !== '' ? `${detailFormData.kilometraje} km` : '0 km'}
+                    </span>
                   </label>
                   <input
                     type="number"
                     min="0"
                     value={detailFormData.kilometraje}
-                    onChange={(e) =>
-                      setDetailFormData({ ...detailFormData, kilometraje: parseInt(e.target.value) || 0 })
-                    }
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const km = cleanNumberInput(e.target.value);
+                      setDetailFormData({
+                        ...detailFormData,
+                        kilometraje: km,
+                      });
+                    }}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
                   />
-                </div>
-
-                <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 text-xs">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase block mb-1">
-                    Resumen del Vehículo:
-                  </span>
-                  <div className="text-zinc-800 font-bold">{detailFormData.modeloMarca || 'Sin modelo'}</div>
-                  <div className="text-[11px] text-zinc-600 font-mono mt-0.5">
-                    Placa: <strong>{detailFormData.placa || 'SIN PLACA'}</strong> • Km:{' '}
-                    <strong>{detailFormData.kilometraje} km</strong>
-                  </div>
                 </div>
               </div>
 
@@ -1137,16 +1297,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         <input
                           type="number"
                           step="0.01"
-                          value={detailFormData.valorServicio || 0}
+                          value={detailFormData.valorServicio !== undefined && detailFormData.valorServicio !== null ? detailFormData.valorServicio : ''}
+                          onFocus={selectOnFocus}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            const ab = detailFormData.abono !== undefined ? detailFormData.abono : (detailFormData.montoPagado || 0);
+                            const clean = cleanNumberInput(e.target.value);
+                            const val = clean === '' ? 0 : parseFloat(clean);
+                            const ab = Number(detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado || 0));
                             setDetailFormData({
                               ...detailFormData,
-                              valorServicio: val,
+                              valorServicio: clean,
                               saldoPendiente: Math.max(0, val - ab),
                             });
                           }}
+                          placeholder="0.00"
                           className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600"
                         />
                       </div>
@@ -1165,7 +1328,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                               esCredito: isCred,
                               abono: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
                               montoPagado: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
-                              saldoPendiente: isCred ? valServ : Math.max(0, valServ - (detailFormData.abono || valServ)),
+                              saldoPendiente: isCred ? valServ : Math.max(0, Number(valServ) - Number(detailFormData.abono || valServ)),
                             });
                           }}
                           className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 cursor-pointer"
@@ -1210,7 +1373,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             <label className="block text-[10px] font-bold text-blue-900 mb-0.5">Monto a Crédito ($)</label>
                             <input
                               type="number"
-                              value={(detailFormData.valorServicio || 0).toFixed(2)}
+                              value={Number(detailFormData.valorServicio || 0).toFixed(2)}
                               readOnly
                               className="w-full px-2 py-1 bg-blue-50/70 border border-blue-300 rounded-lg text-xs font-mono font-bold text-blue-900 outline-none"
                             />
@@ -1218,7 +1381,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <div>
                             <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente por Cobrar ($)</label>
                             <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between items-center">
-                              <span>${(detailFormData.valorServicio || 0).toFixed(2)}</span>
+                              <span>${Number(detailFormData.valorServicio || 0).toFixed(2)}</span>
                               <span className="text-[9px] text-amber-700 font-bold">Crédito</span>
                             </div>
                           </div>
@@ -1231,17 +1394,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <input
                             type="number"
                             step="0.01"
-                            value={detailFormData.abono !== undefined ? detailFormData.abono : detailFormData.montoPagado}
+                            value={detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado ?? '')}
+                            onFocus={selectOnFocus}
                             onChange={(e) => {
-                              const abVal = parseFloat(e.target.value) || 0;
-                              const valServ = detailFormData.valorServicio || 0;
+                              const clean = cleanNumberInput(e.target.value);
+                              const abVal = clean === '' ? 0 : parseFloat(clean);
+                              const valServ = Number(detailFormData.valorServicio || 0);
                               setDetailFormData({
                                 ...detailFormData,
-                                abono: abVal,
-                                montoPagado: abVal,
+                                abono: clean,
+                                montoPagado: clean,
                                 saldoPendiente: Math.max(0, valServ - abVal),
                               });
                             }}
+                            placeholder="0.00"
                             className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900 outline-none"
                           />
                         </div>
@@ -1249,7 +1415,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente ($)</label>
                           <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between">
                             <span>
-                              ${(detailFormData.saldoPendiente ?? Math.max(0, (detailFormData.valorServicio || 0) - (detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
+                              ${Number(detailFormData.saldoPendiente ?? Math.max(0, Number(detailFormData.valorServicio || 0) - Number(detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
                             </span>
                             <span className="text-[9px] text-amber-700">Saldo</span>
                           </div>
@@ -1281,11 +1447,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="number"
                       min="0"
                       value={detailFormData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        const clean = cleanNumberInput(e.target.value);
                         setDetailFormData({
                           ...detailFormData,
-                          proximoMantenimientoKm: isNaN(val) ? 0 : val,
+                          proximoMantenimientoKm: clean,
                         });
                       }}
                       placeholder="Ej: 1000"
@@ -1294,24 +1461,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
                       KM
                     </span>
-                  </div>
-                  {/* Botones de sugerencias rápidas */}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-zinc-500 font-semibold">Sugeridos:</span>
-                    {[1000, 2500, 3000, 5000].map((km) => (
-                      <button
-                        key={km}
-                        type="button"
-                        onClick={() => setDetailFormData({ ...detailFormData, proximoMantenimientoKm: km })}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                          detailFormData.proximoMantenimientoKm === km
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
-                        }`}
-                      >
-                        {km.toLocaleString()} km
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -1427,7 +1576,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   {recentRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
-                  ${recentRecords.reduce((acc, r) => acc + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)} Facturado
+                  ${recentRecords.reduce((acc, r) => acc + (isPdiOnlyRecord(r) ? 0 : (Number(r.montoPagado) || Number(r.valorServicio) || 0)), 0).toFixed(2)} Facturado
                 </span>
               </div>
             </div>
@@ -1480,8 +1629,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Filtro de Sede / Taller */}
-              {workshops && workshops.length > 0 && (
+              {/* Filtro de Sede / Taller (Solo disponible para Matriz) */}
+              {isMatriz && workshops && workshops.length > 0 && (
                 <div className="h-12 sm:h-13 bg-white border border-zinc-300 rounded-xl px-3 flex items-center shrink-0 shadow-2xs">
                   <Building2 className="w-4 h-4 text-blue-600 mr-2 shrink-0" />
                   <select
@@ -1715,7 +1864,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
                           {/* 9. Valor */}
                           <td className="px-2 py-2 text-right font-mono font-bold text-zinc-900 whitespace-nowrap text-xs">
-                            ${(record.montoPagado || record.valorServicio || 35).toFixed(2)}
+                            {isPdiOnlyRecord(record) ? (
+                              <span className="text-zinc-400 font-bold text-center block">-</span>
+                            ) : (
+                              `$${(Number(record.montoPagado) || Number(record.valorServicio) || 0).toFixed(2)}`
+                            )}
                           </td>
 
                           {/* 10. Factura */}
@@ -1788,7 +1941,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         Total ({filteredRecords.length} registros):
                       </td>
                       <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
-                        ${filteredRecords.reduce((sum, r) => sum + (r.montoPagado || r.valorServicio || 35), 0).toFixed(2)}
+                        ${filteredRecords.reduce((sum, r) => sum + (isPdiOnlyRecord(r) ? 0 : (Number(r.montoPagado) || Number(r.valorServicio) || 0)), 0).toFixed(2)}
                       </td>
                       <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
                         <span className="font-bold text-blue-700">
@@ -1877,9 +2030,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <p className="text-[11px] text-zinc-400">Verificación y contacto</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                    Paso 1
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Paso 1
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSaveClientToDatabase}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="Guardar este cliente en la base de datos para futuras consultas"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Guardar</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Cédula o RUC (Primerito) */}
@@ -1914,7 +2078,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </button>
                   </div>
                   {searchFeedback && (
-                    <p className="text-[11px] text-blue-800 font-medium leading-tight">
+                    <p
+                      className={`text-xs font-medium leading-tight p-2.5 rounded-xl border ${
+                        searchFeedback.startsWith('✓')
+                          ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-200'
+                      }`}
+                    >
                       {searchFeedback}
                     </p>
                   )}
@@ -2123,18 +2293,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                {/* Kilometraje Actual (1 por fila) */}
+                {/* Kilometraje de Recepción (1 por fila) */}
                 <div>
-                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
-                    Kilometraje Actual
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5 flex items-center justify-between">
+                    <span>Kilometraje de Recepción (Odómetro) *</span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
+                    </span>
                   </label>
                   <div className="relative">
                     <input
                       type="number"
-                      value={formData.kilometraje || ''}
-                      onChange={(e) =>
-                        setFormData({ ...formData, kilometraje: parseInt(e.target.value) || 0 })
-                      }
+                      min="0"
+                      value={formData.kilometraje}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => {
+                        const km = cleanNumberInput(e.target.value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          kilometraje: km,
+                        }));
+                      }}
                       placeholder="0"
                       className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
                     />
@@ -2266,12 +2445,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       setFormData({
                         ...formData,
                         tecnicoResponsable: techName,
-                        tecnicoId: techObj?.id || 'tec-01',
+                        tecnicoId: techObj?.id || '',
                       });
                     }}
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-emerald-600 focus:bg-white"
                     required
                   >
+                    <option value="">
+                      {technicians.length === 0
+                        ? '⚠️ Sin técnicos en este taller (Cree uno con + Nuevo Técnico)'
+                        : 'Seleccione un técnico responsable...'}
+                    </option>
                     {technicians.map((t) => (
                       <option key={t.id} value={t.name}>
                         {t.name} ({t.workshopName || 'Taller'})
@@ -2385,15 +2569,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           type="number"
                           step="0.01"
                           value={formData.valorServicio}
+                          onFocus={selectOnFocus}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            const abonoVal = formData.abono !== undefined ? formData.abono : val;
+                            const clean = cleanNumberInput(e.target.value);
+                            const val = clean === '' ? 0 : parseFloat(clean);
+                            const abonoVal = formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : val;
                             setFormData({
                               ...formData,
-                              valorServicio: val,
+                              valorServicio: clean,
                               saldoPendiente: Math.max(0, val - abonoVal),
                             });
                           }}
+                          placeholder="0.00"
                           className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
                           required
                         />
@@ -2448,7 +2635,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             <input
                               type="number"
                               step="0.01"
-                              value={formData.valorServicio}
+                              value={formData.valorServicio !== '' ? Number(formData.valorServicio).toFixed(2) : '0.00'}
                               readOnly
                               className="w-full px-3 py-1.5 bg-blue-50/60 border border-blue-300 rounded-xl text-sm font-mono font-bold text-blue-900 outline-none"
                             />
@@ -2476,7 +2663,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs">
                           <span className="font-bold text-amber-900">Total Pendiente por Cobrar:</span>
                           <span className="font-mono font-black text-amber-700 text-sm">
-                            ${formData.valorServicio.toFixed(2)}
+                            ${Number(formData.valorServicio || 0).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -2507,16 +2694,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             type="number"
                             step="0.01"
                             value={formData.abono !== undefined ? formData.abono : formData.montoPagado}
+                            onFocus={selectOnFocus}
                             onChange={(e) => {
-                              const abonoVal = parseFloat(e.target.value) || 0;
-                              const pendiente = Math.max(0, formData.valorServicio - abonoVal);
+                              const clean = cleanNumberInput(e.target.value);
+                              const abonoVal = clean === '' ? 0 : parseFloat(clean);
+                              const valServ = Number(formData.valorServicio || 0);
+                              const pendiente = Math.max(0, valServ - abonoVal);
                               setFormData({
                                 ...formData,
-                                abono: abonoVal,
-                                montoPagado: abonoVal,
+                                abono: clean,
+                                montoPagado: clean,
                                 saldoPendiente: pendiente,
                               });
                             }}
+                            placeholder="0.00"
                             className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
                           />
                         </div>
@@ -2527,15 +2718,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           </label>
                           <div
                             className={`w-full px-3 py-1.5 rounded-xl border text-sm font-mono font-bold flex items-center justify-between ${
-                              (formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))) > 0
+                              Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))) > 0
                                 ? 'bg-amber-50 border-amber-300 text-amber-900'
                                 : 'bg-emerald-50 border-emerald-300 text-emerald-900'
                             }`}
                           >
                             <span>
-                              ${(formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))).toFixed(2)}
+                              ${Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))).toFixed(2)}
                             </span>
-                            {(formData.saldoPendiente ?? Math.max(0, formData.valorServicio - (formData.abono ?? formData.montoPagado))) > 0 ? (
+                            {Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))) > 0 ? (
                               <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-sans">
                                 Pendiente
                               </span>
@@ -2592,11 +2783,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="number"
                       min="0"
                       value={formData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        const clean = cleanNumberInput(e.target.value);
                         setFormData({
                           ...formData,
-                          proximoMantenimientoKm: isNaN(val) ? 0 : val,
+                          proximoMantenimientoKm: clean,
                         });
                       }}
                       placeholder="Ej: 1000"
@@ -2605,24 +2797,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
                       KM
                     </span>
-                  </div>
-                  {/* Botones de sugerencias rápidas */}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-zinc-500 font-semibold">Sugeridos:</span>
-                    {[1000, 2500, 3000, 5000].map((km) => (
-                      <button
-                        key={km}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, proximoMantenimientoKm: km })}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                          formData.proximoMantenimientoKm === km
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
-                        }`}
-                      >
-                        {km.toLocaleString()} km
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -2756,8 +2930,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
             {mobileStep === 1 && (
               <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-                  <h3 className="text-sm font-black text-zinc-900">Paso 1: Datos del Cliente</h3>
-                  <span className="text-[10px] font-bold text-blue-600">1 de 3</span>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-black text-zinc-900">Paso 1: Datos del Cliente</h3>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">1 de 3</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveClientToDatabase}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    title="Guardar este cliente en la base de datos para futuras consultas"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Guardar Cliente</span>
+                  </button>
                 </div>
 
                 <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
@@ -2789,7 +2974,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <span>{isSearching ? '...' : 'Consultar'}</span>
                     </button>
                   </div>
-                  {searchFeedback && <p className="text-[11px] text-blue-800 font-medium">{searchFeedback}</p>}
+                  {searchFeedback && (
+                    <p
+                      className={`text-xs font-medium leading-tight p-2 rounded-lg border ${
+                        searchFeedback.startsWith('✓')
+                          ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      {searchFeedback}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -2957,15 +3152,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                    Kilometraje Actual
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                    <span>Kilometraje de Recepción (Odómetro) *</span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                      {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
+                    </span>
                   </label>
                   <input
                     type="number"
-                    value={formData.kilometraje || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, kilometraje: parseInt(e.target.value) || 0 })
-                    }
+                    min="0"
+                    value={formData.kilometraje}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const km = cleanNumberInput(e.target.value);
+                      setFormData((prev) => ({
+                        ...prev,
+                        kilometraje: km,
+                      }));
+                    }}
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold"
                     placeholder="0"
                   />
@@ -3080,11 +3284,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       setFormData({
                         ...formData,
                         tecnicoResponsable: techName,
-                        tecnicoId: techObj?.id || 'tec-01',
+                        tecnicoId: techObj?.id || '',
                       });
                     }}
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
                   >
+                    <option value="">
+                      {technicians.length === 0
+                        ? '⚠️ Sin técnicos registrados'
+                        : 'Seleccione un técnico responsable...'}
+                    </option>
                     {technicians.map((t) => (
                       <option key={t.id} value={t.name}>
                         {t.name}
@@ -3141,14 +3350,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           type="number"
                           step="0.01"
                           value={formData.valorServicio}
+                          onFocus={selectOnFocus}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
+                            const clean = cleanNumberInput(e.target.value);
+                            const val = clean === '' ? 0 : parseFloat(clean);
                             setFormData((prev) => ({
                               ...prev,
-                              valorServicio: val,
-                              abono: prev.esCredito ? 0 : ((prev.abono ?? 0) > val ? val : prev.abono),
+                              valorServicio: clean,
+                              abono: prev.esCredito ? 0 : (Number(prev.abono ?? 0) > val ? clean : prev.abono),
                             }));
                           }}
+                          placeholder="0.00"
                           className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
                         />
                       </div>
@@ -3217,7 +3429,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </label>
                             <div className="h-8 px-2.5 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-between text-blue-900 text-xs font-black">
                               <span>Total</span>
-                              <span>${formData.valorServicio.toFixed(2)}</span>
+                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
                             </div>
                           </div>
                           <div>
@@ -3225,7 +3437,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                               Pendiente ($)
                             </label>
                             <div className="h-8 px-2.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
-                              <span>${formData.valorServicio.toFixed(2)}</span>
+                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
                               <span className="text-[9px] text-amber-700">Crédito</span>
                             </div>
                           </div>
@@ -3241,15 +3453,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             type="number"
                             step="0.01"
                             min="0"
-                            max={formData.valorServicio}
+                            max={Number(formData.valorServicio || 0)}
                             value={formData.abono ?? ''}
+                            onFocus={selectOnFocus}
                             onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
+                              const clean = cleanNumberInput(e.target.value);
+                              const val = clean === '' ? 0 : parseFloat(clean);
                               setFormData((prev) => ({
                                 ...prev,
-                                abono: val,
-                                montoPagado: val,
-                                saldoPendiente: Math.max(0, prev.valorServicio - val),
+                                abono: clean,
+                                montoPagado: clean,
+                                saldoPendiente: Math.max(0, Number(prev.valorServicio || 0) - val),
                               }));
                             }}
                             placeholder="0.00"
@@ -3264,12 +3478,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <div className="h-8 px-2.5 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
                             <span
                               className={
-                                Math.max(0, formData.valorServicio - (formData.abono ?? 0)) > 0
+                                Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)) > 0
                                   ? 'text-amber-600'
                                   : 'text-emerald-600'
                               }
                             >
-                              ${Math.max(0, formData.valorServicio - (formData.abono ?? 0)).toFixed(2)}
+                              ${Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)).toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -3323,11 +3537,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       type="number"
                       min="0"
                       value={formData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
                       onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        const clean = cleanNumberInput(e.target.value);
                         setFormData({
                           ...formData,
-                          proximoMantenimientoKm: isNaN(val) ? 0 : val,
+                          proximoMantenimientoKm: clean,
                         });
                       }}
                       placeholder="Ej: 1000"
@@ -3336,24 +3551,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
                       KM
                     </span>
-                  </div>
-                  {/* Botones de sugerencias rápidas */}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-zinc-500 font-semibold">Sugeridos:</span>
-                    {[1000, 2500, 3000, 5000].map((km) => (
-                      <button
-                        key={km}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, proximoMantenimientoKm: km })}
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                          formData.proximoMantenimientoKm === km
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200'
-                        }`}
-                      >
-                        {km.toLocaleString()} km
-                      </button>
-                    ))}
                   </div>
                 </div>
 

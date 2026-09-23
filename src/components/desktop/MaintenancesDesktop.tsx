@@ -95,39 +95,49 @@ export const MaintenancesDesktop: React.FC<Props> = ({
           Citas y Mantenimientos Registrados
         </h3>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
-          {scheduledMaintenances.map((maint) => (
-            <div
-              key={maint.id}
-              className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3 hover:border-zinc-300 transition"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h4 className="text-sm font-bold text-zinc-900">{maint.serviceTitle}</h4>
-                  <span className="text-xs text-blue-600 font-mono font-medium">
-                    Recomendado a los {maint.recommendedKm.toLocaleString()} KM
+        {scheduledMaintenances.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-dashed border-zinc-300 text-center space-y-3 max-w-xl mx-auto my-4">
+            <Calendar className="w-10 h-10 text-zinc-400 mx-auto" />
+            <h4 className="text-sm font-bold text-zinc-900">Sin citas ni mantenimientos programados</h4>
+            <p className="text-xs text-zinc-500">
+              No tienes citas pendientes. Puedes agendar una nueva cita técnica haciendo clic en el botón superior o esperar a que el taller te recomiende tu próximo servicio.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+            {scheduledMaintenances.map((maint) => (
+              <div
+                key={maint.id}
+                className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3 hover:border-zinc-300 transition"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900">{maint.serviceTitle}</h4>
+                    <span className="text-xs text-blue-600 font-mono font-medium">
+                      Recomendado a los {maint.recommendedKm.toLocaleString()} KM
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    {maint.status}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                  {maint.status}
-                </span>
-              </div>
 
-              <div className="text-xs text-zinc-600 flex items-center justify-between border-t border-zinc-100 pt-3">
-                <span>
-                  <strong className="text-zinc-800">Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
-                </span>
-                <span>
-                  <strong className="text-zinc-800">Sucursal:</strong> {maint.branchName}
-                </span>
-              </div>
+                <div className="text-xs text-zinc-600 flex items-center justify-between border-t border-zinc-100 pt-3">
+                  <span>
+                    <strong className="text-zinc-800">Fecha:</strong> {maint.scheduledDate || maint.recommendedDate} {maint.scheduledTime ? `• ${maint.scheduledTime}` : ''}
+                  </span>
+                  <span>
+                    <strong className="text-zinc-800">Sucursal:</strong> {maint.branchName}
+                  </span>
+                </div>
 
-              <div className="text-xs text-zinc-500 pt-1">
-                <strong className="text-zinc-700">Tareas:</strong> {maint.tasks.join(' • ')}
+                <div className="text-xs text-zinc-500 pt-1">
+                  <strong className="text-zinc-700">Tareas:</strong> {maint.tasks.join(' • ')}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import {
   AlistamientoService,
   MaintenanceType,
 } from '../../../types/customer';
+import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 
 interface Props {
   client: AlistamientoClient;
@@ -269,7 +270,11 @@ export const AlistamientoMobile: React.FC<Props> = ({
                 type="number"
                 step="0.01"
                 value={service.cost}
-                onChange={(e) => setService({ ...service, cost: Number(e.target.value) })}
+                onFocus={selectOnFocus}
+                onChange={(e) => {
+                  const clean = cleanNumberInput(e.target.value);
+                  setService({ ...service, cost: clean === '' ? 0 : Number(clean) });
+                }}
                 className="w-full px-3 py-1.5 text-xs font-mono font-bold text-blue-600 bg-zinc-50 border border-zinc-300 rounded-lg"
                 required
               />

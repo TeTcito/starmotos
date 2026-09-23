@@ -20,7 +20,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     orders,
     updateOrderStatus,
     warranties,
-    clients,
+    localClients: clients,
     inventory,
     workshops,
     technicians,

@@ -299,6 +299,7 @@ export const AdminViewMobile: React.FC<Props> = ({
             workshops={workshops}
             onAddTechnician={onAddTechnician}
             currentWorkshopId="matriz-la-mana"
+            isMatriz={true}
           />
         )}
         {activeSection === 'garantias_admin' && (

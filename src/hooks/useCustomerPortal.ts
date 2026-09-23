@@ -7,6 +7,7 @@ import {
   Vehicle,
   MaintenanceRecord,
   WarrantyItem,
+  WarrantyStatus,
   Branch,
   WorkOrderStatus,
   ProgressStep,
@@ -14,9 +15,18 @@ import {
   MotorcycleClientData,
   ScheduledMaintenance,
   TallerClient,
+  AlistamientoFullRecord,
+  ServiceActionType,
+  TallerOrder,
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
-import { getStoredClients, saveStoredClients } from '../data/mockMultiRoleData';
+import {
+  getStoredClients,
+  saveStoredClients,
+  getStoredFullAlistamientos,
+  getStoredOrders,
+  getStoredWarranties,
+} from '../data/mockMultiRoleData';
 import { cloudSaveClient } from '../services/supabaseService';
 
 // Sucursales Oficiales StarMotos
@@ -109,6 +119,41 @@ export const ALL_BRANCHES = [
   BRANCH_PORTOVIEJO,
 ];
 
+// Perfil base limpio para nuevos clientes
+export const DEFAULT_PROFILE: ClientProfile = {
+  id: '',
+  fullName: 'Cliente StarMotos',
+  idNumber: '',
+  phone: '',
+  email: '',
+  address: '',
+  city: 'Ecuador',
+  emergencyContactName: '',
+  emergencyContactPhone: '',
+  clientType: 'particular',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+};
+
+// Moto base limpia para nuevos clientes
+export const DEFAULT_MOTORCYCLE: MotorcycleClientData = {
+  plate: 'EN TRÁMITE',
+  brand: 'StarMotos',
+  model: 'Motocicleta',
+  year: new Date().getFullYear(),
+  displacement: '150 cc',
+  vin: 'S/N',
+  color: 'Negro',
+  currentKm: 0,
+  lastOilChangeKm: 0,
+  oilChangeIntervalKm: 3000,
+  preferredOil: 'Katana 20W50',
+  dailyUsageKm: 15,
+  reportedSymptoms: '',
+  preferredPartsQuality: 'originales_oem',
+  preferredBranchId: 'matriz-la-mana',
+  photoUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
+};
+
 const INITIAL_PROFILE: ClientProfile = {
   id: 'cli-0089',
   fullName: 'Fernando Vaca',
@@ -173,6 +218,31 @@ const INITIAL_SCHEDULED_MAINTENANCES: ScheduledMaintenance[] = [
 
 // Generador de pasos de la OT
 const buildSteps = (currentStatus: WorkOrderStatus): ProgressStep[] => {
+  // New simplified flow from user request
+  const newFlowStatuses: WorkOrderStatus[] = ['inicio', 'en_proceso', 'trabajando', 'listo_para_entregar', 'entregado'];
+  const isNewFlow = newFlowStatuses.includes(currentStatus);
+
+  if (isNewFlow) {
+    const stepsDef: { id: WorkOrderStatus; label: string; shortLabel: string; desc: string }[] = [
+      { id: 'inicio', label: 'Recepción / Inicio', shortLabel: 'Inicio', desc: 'Moto recibida en taller, orden creada.' },
+      { id: 'en_proceso', label: 'En Proceso', shortLabel: 'En Proceso', desc: 'Diagnóstico y preparación de repuestos.' },
+      { id: 'trabajando', label: 'Trabajando', shortLabel: 'Trabajando', desc: 'Técnico ejecutando los servicios.' },
+      { id: 'listo_para_entregar', label: 'Listo para Entregar', shortLabel: 'Listo', desc: 'Servicio terminado, moto lista para retirar.' },
+      { id: 'entregado', label: 'Entregado', shortLabel: 'Entregado', desc: 'Entregada al cliente con conformidad.' },
+    ];
+    const currentIndex = newFlowStatuses.indexOf(currentStatus);
+    return stepsDef.map((step, idx) => ({
+      id: step.id,
+      label: step.label,
+      shortLabel: step.shortLabel,
+      description: step.desc,
+      completed: idx < currentIndex,
+      current: idx === currentIndex,
+      timestamp: idx <= currentIndex ? 'Actualizado' : undefined,
+    }));
+  }
+
+  // Legacy flow
   const stepsDef: { id: WorkOrderStatus; label: string; shortLabel: string; desc: string; time: string }[] = [
     { id: 'recepcion', label: 'Recepción e Inspección 360°', shortLabel: 'Recepción', desc: 'Inventario de pertenencias y chequeo visual de carrocería.', time: '20 Sep 2026, 08:45 AM' },
     { id: 'diagnostico', label: 'Diagnóstico en Elevador', shortLabel: 'Diagnóstico', desc: 'Revisión técnica de compresión, sistema eléctrico y transmisión.', time: '20 Sep 2026, 10:15 AM' },
@@ -359,6 +429,499 @@ const isMobileViewport = (): boolean => {
   );
 };
 
+// Orden vacía para clientes sin OT activa en taller
+const EMPTY_WORK_ORDER: WorkOrder = {
+  otNumber: '',
+  entryDate: '',
+  estimatedDelivery: '',
+  clientReason: '',
+  branch: BRANCH_MATRIZ,
+  mechanic: {
+    id: '',
+    name: '',
+    specialty: '',
+    avatarUrl: '',
+    certifications: [],
+  },
+  advisor: '',
+  status: 'recepcion',
+  steps: [],
+  supervisorObservations: '',
+  diagnosticPhotos: [],
+  quotation: {
+    quotationNumber: '',
+    createdAt: '',
+    expiresAt: '',
+    status: 'aprobado',
+    parts: [],
+    services: [],
+    subtotalParts: 0,
+    subtotalServices: 0,
+    subtotal: 0,
+    discount: 0,
+    taxRate: 0,
+    taxAmount: 0,
+    total: 0,
+    mechanicNotes: '',
+  },
+};
+
+// Helper functions para detectar placeholders en placas y chasis
+export const isPlaceholderPlate = (plate?: string): boolean => {
+  if (!plate) return true;
+  const clean = plate.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!clean || clean.length < 4) return true;
+  const placeholders = [
+    'sinplaca',
+    'entramite',
+    'entrmite',
+    'tramite',
+    'pendiente',
+    'porasignar',
+    'enproceso',
+    'ninguna',
+    'ninguno',
+    'sinnunero',
+    'sinnro',
+    'sn',
+    'sp',
+    'null',
+    'undefined',
+    'pdi',
+  ];
+  return placeholders.includes(clean);
+};
+
+export const isPlaceholderVin = (vin?: string): boolean => {
+  if (!vin) return true;
+  const clean = vin.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!clean || clean.length < 8) return true;
+  const placeholders = [
+    'sinchasis',
+    'sinnro',
+    'sinnumber',
+    'sinnumero',
+    'pendiente',
+    'porasignar',
+    'entramite',
+    'enproceso',
+    'ninguno',
+    'ninguna',
+    'sn',
+    'sp',
+    'null',
+    'undefined',
+  ];
+  return placeholders.includes(clean);
+};
+
+// Vinculación estricta entre el cliente y los alistamientos registrados en taller
+const isMatchingClientAlistamiento = (
+  alistamiento: AlistamientoFullRecord,
+  p: ClientProfile,
+  m: MotorcycleClientData
+): boolean => {
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+
+  const clientCedula = norm(p.idNumber);
+  const alistCedula = norm(alistamiento.cedulaRuc);
+
+  // 1. REGLA ESTRICTA DE CÉDULA / RUC:
+  // Si ambos registros tienen cédula, DEBEN coincidir exactamente.
+  // Si tienen cédulas diferentes, son clientes distintos (NUNCA transferir datos).
+  if (clientCedula && alistCedula) {
+    return clientCedula === alistCedula;
+  }
+
+  // 2. Correo electrónico (si ambos lo registraron válidamente y tienen formato de email)
+  const clientEmail = norm(p.email);
+  const alistEmail = norm(alistamiento.email);
+  if (clientEmail && alistEmail && clientEmail.includes('@') && alistEmail.includes('@')) {
+    if (clientEmail === alistEmail) {
+      if (alistCedula && clientCedula && alistCedula !== clientCedula) return false;
+      return true;
+    }
+  }
+
+  // 3. Chasis / VIN ÚNICO (solo si NO es placeholder genérico y no entra en conflicto con otra cédula)
+  const clientVin = norm(m.vin);
+  const alistVin = norm(alistamiento.chasis);
+  if (clientVin && alistVin && !isPlaceholderVin(clientVin) && !isPlaceholderVin(alistVin)) {
+    if (clientVin === alistVin) {
+      if (alistCedula && clientCedula && alistCedula !== clientCedula) return false;
+      return true;
+    }
+  }
+
+  // 4. Placa vehicular ÚNICA (solo si NO es placeholder como 'EN TRÁMITE', 'S/P' y no hay conflicto de cédula)
+  const clientPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+  const alistPlate = norm(alistamiento.placa).replace(/[^a-z0-9]/g, '');
+  if (clientPlate && alistPlate && !isPlaceholderPlate(clientPlate) && !isPlaceholderPlate(alistPlate)) {
+    if (clientPlate === alistPlate) {
+      if (alistCedula && clientCedula && alistCedula !== clientCedula) return false;
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const formatDisplayDate = (dateStr?: string): string => {
+  if (!dateStr) return new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+  try {
+    if (dateStr.includes('-') && dateStr.length === 10) {
+      const [year, month, day] = dateStr.split('-');
+      const d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+      return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+  } catch (_) {}
+  return dateStr;
+};
+
+const formatServiceSummary = (actions: ServiceActionType[] = [], defaultObs?: string): string[] => {
+  const labelMap: Record<string, string> = {
+    alistamiento_pdi: 'Alistamiento PDI (Inspección Pre-Entrega 360°)',
+    engrasado: 'Servicio de Engrasado General y Calibración Dinamométrica',
+    mantenimiento: 'Mantenimiento Preventivo Certificado y Puesta a Punto',
+  };
+
+  const results: string[] = actions.map((a) => labelMap[a] || a);
+  if (results.length === 0) {
+    results.push('Servicio Técnico Certificado');
+  }
+  if (defaultObs && defaultObs.trim()) {
+    results.push(defaultObs.trim());
+  }
+  return results;
+};
+
+// Generador de historial específico para el cliente según alistamientos/servicios realizados
+const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): MaintenanceRecord[] => {
+  const allAlistamientos = getStoredFullAlistamientos();
+  const matched = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+
+  matched.sort(
+    (a, b) =>
+      new Date(b.fechaServicio || b.createdAt || 0).getTime() -
+      new Date(a.fechaServicio || a.createdAt || 0).getTime()
+  );
+
+  const result: MaintenanceRecord[] = [];
+
+  if (matched.length > 0) {
+    result.push(
+      ...matched.map((a) => {
+        const parts: string[] = [];
+        if (a.tipoAceite) parts.push(a.tipoAceite);
+        else if (a.aceite && a.aceite !== 'sin_aceite') parts.push('Lubricante 4T Oficial');
+        parts.push('Insumos y Filtros de Taller');
+
+        return {
+          id: a.id,
+          otNumber: a.numeroTicket || `OT-${a.id.slice(-6).toUpperCase()}`,
+          invoiceNumber: a.numeroFactura || `FAC-${a.id.slice(-6).toUpperCase()}`,
+          date: formatDisplayDate(a.fechaServicio),
+          mileage: a.kilometraje || 0,
+          branchName: a.sede || 'StarMotos Red Oficial',
+          workSummary: formatServiceSummary(a.serviciosRealizados, a.observaciones),
+          partsReplaced: parts,
+          totalPaid: Number(a.montoPagado ?? a.valorServicio ?? 0),
+          technicianName: a.tecnicoResponsable || 'Técnico Certificado StarMotos',
+        };
+      })
+    );
+  }
+
+  // Also include delivered orders (entregado/entregada) that don't already have an alistamiento record
+  const allOrders = getStoredOrders();
+  const deliveredOrders = allOrders.filter((o) => {
+    if (o.status !== 'entregado' && o.status !== 'entregada') return false;
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const cId = norm(p.idNumber);
+    const oId = norm(o.clientIdNumber);
+    // Cedula-first: if both have cedula, they MUST match
+    if (cId && oId) return cId === oId;
+    // Plate fallback only for non-placeholder plates
+    const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const oPlate = norm(o.plate).replace(/[^a-z0-9]/g, '');
+    if (mPlate && oPlate && !isPlaceholderPlate(m.plate) && !isPlaceholderPlate(o.plate) && mPlate === oPlate) return true;
+    return false;
+  });
+
+  deliveredOrders.forEach((o) => {
+    // Skip if already covered by an alistamiento record
+    if (o.alistamientoId && result.some((r) => r.id === o.alistamientoId)) return;
+    if (result.some((r) => r.otNumber === o.otNumber)) return;
+
+    result.push({
+      id: o.id,
+      otNumber: o.otNumber,
+      invoiceNumber: `FAC-${o.id.slice(-6).toUpperCase()}`,
+      date: formatDisplayDate(o.entryDate),
+      mileage: 0,
+      branchName: o.workshopName || 'StarMotos Red Oficial',
+      workSummary: o.servicesSummary ? o.servicesSummary.split(', ') : [`Servicio: ${o.motorcycleInfo}`],
+      partsReplaced: ['Insumos de Taller'],
+      totalPaid: o.totalCost || 0,
+      technicianName: o.mechanicName || 'Técnico StarMotos',
+    });
+  });
+
+  if (result.length > 0) return result;
+
+  // Fallback para cuenta demo Fernando Vaca si no tiene alistamientos
+  if (p.idNumber === '1724890123') {
+    return INITIAL_HISTORY;
+  }
+
+  return [];
+};
+
+// Generador de citas y mantenimientos programados vinculando los realizados en taller
+const getClientScheduledMaintenances = (
+  p: ClientProfile,
+  m: MotorcycleClientData,
+  branch: Branch
+): ScheduledMaintenance[] => {
+  const result: ScheduledMaintenance[] = [];
+
+  // 1. Citas del cliente en localStorage
+  try {
+    const customKey = `starmotos_scheduled_citas_${p.idNumber || 'default'}`;
+    const raw = localStorage.getItem(customKey);
+    if (raw) {
+      const parsed: ScheduledMaintenance[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        result.push(...parsed);
+      }
+    }
+  } catch (_) {}
+
+  // 2. Mantenimiento sugerido registrado en el último servicio por el taller
+  const allAlistamientos = getStoredFullAlistamientos();
+  const matched = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+  matched.sort(
+    (a, b) =>
+      new Date(b.fechaServicio || b.createdAt || 0).getTime() -
+      new Date(a.fechaServicio || a.createdAt || 0).getTime()
+  );
+
+  matched.forEach((a) => {
+    if (a.proximoMantenimientoKm && a.proximoMantenimientoKm > 0) {
+      let recDate = 'Fecha flexible sugerida';
+      try {
+        if (a.fechaServicio) {
+          const d = new Date(a.fechaServicio);
+          d.setMonth(d.getMonth() + 3);
+          recDate = d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+      } catch (_) {}
+
+      const maintId = `alist-sugg-${a.id}`;
+      if (!result.some((r) => r.id === maintId)) {
+        result.push({
+          id: maintId,
+          serviceTitle: `Próximo Mantenimiento Sugerido por Taller (${a.proximoMantenimientoKm.toLocaleString()} KM)`,
+          recommendedKm: a.proximoMantenimientoKm,
+          recommendedDate: recDate,
+          branchName: a.sede || branch.name,
+          branchId: a.sedeId || branch.id,
+          status: 'pendiente',
+          estimatedCost: a.valorServicio ? Number(a.valorServicio) : 55.0,
+          tasks: [
+            `Mantenimiento Preventivo a los ${a.proximoMantenimientoKm.toLocaleString()} KM`,
+            'Cambio de Aceite de Motor y Filtro',
+            'Regulación de Válvulas y Transmisión',
+            'Chequeo de Frenos, Neumáticos y Suspensión',
+          ],
+          notes: a.observaciones
+            ? `Recomendación técnica (${a.tecnicoResponsable || 'Taller'}): ${a.observaciones}`
+            : `Sugerido por ${a.tecnicoResponsable || 'técnico StarMotos'} en su última visita a ${a.sede || 'taller StarMotos'}.`,
+        });
+      }
+    }
+  });
+
+  // 3. Fallback para cuenta demo Fernando Vaca si no tiene citas
+  if (result.length === 0 && p.idNumber === '1724890123') {
+    return INITIAL_SCHEDULED_MAINTENANCES;
+  }
+
+  return result;
+};
+
+// Generador de OT activa para el cliente
+const getClientActiveOrder = (
+  p: ClientProfile,
+  m: MotorcycleClientData,
+  branch: Branch
+): WorkOrder => {
+  const allOrders = getStoredOrders();
+  const clientOrders = allOrders.filter((o) => {
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const cId = norm(p.idNumber);
+    const oId = norm(o.clientIdNumber);
+    // Cedula-first: if both have cedula, they MUST match
+    if (cId && oId) return cId === oId;
+
+    const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const oPlate = norm(o.plate).replace(/[^a-z0-9]/g, '');
+    if (mPlate && oPlate && !isPlaceholderPlate(m.plate) && !isPlaceholderPlate(o.plate) && mPlate === oPlate) return true;
+
+    return false;
+  });
+  // Find the most recent non-delivered order
+  const matched = clientOrders.find((o) => o.status !== 'entregada' && o.status !== 'entregado');
+
+  if (matched) {
+    const orderBranch = ALL_BRANCHES.find((b) => b.id === matched.workshopId) || branch;
+    const steps = buildSteps(matched.status || 'en_reparacion');
+    const isQuotationPending = matched.status === 'cotizacion_pendiente';
+
+    return {
+      otNumber: matched.otNumber,
+      entryDate: matched.entryDate || 'Reciente',
+      estimatedDelivery: matched.estimatedDelivery || 'En coordinación con taller',
+      clientReason: `Servicio técnico para ${matched.motorcycleInfo || `${m.brand} ${m.model}`}.`,
+      branch: orderBranch,
+      mechanic: {
+        id: 'mec-assigned',
+        name: matched.mechanicName || 'Técnico Especialista Asignado',
+        specialty: 'Mecánico Certificado StarMotos',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        certifications: ['Técnico Homologado StarMotos'],
+      },
+      advisor: matched.workshopName || orderBranch.name,
+      status: matched.status || 'en_reparacion',
+      steps: steps,
+      supervisorObservations: 'Servicio en proceso según especificaciones técnicas de fábrica.',
+      diagnosticPhotos: [],
+      quotation: {
+        quotationNumber: `COT-${matched.otNumber.replace(/[^0-9]/g, '') || '01'}`,
+        createdAt: matched.entryDate || 'Reciente',
+        expiresAt: '48 horas posteriores',
+        status: isQuotationPending ? 'pendiente_aprobacion' : 'aprobado',
+        parts: [
+          {
+            code: 'REP-STAR-01',
+            description: 'Insumos y repuestos certificados StarMotos',
+            brand: 'StarMotos Genuine Parts',
+            quantity: 1,
+            unitPrice: Math.round((matched.totalCost || 45) * 0.6),
+            subtotal: Math.round((matched.totalCost || 45) * 0.6),
+            warrantyMonths: 6,
+          },
+        ],
+        services: [
+          {
+            code: 'SRV-STAR-01',
+            description: 'Mano de obra técnica y calibración en elevador',
+            hours: 1.5,
+            unitCost: Math.round((matched.totalCost || 45) * 0.4),
+            subtotal: Math.round((matched.totalCost || 45) * 0.4),
+          },
+        ],
+        subtotalParts: Math.round((matched.totalCost || 45) * 0.6),
+        subtotalServices: Math.round((matched.totalCost || 45) * 0.4),
+        subtotal: matched.totalCost || 45,
+        discount: 0,
+        taxRate: 0.15,
+        taxAmount: Number(((matched.totalCost || 45) * 0.15).toFixed(2)),
+        total: Number(((matched.totalCost || 45) * 1.15).toFixed(2)),
+        mechanicNotes: 'Servicio respaldado con garantía oficial de taller StarMotos.',
+      },
+    };
+  }
+
+  // Fallback demo Fernando Vaca
+  if (p.idNumber === '1724890123') {
+    return INITIAL_WORK_ORDER;
+  }
+
+  return EMPTY_WORK_ORDER;
+};
+
+// Generador de garantías para el cliente
+const getClientWarranties = (p: ClientProfile, m: MotorcycleClientData): WarrantyItem[] => {
+  const allWarranties = getStoredWarranties();
+  const matched = allWarranties.filter((w) => {
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const cId = norm(p.idNumber);
+    const wId = norm(w.clientIdNumber);
+    // Cedula-first: if both have cedula, they MUST match
+    if (cId && wId) return cId === wId;
+
+    const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const wPlate = norm(w.motorcyclePlate).replace(/[^a-z0-9]/g, '');
+    if (mPlate && wPlate && !isPlaceholderPlate(m.plate) && !isPlaceholderPlate(w.motorcyclePlate) && mPlate === wPlate) return true;
+
+    return false;
+  });
+
+  if (matched.length > 0) {
+    return matched.map((w) => ({
+      id: w.id,
+      title: `Garantía StarMotos - ${w.partsRequired || w.requestNumber || 'Taller'}`,
+      type: 'garantia_fabrica' as const,
+      status: (w.status === 'aprobada' ? 'vigente' : w.status === 'rechazada' ? 'vencida' : 'vigente') as WarrantyStatus,
+      coverage: w.issueDescription || 'Cobertura de garantía tramitada en sede oficial StarMotos.',
+      startDate: formatDisplayDate(w.createdAt || new Date().toISOString()),
+      expirationDate: '12 meses posteriores a la entrega',
+      kmLimit: 20000,
+      currentKm: m.currentKm || 0,
+      terms: 'Válida cumpliendo el plan de mantenimientos preventivos en la red oficial StarMotos.',
+    }));
+  }
+
+  // Fallback demo Fernando Vaca
+  if (p.idNumber === '1724890123') {
+    return INITIAL_WARRANTIES;
+  }
+
+  return [];
+};
+
+// Enriquecer la moto del cliente con el kilometraje e información certificada por el taller
+const enrichMotorcycleFromAlistamientos = (
+  m: MotorcycleClientData,
+  p: ClientProfile
+): MotorcycleClientData => {
+  const allAlistamientos = getStoredFullAlistamientos();
+  const matched = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+  matched.sort(
+    (a, b) =>
+      new Date(b.fechaServicio || b.createdAt || 0).getTime() -
+      new Date(a.fechaServicio || a.createdAt || 0).getTime()
+  );
+
+  if (matched.length > 0) {
+    const latest = matched[0];
+    let updatedKm = m.currentKm;
+    let updatedLastOil = m.lastOilChangeKm;
+
+    if (latest.kilometraje && latest.kilometraje > updatedKm) {
+      updatedKm = latest.kilometraje;
+    }
+
+    const hasOil =
+      latest.aceite === 'con_aceite' ||
+      Boolean(latest.tipoAceite) ||
+      latest.serviciosRealizados?.includes('mantenimiento');
+    if (hasOil && latest.kilometraje) {
+      updatedLastOil = latest.kilometraje;
+    }
+
+    return {
+      ...m,
+      currentKm: updatedKm,
+      lastOilChangeKm: updatedLastOil,
+      preferredBranchId: latest.sedeId || m.preferredBranchId,
+    };
+  }
+
+  return m;
+};
+
 export function useCustomerPortal() {
   // Estado de Autenticación
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -481,14 +1044,22 @@ export function useCustomerPortal() {
   });
 
   const [motorcycle, setMotorcycle] = useState<MotorcycleClientData>(() => {
+    let baseMoto = INITIAL_MOTORCYCLE;
     try {
       const stored = localStorage.getItem('starmotos_current_client_moto');
       if (stored) {
         const parsed = JSON.parse(stored);
-        return { ...INITIAL_MOTORCYCLE, ...parsed };
+        baseMoto = { ...INITIAL_MOTORCYCLE, ...parsed };
       }
     } catch (_) {}
-    return INITIAL_MOTORCYCLE;
+
+    try {
+      const storedProfile = localStorage.getItem('starmotos_current_client_profile');
+      const p = storedProfile ? JSON.parse(storedProfile) : INITIAL_PROFILE;
+      return enrichMotorcycleFromAlistamientos(baseMoto, p);
+    } catch (_) {
+      return baseMoto;
+    }
   });
 
   // Sucursal activa actual
@@ -496,26 +1067,104 @@ export function useCustomerPortal() {
     return ALL_BRANCHES.find((b) => b.id === motorcycle.preferredBranchId) || BRANCH_MATRIZ;
   }, [motorcycle.preferredBranchId]);
 
-  const [scheduledMaintenances, setScheduledMaintenances] = useState<ScheduledMaintenance[]>(INITIAL_SCHEDULED_MAINTENANCES);
+  const [scheduledMaintenances, setScheduledMaintenances] = useState<ScheduledMaintenance[]>(() =>
+    getClientScheduledMaintenances(profile, motorcycle, activeBranch)
+  );
 
-  // Orden de Trabajo y otros datos
-  const [activeOrder, setActiveOrder] = useState<WorkOrder>(INITIAL_WORK_ORDER);
-  const [history, setHistory] = useState<MaintenanceRecord[]>(INITIAL_HISTORY);
-  const [warranties, setWarranties] = useState<WarrantyItem[]>(INITIAL_WARRANTIES);
+  // Orden de Trabajo, Historial y Garantías vinculadas en tiempo real
+  const [activeOrder, setActiveOrder] = useState<WorkOrder>(() =>
+    getClientActiveOrder(profile, motorcycle, activeBranch)
+  );
+  const [history, setHistory] = useState<MaintenanceRecord[]>(() =>
+    getClientHistory(profile, motorcycle)
+  );
+  const [warranties, setWarranties] = useState<WarrantyItem[]>(() =>
+    getClientWarranties(profile, motorcycle)
+  );
+
+  // Sincronización reactiva en tiempo real al registrar alistamientos, órdenes o garantías
+  useEffect(() => {
+    const syncAll = () => {
+      let curProfile = profile;
+      let curMoto = motorcycle;
+
+      try {
+        const rawProfile = localStorage.getItem('starmotos_current_client_profile');
+        if (rawProfile) {
+          curProfile = { ...INITIAL_PROFILE, ...JSON.parse(rawProfile) };
+          setProfile(curProfile);
+        }
+      } catch (_) {}
+
+      try {
+        const rawMoto = localStorage.getItem('starmotos_current_client_moto');
+        if (rawMoto) {
+          curMoto = { ...INITIAL_MOTORCYCLE, ...JSON.parse(rawMoto) };
+        }
+      } catch (_) {}
+
+      const enrichedMoto = enrichMotorcycleFromAlistamientos(curMoto, curProfile);
+      setMotorcycle(enrichedMoto);
+
+      const branch = ALL_BRANCHES.find((b) => b.id === enrichedMoto.preferredBranchId) || BRANCH_MATRIZ;
+      setHistory(getClientHistory(curProfile, enrichedMoto));
+      setScheduledMaintenances(getClientScheduledMaintenances(curProfile, enrichedMoto, branch));
+      setActiveOrder(getClientActiveOrder(curProfile, enrichedMoto, branch));
+      setWarranties(getClientWarranties(curProfile, enrichedMoto));
+    };
+
+    window.addEventListener('starmotos_alistamientos_updated', syncAll);
+    window.addEventListener('starmotos_orders_updated', syncAll);
+    window.addEventListener('starmotos_warranties_updated', syncAll);
+    window.addEventListener('starmotos_clients_updated', syncAll);
+    window.addEventListener('storage', syncAll);
+
+    return () => {
+      window.removeEventListener('starmotos_alistamientos_updated', syncAll);
+      window.removeEventListener('starmotos_orders_updated', syncAll);
+      window.removeEventListener('starmotos_warranties_updated', syncAll);
+      window.removeEventListener('starmotos_clients_updated', syncAll);
+      window.removeEventListener('storage', syncAll);
+    };
+  }, []);
 
   // Modales
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   isApprovalModalOpenRef.current = isApprovalModalOpen;
   const [isApproving, setIsApproving] = useState(false);
 
-  // Login: Al ingresar, respeta la sección del hash si es válida, o va a eventos
+  // Login: Al ingresar, recarga datos actualizados del cliente y sincroniza
   const login = useCallback(() => {
     setIsAuthenticated(true);
     localStorage.setItem('starmotos_auth', 'true');
+
+    let curProfile = profile;
+    let curMoto = motorcycle;
+    try {
+      const rawProfile = localStorage.getItem('starmotos_current_client_profile');
+      if (rawProfile) {
+        curProfile = { ...INITIAL_PROFILE, ...JSON.parse(rawProfile) };
+        setProfile(curProfile);
+      }
+      const rawMoto = localStorage.getItem('starmotos_current_client_moto');
+      if (rawMoto) {
+        curMoto = { ...INITIAL_MOTORCYCLE, ...JSON.parse(rawMoto) };
+      }
+    } catch (_) {}
+
+    const enrichedMoto = enrichMotorcycleFromAlistamientos(curMoto, curProfile);
+    setMotorcycle(enrichedMoto);
+
+    const branch = ALL_BRANCHES.find((b) => b.id === enrichedMoto.preferredBranchId) || BRANCH_MATRIZ;
+    setHistory(getClientHistory(curProfile, enrichedMoto));
+    setScheduledMaintenances(getClientScheduledMaintenances(curProfile, enrichedMoto, branch));
+    setActiveOrder(getClientActiveOrder(curProfile, enrichedMoto, branch));
+    setWarranties(getClientWarranties(curProfile, enrichedMoto));
+
     const target = getSectionFromHash();
     setActiveSection(target, true);
-    showToast(`¡Bienvenido al Portal, ${profile.fullName.split(' ')[0]}!`, 'success');
-  }, [profile.fullName, showToast, setActiveSection]);
+    showToast(`¡Bienvenido al Portal, ${curProfile.fullName.split(' ')[0]}!`, 'success');
+  }, [profile, motorcycle, showToast, setActiveSection]);
 
   // Logout
   const logout = useCallback(() => {
@@ -630,7 +1279,15 @@ export function useCustomerPortal() {
 
   // Agendar nuevo mantenimiento
   const addScheduledMaintenance = useCallback((maintenance: ScheduledMaintenance) => {
-    setScheduledMaintenances((prev) => [maintenance, ...prev]);
+    setScheduledMaintenances((prev) => {
+      const updated = [maintenance, ...prev];
+      try {
+        const customKey = `starmotos_scheduled_citas_${profile.idNumber || 'default'}`;
+        const userOnly = updated.filter((m) => !m.id.startsWith('alist-sugg-'));
+        localStorage.setItem(customKey, JSON.stringify(userOnly));
+      } catch (_) {}
+      return updated;
+    });
     confetti({
       particleCount: 60,
       spread: 60,
@@ -638,7 +1295,7 @@ export function useCustomerPortal() {
       colors: ['#1d4ed8', '#dc2626', '#ffffff'],
     });
     showToast('¡Cita técnica agendada exitosamente en StarMotos!', 'success');
-  }, [showToast]);
+  }, [profile.idNumber, showToast]);
 
   // Aprobar cotización de la OT activa
   const approveQuotation = useCallback(() => {

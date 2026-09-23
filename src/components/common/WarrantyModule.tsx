@@ -33,11 +33,14 @@ import {
   Save,
   Tag,
   Package,
+  Play,
+  Film,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
 import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos } from '../../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../../services/supabaseService';
+import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 
 // =========================================================================
@@ -1591,27 +1594,50 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
-            {currentWarranty.diagnosticPhotos.map((url, i) => (
-              <div
-                key={i}
-                onClick={() => setPreviewZoomImage(url)}
-                className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs cursor-pointer bg-zinc-100"
-              >
-                <img
-                  src={url}
-                  alt={`Evidencia ${i + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center text-zinc-900 shadow-xs">
-                    <ZoomIn className="w-4 h-4" />
-                  </div>
+            {currentWarranty.diagnosticPhotos.map((url, i) => {
+              const isVideo = isVideoUrl(url);
+              return (
+                <div
+                  key={i}
+                  onClick={() => setPreviewZoomImage(url)}
+                  className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs cursor-pointer bg-zinc-900"
+                >
+                  {isVideo ? (
+                    <div className="w-full h-full relative flex items-center justify-center bg-black">
+                      <video
+                        src={url}
+                        className="w-full h-full object-cover opacity-80"
+                        preload="metadata"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
+                          <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
+                        </div>
+                      </div>
+                      <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
+                        <Film className="w-2.5 h-2.5" /> Video
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <img
+                        src={url}
+                        alt={`Evidencia ${i + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center text-zinc-900 shadow-xs">
+                          <ZoomIn className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold z-10">
+                    #{i + 1}
+                  </span>
                 </div>
-                <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold">
-                  #{i + 1}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1623,21 +1649,31 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           onClick={() => setPreviewZoomImage(null)}
         >
           <div
-            className="relative max-w-4xl max-h-[90vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700"
+            className="relative max-w-4xl max-h-[90vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700 flex flex-col items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setPreviewZoomImage(null)}
-              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-sm font-bold"
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-20 text-sm font-bold"
             >
               ✕
             </button>
-            <img
-              src={previewZoomImage}
-              alt="Evidencia ampliada"
-              className="max-h-[85vh] w-auto object-contain mx-auto"
-            />
+            {isVideoUrl(previewZoomImage) ? (
+              <video
+                src={previewZoomImage}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[85vh] w-auto max-w-full rounded-lg"
+              />
+            ) : (
+              <img
+                src={previewZoomImage}
+                alt="Evidencia ampliada"
+                className="max-h-[85vh] w-auto object-contain mx-auto"
+              />
+            )}
           </div>
         </div>
       )}
@@ -2550,48 +2586,69 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {formData.photos.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-white shadow-2xs"
-                  >
-                    <img
-                      src={p}
-                      alt={`Evidencia ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewZoomImage(p);
-                        }}
-                        className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                        title="Ampliar foto"
-                      >
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFormData((prev) => ({
-                            ...prev,
-                            photos: prev.photos.filter((_, i) => i !== idx),
-                          }));
-                        }}
-                        className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                        title="Eliminar foto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                {formData.photos.map((p, idx) => {
+                  const isVideo = isVideoUrl(p);
+                  return (
+                    <div
+                      key={idx}
+                      className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-900 shadow-2xs"
+                    >
+                      {isVideo ? (
+                        <div className="w-full h-full relative flex items-center justify-center bg-black">
+                          <video
+                            src={p}
+                            className="w-full h-full object-cover opacity-80"
+                            preload="metadata"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
+                              <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
+                            </div>
+                          </div>
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
+                            <Film className="w-2.5 h-2.5" /> Video
+                          </span>
+                        </div>
+                      ) : (
+                        <img
+                          src={p}
+                          alt={`Evidencia ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewZoomImage(p);
+                          }}
+                          className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                          title="Ampliar evidencia"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFormData((prev) => ({
+                              ...prev,
+                              photos: prev.photos.filter((_, i) => i !== idx),
+                            }));
+                          }}
+                          className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
+                          title="Eliminar evidencia"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none z-10">
+                        #{idx + 1}
+                      </span>
                     </div>
-                    <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none">
-                      #{idx + 1}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

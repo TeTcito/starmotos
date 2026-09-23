@@ -58,6 +58,7 @@ import {
   querySriMock,
 } from '../../data/mockMultiRoleData';
 import { cloudSaveClient } from '../../services/supabaseService';
+import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
 
 export interface ClientRowData {
   nombre: string;
@@ -385,8 +386,8 @@ export const ClientesModule: React.FC<Props> = ({
           email: rec.email,
           address: rec.direccion,
           origin: rec.origen,
-          workshopId: rec.sedeId || ws?.id || 'taller-quevedo',
-          workshopName: rec.sede || ws?.name || 'StarMotos Sucursal Quevedo',
+          workshopId: rec.sedeId || ws?.id || '',
+          workshopName: rec.sede || ws?.name || 'StarMotos Sede',
           motorcycles: [
             {
               model: rec.modeloMarca,
@@ -413,10 +414,14 @@ export const ClientesModule: React.FC<Props> = ({
         if (isMant) existing.maintenanceCount += 1;
 
         // Comprobar si es una nueva moto o fecha más reciente
-        const hasMoto = existing.motorcycles.some(
+        const existingMotoIdx = existing.motorcycles.findIndex(
           (m) => (m.chasis && m.chasis === rec.chasis) || (m.plate && m.plate === rec.placa)
         );
-        if (!hasMoto && (rec.chasis || rec.placa)) {
+        if (existingMotoIdx >= 0) {
+          if (rec.kilometraje !== undefined && (rec.kilometraje > (existing.motorcycles[existingMotoIdx].lastMileage || 0) || existing.motorcycles[existingMotoIdx].lastMileage === undefined)) {
+            existing.motorcycles[existingMotoIdx].lastMileage = rec.kilometraje;
+          }
+        } else if (rec.chasis || rec.placa) {
           existing.motorcycles.push({
             model: rec.modeloMarca,
             plate: rec.placa,
@@ -455,8 +460,8 @@ export const ClientesModule: React.FC<Props> = ({
           phone: c.phone,
           email: c.email,
           address: c.address,
-          workshopId: c.workshopId || currentWorkshopId || 'taller-quevedo',
-          workshopName: c.workshopName || 'StarMotos Sucursal Quevedo',
+          workshopId: c.workshopId || currentWorkshopId || '',
+          workshopName: c.workshopName || 'StarMotos Sede',
           motorcycles: [
             {
               model: `${c.motorcycleBrand} ${c.motorcycleModel}`.trim(),
@@ -726,7 +731,7 @@ export const ClientesModule: React.FC<Props> = ({
           motorcycleModel: clientFormData.motoModel,
           motorcyclePlate: clientFormData.motoPlate,
           motorcycleVin: clientFormData.motoChasis,
-          motorcycleMileage: Number(clientFormData.motoMileage) || undefined,
+          motorcycleMileage: clientFormData.motoMileage !== '' ? Number(clientFormData.motoMileage) : (updatedClients[existingIdx]?.motorcycleMileage ?? 0),
           workshopName: clientFormData.workshopName,
         };
       } else {
@@ -742,7 +747,7 @@ export const ClientesModule: React.FC<Props> = ({
             motorcycleModel: clientFormData.motoModel,
             motorcyclePlate: clientFormData.motoPlate,
             motorcycleVin: clientFormData.motoChasis,
-            motorcycleMileage: Number(clientFormData.motoMileage) || undefined,
+            motorcycleMileage: clientFormData.motoMileage !== '' ? Number(clientFormData.motoMileage) : 0,
             lastVisit: new Date().toLocaleDateString('es-EC'),
             totalVisits: selectedClientForDetail.records.length || 1,
             workshopName: clientFormData.workshopName,
@@ -769,7 +774,7 @@ export const ClientesModule: React.FC<Props> = ({
             modeloMarca: clientFormData.motoModel,
             placa: clientFormData.motoPlate,
             chasis: clientFormData.motoChasis,
-            kilometraje: Number(clientFormData.motoMileage) || rec.kilometraje,
+            kilometraje: clientFormData.motoMileage !== '' ? Number(clientFormData.motoMileage) : rec.kilometraje,
           };
         }
         return rec;
@@ -1263,8 +1268,9 @@ export const ClientesModule: React.FC<Props> = ({
                       type="number"
                       min="0"
                       value={newClientData.motoMileage}
+                      onFocus={selectOnFocus}
                       onChange={(e) =>
-                        setNewClientData({ ...newClientData, motoMileage: e.target.value })
+                        setNewClientData({ ...newClientData, motoMileage: cleanNumberInput(e.target.value) })
                       }
                       placeholder="0"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none transition"
@@ -1747,22 +1753,11 @@ export const ClientesModule: React.FC<Props> = ({
                   type="number"
                   min="0"
                   value={clientFormData.motoMileage}
-                  onChange={(e) => setClientFormData({ ...clientFormData, motoMileage: e.target.value })}
+                  onFocus={selectOnFocus}
+                  onChange={(e) => setClientFormData({ ...clientFormData, motoMileage: cleanNumberInput(e.target.value) })}
                   className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
                   placeholder="0"
                 />
-              </div>
-
-              {/* Resumen del Vehículo */}
-              <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 text-xs space-y-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase block">
-                  Resumen del Vehículo
-                </span>
-                <div className="text-zinc-800 font-semibold">{clientFormData.motoModel || 'Sin modelo'}</div>
-                <div className="text-[11px] text-zinc-600 font-mono">
-                  Placa: <strong>{clientFormData.motoPlate || 'SIN PLACA'}</strong> • Km:{' '}
-                  <strong>{clientFormData.motoMileage || '0'} km</strong>
-                </div>
               </div>
             </div>
 

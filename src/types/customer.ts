@@ -116,7 +116,12 @@ export type WorkOrderStatus =
   | 'en_reparacion'
   | 'control_calidad'
   | 'lista_retiro'
-  | 'entregada';
+  | 'entregada'
+  | 'inicio'
+  | 'en_proceso'
+  | 'trabajando'
+  | 'listo_para_entregar'
+  | 'entregado';
 
 export interface ProgressStep {
   id: WorkOrderStatus;
@@ -437,6 +442,19 @@ export interface AlistamientoFullRecord {
   createdAt: string;
 }
 
+export type AlistamientoFormData = Omit<
+  AlistamientoFullRecord,
+  'kilometraje' | 'valorServicio' | 'montoPagado' | 'abono' | 'saldoPendiente' | 'proximoMantenimientoKm' | 'year'
+> & {
+  kilometraje: number | string;
+  valorServicio: number | string;
+  montoPagado: number | string;
+  abono?: number | string;
+  saldoPendiente?: number | string;
+  proximoMantenimientoKm: number | string;
+  year?: number | string;
+};
+
 // --- Entidad Técnico ---
 export interface Technician {
   id: string;
@@ -548,7 +566,6 @@ export interface TallerClient {
   password?: string;
 }
 
-// --- Orden de Taller ---
 export interface TallerOrder {
   id: string;
   otNumber: string;
@@ -563,6 +580,8 @@ export interface TallerOrder {
   totalCost: number;
   workshopId?: string;
   workshopName?: string;
+  alistamientoId?: string;
+  servicesSummary?: string;
 }
 
 // --- Perfil Garante ---

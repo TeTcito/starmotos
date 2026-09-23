@@ -7,13 +7,6 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  KeyRound,
-  ChevronDown,
-  ChevronUp,
-  Building2,
-  Bike,
-  Wrench,
-  Tag,
 } from 'lucide-react';
 import { UserRole } from '../../types/customer';
 import { OFFICIAL_CORPORATE_ACCOUNTS } from '../../data/authAccounts';
@@ -27,7 +20,6 @@ export const AdminLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [showCredentialsGuide, setShowCredentialsGuide] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -92,31 +84,17 @@ export const AdminLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   return (
     <div className="w-full max-w-md my-auto py-2 sm:py-4 animate-fade-in">
       {/* Encabezado Administrador */}
-      <div className="mb-4 sm:mb-6 text-center">
-        <div className="inline-flex p-2 rounded-2xl bg-gradient-to-tr from-slate-900 via-blue-900 to-indigo-950 text-white shadow-xl shadow-blue-950/20 mb-3 border border-blue-500/20">
-          <Shield className="w-9 h-9 sm:w-11 sm:h-11 text-blue-400" />
+      <div className="mb-4 text-center">
+        <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-bold mb-1.5">
+          <Shield className="w-3.5 h-3.5 text-red-600" />
+          <span>Matriz Central</span>
         </div>
-
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <span className="h-px w-6 bg-gradient-to-r from-transparent to-red-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-red-600 font-mono">
-            Acceso Matriz Central
-          </span>
-          <span className="h-px w-6 bg-gradient-to-l from-transparent to-red-400" />
-        </div>
-
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900">
           Portal Administrador
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 mt-1 max-w-xs mx-auto">
-          Gestión integral de sedes, garantías, alistamientos PDI y auditoría general.
+        <p className="text-xs text-zinc-500 mt-0.5">
+          Acceso exclusivo para Gerencia y Dirección
         </p>
-
-        {/* Badge Exclusivo: Solo Inicio de Sesión */}
-        <div className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-100 border border-zinc-200 rounded-full text-[11px] text-zinc-600 font-semibold">
-          <Lock className="w-3 h-3 text-zinc-500" />
-          <span>Acceso restringido · Cuentas creadas por Gerencia</span>
-        </div>
       </div>
 
       {/* Alertas */}
@@ -206,53 +184,6 @@ export const AdminLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           )}
         </button>
       </form>
-
-      {/* Guía Rápida de Credenciales Administrativas Oficiales */}
-      <div className="mt-4 pt-3 border-t border-zinc-200">
-        <button
-          type="button"
-          onClick={() => setShowCredentialsGuide(!showCredentialsGuide)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-red-50/70 hover:bg-red-100/70 border border-red-200/80 rounded-xl text-red-900 transition cursor-pointer text-xs font-bold"
-        >
-          <div className="flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5 text-red-600 shrink-0" />
-            <span>Ver Correos Administrativos Autorizados</span>
-          </div>
-          {showCredentialsGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {showCredentialsGuide && (
-          <div className="mt-2.5 p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-2 text-xs text-zinc-700 animate-fade-in font-mono">
-            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-200 font-sans font-bold text-zinc-900">
-              <span>Cuenta Matriz</span>
-              <span className="text-zinc-500 font-normal">Clave de Acceso</span>
-            </div>
-            <div
-              className="flex justify-between items-center cursor-pointer hover:bg-white p-1 rounded"
-              onClick={() => {
-                setIdentifier('admin@starmotos.com');
-                setPassword('StarMotos@Admin2026');
-              }}
-            >
-              <span className="text-blue-700 font-bold">admin@starmotos.com</span>
-              <span className="text-zinc-600">StarMotos@Admin2026</span>
-            </div>
-            <div
-              className="flex justify-between items-center cursor-pointer hover:bg-white p-1 rounded"
-              onClick={() => {
-                setIdentifier('admin@starmotos.ec');
-                setPassword('StarMotos@Admin2026');
-              }}
-            >
-              <span className="text-blue-700 font-bold">admin@starmotos.ec</span>
-              <span className="text-zinc-600">StarMotos@Admin2026</span>
-            </div>
-            <p className="text-[10px] text-zinc-400 font-sans pt-1">
-              (Haga clic sobre cualquier cuenta para auto-completar)
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

@@ -11,12 +11,6 @@ import {
   EyeOff,
   ArrowLeft,
   CheckCircle2,
-  Shield,
-  Bike,
-  Wrench,
-  KeyRound,
-  ChevronDown,
-  ChevronUp,
   Briefcase,
   MapPin,
   Sparkles,
@@ -38,7 +32,6 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showCredentialsGuide, setShowCredentialsGuide] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -222,33 +215,20 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   return (
     <div className="w-full max-w-md my-auto py-2 sm:py-4 animate-fade-in">
       {/* Encabezado */}
-      <div className="mb-4 sm:mb-5 text-center">
-        <div className="inline-flex p-2.5 rounded-2xl bg-gradient-to-tr from-purple-700 via-indigo-700 to-purple-900 text-white shadow-xl shadow-purple-700/20 mb-2.5">
-          <Tag className="w-9 h-9 sm:w-11 sm:h-11 text-purple-200" />
+      <div className="mb-4 text-center">
+        <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold mb-1.5">
+          <Tag className="w-3.5 h-3.5 text-purple-700" />
+          <span>{isRegisterMode ? 'Registro de Marca' : 'Garantías Oficiales'}</span>
         </div>
-
-        <div className="flex items-center justify-center gap-2 mb-0.5">
-          <span className="h-px w-5 bg-gradient-to-r from-transparent to-purple-500" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-700 font-mono">
-            Garantías de Fábrica & Marcas
-          </span>
-          <span className="h-px w-5 bg-gradient-to-l from-transparent to-purple-500" />
-        </div>
-
-        <h1 className="text-2xl sm:text-3xl font-black text-zinc-900">
+        <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">
           {isRegisterMode ? 'Registro de Marca / Garante' : 'Portal Garantías de Marca'}
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-          {isRegisterMode
-            ? 'Inscripción oficial de la marca y del encargado del panel de garantías.'
-            : 'Revisión técnica, dictamen de coberturas oficiales y despacho de repuestos.'}
-        </p>
 
         {/* Conmutador Registro / Login */}
-        <div className="mt-2.5">
+        <div className="mt-1">
           {!isRegisterMode ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 border border-purple-200 rounded-full text-xs text-zinc-700">
-              <span>¿Eres representante de marca nuevo?</span>
+            <p className="text-xs text-zinc-500">
+              ¿Representante de marca nuevo?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -256,11 +236,11 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   setErrorMessage('');
                   setSuccessMessage('');
                 }}
-                className="text-purple-800 hover:text-purple-950 font-black underline cursor-pointer"
+                className="text-purple-800 hover:text-purple-950 font-bold underline cursor-pointer"
               >
                 Regístrate aquí
               </button>
-            </div>
+            </p>
           ) : (
             <button
               type="button"
@@ -556,52 +536,6 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           </button>
         </form>
       )}
-
-      {/* Guía Rápida de Garantes Autorizados */}
-      <div className="mt-4 pt-3 border-t border-zinc-200">
-        <button
-          type="button"
-          onClick={() => setShowCredentialsGuide(!showCredentialsGuide)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200/80 rounded-xl text-purple-900 transition cursor-pointer text-xs font-bold"
-        >
-          <div className="flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5 text-purple-700 shrink-0" />
-            <span>Ver Garantes Oficiales de Fábrica</span>
-          </div>
-          {showCredentialsGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {showCredentialsGuide && (
-          <div className="mt-2.5 p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-2 text-xs text-zinc-700 animate-fade-in font-mono">
-            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-200 font-sans font-bold text-zinc-900">
-              <span>Garante Oficial</span>
-              <span className="text-zinc-500 font-normal">Clave de Acceso</span>
-            </div>
-            <div
-              className="flex justify-between items-center cursor-pointer hover:bg-white p-1 rounded"
-              onClick={() => {
-                setLoginEmail('garantias.oficial@benelli-ecuador.com');
-                setLoginPassword('StarMotos@Garante2026');
-              }}
-            >
-              <span className="text-purple-800 font-bold truncate max-w-[200px]">
-                garantias.oficial@benelli-ecuador.com
-              </span>
-              <span className="text-zinc-600 shrink-0">StarMotos@Garante2026</span>
-            </div>
-            <div
-              className="flex justify-between items-center cursor-pointer hover:bg-white p-1 rounded"
-              onClick={() => {
-                setLoginEmail('garante@starmotos.com');
-                setLoginPassword('StarMotos@Garante2026');
-              }}
-            >
-              <span className="text-purple-800 font-bold">garante@starmotos.com</span>
-              <span className="text-zinc-600">StarMotos@Garante2026</span>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

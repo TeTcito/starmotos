@@ -1,6 +1,5 @@
 // src/components/LoginView.tsx
 import React, { useState, useEffect } from 'react';
-import { Shield, Bike, Wrench, Tag } from 'lucide-react';
 import { UserRole } from '../types/customer';
 import { AdminLoginView } from './login/AdminLoginView';
 import { CustomerLoginView } from './login/CustomerLoginView';
@@ -108,13 +107,13 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       {/* ========================================================================= */}
       <div className="w-full lg:w-1/3 h-full flex flex-col justify-start sm:justify-center items-center bg-white px-4 py-3 sm:p-6 lg:p-8 overflow-y-auto scroll-smooth pb-44 sm:pb-8">
         {/* LOGO HEADER GLOBAL */}
-        <div className="w-full max-w-md text-center pt-2 pb-3 shrink-0">
-          <div className="flex items-center justify-center gap-2.5 mb-2">
+        <div className="w-full max-w-md text-center pt-2 pb-1 shrink-0">
+          <div className="flex items-center justify-center gap-2 mb-1">
             <div className="p-1 rounded-full bg-gradient-to-tr from-blue-600 via-white to-red-600 shadow-sm">
               <img
                 src="/starmotos-logo.jpg"
                 alt="Logo StarMotos"
-                className="w-8 h-8 rounded-full object-cover bg-white"
+                className="w-7 h-7 rounded-full object-cover bg-white"
               />
             </div>
             <span className="text-xl font-black tracking-wider uppercase">
@@ -122,73 +121,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <span className="text-red-600">MOTOS</span>
             </span>
           </div>
-
-          {/* IDENTIFICADOR EXCLUSIVO DEL PORTAL ACCEDIDO */}
-          <div className="mt-2 text-center">
-            {activeRole === 'admin' && (
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-red-100 text-red-800 border border-red-200 shadow-xs">
-                  <Shield className="w-3.5 h-3.5 text-red-600" />
-                  Módulo Matriz Central
-                </span>
-                <h1 className="text-xl font-black text-zinc-900 tracking-tight mt-1">
-                  Portal de Administración
-                </h1>
-                <p className="text-xs text-zinc-500 font-medium">
-                  Acceso exclusivo para Gerencia y Dirección Matriz
-                </p>
-              </div>
-            )}
-
-            {activeRole === 'cliente' && (
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 shadow-xs">
-                  <Bike className="w-3.5 h-3.5 text-blue-600" />
-                  Portal del Propietario
-                </span>
-                <h1 className="text-xl font-black text-zinc-900 tracking-tight mt-1">
-                  Acceso a Clientes StarMotos
-                </h1>
-                <p className="text-xs text-zinc-500 font-medium">
-                  Consulta de mantenimientos, historial y garantías de tu moto
-                </p>
-              </div>
-            )}
-
-            {activeRole === 'taller' && (
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-200 shadow-xs">
-                  <Wrench className="w-3.5 h-3.5 text-amber-700" />
-                  Red Oficial de Sedes
-                </span>
-                <h1 className="text-xl font-black text-zinc-900 tracking-tight mt-1">
-                  Portal de Jefes de Taller
-                </h1>
-                <p className="text-xs text-zinc-500 font-medium">
-                  Gestión de órdenes de trabajo, alistamiento PDI y perfil de sede
-                </p>
-              </div>
-            )}
-
-            {activeRole === 'garante' && (
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-100 text-purple-900 border border-purple-200 shadow-xs">
-                  <Tag className="w-3.5 h-3.5 text-purple-700" />
-                  Garantías de Fábrica
-                </span>
-                <h1 className="text-xl font-black text-zinc-900 tracking-tight mt-1">
-                  Portal Garantías de Marca
-                </h1>
-                <p className="text-xs text-zinc-500 font-medium">
-                  Auditoría, validación técnica y homologación de repuestos
-                </p>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* RENDERIZADO EXCLUSIVO E INDEPENDIENTE DEL FORMULARIO */}
-        <div className="w-full flex justify-center">
+        <div className="w-full flex justify-center pt-2.5">
           {activeRole === 'admin' && (
             <AdminLoginView onLoginSuccess={onLoginSuccess} />
           )}

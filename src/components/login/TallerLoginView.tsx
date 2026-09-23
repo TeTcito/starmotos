@@ -11,12 +11,6 @@ import {
   EyeOff,
   ArrowLeft,
   CheckCircle2,
-  Shield,
-  Bike,
-  Tag,
-  KeyRound,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { UserRole, WorkshopManagerAccount } from '../../types/customer';
 import {
@@ -34,7 +28,6 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showCredentialsGuide, setShowCredentialsGuide] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -201,33 +194,20 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   return (
     <div className="w-full max-w-md my-auto py-2 sm:py-4 animate-fade-in">
       {/* Encabezado */}
-      <div className="mb-4 sm:mb-6 text-center">
-        <div className="inline-flex p-2.5 rounded-2xl bg-gradient-to-tr from-amber-600 via-orange-600 to-amber-700 text-white shadow-xl shadow-amber-600/20 mb-2.5">
-          <Wrench className="w-9 h-9 sm:w-11 sm:h-11 text-white" />
+      <div className="mb-4 text-center">
+        <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold mb-1.5">
+          <Wrench className="w-3.5 h-3.5 text-amber-700" />
+          <span>{isRegisterMode ? 'Registro de Sede' : 'Red Oficial de Sedes'}</span>
         </div>
-
-        <div className="flex items-center justify-center gap-2 mb-0.5">
-          <span className="h-px w-5 bg-gradient-to-r from-transparent to-amber-500" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-amber-700 font-mono">
-            Red de Sedes & Talleres
-          </span>
-          <span className="h-px w-5 bg-gradient-to-l from-transparent to-amber-500" />
-        </div>
-
-        <h1 className="text-2xl sm:text-3xl font-black text-zinc-900">
-          {isRegisterMode ? 'Registro de Jefe de Taller' : 'Portal Jefes de Taller'}
+        <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">
+          {isRegisterMode ? 'Registro Jefe de Taller' : 'Portal Jefes de Taller'}
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-          {isRegisterMode
-            ? 'Registro simplificado para encargados de sedes y talleres mecánicos.'
-            : 'Gestión de órdenes de trabajo, alistamientos, garantías de sede y mecánicos.'}
-        </p>
 
         {/* Conmutador Registro / Login */}
-        <div className="mt-2.5">
+        <div className="mt-1">
           {!isRegisterMode ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-xs text-zinc-700">
-              <span>¿Nuevo jefe de taller?</span>
+            <p className="text-xs text-zinc-500">
+              ¿Nuevo jefe de taller?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -235,11 +215,11 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   setErrorMessage('');
                   setSuccessMessage('');
                 }}
-                className="text-amber-800 hover:text-amber-950 font-black underline cursor-pointer"
+                className="text-amber-800 hover:text-amber-950 font-bold underline cursor-pointer"
               >
                 Regístrate aquí
               </button>
-            </div>
+            </p>
           ) : (
             <button
               type="button"
@@ -484,47 +464,6 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           </button>
         </form>
       )}
-
-      {/* Guía Rápida de Sedes Oficiales */}
-      <div className="mt-4 pt-3 border-t border-zinc-200">
-        <button
-          type="button"
-          onClick={() => setShowCredentialsGuide(!showCredentialsGuide)}
-          className="w-full flex items-center justify-between px-3 py-2 bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/80 rounded-xl text-amber-900 transition cursor-pointer text-xs font-bold"
-        >
-          <div className="flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-            <span>Ver Sedes Oficiales Autorizadas</span>
-          </div>
-          {showCredentialsGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-
-        {showCredentialsGuide && (
-          <div className="mt-2.5 p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-2 text-xs text-zinc-700 animate-fade-in font-mono max-h-60 overflow-y-auto">
-            <div className="flex justify-between items-center pb-1.5 border-b border-zinc-200 font-sans font-bold text-zinc-900">
-              <span>Sede Oficial (Click para autocompletar)</span>
-              <span className="text-zinc-500 font-normal">Clave Genérica</span>
-            </div>
-            {workshops.map((ws) => (
-              <div
-                key={ws.id}
-                className="flex justify-between items-center cursor-pointer hover:bg-white p-1.5 rounded transition border border-transparent hover:border-amber-200"
-                onClick={() => {
-                  setLoginEmail(ws.email || '');
-                  setLoginPassword('StarMotos@2026');
-                }}
-                title={`Click para seleccionar ${ws.name}`}
-              >
-                <div className="flex flex-col min-w-0 pr-2">
-                  <span className="text-zinc-900 font-bold font-sans truncate text-[11px]">{ws.name}</span>
-                  <span className="text-amber-800 font-mono text-[10px] truncate">{ws.email}</span>
-                </div>
-                <span className="text-zinc-600 shrink-0 text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded">StarMotos@2026</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

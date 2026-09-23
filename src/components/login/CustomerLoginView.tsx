@@ -318,32 +318,19 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     <div className="w-full max-w-md my-auto py-2 sm:py-4 animate-fade-in">
       {/* Encabezado */}
       <div className="mb-3 text-center">
-        <div className="inline-flex p-2 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-600/20 mb-2">
-          <Bike className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+        <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold mb-1.5">
+          <Bike className="w-3.5 h-3.5 text-blue-600" />
+          <span>{isRegisterMode ? 'Nuevo Propietario' : 'Portal de Clientes'}</span>
         </div>
-
-        <div className="flex items-center justify-center gap-2 mb-0.5">
-          <span className="h-px w-5 bg-gradient-to-r from-transparent to-blue-400" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 font-mono">
-            Portal Oficial de Clientes
-          </span>
-          <span className="h-px w-5 bg-gradient-to-l from-transparent to-blue-400" />
-        </div>
-
-        <h1 className="text-2xl sm:text-3xl font-black text-zinc-900">
+        <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight">
           {isRegisterMode ? 'Registro de Cliente' : 'Acceso Clientes'}
         </h1>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          {isRegisterMode
-            ? 'Crea tu cuenta de propietario y vincula los datos de tu motocicleta.'
-            : 'Consulta mantenimientos, historial de taller y solicita citas.'}
-        </p>
 
         {/* Conmutador Registro / Login */}
-        <div className="mt-2">
+        <div className="mt-1">
           {!isRegisterMode ? (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-zinc-700">
-              <span>¿Eres cliente nuevo?</span>
+            <p className="text-xs text-zinc-500">
+              ¿Eres cliente nuevo?{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -351,11 +338,11 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   setIsRegisterMode(true);
                   setRegisterTab('cliente');
                 }}
-                className="text-blue-700 hover:text-blue-900 font-black underline cursor-pointer"
+                className="text-blue-700 hover:text-blue-900 font-bold underline cursor-pointer"
               >
                 Regístrate aquí
               </button>
-            </div>
+            </p>
           ) : (
             <button
               type="button"

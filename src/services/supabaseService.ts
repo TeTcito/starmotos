@@ -422,12 +422,21 @@ export async function syncAllFromSupabase(): Promise<{
         .order('created_at', { ascending: false });
 
       if (!garErr && garantesData) {
-        const items: GaranteProfile[] = garantesData.map((row) => row.data as GaranteProfile).filter(Boolean);
-        if (items.length > 0) {
-          localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(items));
-          window.dispatchEvent(new Event('starmotos_garantes_updated'));
-          window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
-        }
+        const testIds = ['gar-1790198469789', 'gar-1790177178056', 'gar-1790195112522'];
+        const testCompanies = ['honder', 'kindev', 'social'];
+        const items: GaranteProfile[] = garantesData
+          .map((row) => row.data as GaranteProfile)
+          .filter(Boolean)
+          .filter(
+            (g) =>
+              g &&
+              g.id &&
+              !testIds.includes(g.id) &&
+              !(g.companyName && testCompanies.includes(g.companyName.toLowerCase().trim()))
+          );
+        localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(items));
+        window.dispatchEvent(new Event('starmotos_garantes_updated'));
+        window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
       }
     } catch (e) {
       console.warn('Error sincronizando garantes:', e);

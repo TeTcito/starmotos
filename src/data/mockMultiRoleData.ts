@@ -387,8 +387,40 @@ try {
     'starmotos_shared_technicians_v2',
     'starmotos_shared_technicians_v3',
     'starmotos_shared_technicians_v4',
+    'starmotos_garante_pwd_ff@gmail.com',
+    'starmotos_garante_pwd_garante1@starmotos.com',
+    'starmotos_garante_pwd_luis@starmotos.com',
+    'starmotos_pwd_ff@gmail.com',
+    'starmotos_pwd_garante1@starmotos.com',
+    'starmotos_pwd_luis@starmotos.com',
   ];
   legacyKeys.forEach((k) => localStorage.removeItem(k));
+
+  const testIds = ['gar-1790198469789', 'gar-1790177178056', 'gar-1790195112522'];
+  const testCompanies = ['honder', 'kindev', 'social'];
+  const activeGarante = localStorage.getItem('starmotos_active_garante_id');
+  if (activeGarante && testIds.includes(activeGarante)) {
+    localStorage.removeItem('starmotos_active_garante_id');
+    localStorage.removeItem('starmotos_active_garante_email');
+    localStorage.removeItem('starmotos_shared_garante_profile');
+  }
+
+  const rawGarantes = localStorage.getItem(STORAGE_KEYS.GARANTES);
+  if (rawGarantes) {
+    const parsed = JSON.parse(rawGarantes);
+    if (Array.isArray(parsed)) {
+      const cleaned = parsed.filter(
+        (g: any) =>
+          g &&
+          g.id &&
+          !testIds.includes(g.id) &&
+          !(g.companyName && testCompanies.includes(g.companyName.toLowerCase().trim()))
+      );
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(cleaned));
+      }
+    }
+  }
 } catch (_) {}
 
 // Garantías
@@ -727,7 +759,13 @@ export function getStoredGaranteProfile(): GaranteProfile {
       if (match) return match;
     }
     const raw = localStorage.getItem('starmotos_shared_garante_profile');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const testIds = ['gar-1790198469789', 'gar-1790177178056', 'gar-1790195112522'];
+      if (parsed && !testIds.includes(parsed.id)) {
+        return parsed;
+      }
+    }
   } catch (_) {}
   return INITIAL_GARANTE_PROFILE;
 }
@@ -748,27 +786,32 @@ export function saveStoredGaranteProfile(profile: GaranteProfile) {
 }
 
 // ===================== GARANTES Y MARCAS REGISTRADAS =====================
-export const INITIAL_GARANTES: GaranteProfile[] = [INITIAL_GARANTE_PROFILE];
+export const INITIAL_GARANTES: GaranteProfile[] = [];
 
 export function getStoredGarantes(): GaranteProfile[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.GARANTES);
     if (raw) {
       const parsed: GaranteProfile[] = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Excluir perfiles legacy con marcas hardcodeadas solicitadas para remover
+      if (Array.isArray(parsed)) {
+        const testIds = ['gar-1790198469789', 'gar-1790177178056', 'gar-1790195112522'];
+        const testCompanies = ['honder', 'kindev', 'social'];
         const clean = parsed.filter(
-          (g) => g.id !== 'gar-benelli-ec' && !(g.companyName && g.companyName.toLowerCase().includes('benelli'))
+          (g) =>
+            g &&
+            g.id &&
+            g.id !== 'gar-benelli-ec' &&
+            !testIds.includes(g.id) &&
+            !(g.companyName && testCompanies.includes(g.companyName.toLowerCase().trim())) &&
+            !(g.companyName && g.companyName.toLowerCase().includes('benelli'))
         );
-        if (clean.length > 0) {
-          return clean;
-        }
+        return clean;
       }
     }
   } catch (e) {
     console.error('Error reading garantes from localStorage', e);
   }
-  return INITIAL_GARANTES;
+  return [];
 }
 
 export function saveStoredGarantes(garantes: GaranteProfile[]) {

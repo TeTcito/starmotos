@@ -34,6 +34,7 @@ import { AlistamientoWizard } from '../../common/AlistamientoWizard';
 import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { AlertasDesktop } from '../admin/AlertasDesktop';
+import { PerfilTallerDesktop } from './PerfilTallerDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
@@ -50,6 +51,7 @@ interface Props {
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   newWarrantyForm: any;
@@ -89,6 +91,8 @@ export const TallerViewDesktop: React.FC<Props> = ({
   onDeleteAlert,
   onDeleteAllReadAlerts,
   currentWorkshop,
+  onUpdateWorkshop,
+  onDeleteTechnician,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
 
@@ -103,6 +107,11 @@ export const TallerViewDesktop: React.FC<Props> = ({
   );
 
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
+    {
+      id: 'perfil_taller',
+      label: 'Perfil de Sede',
+      icon: <Building2 className="w-4 h-4" />,
+    },
     {
       id: 'ordenes_taller',
       label: 'Órdenes en Taller',
@@ -146,6 +155,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
   ];
 
   const sectionTitles: Record<TallerSection, string> = {
+    perfil_taller: 'Perfil y Datos de la Sede Oficial',
     ordenes_taller: 'Bahías y Órdenes de Trabajo Activas',
     alistamiento_taller: 'Alistamiento PDI, Registro de Clientes y Motocicletas',
     solicitudes_garantia: 'Solicitudes de Garantía Técnicas hacia Matriz',
@@ -338,6 +348,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 : ''
             }`}
           >
+            {activeSection === 'perfil_taller' && (
+              <PerfilTallerDesktop
+                workshop={currentWs}
+                onUpdateWorkshop={onUpdateWorkshop || (() => {})}
+              />
+            )}
             {activeSection === 'ordenes_taller' && (
               <OrdenesTallerDesktop orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
             )}
@@ -386,6 +402,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 technicians={technicians}
                 workshops={workshops}
                 onAddTechnician={onAddTechnician}
+                onDeleteTechnician={onDeleteTechnician}
                 currentWorkshopId={currentWs.id}
               />
             )}

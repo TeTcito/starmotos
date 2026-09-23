@@ -279,6 +279,7 @@ export type AdminSection =
 export type AdminSectionMobile = AdminSection | 'perfil_admin';
 
 export type TallerSection =
+  | 'perfil_taller'
   | 'ordenes_taller'
   | 'alistamiento_taller'
   | 'solicitudes_garantia'
@@ -287,7 +288,7 @@ export type TallerSection =
   | 'inventario'
   | 'alertas_taller';
 
-export type TallerSectionMobile = TallerSection | 'perfil_taller';
+export type TallerSectionMobile = TallerSection;
 
 export interface AdminProfile {
   id?: string;
@@ -361,6 +362,9 @@ export interface WarrantyRequest {
   rejectionReason?: string;
   estimatedCost?: number;
   invoiceNumber?: string;
+  garanteId?: string;
+  targetBrand?: string;
+  garanteName?: string;
 }
 
 // --- Entidad Taller ---
@@ -590,12 +594,27 @@ export interface GaranteProfile {
   companyName: string;
   ruc: string;
   contactName: string;
+  roleTitle?: string;
   phone: string;
   email: string;
   address: string;
   brandsRepresented: string[];
-  contractStartDate: string;
-  contractEndDate: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  password?: string;
+  createdAt?: string;
+}
+
+// --- Cuenta de Jefe de Taller ---
+export interface WorkshopManagerAccount {
+  id: string;
+  name: string;
+  workshopId: string;
+  workshopName: string;
+  email: string;
+  phone: string;
+  password?: string;
+  createdAt?: string;
 }
 
 // --- Cliente Unificado para Módulo de Clientes Multirrol ---

@@ -100,7 +100,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
     { id: 'clientes_garante', label: 'Talleres B2B', icon: <Building2 className="w-4 h-4" /> },
     { id: 'historial_garantias', label: 'Historial', icon: <History className="w-4 h-4" /> },
     { id: 'reportes_garante', label: 'Reportes', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'perfil_garante', label: 'Ficha Marca', icon: <Building2 className="w-4 h-4" /> },
+    { id: 'perfil_garante', label: 'Mi Perfil', icon: <Building2 className="w-4 h-4" /> },
     {
       id: 'alertas_garante',
       label: 'Alertas & Eventos',
@@ -114,7 +114,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
     clientes_garante: 'Red de Talleres & Concesionarios',
     historial_garantias: 'Historial Dictámenes',
     reportes_garante: 'Reportes Técnicos',
-    perfil_garante: 'Ficha de Marca',
+    perfil_garante: 'Mi Perfil',
     alertas_garante: 'Alertas & Eventos',
   };
 
@@ -165,8 +165,16 @@ export const GaranteViewMobile: React.FC<Props> = ({
           <aside className="relative w-72 max-w-[85vw] h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between shadow-2xl z-10 p-4">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-[#b8d1ea]">
-                <span className="text-xs font-bold text-zinc-900">Ing. Paulina Velasteguí</span>
-                <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600">
+                <div className="min-w-0 flex-1 pr-2">
+                  <span className="text-xs font-bold text-zinc-900 truncate block">
+                    {profile.contactName || profile.companyName || 'Garante Autorizado'}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0" />
+                    <span className="text-[10px] text-purple-900 font-bold truncate">Garante Autorizado</span>
+                  </div>
+                </div>
+                <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600 shrink-0">
                   <X className="w-4 h-4" />
                 </button>
               </div>

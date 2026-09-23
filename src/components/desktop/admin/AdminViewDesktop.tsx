@@ -60,6 +60,7 @@ interface Props {
   orders: TallerOrder[];
   inventory: InventoryItem[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   onDeleteFullAlistamiento?: (id: string) => void;
@@ -102,6 +103,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   orders,
   inventory,
   onAddTechnician,
+  onDeleteTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
   onDeleteFullAlistamiento,
@@ -385,6 +387,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 technicians={technicians}
                 workshops={workshops}
                 onAddTechnician={onAddTechnician}
+                onDeleteTechnician={onDeleteTechnician}
                 isMatriz={true}
               />
             )}

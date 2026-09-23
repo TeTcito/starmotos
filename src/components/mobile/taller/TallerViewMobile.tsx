@@ -51,6 +51,7 @@ interface Props {
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   newWarrantyForm: any;
@@ -91,6 +92,7 @@ export const TallerViewMobile: React.FC<Props> = ({
   onDeleteAllReadAlerts,
   currentWorkshop,
   onUpdateWorkshop,
+  onDeleteTechnician,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeWorkshopId] = useState<string>(() => {
@@ -104,6 +106,7 @@ export const TallerViewMobile: React.FC<Props> = ({
     workshops[0];
 
   const menuItems: { id: TallerSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
+    { id: 'perfil_taller', label: 'Mi Perfil de Sede', icon: <User className="w-4 h-4" /> },
     { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
     { id: 'alistamiento_taller', label: 'Alistamiento PDI', icon: <UserCheck className="w-4 h-4" />, badge: 'Nuevo' },
     { id: 'solicitudes_garantia', label: 'Solicitudes Garantía', icon: <ShieldAlert className="w-4 h-4" /> },
@@ -116,7 +119,6 @@ export const TallerViewMobile: React.FC<Props> = ({
       icon: <Bell className="w-4 h-4" />,
       badge: alerts.filter((a) => !a.read).length > 0 ? String(alerts.filter((a) => !a.read).length) : undefined,
     },
-    { id: 'perfil_taller', label: 'Mi Perfil de Sede', icon: <User className="w-4 h-4" /> },
   ];
 
   const sectionTitles: Record<TallerSectionMobile, string> = {
@@ -301,6 +303,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             technicians={technicians}
             workshops={workshops}
             onAddTechnician={onAddTechnician}
+            onDeleteTechnician={onDeleteTechnician}
             currentWorkshopId={currentWs.id}
           />
         )}

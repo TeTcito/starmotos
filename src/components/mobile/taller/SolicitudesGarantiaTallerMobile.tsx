@@ -204,6 +204,8 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
       clientIdNumber: newRequestData.clientIdNumber || '1700000000',
       clientPhone: newRequestData.clientPhone || '',
       motorcycleBrand: newRequestData.motorcycleBrand,
+      targetBrand: newRequestData.motorcycleBrand,
+      garanteName: newRequestData.warrantyType === 'marca' ? newRequestData.motorcycleBrand : undefined,
       motorcycleModel: newRequestData.motorcycleModel,
       motorcyclePlate: newRequestData.motorcyclePlate || 'SIN PLACA',
       motorcycleVin: newRequestData.motorcycleVin || 'VIN-EC-99881',

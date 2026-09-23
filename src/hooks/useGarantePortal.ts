@@ -14,6 +14,7 @@ import {
   INITIAL_GARANTE_PROFILE,
   getStoredGaranteProfile,
   saveStoredGaranteProfile,
+  saveStoredGarante,
   saveStoredAlerts,
   getStoredAlerts,
   deleteStoredAlert,
@@ -111,8 +112,9 @@ export function useGarantePortal() {
 
   const updateGaranteProfile = useCallback((updated: GaranteProfile) => {
     setProfile(updated);
+    saveStoredGarante(updated);
     saveStoredGaranteProfile(updated);
-    showToast('Perfil de garante oficial guardado correctamente.', 'success');
+    showToast('Perfil de garante oficial guardado y sincronizado correctamente.', 'success');
   }, [showToast]);
 
   const markAlertAsRead = useCallback((id: string) => {
@@ -181,17 +183,35 @@ export function useGarantePortal() {
 
   // Solicitudes pendientes de decisión del Garante (en_proceso, enviada_garante, etc.)
   const pendingRequests = useMemo(() => {
-    return warranties.filter((w) =>
+    const statusFiltered = warranties.filter((w) =>
       ['en_proceso', 'enviada_garante', 'validada_matriz'].includes(w.status)
     );
-  }, [warranties]);
+    if (!profile?.brandsRepresented || profile.brandsRepresented.length === 0) {
+      return statusFiltered;
+    }
+    const brandTokens = profile.brandsRepresented.map((b) => b.trim().toLowerCase());
+    const matched = statusFiltered.filter((w) => {
+      const wb = (w.targetBrand || w.motorcycleBrand || '').trim().toLowerCase();
+      return brandTokens.some((bt) => wb.includes(bt) || bt.includes(wb));
+    });
+    return matched.length > 0 ? matched : statusFiltered;
+  }, [warranties, profile]);
 
   // Historial (aceptada, aprobada, denegada, rechazada, completada, en_proceso_aceptacion_2)
   const historyRequests = useMemo(() => {
-    return warranties.filter((w) =>
+    const statusFiltered = warranties.filter((w) =>
       ['aceptada', 'aprobada', 'denegada', 'rechazada', 'completada', 'en_proceso_aceptacion_2'].includes(w.status)
     );
-  }, [warranties]);
+    if (!profile?.brandsRepresented || profile.brandsRepresented.length === 0) {
+      return statusFiltered;
+    }
+    const brandTokens = profile.brandsRepresented.map((b) => b.trim().toLowerCase());
+    const matched = statusFiltered.filter((w) => {
+      const wb = (w.targetBrand || w.motorcycleBrand || '').trim().toLowerCase();
+      return brandTokens.some((bt) => wb.includes(bt) || bt.includes(wb));
+    });
+    return matched.length > 0 ? matched : statusFiltered;
+  }, [warranties, profile]);
 
   // Abrir modal de decisión
   const openDecisionModal = useCallback((warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => {

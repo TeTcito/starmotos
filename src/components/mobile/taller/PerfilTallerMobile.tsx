@@ -192,12 +192,13 @@ export const PerfilTallerMobile: React.FC<Props> = ({ workshop, onUpdateWorkshop
             <span>Correo Oficial de Acceso</span>
           </span>
           <div className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg font-mono text-xs text-zinc-800 font-semibold truncate">
-            {workshop.id === 'matriz-la-mana'
-              ? 'taller.lamana@starmotos.com'
-              : `taller.${workshop.city.toLowerCase().replace(/[^a-z0-9]/g, '')}@starmotos.com`}
+            {workshop.email ||
+              (workshop.id === 'matriz-la-mana'
+                ? 'sede.la-mana@starmotos.com'
+                : `sede.${workshop.city.toLowerCase().split(',')[0].trim().replace(/[^a-z0-9]/g, '-') || 'taller'}@starmotos.com`)}
           </div>
           <p className="text-[10px] text-zinc-500">
-            Sede asignada permanentemente a este correo.
+            Sede asignada permanentemente a este correo corporativo.
           </p>
         </div>
 

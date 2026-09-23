@@ -58,6 +58,7 @@ export const GarantePortal: React.FC<Props> = ({ onLogout }) => {
           clients={clients}
           workshops={workshops}
           profile={profile}
+          onUpdateProfile={updateGaranteProfile}
           selectedWarranty={selectedWarranty}
           reviewNotes={reviewNotes}
           setReviewNotes={setReviewNotes}

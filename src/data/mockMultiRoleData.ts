@@ -11,6 +11,7 @@ import {
   Technician,
   AlistamientoFullRecord,
   AdminProfile,
+  WorkshopManagerAccount,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -20,6 +21,10 @@ import {
   cloudSaveOrder,
   cloudSaveInvoice,
   cloudSaveTechnician,
+  cloudSaveGarante,
+  cloudDeleteGarante,
+  cloudSaveWorkshopManager,
+  cloudDeleteWorkshopManager,
   cloudDeleteTechnician,
   cloudDeleteWarranty,
   cloudDeleteAlistamiento,
@@ -278,7 +283,8 @@ export const INITIAL_GARANTE_PROFILE: GaranteProfile = {
   id: 'gar-benelli-ec',
   companyName: 'Representaciones Benelli & CFMOTO del Ecuador S.A.',
   ruc: '1792849102001',
-  contactName: 'Ing. Paulina Velasteguí (Jefa Nacional de Garantías)',
+  contactName: 'Ing. Paulina Velasteguí',
+  roleTitle: 'Jefa Nacional de Garantías',
   phone: '+593 2 398 5400 / +593 99 780 1200',
   email: 'garantias.oficial@benelli-ecuador.com',
   address: 'Av. Granados E12-40 y 6 de Diciembre, Edificio Corporativo Motorcorp Piso 4',
@@ -566,6 +572,17 @@ export function saveStoredAdminProfile(profile: AdminProfile) {
 // ===================== PERFIL DE GARANTE =====================
 export function getStoredGaranteProfile(): GaranteProfile {
   try {
+    const activeEmail = localStorage.getItem('starmotos_active_garante_email');
+    const activeId = localStorage.getItem('starmotos_active_garante_id');
+    const garantes = getStoredGarantes();
+    if (activeEmail) {
+      const match = garantes.find((g) => g.email.trim().toLowerCase() === activeEmail.trim().toLowerCase());
+      if (match) return match;
+    }
+    if (activeId) {
+      const match = garantes.find((g) => g.id === activeId);
+      if (match) return match;
+    }
     const raw = localStorage.getItem('starmotos_shared_garante_profile');
     if (raw) return JSON.parse(raw);
   } catch (_) {}
@@ -575,9 +592,142 @@ export function getStoredGaranteProfile(): GaranteProfile {
 export function saveStoredGaranteProfile(profile: GaranteProfile) {
   try {
     localStorage.setItem('starmotos_shared_garante_profile', JSON.stringify(profile));
+    if (profile.email) {
+      localStorage.setItem('starmotos_active_garante_email', profile.email);
+    }
+    if (profile.id) {
+      localStorage.setItem('starmotos_active_garante_id', profile.id);
+    }
     window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
   } catch (e) {
     console.error('Error saving garante profile', e);
+  }
+}
+
+// ===================== GARANTES Y MARCAS REGISTRADAS =====================
+export const INITIAL_GARANTES: GaranteProfile[] = [INITIAL_GARANTE_PROFILE];
+
+export function getStoredGarantes(): GaranteProfile[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GARANTES);
+    if (raw) {
+      const parsed: GaranteProfile[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading garantes from localStorage', e);
+  }
+  return INITIAL_GARANTES;
+}
+
+export function saveStoredGarantes(garantes: GaranteProfile[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(garantes));
+    window.dispatchEvent(new Event('starmotos_garantes_updated'));
+    garantes.forEach((g) => cloudSaveGarante(g));
+  } catch (e) {
+    console.error('Error saving garantes to localStorage', e);
+  }
+}
+
+export function saveStoredGarante(garante: GaranteProfile) {
+  try {
+    const current = getStoredGarantes();
+    const updated = [
+      garante,
+      ...current.filter((g) => g.id !== garante.id && g.email.toLowerCase() !== garante.email.toLowerCase()),
+    ];
+    saveStoredGarantes(updated);
+    saveStoredGaranteProfile(garante);
+  } catch (e) {
+    console.error('Error saving individual garante', e);
+  }
+}
+
+/**
+ * Devuelve todas las marcas registradas consolidadas (de garantes registrados y marcas base).
+ * Siempre sincronizado con la base de datos y garantes.
+ */
+export function getRegisteredBrands(): string[] {
+  const defaultBrands = ['Benelli', 'CFMOTO', 'Keeway', 'Brixton', 'StarMotos', 'Yamaha', 'Suzuki', 'Honda', 'Bajaj', 'Shineray'];
+  const brandSet = new Set<string>();
+
+  // 1. Agregar marcas de todos los garantes registrados
+  const garantes = getStoredGarantes();
+  for (const g of garantes) {
+    if (Array.isArray(g.brandsRepresented)) {
+      for (const b of g.brandsRepresented) {
+        const clean = b.trim();
+        if (clean) brandSet.add(clean);
+      }
+    }
+  }
+
+  // 2. Agregar marcas base por defecto si no están presentes
+  for (const b of defaultBrands) {
+    brandSet.add(b);
+  }
+
+  return Array.from(brandSet).sort((a, b) => a.localeCompare(b));
+}
+
+// ===================== JEFES DE TALLER REGISTRADOS =====================
+export const INITIAL_WORKSHOP_MANAGERS: WorkshopManagerAccount[] = [
+  {
+    id: 'mgr-la-mana',
+    name: 'William Daniel Meza Chicaiza',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    email: 'sede.la-mana@starmotos.com',
+    phone: '0939316698',
+  },
+  {
+    id: 'mgr-quevedo',
+    name: 'Jefe de Taller Quevedo',
+    workshopId: 'taller-quevedo',
+    workshopName: 'StarMotos Sucursal Quevedo',
+    email: 'sede.quevedo@starmotos.com',
+    phone: '0939317809',
+  },
+];
+
+export function getStoredWorkshopManagers(): WorkshopManagerAccount[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.WORKSHOP_MANAGERS);
+    if (raw) {
+      const parsed: WorkshopManagerAccount[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading workshop managers from localStorage', e);
+  }
+  return INITIAL_WORKSHOP_MANAGERS;
+}
+
+export function saveStoredWorkshopManagers(managers: WorkshopManagerAccount[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(managers));
+    window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
+    managers.forEach((m) => cloudSaveWorkshopManager(m));
+  } catch (e) {
+    console.error('Error saving workshop managers to localStorage', e);
+  }
+}
+
+export function saveStoredWorkshopManager(manager: WorkshopManagerAccount) {
+  try {
+    const current = getStoredWorkshopManagers();
+    const updated = [
+      manager,
+      ...current.filter((m) => m.id !== manager.id && m.email.toLowerCase() !== manager.email.toLowerCase()),
+    ];
+    saveStoredWorkshopManagers(updated);
+  } catch (e) {
+    console.error('Error saving individual workshop manager', e);
   }
 }
 

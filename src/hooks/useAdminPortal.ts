@@ -29,6 +29,7 @@ import {
   saveStoredInvoices,
   getStoredTechnicians,
   saveStoredTechnicians,
+  deleteStoredTechnician,
   getStoredOrigins,
   saveStoredOrigins,
   getStoredFullAlistamientos,
@@ -598,6 +599,12 @@ export function useAdminPortal() {
     showToast(`Técnico ${newTech.name} registrado con éxito.`, 'success');
   }, [showToast]);
 
+  const deleteTechnician = useCallback((id: string) => {
+    deleteStoredTechnician(id);
+    setTechnicians((prev) => prev.filter((t) => t.id !== id));
+    showToast('Técnico eliminado del sistema.', 'info');
+  }, [showToast]);
+
   const addOrigin = useCallback((newOrigin: string) => {
     setOrigins((prev) => {
       if (prev.includes(newOrigin)) return prev;
@@ -786,6 +793,7 @@ export function useAdminPortal() {
     deleteAllReadAlerts,
     // Técnicos & Alistamiento Full
     addTechnician,
+    deleteTechnician,
     addOrigin,
     saveFullAlistamiento,
     deleteFullAlistamiento,

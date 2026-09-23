@@ -1,12 +1,13 @@
 // src/components/mobile/common/TecnicosMobile.tsx
 import React, { useState } from 'react';
-import { Wrench, Plus, Phone, Building2, CheckCircle2, X } from 'lucide-react';
+import { Wrench, Plus, Phone, Building2, CheckCircle2, X, Trash2 } from 'lucide-react';
 import { Technician, Workshop } from '../../../types/customer';
 
 interface Props {
   technicians: Technician[];
   workshops: Workshop[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onDeleteTechnician?: (id: string) => void;
   currentWorkshopId?: string;
   isMatriz?: boolean;
 }
@@ -15,6 +16,7 @@ export const TecnicosMobile: React.FC<Props> = ({
   technicians,
   workshops,
   onAddTechnician,
+  onDeleteTechnician,
   currentWorkshopId,
   isMatriz = false,
 }) => {
@@ -85,7 +87,27 @@ export const TecnicosMobile: React.FC<Props> = ({
 
               <div className="text-[11px] text-zinc-600 flex justify-between items-center pt-1 border-t border-zinc-100">
                 <span className="truncate max-w-[170px]">{tech.workshopName.replace('StarMotos ', '')}</span>
-                <span className="font-mono text-zinc-800">{tech.phone}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-zinc-800">{tech.phone}</span>
+                  {onDeleteTechnician && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `¿Está seguro de eliminar al técnico "${tech.name}" de la sede "${tech.workshopName}"?`
+                          )
+                        ) {
+                          onDeleteTechnician(tech.id);
+                        }
+                      }}
+                      className="p-1 text-zinc-400 hover:text-red-600 rounded transition"
+                      title={`Eliminar ${tech.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

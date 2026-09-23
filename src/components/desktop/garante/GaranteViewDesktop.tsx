@@ -44,6 +44,7 @@ interface Props {
   clients: TallerClient[];
   workshops: Workshop[];
   profile: GaranteProfile;
+  onUpdateProfile?: (updated: GaranteProfile) => void;
   selectedWarranty: WarrantyRequest | null;
   reviewNotes: string;
   setReviewNotes: (val: string) => void;
@@ -73,6 +74,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
   clients,
   workshops,
   profile,
+  onUpdateProfile,
   selectedWarranty,
   reviewNotes,
   setReviewNotes,
@@ -114,7 +116,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
     },
     {
       id: 'perfil_garante',
-      label: 'Ficha de Marca',
+      label: 'Mi Perfil',
       icon: <Building2 className="w-4 h-4" />,
     },
     {
@@ -130,7 +132,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
     clientes_garante: 'Clientes y Unidades con Cobertura de Garantía',
     historial_garantias: 'Historial Consolidado de Garantías Emitidas',
     reportes_garante: 'Indicadores Técnicos & Tasa de Reclamos',
-    perfil_garante: 'Información Institucional del Garante Oficial',
+    perfil_garante: 'Mi Perfil de Garante y Respaldo de Marca',
     alertas_garante: 'Auditoría de Alertas & Eventos del Garante',
   };
 
@@ -173,7 +175,12 @@ export const GaranteViewDesktop: React.FC<Props> = ({
 
             <div className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-800 border border-blue-600 text-xs text-blue-100 font-medium shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Auditoría Oficial Benelli & CFMOTO</span>
+              <span>
+                Auditoría Oficial{' '}
+                {profile.brandsRepresented && profile.brandsRepresented.length > 0
+                  ? profile.brandsRepresented.slice(0, 3).join(' & ')
+                  : profile.companyName}
+              </span>
             </div>
 
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-[11px] text-emerald-300 font-semibold shadow-xs" title="Conectado en tiempo real con Supabase Cloud">
@@ -190,15 +197,22 @@ export const GaranteViewDesktop: React.FC<Props> = ({
           {/* Info Garante */}
           <div className="shrink-0 p-4 border-b border-[#b8d1ea] bg-white/40">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-purple-700 text-white font-black text-sm flex items-center justify-center border-2 border-purple-600 shadow-xs shrink-0">
-                GAR
+              <div className="w-11 h-11 rounded-full bg-purple-700 text-white font-black text-xs flex items-center justify-center border-2 border-purple-600 shadow-xs shrink-0">
+                {(profile.contactName || profile.companyName || 'GAR')
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0])
+                  .join('')
+                  .toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-xs font-bold text-zinc-900 truncate">Ing. Paulina Velasteguí</h3>
-                <p className="text-[10px] text-zinc-600 font-mono">Jefa Nacional de Garantías</p>
+                <h3 className="text-xs font-bold text-zinc-900 truncate" title={profile.contactName || profile.companyName}>
+                  {profile.contactName || profile.companyName || 'Garante Autorizado'}
+                </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                  <span className="text-[10px] text-purple-900 font-bold">Garante Autorizado</span>
+                  <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
+                  <span className="text-[10px] text-purple-900 font-bold truncate">Garante Autorizado</span>
                 </div>
               </div>
             </div>
@@ -245,18 +259,10 @@ export const GaranteViewDesktop: React.FC<Props> = ({
           </nav>
 
           {/* Footer */}
-          <div className="shrink-0 p-3.5 border-t border-[#b8d1ea] space-y-2 bg-[#dce8f5]">
-            <div className="px-3 py-2 rounded-xl bg-white/70 border border-[#b8d1ea] text-xs text-zinc-700 shadow-xs">
-              <div className="flex items-center gap-1.5 font-bold text-zinc-900">
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="truncate">Sede Corporativa Quito</span>
-              </div>
-              <p className="truncate text-zinc-600 text-[11px] mt-0.5">Av. Granados E12-40</p>
-            </div>
-
+          <div className="shrink-0 p-3.5 border-t border-[#b8d1ea] bg-[#dce8f5]">
             <button
               onClick={onLogout}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white hover:bg-red-50 border border-zinc-300 hover:border-red-300 text-zinc-800 hover:text-red-700 text-xs font-bold transition active:scale-98 cursor-pointer shadow-xs"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white hover:bg-red-50 border border-zinc-300 hover:border-red-300 text-zinc-800 hover:text-red-700 text-xs font-bold transition active:scale-98 cursor-pointer shadow-xs"
             >
               <LogOut className="w-3.5 h-3.5 text-red-500" />
               <span>Cerrar Sesión</span>
@@ -293,7 +299,9 @@ export const GaranteViewDesktop: React.FC<Props> = ({
             {activeSection === 'reportes_garante' && (
               <ReportesGaranteDesktop warranties={warranties} />
             )}
-            {activeSection === 'perfil_garante' && <PerfilGaranteDesktop profile={profile} />}
+            {activeSection === 'perfil_garante' && (
+              <PerfilGaranteDesktop profile={profile} onUpdateProfile={onUpdateProfile} />
+            )}
             {activeSection === 'alertas_garante' && (
               <AlertasDesktop
                 alerts={alerts}

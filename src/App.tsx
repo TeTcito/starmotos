@@ -34,7 +34,7 @@ function App() {
     if (selectedRole === 'admin') {
       window.location.hash = '#talleres';
     } else if (selectedRole === 'taller') {
-      window.location.hash = '#ordenes_taller';
+      window.location.hash = '#perfil_taller';
     } else if (selectedRole === 'garante') {
       window.location.hash = '#solicitudes_garante';
     } else {
@@ -43,9 +43,14 @@ function App() {
   };
 
   const handleLogout = () => {
+    const logoutRole = role === 'garante' ? 'marca' : role;
     setIsAuthenticated(false);
     localStorage.removeItem('starmotos_auth');
     localStorage.removeItem('starmotos_role');
+    localStorage.setItem('starmotos_preferred_login_role', role);
+    try {
+      window.history.pushState(null, '', `/login/${logoutRole}`);
+    } catch (_) {}
     window.location.hash = '';
   };
 

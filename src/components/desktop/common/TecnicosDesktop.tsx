@@ -12,6 +12,7 @@ import {
   Filter,
   ShieldCheck,
   X,
+  Trash2,
 } from 'lucide-react';
 import { Technician, Workshop } from '../../../types/customer';
 
@@ -19,6 +20,7 @@ interface Props {
   technicians: Technician[];
   workshops: Workshop[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
+  onDeleteTechnician?: (id: string) => void;
   currentWorkshopId?: string;
   isMatriz?: boolean;
 }
@@ -27,6 +29,7 @@ export const TecnicosDesktop: React.FC<Props> = ({
   technicians,
   workshops,
   onAddTechnician,
+  onDeleteTechnician,
   currentWorkshopId,
   isMatriz = false,
 }) => {
@@ -193,10 +196,31 @@ export const TecnicosDesktop: React.FC<Props> = ({
               </div>
 
               <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-500">
-                <span>Órdenes asignadas:</span>
-                <strong className="text-blue-700 font-mono font-bold">
-                  {tech.activeOrdersCount} activas
-                </strong>
+                <div className="flex items-center gap-1.5">
+                  <span>Órdenes asignadas:</span>
+                  <strong className="text-blue-700 font-mono font-bold">
+                    {tech.activeOrdersCount} activas
+                  </strong>
+                </div>
+
+                {onDeleteTechnician && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `¿Está seguro de eliminar al técnico "${tech.name}" de la sede "${tech.workshopName}"? Esta acción no se puede deshacer.`
+                        )
+                      ) {
+                        onDeleteTechnician(tech.id);
+                      }
+                    }}
+                    className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                    title={`Eliminar al técnico ${tech.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

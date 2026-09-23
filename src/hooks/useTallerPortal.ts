@@ -23,6 +23,7 @@ import {
   deleteStoredAlerts,
   getStoredTechnicians,
   saveStoredTechnicians,
+  deleteStoredTechnician,
   getStoredOrigins,
   saveStoredOrigins,
   getStoredFullAlistamientos,
@@ -34,6 +35,7 @@ import { Technician, AlistamientoFullRecord, Workshop, TallerSectionMobile } fro
 
 
 export const TALLER_SECTIONS: TallerSectionMobile[] = [
+  'perfil_taller',
   'ordenes_taller',
   'alistamiento_taller',
   'solicitudes_garantia',
@@ -41,16 +43,15 @@ export const TALLER_SECTIONS: TallerSectionMobile[] = [
   'tecnicos',
   'inventario',
   'alertas_taller',
-  'perfil_taller',
 ];
 
 const getSectionFromHash = (): TallerSectionMobile => {
-  if (typeof window === 'undefined') return 'ordenes_taller';
+  if (typeof window === 'undefined') return 'perfil_taller';
   const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
   if (TALLER_SECTIONS.includes(cleanHash as TallerSectionMobile)) {
     return cleanHash as TallerSectionMobile;
   }
-  return 'ordenes_taller';
+  return 'perfil_taller';
 };
 
 export function useTallerPortal() {
@@ -337,6 +338,8 @@ export function useTallerPortal() {
         status: 'en_revision',
         tallerOrigin: directReq.tallerOrigin || wsName,
         tallerOriginId: directReq.tallerOriginId || wsId,
+        targetBrand: directReq.targetBrand || directReq.motorcycleBrand,
+        garanteName: directReq.garanteName || (directReq.warrantyType === 'marca' ? directReq.motorcycleBrand : undefined),
       };
     } else {
       if (!newWarrantyForm.clientName || !newWarrantyForm.issueDescription) {
@@ -351,6 +354,8 @@ export function useTallerPortal() {
         clientName: newWarrantyForm.clientName,
         clientIdNumber: newWarrantyForm.clientIdNumber || '1700000000',
         motorcycleBrand: newWarrantyForm.motorcycleBrand,
+        targetBrand: newWarrantyForm.motorcycleBrand,
+        garanteName: newWarrantyForm.warrantyType === 'marca' ? newWarrantyForm.motorcycleBrand : undefined,
         motorcycleModel: newWarrantyForm.motorcycleModel,
         motorcyclePlate: newWarrantyForm.motorcyclePlate || 'PBX-0000',
         motorcycleVin: newWarrantyForm.motorcycleVin || 'VIN-EC-99881',
@@ -427,6 +432,12 @@ export function useTallerPortal() {
     });
     showToast(`Técnico ${newTech.name} registrado con éxito en ${wsName}.`, 'success');
   }, [currentWorkshop, activeWorkshopId, showToast]);
+
+  const deleteTechnician = useCallback((id: string) => {
+    deleteStoredTechnician(id);
+    setTechnicians((prev) => prev.filter((t) => t.id !== id));
+    showToast('Técnico eliminado de la sede.', 'info');
+  }, [showToast]);
 
   const addOrigin = useCallback((newOrigin: string) => {
     setOrigins((prev) => {
@@ -601,6 +612,7 @@ export function useTallerPortal() {
     origins,
     fullAlistamientos: filteredFullAlistamientos,
     addTechnician,
+    deleteTechnician,
     addOrigin,
     saveFullAlistamiento,
     newWarrantyForm,

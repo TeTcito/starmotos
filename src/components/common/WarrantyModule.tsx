@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
-import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos } from '../../data/mockMultiRoleData';
+import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes } from '../../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64 } from '../../utils/imageCompressor';
@@ -817,6 +817,20 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <option value="gps">Garantía Dispositivo GPS Satelital</option>
                 </select>
               </div>
+              {editFormData.warrantyType === 'marca' && (
+                <div className="pt-1.5 animate-fade-in">
+                  <label className="block text-xs font-black text-purple-900 mb-1">Marca / Garante Responsable (BD)</label>
+                  <select
+                    value={editFormData.motorcycleBrand}
+                    onChange={(e) => setEditFormData({ ...editFormData, motorcycleBrand: e.target.value, targetBrand: e.target.value })}
+                    className="w-full h-11 px-3 bg-purple-50 border border-purple-300 focus:border-purple-600 rounded-xl text-xs font-bold text-purple-900 cursor-pointer"
+                  >
+                    {getRegisteredBrands().map((b) => (
+                      <option key={b} value={b}>{b} (Garante Oficial)</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Columna 2 Edición: Vehículo */}
@@ -2150,6 +2164,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       ramvNumber: formData.ramvNumber.trim().toUpperCase(),
       motorcycleMileage: Number(formData.motorcycleMileage) || 0,
       warrantyType: formData.warrantyType,
+      targetBrand: formData.motorcycleBrand.trim(),
+      garanteName: formData.warrantyType === 'marca' ? formData.motorcycleBrand.trim() : undefined,
       issueDescription: formData.issueDescription.trim(),
       partsTags: partsTags.length > 0 ? partsTags : (formData.partsRequired ? [formData.partsRequired] : []),
       partsRequired: partsTags.join(', ') || formData.partsRequired.trim(),
@@ -2297,6 +2313,30 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <option value="gps">Garantía Dispositivo GPS Satelital</option>
               </select>
             </div>
+
+            {/* Selector de Marca / Garante Responsable sincronizado con la Base de Datos */}
+            {formData.warrantyType === 'marca' && (
+              <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1.5 animate-fade-in">
+                <label className="block text-xs font-black text-purple-950 uppercase tracking-wider">
+                  Marca / Garante con quien es la Garantía <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.motorcycleBrand}
+                  onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
+                  className="w-full h-10 px-3 bg-white border border-purple-300 focus:border-purple-600 rounded-lg text-xs sm:text-sm font-bold text-purple-900 outline-none cursor-pointer"
+                >
+                  {getRegisteredBrands().map((b) => (
+                    <option key={b} value={b}>
+                      {b} (Garante Oficial Registrado)
+                    </option>
+                  ))}
+                  <option value="OTRA">+ Otra Marca / Garante no listado</option>
+                </select>
+                <p className="text-[10px] text-purple-700 font-medium">
+                  Sincronizado en tiempo real con las marcas y garantes oficiales registrados en la base de datos.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2318,11 +2358,17 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <input
                   type="text"
                   required
+                  list="registered-brands-datalist"
                   value={formData.motorcycleBrand}
                   onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
                   placeholder="Ej: Benelli"
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
                 />
+                <datalist id="registered-brands-datalist">
+                  {getRegisteredBrands().map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">

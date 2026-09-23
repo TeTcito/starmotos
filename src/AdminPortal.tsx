@@ -37,6 +37,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     markAlertAsRead,
     markAllAlertsAsRead,
     addTechnician,
+    deleteTechnician,
     addOrigin,
     saveFullAlistamiento,
     deleteFullAlistamiento,
@@ -88,6 +89,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           orders={orders}
           inventory={inventory}
           onAddTechnician={addTechnician}
+          onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}
           onDeleteFullAlistamiento={deleteFullAlistamiento}
@@ -130,6 +132,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           orders={orders}
           inventory={inventory}
           onAddTechnician={addTechnician}
+          onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}
           onSaveFullAlistamiento={saveFullAlistamiento}
           onDeleteFullAlistamiento={deleteFullAlistamiento}

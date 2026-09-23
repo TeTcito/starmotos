@@ -29,7 +29,7 @@ import {
   WarrantyRequest,
   TallerClient,
 } from '../../../types/customer';
-import { getStoredFullAlistamientos } from '../../../data/mockMultiRoleData';
+import { getStoredFullAlistamientos, getRegisteredBrands } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 
 export const isVideoUrl = (url?: string): boolean => {
@@ -288,6 +288,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       tallerOrigin: formData.tallerOrigin.trim() || defaultTallerOrigin,
       tallerOriginId: defaultTallerOriginId,
       warrantyType: formData.warrantyType,
+      targetBrand: formData.motorcycleBrand.trim(),
+      garanteName: formData.warrantyType === 'marca' ? formData.motorcycleBrand.trim() : undefined,
       motorcycleBrand: formData.motorcycleBrand.trim(),
       motorcycleModel: formData.motorcycleModel.trim(),
       motorcyclePlate: formData.motorcyclePlate.trim().toUpperCase() || 'SIN PLACA',
@@ -561,6 +563,24 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               <option value="gps">Garantía GPS Satelital</option>
             </select>
           </div>
+
+          {formData.warrantyType === 'marca' && (
+            <div className="p-2.5 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1 animate-fade-in">
+              <label className="block text-[11px] font-black text-purple-950 uppercase tracking-wider">
+                Marca / Garante Responsable *
+              </label>
+              <select
+                value={formData.motorcycleBrand}
+                onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
+                className="w-full px-2.5 py-2 bg-white border border-purple-300 focus:border-purple-600 rounded-lg text-xs font-bold text-purple-900 outline-none cursor-pointer"
+              >
+                {getRegisteredBrands().map((b) => (
+                  <option key={b} value={b}>{b} (Garante Oficial)</option>
+                ))}
+                <option value="OTRA">+ Otra Marca / Garante</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -579,13 +599,21 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Marca y Modelo</label>
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                value={formData.motorcycleBrand}
-                onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                placeholder="Marca (Ej: Benelli)"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-              />
+              <div>
+                <input
+                  type="text"
+                  list="mobile-brands-datalist"
+                  value={formData.motorcycleBrand}
+                  onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
+                  placeholder="Marca (Ej: Benelli)"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                />
+                <datalist id="mobile-brands-datalist">
+                  {getRegisteredBrands().map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
+              </div>
               <input
                 type="text"
                 value={formData.motorcycleModel}

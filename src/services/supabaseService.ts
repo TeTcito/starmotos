@@ -8,6 +8,8 @@ import {
   TallerOrder,
   AdminInvoice,
   Technician,
+  GaranteProfile,
+  WorkshopManagerAccount,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
@@ -302,6 +304,46 @@ export async function syncAllFromSupabase(): Promise<{
     } catch (e) {
       console.warn('Error sincronizando técnicos:', e);
     }
+    // -----------------------------------------------------------------------
+    // 8. GARANTES Y MARCAS REGISTRADAS
+    // -----------------------------------------------------------------------
+    try {
+      const { data: garantesData, error: garErr } = await supabase
+        .from('garantes')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!garErr && garantesData) {
+        const items: GaranteProfile[] = garantesData.map((row) => row.data as GaranteProfile).filter(Boolean);
+        if (items.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(items));
+          window.dispatchEvent(new Event('starmotos_garantes_updated'));
+          window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error sincronizando garantes:', e);
+    }
+
+    // -----------------------------------------------------------------------
+    // 9. JEFES DE TALLER REGISTRADOS
+    // -----------------------------------------------------------------------
+    try {
+      const { data: managersData, error: mgrErr } = await supabase
+        .from('workshop_managers')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!mgrErr && managersData) {
+        const items: WorkshopManagerAccount[] = managersData.map((row) => row.data as WorkshopManagerAccount).filter(Boolean);
+        if (items.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(items));
+          window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error sincronizando jefes de taller:', e);
+    }
 
     return {
       warrantiesCount,
@@ -580,6 +622,67 @@ export async function cloudDeleteTechnician(id: string) {
   }
 }
 
+export async function cloudSaveGarante(g: GaranteProfile) {
+  try {
+    const payload = {
+      id: g.id,
+      company_name: g.companyName || null,
+      ruc: g.ruc || null,
+      contact_name: g.contactName || null,
+      role_title: g.roleTitle || null,
+      email: g.email || null,
+      phone: g.phone || null,
+      address: g.address || null,
+      brands_represented: g.brandsRepresented || [],
+      data: g,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('garantes').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando garante:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando garante:', err);
+  }
+}
+
+export async function cloudDeleteGarante(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('garantes').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando garante:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando garante:', err);
+  }
+}
+
+export async function cloudSaveWorkshopManager(m: WorkshopManagerAccount) {
+  try {
+    const payload = {
+      id: m.id,
+      name: m.name || null,
+      workshop_id: m.workshopId || null,
+      workshop_name: m.workshopName || null,
+      email: m.email || null,
+      phone: m.phone || null,
+      data: m,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('workshop_managers').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando jefe de taller:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando jefe de taller:', err);
+  }
+}
+
+export async function cloudDeleteWorkshopManager(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('workshop_managers').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando jefe de taller:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando jefe de taller:', err);
+  }
+}
+
 // =========================================================================
 // 3. SUSCRIPCIÓN EN TIEMPO REAL (REALTIME BROADCAST MULTI-DISPOSITIVO)
 // =========================================================================
@@ -841,6 +944,69 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_technicians_updated'));
         } catch (e) {
           console.error('Error procesando realtime technicians:', e);
+        }
+      }
+    )
+    // Garantes y Marcas
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'garantes' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.GARANTES);
+          let current: GaranteProfile[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as GaranteProfile;
+            if (newDoc && !current.some((g) => g.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as GaranteProfile;
+            if (updatedDoc) {
+              current = current.map((g) => (g.id === updatedDoc.id ? updatedDoc : g));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            current = current.filter((g) => g.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_garantes_updated'));
+          window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime garantes:', e);
+        }
+      }
+    )
+    // Jefes de Taller
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'workshop_managers' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.WORKSHOP_MANAGERS);
+          let current: WorkshopManagerAccount[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as WorkshopManagerAccount;
+            if (newDoc && !current.some((m) => m.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as WorkshopManagerAccount;
+            if (updatedDoc) {
+              current = current.map((m) => (m.id === updatedDoc.id ? updatedDoc : m));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            current = current.filter((m) => m.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime workshop managers:', e);
         }
       }
     )

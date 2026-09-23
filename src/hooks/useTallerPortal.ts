@@ -19,6 +19,8 @@ import {
   getStoredInventory,
   saveStoredAlerts,
   getStoredAlerts,
+  addStoredAlerts,
+  filterAlertsForRole,
   deleteStoredAlert,
   deleteStoredAlerts,
   getStoredTechnicians,
@@ -73,7 +75,7 @@ export function useTallerPortal() {
   const [technicians, setTechnicians] = useState<Technician[]>(getStoredTechnicians);
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
-  const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
+  const [allAlerts, setAllAlerts] = useState<SystemAlert[]>(getStoredAlerts);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Instancia de la sede actual autenticada
@@ -170,6 +172,15 @@ export function useTallerPortal() {
     });
   }, [technicians, activeWorkshopId, currentWorkshop]);
 
+  // Alertas exclusivas de este taller / sede
+  const filteredAlerts = useMemo(() => {
+    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    return filterAlertsForRole(allAlerts, {
+      role: 'taller',
+      workshopId: targetWsId,
+    });
+  }, [allAlerts, activeWorkshopId, currentWorkshop]);
+
   // Sincronización entre ventanas o localStorage
   useEffect(() => {
     const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
@@ -178,7 +189,7 @@ export function useTallerPortal() {
     const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
-    const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
+    const handleAlertsUpdate = () => setAllAlerts(getStoredAlerts());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
 
     const handleStorageEvent = (e: StorageEvent) => {
@@ -235,45 +246,39 @@ export function useTallerPortal() {
   }, [currentWorkshop, activeWorkshopId, showToast]);
 
   const markAlertAsRead = useCallback((id: string) => {
-    setAlerts((prev) => {
-      const updated = prev.map((a) => (a.id === id ? { ...a, read: true } : a));
-      saveStoredAlerts(updated);
-      return updated;
-    });
+    const current = getStoredAlerts();
+    const updated = current.map((a) => (a.id === id ? { ...a, read: true } : a));
+    saveStoredAlerts(updated);
   }, []);
 
   const markAllAlertsAsRead = useCallback(() => {
-    setAlerts((prev) => {
-      const updated = prev.map((a) => ({ ...a, read: true }));
-      saveStoredAlerts(updated);
-      return updated;
-    });
-  }, []);
+    const current = getStoredAlerts();
+    const wsId = currentWorkshop?.id || activeWorkshopId;
+    const tallerAlertIds = new Set(
+      filterAlertsForRole(current, { role: 'taller', workshopId: wsId }).map((a) => a.id)
+    );
+    const updated = current.map((a) => (tallerAlertIds.has(a.id) ? { ...a, read: true } : a));
+    saveStoredAlerts(updated);
+    showToast('Notificaciones de la sede marcadas como leídas.', 'info');
+  }, [currentWorkshop, activeWorkshopId, showToast]);
 
   const deleteAlert = useCallback((id: string) => {
-    setAlerts((prev) => {
-      const updated = prev.filter((a) => a.id !== id);
-      saveStoredAlerts(updated);
-      return updated;
-    });
     deleteStoredAlert(id);
     showToast('Notificación eliminada.', 'info');
   }, [showToast]);
 
   const deleteAllReadAlerts = useCallback(() => {
-    const readIds = alerts.filter((a) => a.read).map((a) => a.id);
+    const current = getStoredAlerts();
+    const wsId = currentWorkshop?.id || activeWorkshopId;
+    const tallerAlerts = filterAlertsForRole(current, { role: 'taller', workshopId: wsId });
+    const readIds = tallerAlerts.filter((a) => a.read).map((a) => a.id);
     if (readIds.length === 0) {
       showToast('No hay notificaciones leídas para eliminar.', 'info');
       return;
     }
-    setAlerts((prev) => {
-      const updated = prev.filter((a) => !a.read);
-      saveStoredAlerts(updated);
-      return updated;
-    });
     deleteStoredAlerts(readIds);
     showToast('Notificaciones leídas eliminadas.', 'info');
-  }, [alerts, showToast]);
+  }, [currentWorkshop, activeWorkshopId, showToast]);
 
   // Hash navigation
   const setActiveSection = useCallback((newSection: TallerSectionMobile, replace = false) => {
@@ -367,7 +372,7 @@ export function useTallerPortal() {
         status: 'en_revision', // Nace En Revisión para Matriz
         tallerOrigin: wsName,
         tallerOriginId: wsId,
-        estimatedCost: Number(newWarrantyForm.estimatedCost) || 60,
+        estimatedCost: Number(newWarrantyForm.estimatedCost) || 0,
       };
     }
 
@@ -377,17 +382,35 @@ export function useTallerPortal() {
       return updated;
     });
 
-    // Alertar en el sistema
-    const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
-      type: 'estado_cambiado',
-      title: 'Nueva Solicitud de Garantía desde Taller',
-      message: `${newReq.tallerOrigin} generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}. Esperando revisión de Matriz.`,
+    // Alertar en el sistema de forma diferenciada por rol
+    const alertsToPush: SystemAlert[] = [];
+
+    // Alerta para el Taller
+    alertsToPush.push({
+      id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'solicitud_garantia',
+      targetRole: 'taller',
+      targetWorkshopId: newReq.tallerOriginId,
+      title: 'Solicitud Enviada a Matriz',
+      message: `Solicitud #${newReq.requestNumber} (${newReq.motorcycleBrand} ${newReq.motorcycleModel}) enviada a Matriz Central para validación inicial.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: newReq.id,
-    };
-    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+    });
+
+    // Alerta para Matriz / Admin
+    alertsToPush.push({
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'solicitud_garantia',
+      targetRole: 'admin',
+      title: 'Nueva Solicitud de Garantía Recibida',
+      message: `${newReq.tallerOrigin} envió la solicitud #${newReq.requestNumber} para el cliente ${newReq.clientName} (${newReq.motorcycleBrand} ${newReq.motorcycleModel}).`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: newReq.id,
+    });
+
+    addStoredAlerts(alertsToPush);
 
     confetti({
       particleCount: 60,
@@ -572,17 +595,35 @@ export function useTallerPortal() {
       return updated;
     });
 
-    // 5. Crear Alerta de sistema
-    const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
+    // 5. Crear Alertas diferenciadas de sistema
+    const alertsToPush: SystemAlert[] = [];
+
+    // Alerta para el Taller
+    alertsToPush.push({
+      id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'orden_creada',
+      targetRole: 'taller',
+      targetWorkshopId: targetWsId,
       title: 'Orden de Trabajo Generada',
       message: `${wsName}: ${otNumber} — ${securedRecord.nombres} ${securedRecord.apellidos} — ${securedRecord.modeloMarca} (${securedRecord.placa}). Servicios: ${servicesSummary}.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: securedRecord.id,
-    };
-    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+    });
+
+    // Alerta para Matriz / Admin
+    alertsToPush.push({
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'orden_creada',
+      targetRole: 'admin',
+      title: 'Nuevo Alistamiento en Sede',
+      message: `${wsName} registró la orden ${otNumber} para ${securedRecord.nombres} ${securedRecord.apellidos} (${securedRecord.modeloMarca} - ${securedRecord.placa}).`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: securedRecord.id,
+    });
+
+    addStoredAlerts(alertsToPush);
 
     confetti({
       particleCount: 80,
@@ -618,7 +659,7 @@ export function useTallerPortal() {
     newWarrantyForm,
     setNewWarrantyForm,
     createWarrantyRequest,
-    alerts,
+    alerts: filteredAlerts,
     markAlertAsRead,
     markAllAlertsAsRead,
     deleteAlert,

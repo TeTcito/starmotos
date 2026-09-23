@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   XCircle,
   Trash2,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
 import { SystemAlert } from '../../../types/customer';
 
@@ -41,6 +43,13 @@ export const AlertasDesktop: React.FC<Props> = ({
         return <XCircle className="w-4 h-4 text-red-600" />;
       case 'factura_emitida':
         return <FileText className="w-4 h-4 text-purple-600" />;
+      case 'cliente_creado':
+        return <UserCheck className="w-4 h-4 text-emerald-600" />;
+      case 'solicitud_garantia':
+        return <Shield className="w-4 h-4 text-amber-600" />;
+      case 'garantia_validada':
+      case 'dictamen_emitido':
+        return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
       default:
         return <Bell className="w-4 h-4 text-zinc-600" />;
     }

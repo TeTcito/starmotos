@@ -1,6 +1,6 @@
 // src/components/mobile/admin/AlertasMobile.tsx
 import React from 'react';
-import { Bell, Clock, CheckCircle2, XCircle, FileText, Trash2, CheckCheck } from 'lucide-react';
+import { Bell, Clock, CheckCircle2, XCircle, FileText, Trash2, CheckCheck, Shield, UserCheck } from 'lucide-react';
 import { SystemAlert } from '../../../types/customer';
 
 interface Props {
@@ -26,6 +26,15 @@ export const AlertasMobile: React.FC<Props> = ({
         return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />;
       case 'garantia_rechazada':
         return <XCircle className="w-3.5 h-3.5 text-red-600" />;
+      case 'factura_emitida':
+        return <FileText className="w-3.5 h-3.5 text-purple-600" />;
+      case 'cliente_creado':
+        return <UserCheck className="w-3.5 h-3.5 text-emerald-600" />;
+      case 'solicitud_garantia':
+        return <Shield className="w-3.5 h-3.5 text-amber-600" />;
+      case 'garantia_validada':
+      case 'dictamen_emitido':
+        return <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />;
       default:
         return <Bell className="w-3.5 h-3.5 text-zinc-600" />;
     }

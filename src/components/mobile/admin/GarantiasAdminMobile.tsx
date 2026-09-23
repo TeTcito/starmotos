@@ -383,11 +383,28 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
                           {typeLabel}
                         </span>
                       </div>
-                      <span
-                        className={`text-[9px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${badge.bg}`}
-                      >
-                        {badge.label.toUpperCase()}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${badge.bg}`}
+                        >
+                          {badge.label.toUpperCase()}
+                        </span>
+                        {onDeleteWarranty && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${w.requestNumber} de ${w.clientName}?`)) {
+                                onDeleteWarranty(w.id);
+                              }
+                            }}
+                            className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Eliminar Solicitud de Garantía"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Fila 2: Cliente y Teléfono WhatsApp */}
@@ -446,9 +463,15 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
                             <span>{photosCount}</span>
                           </span>
                         )}
-                        <span className="font-bold text-zinc-900">
-                          ${(w.estimatedCost || 60).toFixed(2)} USD
-                        </span>
+                        {(w.totalBudget !== undefined && w.totalBudget > 0) || (w.estimatedCost !== undefined && w.estimatedCost > 0) ? (
+                          <span className="font-bold text-zinc-900">
+                            ${((w.totalBudget !== undefined && w.totalBudget > 0 ? w.totalBudget : w.estimatedCost) || 0).toFixed(2)} USD
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                            Pendiente Matriz
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

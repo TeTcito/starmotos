@@ -144,6 +144,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
           </span>
           <NotificationsPopover
             role="garante"
+            brand={profile.companyName}
+            brandsRepresented={profile.brandsRepresented}
             alerts={alerts}
             warranties={warranties}
             onViewAll={() => {

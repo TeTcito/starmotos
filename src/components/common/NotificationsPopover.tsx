@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Inbox,
   Trash2,
+  UserCheck,
 } from 'lucide-react';
 import {
   SystemAlert,
@@ -23,6 +24,7 @@ import {
   WarrantyItem,
   MaintenanceRecord,
 } from '../../types/customer';
+import { filterAlertsForRole } from '../../data/mockMultiRoleData';
 
 export type NotificationCategory = 'caso' | 'evento';
 export type StatusBadgeVariant = 'blue' | 'emerald' | 'amber' | 'red' | 'purple' | 'zinc';
@@ -44,6 +46,10 @@ export interface PopoverNotification {
 
 export interface NotificationsPopoverProps {
   role: 'admin' | 'taller' | 'garante' | 'cliente';
+  workshopId?: string;
+  brand?: string;
+  brandsRepresented?: string[];
+  clientId?: string;
   alerts?: SystemAlert[];
   warranties?: WarrantyRequest[];
   orders?: TallerOrder[];
@@ -84,6 +90,10 @@ function saveStoredReadCases(set: Set<string>) {
 
 export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
   role,
+  workshopId,
+  brand,
+  brandsRepresented,
+  clientId,
   alerts = [],
   warranties = [],
   orders = [],
@@ -335,9 +345,35 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
           },
         });
       });
+      // Alertas operacionales dirigidas al cliente
+      const clientScopedAlerts = filterAlertsForRole(alerts, { role: 'cliente', clientId });
+      clientScopedAlerts.forEach((alt) => {
+        list.push({
+          id: `evt-alt-${alt.id}`,
+          rawId: alt.id,
+          category: 'evento',
+          type: alt.type,
+          title: alt.title,
+          description: alt.message,
+          timestamp: alt.timestamp,
+          read: alt.read,
+          statusBadge: {
+            text: 'Notificación',
+            variant: 'blue',
+          },
+        });
+      });
     } else {
-      // Alertas operacionales del sistema para Admin, Taller y Garante
-      alerts.forEach((alt) => {
+      // Alertas operacionales del sistema filtradas estrictamente para Admin, Taller y Garante
+      const scopedAlerts = filterAlertsForRole(alerts, {
+        role,
+        workshopId,
+        brand,
+        brandsRepresented,
+        clientId,
+      });
+
+      scopedAlerts.forEach((alt) => {
         let badgeText = 'Evento';
         let variant: StatusBadgeVariant = 'zinc';
 
@@ -357,6 +393,19 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
           case 'factura_emitida':
             badgeText = 'Factura SRI';
             variant = 'purple';
+            break;
+          case 'cliente_creado':
+            badgeText = 'Cliente';
+            variant = 'emerald';
+            break;
+          case 'solicitud_garantia':
+            badgeText = 'Garantía';
+            variant = 'amber';
+            break;
+          case 'garantia_validada':
+          case 'dictamen_emitido':
+            badgeText = 'Dictamen';
+            variant = 'blue';
             break;
           case 'estado_cambiado':
             badgeText = 'Operatividad';
@@ -384,6 +433,10 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
     return list;
   }, [
     role,
+    workshopId,
+    brand,
+    brandsRepresented,
+    clientId,
     warranties,
     orders,
     alerts,
@@ -476,6 +529,15 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
     }
     if (item.type === 'garantia_rechazada') {
       return <XCircle className="w-4 h-4 text-red-600" />;
+    }
+    if (item.type === 'cliente_creado') {
+      return <UserCheck className="w-4 h-4 text-emerald-600" />;
+    }
+    if (item.type === 'solicitud_garantia') {
+      return <Shield className="w-4 h-4 text-amber-600" />;
+    }
+    if (item.type === 'garantia_validada' || item.type === 'dictamen_emitido') {
+      return <CheckCircle2 className="w-4 h-4 text-blue-600" />;
     }
     return <Sparkles className="w-4 h-4 text-amber-500" />;
   };

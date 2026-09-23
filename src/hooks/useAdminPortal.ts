@@ -1,5 +1,5 @@
 // src/hooks/useAdminPortal.ts
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   AdminSection,
@@ -25,6 +25,8 @@ import {
   getStoredWorkshops,
   getStoredAlerts,
   saveStoredAlerts,
+  addStoredAlerts,
+  filterAlertsForRole,
   getStoredInvoices,
   saveStoredInvoices,
   getStoredTechnicians,
@@ -78,7 +80,7 @@ export function useAdminPortal() {
   // Estado compartido
   const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
   const [warranties, setWarranties] = useState<WarrantyRequest[]>(getStoredWarranties);
-  const [alerts, setAlerts] = useState<SystemAlert[]>(getStoredAlerts);
+  const [allAlerts, setAllAlerts] = useState<SystemAlert[]>(getStoredAlerts);
   const [invoices, setInvoices] = useState<AdminInvoice[]>(getStoredInvoices);
   const [technicians, setTechnicians] = useState<Technician[]>(getStoredTechnicians);
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
@@ -92,7 +94,7 @@ export function useAdminPortal() {
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
   useEffect(() => {
     const handleWarrantiesUpdate = () => setWarranties(getStoredWarranties());
-    const handleAlertsUpdate = () => setAlerts(getStoredAlerts());
+    const handleAlertsUpdate = () => setAllAlerts(getStoredAlerts());
     const handleTechsUpdate = () => setTechnicians(getStoredTechnicians());
     const handleOriginsUpdate = () => setOrigins(getStoredOrigins());
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
@@ -131,6 +133,11 @@ export function useAdminPortal() {
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
+
+  // Alertas exclusivas para el rol Administrador Matriz
+  const alerts = useMemo(() => {
+    return filterAlertsForRole(allAlerts, { role: 'admin' });
+  }, [allAlerts]);
 
   const updateAdminProfile = useCallback((newProfile: AdminProfile) => {
     setAdminProfile(newProfile);
@@ -188,23 +195,38 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // Crear alerta
+    // Crear alertas diferenciadas por rol
     const targetW = warranties.find((w) => w.id === id);
-    const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
+    const alertsToPush: SystemAlert[] = [];
+
+    // Alerta para Admin
+    alertsToPush.push({
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'estado_cambiado',
-      title: 'Garantía Aceptada por Matriz (En Proceso)',
-      message: `La solicitud ${targetW?.requestNumber || id} fue aceptada por Matriz y pasa a En Proceso hacia el Garante de Marca.`,
+      targetRole: 'admin',
+      title: 'Garantía Aceptada en Matriz (En Proceso)',
+      message: `La solicitud ${targetW?.requestNumber || id} fue aceptada en revisión interna y pasa a En Proceso hacia el Garante de Marca.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: id,
-    };
-    setAlerts((prev) => {
-      const updatedAlerts = [newAlert, ...prev];
-      saveStoredAlerts(updatedAlerts);
-      return updatedAlerts;
     });
 
+    // Alerta para Taller de origen
+    if (targetW?.tallerOriginId) {
+      alertsToPush.push({
+        id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'estado_cambiado',
+        targetRole: 'taller',
+        targetWorkshopId: targetW.tallerOriginId,
+        title: 'Garantía Aprobada por Matriz',
+        message: `Tu solicitud #${targetW.requestNumber} para ${targetW.clientName} fue aprobada por Matriz y está en proceso de revisión con el Garante.`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: id,
+      });
+    }
+
+    addStoredAlerts(alertsToPush);
     showToast('Solicitud aceptada por Matriz. Puesta EN PROCESO para el Garante de Marca.', 'success');
   }, [warranties, showToast]);
 
@@ -226,21 +248,36 @@ export function useAdminPortal() {
     });
 
     const targetW = warranties.find((w) => w.id === id);
-    const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
+    const alertsToPush: SystemAlert[] = [];
+
+    // Alerta para Admin
+    alertsToPush.push({
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'garantia_rechazada',
-      title: 'Garantía Denegada por Matriz',
+      targetRole: 'admin',
+      title: 'Garantía Denegada en Matriz',
       message: `La solicitud ${targetW?.requestNumber || id} fue denegada en revisión de Matriz.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: id,
-    };
-    setAlerts((prev) => {
-      const updatedAlerts = [newAlert, ...prev];
-      saveStoredAlerts(updatedAlerts);
-      return updatedAlerts;
     });
 
+    // Alerta para Taller de origen
+    if (targetW?.tallerOriginId) {
+      alertsToPush.push({
+        id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'garantia_rechazada',
+        targetRole: 'taller',
+        targetWorkshopId: targetW.tallerOriginId,
+        title: 'Garantía No Aprobada por Matriz',
+        message: `La solicitud #${targetW.requestNumber} para ${targetW.clientName} fue denegada por Matriz. Motivo: ${reason}`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: id,
+      });
+    }
+
+    addStoredAlerts(alertsToPush);
     showToast('Solicitud de garantía denegada en Matriz.', 'error');
   }, [warranties, showToast]);
 
@@ -260,23 +297,50 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // Crear alerta
     const targetW = warranties.find((w) => w.id === id);
-    const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
-      type: 'estado_cambiado',
-      title: 'Garantía Enviada al Garante',
-      message: `La solicitud ${targetW?.requestNumber || id} fue despachada digitalmente al Garante oficial de marca.`,
+    const alertsToPush: SystemAlert[] = [];
+
+    // Alerta para el Garante de la Marca correspondiente
+    alertsToPush.push({
+      id: `alt-gar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'solicitud_garantia',
+      targetRole: 'garante',
+      targetBrand: targetW?.motorcycleBrand,
+      title: 'Te llegó una solicitud de garantía',
+      message: `Nueva solicitud de garantía #${targetW?.requestNumber || id} para la marca ${targetW?.motorcycleBrand} (${targetW?.motorcycleModel}) remitida por Matriz Central para dictamen oficial.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: id,
-    };
-    setAlerts((prev) => {
-      const updatedAlerts = [newAlert, ...prev];
-      saveStoredAlerts(updatedAlerts);
-      return updatedAlerts;
     });
 
+    // Alerta para Matriz / Admin
+    alertsToPush.push({
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'estado_cambiado',
+      targetRole: 'admin',
+      title: 'Garantía Derivada al Garante',
+      message: `La solicitud ${targetW?.requestNumber || id} fue despachada digitalmente al Garante oficial de ${targetW?.motorcycleBrand} para su dictamen técnico.`,
+      timestamp: 'Ahora mismo',
+      read: false,
+      relatedId: id,
+    });
+
+    // Alerta para Taller de origen
+    if (targetW?.tallerOriginId) {
+      alertsToPush.push({
+        id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'estado_cambiado',
+        targetRole: 'taller',
+        targetWorkshopId: targetW.tallerOriginId,
+        title: 'Garantía en Revisión de Marca',
+        message: `Tu solicitud #${targetW.requestNumber} para ${targetW.clientName} fue despachada al Garante oficial de ${targetW.motorcycleBrand}.`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: id,
+      });
+    }
+
+    addStoredAlerts(alertsToPush);
     showToast('Solicitud enviada con éxito al panel del Garante oficial.', 'success');
   }, [warranties, showToast]);
 
@@ -321,15 +385,16 @@ export function useAdminPortal() {
     });
 
     const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
-      type: 'estado_cambiado',
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'solicitud_garantia',
+      targetRole: 'admin',
       title: 'Nueva Solicitud de Garantía en Matriz',
-      message: `StarMotos Matriz generó la solicitud ${newReq.requestNumber} para ${newReq.clientName}.`,
+      message: `StarMotos Matriz generó la solicitud ${newReq.requestNumber} para ${newReq.clientName} (${newReq.motorcycleBrand}).`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: newReq.id,
     };
-    saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+    addStoredAlerts(newAlert);
 
     confetti({
       particleCount: 50,
@@ -345,7 +410,7 @@ export function useAdminPortal() {
   const deleteWarranty = useCallback((id: string) => {
     deleteStoredWarranty(id);
     setWarranties((prev) => prev.filter((w) => w.id !== id && w.requestNumber !== id));
-    showToast('Solicitud de garantía eliminada.', 'info');
+    showToast('Solicitud de garantía eliminada permanentemente en Matriz y Sedes conectadas.', 'info');
   }, [showToast]);
 
   // Actualizar datos completos de garantía (edición y presupuesto)
@@ -382,16 +447,36 @@ export function useAdminPortal() {
       saveStoredWarranties(updated);
 
       if (target) {
-        const newAlert: SystemAlert = {
-          id: `alt-${Date.now()}`,
+        const alertsToPush: SystemAlert[] = [];
+
+        // Alerta para Admin
+        alertsToPush.push({
+          id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           type: 'estado_cambiado',
+          targetRole: 'admin',
           title: `Estado Actualizado: ${target.requestNumber}`,
           message: `Matriz dictaminó "${newStatus}" para ${target.clientName}.${notes ? ` Observación: ${notes}` : ''}`,
           timestamp: 'Ahora mismo',
           read: false,
           relatedId: target.id,
-        };
-        saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+        });
+
+        // Alerta para Taller de origen
+        if (target.tallerOriginId) {
+          alertsToPush.push({
+            id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            type: 'estado_cambiado',
+            targetRole: 'taller',
+            targetWorkshopId: target.tallerOriginId,
+            title: `Estado de Garantía Actualizado: ${target.requestNumber}`,
+            message: `Matriz actualizó el estado a "${newStatus}" para ${target.clientName}.${notes ? ` Observación: ${notes}` : ''}`,
+            timestamp: 'Ahora mismo',
+            read: false,
+            relatedId: target.id,
+          });
+        }
+
+        addStoredAlerts(alertsToPush);
       }
       return updated;
     });
@@ -400,49 +485,38 @@ export function useAdminPortal() {
     showToast(`Estado de garantía actualizado: ${newStatus}`, 'success');
   }, [showToast]);
 
-  // Marcar alertas como leídas
+  // Marcar alertas como leídas (aisladas para el rol admin)
   const markAlertAsRead = useCallback((id: string) => {
-    setAlerts((prev) => {
-      const updated = prev.map((a) => (a.id === id ? { ...a, read: true } : a));
-      saveStoredAlerts(updated);
-      return updated;
-    });
+    const current = getStoredAlerts();
+    const updated = current.map((a) => (a.id === id ? { ...a, read: true } : a));
+    saveStoredAlerts(updated);
   }, []);
 
   const markAllAlertsAsRead = useCallback(() => {
-    setAlerts((prev) => {
-      const updated = prev.map((a) => ({ ...a, read: true }));
-      saveStoredAlerts(updated);
-      return updated;
-    });
-    showToast('Todas las notificaciones marcadas como leídas.', 'info');
+    const current = getStoredAlerts();
+    const adminAlertIds = new Set(filterAlertsForRole(current, { role: 'admin' }).map((a) => a.id));
+    const updated = current.map((a) => (adminAlertIds.has(a.id) ? { ...a, read: true } : a));
+    saveStoredAlerts(updated);
+    showToast('Todas las alertas de administración marcadas como leídas.', 'info');
   }, [showToast]);
 
-  // Eliminar alertas
+  // Eliminar alertas (aisladas para el rol admin)
   const deleteAlert = useCallback((id: string) => {
-    setAlerts((prev) => {
-      const updated = prev.filter((a) => a.id !== id);
-      saveStoredAlerts(updated);
-      return updated;
-    });
     deleteStoredAlert(id);
     showToast('Notificación eliminada.', 'info');
   }, [showToast]);
 
   const deleteAllReadAlerts = useCallback(() => {
-    const readIds = alerts.filter((a) => a.read).map((a) => a.id);
+    const current = getStoredAlerts();
+    const adminAlerts = filterAlertsForRole(current, { role: 'admin' });
+    const readIds = adminAlerts.filter((a) => a.read).map((a) => a.id);
     if (readIds.length === 0) {
       showToast('No hay notificaciones leídas para eliminar.', 'info');
       return;
     }
-    setAlerts((prev) => {
-      const updated = prev.filter((a) => !a.read);
-      saveStoredAlerts(updated);
-      return updated;
-    });
     deleteStoredAlerts(readIds);
     showToast('Notificaciones leídas eliminadas.', 'info');
-  }, [alerts, showToast]);
+  }, [showToast]);
 
 
   // ===================== WIZARD DE ALISTAMIENTO =====================
@@ -531,22 +605,18 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // Generar alerta de sistema
+    // Generar alerta de sistema para Admin
     const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'orden_creada',
+      targetRole: 'admin',
       title: 'Alistamiento Registrado con Éxito',
       message: `Cliente ${alistamientoClient.fullName} ingresó ${alistamientoMoto.brand} ${alistamientoMoto.model} (${alistamientoMoto.plate || 'S/P'}). Factura: $${alistamientoService.cost} USD.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: newInvoice.invoiceNumber,
     };
-
-    setAlerts((prev) => {
-      const updatedAlerts = [newAlert, ...prev];
-      saveStoredAlerts(updatedAlerts);
-      return updatedAlerts;
-    });
+    addStoredAlerts(newAlert);
 
     confetti({
       particleCount: 80,
@@ -699,21 +769,18 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // 4. Crear Alerta
+    // 4. Crear Alerta para Admin
     const newAlert: SystemAlert = {
-      id: `alt-${Date.now()}`,
+      id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'orden_creada',
-      title: 'Alistamiento Guardado',
+      targetRole: 'admin',
+      title: 'Alistamiento Guardado en Matriz',
       message: `${record.sede}: Cliente ${record.nombres} ${record.apellidos} — Moto ${record.modeloMarca} (${record.placa}). Factura ${record.numeroFactura}.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: record.id,
     };
-    setAlerts((prev) => {
-      const updated = [newAlert, ...prev];
-      saveStoredAlerts(updated);
-      return updated;
-    });
+    addStoredAlerts(newAlert);
 
     showToast(`¡Alistamiento de ${record.nombres} guardado correctamente!`, 'success');
   }, [showToast]);

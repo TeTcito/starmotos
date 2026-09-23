@@ -18,11 +18,12 @@ import {
   Wrench,
   Tag,
 } from 'lucide-react';
-import { UserRole, TallerClient } from '../../types/customer';
+import { UserRole, TallerClient, SystemAlert } from '../../types/customer';
 import {
   getStoredWorkshops,
   getStoredClients,
   saveStoredClients,
+  addStoredAlerts,
 } from '../../data/mockMultiRoleData';
 import { cloudSaveClient } from '../../services/supabaseService';
 
@@ -86,15 +87,12 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     }
   }, [isRegisterMode]);
 
-  // Validaciones
+  // Validaciones simplificadas: solo mínimo 8 caracteres y confirmación
   const hasMinLength = registerData.password.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(registerData.password);
-  const hasNumber = /[0-9]/.test(registerData.password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(registerData.password);
   const passwordsMatch =
     registerData.password.length > 0 &&
     registerData.password === registerData.confirmPassword;
-  const isPasswordValid = hasMinLength && hasLetter && hasNumber && hasSpecial;
+  const isPasswordValid = hasMinLength && passwordsMatch;
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,13 +191,13 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (!isPasswordValid) {
+    if (registerData.password.length < 8) {
       setRegisterTab('cliente');
-      setErrorMessage('La contraseña debe tener mínimo 8 caracteres, letras, números y un símbolo.');
+      setErrorMessage('La contraseña debe tener un mínimo de 8 caracteres.');
       return;
     }
 
-    if (!passwordsMatch) {
+    if (registerData.password !== registerData.confirmPassword) {
       setRegisterTab('cliente');
       setErrorMessage('Las contraseñas no coinciden.');
       return;
@@ -246,6 +244,38 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       const updatedClients = [newClient, ...currentClients.filter((c) => c.idNumber !== cleanId)];
       saveStoredClients(updatedClients);
       cloudSaveClient(newClient);
+
+      // Generar alertas diferenciadas por rol
+      const alertsToPush: SystemAlert[] = [];
+
+      // 1. Alerta para Matriz / Admin
+      alertsToPush.push({
+        id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'cliente_creado',
+        targetRole: 'admin',
+        title: 'Se creó un cliente',
+        message: `Cliente ${newClient.fullName} (${newClient.idNumber}) se registró en línea para la sede ${newClient.workshopName}. Moto: ${newClient.motorcycleBrand} ${newClient.motorcycleModel}.`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: newClient.idNumber,
+      });
+
+      // 2. Alerta para Taller sede asignada
+      if (newClient.workshopId) {
+        alertsToPush.push({
+          id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: 'cliente_creado',
+          targetRole: 'taller',
+          targetWorkshopId: newClient.workshopId,
+          title: 'Se creó un cliente',
+          message: `El cliente ${newClient.fullName} (${newClient.idNumber}) se registró en línea asignado a tu sede. Moto: ${newClient.motorcycleBrand} ${newClient.motorcycleModel}.`,
+          timestamp: 'Ahora mismo',
+          read: false,
+          relatedId: newClient.idNumber,
+        });
+      }
+
+      addStoredAlerts(alertsToPush);
 
       localStorage.setItem(
         'starmotos_current_client_profile',
@@ -433,7 +463,7 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         </form>
       ) : (
         /* ===================== REGISTRO DE CLIENTE ===================== */
-        <form onSubmit={handleRegisterSubmit} className="space-y-3">
+        <form onSubmit={handleRegisterSubmit} className="space-y-3 pb-28 sm:pb-4">
           {/* Pestañas de Registro */}
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 rounded-xl mb-3">
             <button
@@ -540,25 +570,49 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1">Contraseña *</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    placeholder="Mín 8 car."
-                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={registerData.password}
+                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                      placeholder="Mín. 8 caracteres"
+                      className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 mt-0.5 block">Mínimo 8 caracteres</span>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1">Confirmar *</label>
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required
-                    value={registerData.confirmPassword}
-                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                    placeholder="Repetir clave"
-                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={registerData.confirmPassword}
+                      onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                      placeholder="Repetir clave"
+                      className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  {registerData.confirmPassword && (
+                    <span className={`text-[10px] mt-0.5 block font-bold ${passwordsMatch ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {passwordsMatch ? '✓ Coinciden' : '✗ No coinciden'}
+                    </span>
+                  )}
                 </div>
               </div>
 

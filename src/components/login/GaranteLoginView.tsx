@@ -28,6 +28,7 @@ import {
   INITIAL_GARANTE_PROFILE,
 } from '../../data/mockMultiRoleData';
 import { OFFICIAL_CORPORATE_ACCOUNTS } from '../../data/authAccounts';
+import { cloudSaveGarante } from '../../services/supabaseService';
 
 interface Props {
   onLoginSuccess: (role: UserRole) => void;
@@ -51,7 +52,6 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [registerForm, setRegisterForm] = useState({
     companyName: '',
     ruc: '',
-    brandsRepresented: '',
     contactName: '',
     roleTitle: '',
     email: '',
@@ -157,7 +157,6 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     if (
       !registerForm.companyName.trim() ||
       !registerForm.ruc.trim() ||
-      !registerForm.brandsRepresented.trim() ||
       !registerForm.contactName.trim() ||
       !registerForm.roleTitle.trim() ||
       !registerForm.email.trim() ||
@@ -168,8 +167,8 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (registerForm.password.length < 6) {
-      setErrorMessage('La contraseña debe tener mínimo 6 caracteres.');
+    if (registerForm.password.length < 8) {
+      setErrorMessage('La contraseña debe tener mínimo 8 caracteres.');
       return;
     }
 
@@ -181,23 +180,18 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     const cleanEmail = registerForm.email.trim().toLowerCase();
-
-    // Procesar marcas separadas por coma
-    const parsedBrands = registerForm.brandsRepresented
-      .split(',')
-      .map((b) => b.trim())
-      .filter(Boolean);
+    const cleanBrandCompany = registerForm.companyName.trim();
 
     const newGarante: GaranteProfile = {
       id: `gar-${Date.now()}`,
-      companyName: registerForm.companyName.trim(),
+      companyName: cleanBrandCompany,
       ruc: registerForm.ruc.trim(),
       contactName: registerForm.contactName.trim(),
       roleTitle: registerForm.roleTitle.trim(),
       phone: registerForm.phone.trim() || '+593 99 000 0000',
       email: cleanEmail,
       address: registerForm.address.trim() || 'Ecuador',
-      brandsRepresented: parsedBrands.length > 0 ? parsedBrands : [registerForm.companyName.trim()],
+      brandsRepresented: [cleanBrandCompany],
       contractStartDate: new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }),
       contractEndDate: '31 Dic 2028',
       password: registerForm.password.trim(),
@@ -207,6 +201,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     try {
       localStorage.setItem(`starmotos_garante_pwd_${cleanEmail}`, registerForm.password.trim());
       saveStoredGarante(newGarante);
+      cloudSaveGarante(newGarante);
       localStorage.setItem('starmotos_shared_garante_profile', JSON.stringify(newGarante));
       localStorage.setItem('starmotos_active_garante_email', cleanEmail);
       localStorage.setItem('starmotos_active_garante_id', newGarante.id);
@@ -373,12 +368,12 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         </form>
       ) : (
         /* ===================== REGISTRO COMPLETO DE MARCA / GARANTE ===================== */
-        <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in text-left">
+        <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in text-left pb-28 sm:pb-4">
           {/* 1. Datos de la Marca / Empresa */}
           <div className="bg-purple-50/60 p-3 rounded-xl border border-purple-200/80 space-y-2.5">
             <div className="flex items-center gap-2 text-xs font-black text-purple-900 pb-1 border-b border-purple-200/60">
               <Building2 className="w-3.5 h-3.5 text-purple-700" />
-              <span>1. Información de la Empresa & Marcas</span>
+              <span>1. Información de la Empresa o Marca</span>
             </div>
 
             <div>
@@ -390,41 +385,26 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 required
                 value={registerForm.companyName}
                 onChange={(e) => setRegisterForm({ ...registerForm, companyName: e.target.value })}
-                placeholder="Ej: Representaciones Benelli & CFMOTO del Ecuador S.A."
+                placeholder="Ej: Representaciones Honda del Ecuador S.A."
                 className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
-                  RUC / Identificación Fiscal <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={registerForm.ruc}
-                  onChange={(e) => setRegisterForm({ ...registerForm, ruc: e.target.value })}
-                  placeholder="13 dígitos (ej: 1792849102001)"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-purple-600"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
-                  Marcas que Garantiza <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={registerForm.brandsRepresented}
-                  onChange={(e) => setRegisterForm({ ...registerForm, brandsRepresented: e.target.value })}
-                  placeholder="Ej: Benelli, Keeway, CFMOTO"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
-                />
-              </div>
+            <div>
+              <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                RUC / Identificación Fiscal <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={registerForm.ruc}
+                onChange={(e) => setRegisterForm({ ...registerForm, ruc: e.target.value })}
+                placeholder="13 dígitos (ej: 1792849102001)"
+                className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-purple-600"
+              />
             </div>
             <p className="text-[10px] text-purple-700 italic">
-              * Las marcas ingresadas se sincronizarán inmediatamente con el selector de garantías del taller.
+              * La empresa o razón social registrada actuará directamente como la marca oficial en el sistema de garantías.
             </p>
           </div>
 
@@ -510,27 +490,59 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                 <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
                   Contraseña <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={registerForm.password}
-                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  placeholder="Mín 6 car."
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={registerForm.password}
+                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    placeholder="Mín. 8 caracteres"
+                    className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <span className="text-[10px] text-zinc-400 mt-0.5 block">Mínimo 8 caracteres</span>
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
                   Confirmar Clave <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  value={registerForm.confirmPassword}
-                  onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                  placeholder="Repetir clave"
-                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={registerForm.confirmPassword}
+                    onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                    placeholder="Repetir clave"
+                    className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-purple-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {registerForm.confirmPassword && (
+                  <span
+                    className={`text-[10px] mt-0.5 block font-bold ${
+                      registerForm.password === registerForm.confirmPassword
+                        ? 'text-emerald-600'
+                        : 'text-red-500'
+                    }`}
+                  >
+                    {registerForm.password === registerForm.confirmPassword
+                      ? '✓ Coinciden'
+                      : '✗ No coinciden'}
+                  </span>
+                )}
               </div>
             </div>
           </div>

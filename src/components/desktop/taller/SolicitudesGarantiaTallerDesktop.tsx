@@ -46,15 +46,15 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch =
       !term ||
-      w.requestNumber.toLowerCase().includes(term) ||
-      w.clientName.toLowerCase().includes(term) ||
-      w.clientIdNumber.includes(term) ||
-      w.motorcycleBrand.toLowerCase().includes(term) ||
-      w.motorcycleModel.toLowerCase().includes(term) ||
-      w.motorcyclePlate.toLowerCase().includes(term) ||
-      w.issueDescription.toLowerCase().includes(term);
+      (w.requestNumber && w.requestNumber.toLowerCase().includes(term)) ||
+      (w.clientName && w.clientName.toLowerCase().includes(term)) ||
+      (w.clientIdNumber && w.clientIdNumber.includes(term)) ||
+      (w.motorcycleBrand && w.motorcycleBrand.toLowerCase().includes(term)) ||
+      (w.motorcycleModel && w.motorcycleModel.toLowerCase().includes(term)) ||
+      (w.motorcyclePlate && w.motorcyclePlate.toLowerCase().includes(term)) ||
+      (w.issueDescription && w.issueDescription.toLowerCase().includes(term));
 
-    return matchesStatus && matchesSearch;
+    return matchesStatus && Boolean(matchesSearch);
   });
 
   return (

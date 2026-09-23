@@ -12,6 +12,7 @@ import {
   AlistamientoFullRecord,
   AdminProfile,
   WorkshopManagerAccount,
+  DictamenRecord,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -25,6 +26,8 @@ import {
   cloudDeleteGarante,
   cloudSaveWorkshopManager,
   cloudDeleteWorkshopManager,
+  cloudSaveDictamen,
+  cloudDeleteDictamen,
   cloudDeleteTechnician,
   cloudDeleteWarranty,
   cloudDeleteAlistamiento,
@@ -35,9 +38,11 @@ import {
   addDeletedTombstone,
   removeDeletedTombstone,
   isDeletedTombstone,
+  syncBus,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { saveMediaToIndexedDB } from '../services/mediaStorage';
 export {
   STORAGE_KEYS,
   getDeletedTombstones,
@@ -280,17 +285,17 @@ export const INITIAL_TALLER_ORDERS: TallerOrder[] = [];
 
 // --- Perfil del Garante ---
 export const INITIAL_GARANTE_PROFILE: GaranteProfile = {
-  id: 'gar-benelli-ec',
-  companyName: 'Representaciones Benelli & CFMOTO del Ecuador S.A.',
+  id: 'gar-autorex',
+  companyName: 'Autorex',
   ruc: '1792849102001',
-  contactName: 'Ing. Paulina Velasteguí',
-  roleTitle: 'Jefa Nacional de Garantías',
-  phone: '+593 2 398 5400 / +593 99 780 1200',
-  email: 'garantias.oficial@benelli-ecuador.com',
-  address: 'Av. Granados E12-40 y 6 de Diciembre, Edificio Corporativo Motorcorp Piso 4',
-  brandsRepresented: ['Benelli', 'CFMOTO', 'Keeway', 'Brixton'],
-  contractStartDate: '01 Ene 2024',
-  contractEndDate: '31 Dic 2027',
+  contactName: 'Responsable de Garantías',
+  roleTitle: 'Representante Autorizado',
+  phone: '0990000000',
+  email: 'garantias@autorex.com',
+  address: 'Ecuador',
+  brandsRepresented: ['Autorex'],
+  contractStartDate: '01 Ene 2025',
+  contractEndDate: '31 Dic 2028',
 };
 
 // --- Mock Base de Datos SRI para Auto-Llenado de Cédula/RUC en Ecuador ---
@@ -397,21 +402,13 @@ export function getStoredWarranties(): WarrantyRequest[] {
           w &&
           w.id &&
           !isDeletedTombstone(w.id) &&
-          (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
-          (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
+          (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
       );
     }
   } catch (e) {
     console.error('Error reading warranties from localStorage', e);
   }
-  return INITIAL_WARRANTY_REQUESTS.filter(
-    (w) =>
-      w &&
-      w.id &&
-      !isDeletedTombstone(w.id) &&
-      (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
-      (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
-  );
+  return [];
 }
 
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {
@@ -421,13 +418,50 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
         w &&
         w.id &&
         !isDeletedTombstone(w.id) &&
-        (!w.requestNumber || !isDeletedTombstone(w.requestNumber)) &&
-        (!w.clientIdNumber || !isDeletedTombstone(w.clientIdNumber))
+        (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
     );
-    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cleanList));
+
+    // Intentar guardar en localStorage con protección contra QuotaExceededError
+    try {
+      localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cleanList));
+    } catch (quotaErr) {
+      console.warn('LocalStorage saturado al guardar garantías. Optimizando almacenamiento:', quotaErr);
+      const safeList = cleanList.map((w) => {
+        if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
+        return {
+          ...w,
+          diagnosticPhotos: w.diagnosticPhotos.map((item, idx) => {
+            if (typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'))) {
+              return item;
+            }
+            if (typeof item === 'string' && item.length > 30000) {
+              const mediaKey = `${w.id}_media_${idx}`;
+              saveMediaToIndexedDB(mediaKey, item);
+              return item.slice(0, 500); // fragmento indicador ligero
+            }
+            return item;
+          }),
+        };
+      });
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(safeList));
+      } catch (retryErr) {
+        console.error('Fallo crítico al escribir en localStorage:', retryErr);
+      }
+    }
+
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
+
+    // Transmisión a Supabase en paralelo SIEMPRE
     if (cleanList.length > 0) {
-      cleanList.forEach((w) => cloudSaveWarranty(w));
+      cleanList.forEach((w) => {
+        try {
+          cloudSaveWarranty(w);
+        } catch (e) {
+          console.warn('Error en cloudSaveWarranty:', e);
+        }
+      });
     }
   } catch (e) {
     console.error('Error saving warranties to localStorage', e);
@@ -438,9 +472,20 @@ export function deleteStoredWarranty(id: string) {
   try {
     const cleanId = id.trim();
     const stored = getStoredWarranties();
-    const target = stored.find((w) => w.id === cleanId || w.requestNumber === cleanId);
-    addDeletedTombstone(cleanId, target?.id, target?.requestNumber);
+    const target = stored.find(
+      (w) =>
+        w.id === cleanId ||
+        w.requestNumber === cleanId ||
+        (w.requestNumber && w.requestNumber.toLowerCase() === cleanId.toLowerCase())
+    );
 
+    const idsToTombstone = [cleanId];
+    if (target?.id && !idsToTombstone.includes(target.id)) idsToTombstone.push(target.id);
+    if (target?.requestNumber && !idsToTombstone.includes(target.requestNumber)) idsToTombstone.push(target.requestNumber);
+
+    addDeletedTombstone(...idsToTombstone);
+
+    // 1. Filtrar de garantías locales en localStorage
     const current = stored.filter(
       (w) =>
         w.id !== cleanId &&
@@ -448,11 +493,53 @@ export function deleteStoredWarranty(id: string) {
         (target ? w.id !== target.id && w.requestNumber !== target.requestNumber : true)
     );
     localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
+
+    // 2. Limpiar dictámenes asociados a esta garantía para que no reaparezca en el garante
+    try {
+      const storedDictamenes = getStoredDictamenes();
+      const remainingDictamenes = storedDictamenes.filter(
+        (d) =>
+          d.warrantyId !== cleanId &&
+          d.requestNumber !== cleanId &&
+          (target ? d.warrantyId !== target.id && d.requestNumber !== target.requestNumber : true)
+      );
+      if (remainingDictamenes.length !== storedDictamenes.length) {
+        saveStoredDictamenes(remainingDictamenes);
+        window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
+      }
+    } catch (_) {}
+
+    // 3. Limpiar alertas del sistema vinculadas a esta garantía
+    try {
+      const storedAlerts = getStoredAlerts();
+      const remainingAlerts = storedAlerts.filter(
+        (a) =>
+          a.relatedId !== cleanId &&
+          (target ? a.relatedId !== target.id && a.relatedId !== target.requestNumber : true)
+      );
+      if (remainingAlerts.length !== storedAlerts.length) {
+        saveStoredAlerts(remainingAlerts);
+        window.dispatchEvent(new Event('starmotos_alerts_updated'));
+      }
+    } catch (_) {}
+
+    // 4. Notificar a toda la aplicación
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
-    cloudDeleteWarranty(cleanId);
+    syncBus?.postMessage({ type: 'WARRANTY_DELETED', ids: idsToTombstone });
+
+    // 5. Eliminar en Supabase en cascada
+    cloudDeleteWarranty(...idsToTombstone);
   } catch (e) {
     console.error('Error deleting warranty', e);
   }
+}
+
+/**
+ * Función de compatibilidad para evitar errores de importación.
+ * Las solicitudes residuales anteriores ya fueron depuradas de forma definitiva.
+ */
+export function cleanupQuevedoWarranties() {
+  // No-op intencional para permitir que las nuevas solicitudes de Quevedo persistan normalmente
 }
 
 // Alertas
@@ -507,6 +594,62 @@ export function deleteStoredAlerts(ids: string[]) {
   } catch (e) {
     console.error('Error deleting alerts', e);
   }
+}
+
+export function addStoredAlerts(newAlerts: SystemAlert | SystemAlert[]) {
+  const toAdd = Array.isArray(newAlerts) ? newAlerts : [newAlerts];
+  const current = getStoredAlerts();
+  saveStoredAlerts([...toAdd, ...current]);
+}
+
+export function filterAlertsForRole(
+  alerts: SystemAlert[],
+  options: {
+    role: 'admin' | 'taller' | 'garante' | 'cliente';
+    workshopId?: string;
+    brand?: string;
+    brandsRepresented?: string[];
+    clientId?: string;
+  }
+): SystemAlert[] {
+  const { role, workshopId, brand, brandsRepresented, clientId } = options;
+
+  return alerts.filter((alert) => {
+    if (!alert) return false;
+
+    // 1. Role match
+    const hasRole =
+      !alert.targetRole ||
+      alert.targetRole === 'all' ||
+      alert.targetRole === role ||
+      (alert.targetRoles && alert.targetRoles.includes(role));
+
+    if (!hasRole) return false;
+
+    // 2. Specific role constraints
+    if (role === 'taller') {
+      if (alert.targetWorkshopId && workshopId) {
+        if (alert.targetWorkshopId.trim() !== workshopId.trim()) return false;
+      }
+    }
+
+    if (role === 'garante') {
+      if (alert.targetBrand) {
+        const targetB = alert.targetBrand.trim().toLowerCase();
+        const matchesMainBrand = brand && brand.trim().toLowerCase() === targetB;
+        const matchesRep = brandsRepresented?.some((b) => b.trim().toLowerCase() === targetB);
+        if (!matchesMainBrand && !matchesRep) return false;
+      }
+    }
+
+    if (role === 'cliente') {
+      if (alert.targetClientId && clientId) {
+        if (alert.targetClientId.trim() !== clientId.trim()) return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 // Talleres (11 Ubicaciones Oficiales)
@@ -613,7 +756,13 @@ export function getStoredGarantes(): GaranteProfile[] {
     if (raw) {
       const parsed: GaranteProfile[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Excluir perfiles legacy con marcas hardcodeadas solicitadas para remover
+        const clean = parsed.filter(
+          (g) => g.id !== 'gar-benelli-ec' && !(g.companyName && g.companyName.toLowerCase().includes('benelli'))
+        );
+        if (clean.length > 0) {
+          return clean;
+        }
       }
     }
   } catch (e) {
@@ -647,30 +796,68 @@ export function saveStoredGarante(garante: GaranteProfile) {
 }
 
 /**
- * Devuelve todas las marcas registradas consolidadas (de garantes registrados y marcas base).
- * Siempre sincronizado con la base de datos y garantes.
+ * Devuelve todas las marcas registradas consolidadas (ÚNICAMENTE la Razón Social de garantes registrados).
+ * La razón social de la empresa garante actúa directamente como su marca oficial respaldada.
+ * Sincronizado en tiempo real con la base de datos y perfiles de garantes oficiales.
  */
 export function getRegisteredBrands(): string[] {
-  const defaultBrands = ['Benelli', 'CFMOTO', 'Keeway', 'Brixton', 'StarMotos', 'Yamaha', 'Suzuki', 'Honda', 'Bajaj', 'Shineray'];
   const brandSet = new Set<string>();
 
-  // 1. Agregar marcas de todos los garantes registrados
+  // Agregar única y exclusivamente la razón social de todos los garantes registrados
   const garantes = getStoredGarantes();
   for (const g of garantes) {
-    if (Array.isArray(g.brandsRepresented)) {
-      for (const b of g.brandsRepresented) {
-        const clean = b.trim();
-        if (clean) brandSet.add(clean);
+    if (g.id === 'gar-benelli-ec') continue;
+
+    if (g.companyName) {
+      const cleanCompany = g.companyName.trim();
+      if (cleanCompany && !['benelli', 'brixton', 'cfmoto', 'keeway'].includes(cleanCompany.toLowerCase())) {
+        brandSet.add(cleanCompany);
       }
     }
   }
 
-  // 2. Agregar marcas base por defecto si no están presentes
-  for (const b of defaultBrands) {
-    brandSet.add(b);
-  }
-
   return Array.from(brandSet).sort((a, b) => a.localeCompare(b));
+}
+
+// ===================== DICTÁMENES DE GARANTÍA =====================
+export const INITIAL_DICTAMENES: DictamenRecord[] = [];
+
+export function getStoredDictamenes(): DictamenRecord[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DICTAMENES);
+    if (raw) {
+      const parsed: DictamenRecord[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading dictamenes from localStorage', e);
+  }
+  return INITIAL_DICTAMENES;
+}
+
+export function saveStoredDictamenes(dictamenes: DictamenRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DICTAMENES, JSON.stringify(dictamenes));
+    window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
+    dictamenes.forEach((d) => cloudSaveDictamen(d));
+  } catch (e) {
+    console.error('Error saving dictamenes to localStorage', e);
+  }
+}
+
+export function saveStoredDictamen(dictamen: DictamenRecord) {
+  try {
+    const current = getStoredDictamenes();
+    const updated = [
+      dictamen,
+      ...current.filter((d) => d.id !== dictamen.id),
+    ];
+    saveStoredDictamenes(updated);
+  } catch (e) {
+    console.error('Error saving individual dictamen', e);
+  }
 }
 
 // ===================== JEFES DE TALLER REGISTRADOS =====================

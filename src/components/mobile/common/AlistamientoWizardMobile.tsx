@@ -29,6 +29,8 @@ import {
   Clock,
   CreditCard,
   Upload,
+  SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -43,6 +45,7 @@ import {
   getStoredClients,
   saveStoredClients,
   getStoredFullAlistamientos,
+  getRegisteredBrands,
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
@@ -103,6 +106,47 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   // Búsqueda y Filtro de Sede en el listado móvil
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
+
+  // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
+  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi'>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'custom'>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [sortBy, setSortBy] = useState<
+    'recientes' | 'antiguos' | 'cliente_asc' | 'cliente_desc' | 'modelo_asc' | 'modelo_desc' | 'mayor_valor' | 'mayor_saldo'
+  >('recientes');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Marcas registradas en tiempo real de los garantes oficiales
+  const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+
+  useEffect(() => {
+    const handleBrandsUpdate = () => {
+      setRegisteredBrands(getRegisteredBrands());
+    };
+    window.addEventListener('starmotos_garantes_updated', handleBrandsUpdate);
+    window.addEventListener('starmotos_garante_profile_updated', handleBrandsUpdate);
+    return () => {
+      window.removeEventListener('starmotos_garantes_updated', handleBrandsUpdate);
+      window.removeEventListener('starmotos_garante_profile_updated', handleBrandsUpdate);
+    };
+  }, []);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterPayment !== 'all') count++;
+    if (filterDateRange !== 'all') count++;
+    if (sortBy !== 'recientes') count++;
+    return count;
+  }, [filterPayment, filterDateRange, sortBy]);
+
+  const handleResetFilters = () => {
+    setFilterPayment('all');
+    setFilterDateRange('all');
+    setCustomStartDate('');
+    setCustomEndDate('');
+    setSortBy('recientes');
+  };
 
   // Registro seleccionado para ver detalle en Ficha Técnica
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<AlistamientoFullRecord | null>(null);
@@ -213,10 +257,10 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
 
-  // Filtrado de alistamientos existentes por Sede y término de búsqueda
+  // Filtrado de alistamientos existentes por Sede, búsqueda, estado de pago, fechas y ordenamiento
   const filteredRecords = useMemo(() => {
-    return recentRecords.filter((r) => {
-      // Si no es Matriz, restringir estrictamente a la sede asignada
+    const base = recentRecords.filter((r) => {
+      // 1. Si no es Matriz, restringir estrictamente a la sede asignada
       if (!isMatriz && defaultSedeId) {
         const matchesSede = r.sedeId === defaultSedeId || r.sede === defaultSede;
         if (!matchesSede) return false;
@@ -225,21 +269,136 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
         if (!matchesWs) return false;
       }
 
-      if (!searchTerm.trim()) return true;
-      const term = searchTerm.toLowerCase().trim();
-      const fullClient = `${r.nombres} ${r.apellidos}`.toLowerCase();
-      return (
-        r.cedulaRuc.toLowerCase().includes(term) ||
-        fullClient.includes(term) ||
-        r.placa.toLowerCase().includes(term) ||
-        r.chasis.toLowerCase().includes(term) ||
-        r.modeloMarca.toLowerCase().includes(term) ||
-        r.sede.toLowerCase().includes(term) ||
-        r.origen.toLowerCase().includes(term) ||
-        r.tecnicoResponsable.toLowerCase().includes(term)
-      );
+      // 2. Filtro por término de búsqueda
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase().trim();
+        const fullClient = `${r.nombres} ${r.apellidos}`.toLowerCase();
+        const matchesTerm = (
+          r.cedulaRuc.toLowerCase().includes(term) ||
+          fullClient.includes(term) ||
+          r.placa.toLowerCase().includes(term) ||
+          r.chasis.toLowerCase().includes(term) ||
+          r.modeloMarca.toLowerCase().includes(term) ||
+          r.sede.toLowerCase().includes(term) ||
+          r.origen.toLowerCase().includes(term) ||
+          r.tecnicoResponsable.toLowerCase().includes(term)
+        );
+        if (!matchesTerm) return false;
+      }
+
+      // 3. Filtro por Estado de Pago
+      if (filterPayment !== 'all') {
+        const valor = Number(r.valorServicio) || 0;
+        const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
+        const pendiente = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
+        const isPdi = isPdiOnlyRecord(r);
+
+        if (filterPayment === 'con_saldo') {
+          if (pendiente <= 0.01) return false;
+        } else if (filterPayment === 'pagados') {
+          if (isPdi || valor <= 0 || pendiente > 0.01) return false;
+        } else if (filterPayment === 'pdi') {
+          if (!isPdi) return false;
+        }
+      }
+
+      // 4. Filtro por Fechas
+      if (filterDateRange !== 'all') {
+        const rawDate = r.fechaServicio || r.createdAt;
+        if (rawDate) {
+          const parts = rawDate.split('T')[0].split('-');
+          let recDate: Date | null = null;
+          if (parts.length === 3) {
+            recDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          } else {
+            recDate = new Date(rawDate);
+          }
+
+          if (recDate && !isNaN(recDate.getTime())) {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+            if (filterDateRange === 'today') {
+              if (recDate < todayStart || recDate > todayEnd) return false;
+            } else if (filterDateRange === 'this_week') {
+              const dayOfWeek = now.getDay();
+              const diffToMonday = (dayOfWeek + 6) % 7;
+              const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+              const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+              if (recDate < monday || recDate > sunday) return false;
+            } else if (filterDateRange === 'this_month') {
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+              if (recDate < monthStart || recDate > monthEnd) return false;
+            } else if (filterDateRange === 'custom') {
+              if (customStartDate) {
+                const cStart = new Date(customStartDate + 'T00:00:00');
+                if (!isNaN(cStart.getTime()) && recDate < cStart) return false;
+              }
+              if (customEndDate) {
+                const cEnd = new Date(customEndDate + 'T23:59:59');
+                if (!isNaN(cEnd.getTime()) && recDate > cEnd) return false;
+              }
+            }
+          }
+        }
+      }
+
+      return true;
     });
-  }, [recentRecords, searchTerm, selectedWorkshopFilter, defaultSedeId, defaultSede, isMatriz]);
+
+    // 5. Ordenamiento
+    return [...base].sort((a, b) => {
+      if (sortBy === 'recientes') {
+        const dateA = a.fechaServicio || a.createdAt || '';
+        const dateB = b.fechaServicio || b.createdAt || '';
+        return dateB.localeCompare(dateA);
+      }
+      if (sortBy === 'antiguos') {
+        const dateA = a.fechaServicio || a.createdAt || '';
+        const dateB = b.fechaServicio || b.createdAt || '';
+        return dateA.localeCompare(dateB);
+      }
+      if (sortBy === 'cliente_asc') {
+        const nameA = `${a.nombres} ${a.apellidos}`.trim().toLowerCase();
+        const nameB = `${b.nombres} ${b.apellidos}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'cliente_desc') {
+        const nameA = `${a.nombres} ${a.apellidos}`.trim().toLowerCase();
+        const nameB = `${b.nombres} ${b.apellidos}`.trim().toLowerCase();
+        return nameB.localeCompare(nameA);
+      }
+      if (sortBy === 'modelo_asc') {
+        return (a.modeloMarca || '').trim().toLowerCase().localeCompare((b.modeloMarca || '').trim().toLowerCase());
+      }
+      if (sortBy === 'modelo_desc') {
+        return (b.modeloMarca || '').trim().toLowerCase().localeCompare((a.modeloMarca || '').trim().toLowerCase());
+      }
+      if (sortBy === 'mayor_valor') {
+        return (Number(b.valorServicio) || 0) - (Number(a.valorServicio) || 0);
+      }
+      if (sortBy === 'mayor_saldo') {
+        const saldoA = a.saldoPendiente !== undefined ? Number(a.saldoPendiente) : Math.max(0, (Number(a.valorServicio) || 0) - (Number(a.abono ?? a.montoPagado) || 0));
+        const saldoB = b.saldoPendiente !== undefined ? Number(b.saldoPendiente) : Math.max(0, (Number(b.valorServicio) || 0) - (Number(b.abono ?? b.montoPagado) || 0));
+        return saldoB - saldoA;
+      }
+      return 0;
+    });
+  }, [
+    recentRecords,
+    searchTerm,
+    selectedWorkshopFilter,
+    defaultSedeId,
+    defaultSede,
+    isMatriz,
+    filterPayment,
+    filterDateRange,
+    customStartDate,
+    customEndDate,
+    sortBy,
+  ]);
 
   // Métricas financieras y operativas del listado (Ingresos cobrados vs Pendientes por cobrar)
   const statsMetrics = useMemo(() => {
@@ -1228,6 +1387,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Modelo y Marca *</label>
                     <input
                       type="text"
+                      list="registered-brands-datalist"
                       value={detailFormData.modeloMarca}
                       onChange={(e) => setDetailFormData({ ...detailFormData, modeloMarca: e.target.value })}
                       required
@@ -1906,6 +2066,25 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               )}
             </div>
 
+            {/* Botón Filtros Interactivos Móvil */}
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`h-11 px-2.5 rounded-xl border flex items-center justify-center gap-1 font-bold text-xs transition-all shadow-2xs cursor-pointer shrink-0 ${
+                isFilterOpen || activeFilterCount > 0
+                  ? 'bg-blue-50 border-blue-400 text-blue-700'
+                  : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-50'
+              }`}
+              title="Filtros avanzados"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
             {/* Botón de Filtro al lado derecho de la barra de búsqueda (Solo Matriz) */}
             {isMatriz && workshops && workshops.length > 0 && (
               <div className="relative shrink-0">
@@ -1942,6 +2121,194 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               </div>
             )}
           </div>
+
+          {/* Panel Desplegable de Filtros Móvil */}
+          {isFilterOpen && (
+            <div className="bg-zinc-50 border border-blue-200 rounded-xl p-3 shadow-xs space-y-3 shrink-0 animate-fade-in">
+              <div className="flex items-center justify-between pb-1.5 border-b border-zinc-200">
+                <div className="flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-xs font-bold text-zinc-900 uppercase">Filtros</span>
+                  <span className="text-[10px] text-zinc-500 font-semibold">
+                    ({filteredRecords.length})
+                  </span>
+                </div>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {/* 1. Estado de Pago */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Pago</span>
+                <div className="grid grid-cols-2 gap-1">
+                  {[
+                    { id: 'all', label: 'Todos' },
+                    { id: 'con_saldo', label: 'Con Saldo' },
+                    { id: 'pagados', label: 'Pagados' },
+                    { id: 'pdi', label: 'PDI ($0)' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFilterPayment(item.id as any)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold border text-center transition-all truncate cursor-pointer ${
+                        filterPayment === item.id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                          : 'bg-white text-zinc-700 border-zinc-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Rango de Fechas */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Fecha</span>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { id: 'all', label: 'Todas' },
+                    { id: 'today', label: 'Hoy' },
+                    { id: 'this_week', label: 'Semana' },
+                    { id: 'this_month', label: 'Mes' },
+                    { id: 'custom', label: 'Rango' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFilterDateRange(item.id as any)}
+                      className={`px-1.5 py-1 rounded-lg text-[11px] font-bold border text-center transition-all truncate cursor-pointer ${
+                        filterDateRange === item.id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                          : 'bg-white text-zinc-700 border-zinc-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                {filterDateRange === 'custom' && (
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <div>
+                      <label className="block text-[9px] text-zinc-500 font-bold">Desde</label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full px-1.5 py-1 bg-white border border-zinc-300 rounded text-[11px] font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-zinc-500 font-bold">Hasta</label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full px-1.5 py-1 bg-white border border-zinc-300 rounded text-[11px] font-semibold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Ordenamiento */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ordenar por</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="w-full px-2 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-800 outline-none"
+                >
+                  <option value="recientes">📅 Más recientes</option>
+                  <option value="antiguos">📅 Más antiguos</option>
+                  <option value="cliente_asc">👤 Cliente (A - Z)</option>
+                  <option value="cliente_desc">👤 Cliente (Z - A)</option>
+                  <option value="modelo_asc">🏍️ Modelo (A - Z)</option>
+                  <option value="modelo_desc">🏍️ Modelo (Z - A)</option>
+                  <option value="mayor_valor">💰 Mayor valor</option>
+                  <option value="mayor_saldo">⏳ Mayor saldo</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Chips de Filtros Activos Móvil */}
+          {!isFilterOpen && activeFilterCount > 0 && (
+            <div className="flex flex-wrap items-center gap-1 shrink-0 pt-0.5">
+              <span className="text-[10px] font-bold text-zinc-400">Filtros:</span>
+              {filterPayment !== 'all' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
+                  <span>
+                    {filterPayment === 'con_saldo'
+                      ? 'Con Saldo'
+                      : filterPayment === 'pagados'
+                      ? 'Pagados'
+                      : 'PDI'}
+                  </span>
+                  <button type="button" onClick={() => setFilterPayment('all')} className="hover:text-blue-950">
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+              {filterDateRange !== 'all' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
+                  <span>
+                    {filterDateRange === 'today'
+                      ? 'Hoy'
+                      : filterDateRange === 'this_week'
+                      ? 'Semana'
+                      : filterDateRange === 'this_month'
+                      ? 'Mes'
+                      : 'Rango'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterDateRange('all');
+                      setCustomStartDate('');
+                      setCustomEndDate('');
+                    }}
+                    className="hover:text-blue-950"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+              {sortBy !== 'recientes' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
+                  <span>
+                    {sortBy === 'antiguos'
+                      ? 'Antiguos'
+                      : sortBy.startsWith('cliente')
+                      ? 'Cliente'
+                      : sortBy.startsWith('modelo')
+                      ? 'Modelo'
+                      : sortBy === 'mayor_valor'
+                      ? 'Mayor valor'
+                      : 'Mayor saldo'}
+                  </span>
+                  <button type="button" onClick={() => setSortBy('recientes')} className="hover:text-blue-950">
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+              >
+                Limpiar
+              </button>
+            </div>
+          )}
 
           {/* Bloques de Precios y Estadísticas Adaptados a Móvil (2x2 Compacto) */}
           <div className="grid grid-cols-2 gap-2 shrink-0">
@@ -2423,6 +2790,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Modelo y Marca *</label>
                   <input
                     type="text"
+                    list="registered-brands-datalist"
                     value={formData.modeloMarca}
                     onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
                     placeholder="Ejemplo: Thunder 200, Daytona 250..."
@@ -3177,6 +3545,13 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {/* Lista de sugerencias de marcas registradas */}
+      <datalist id="registered-brands-datalist">
+        {registeredBrands.map((b) => (
+          <option key={b} value={b} />
+        ))}
+      </datalist>
     </div>
   );
 };

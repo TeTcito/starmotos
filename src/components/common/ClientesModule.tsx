@@ -49,6 +49,7 @@ import {
   Workshop,
   WarrantyRequest,
   UnifiedClient,
+  SystemAlert,
 } from '../../types/customer';
 import {
   getStoredClients,
@@ -56,6 +57,7 @@ import {
   getStoredFullAlistamientos,
   saveStoredFullAlistamientos,
   querySriMock,
+  addStoredAlerts,
 } from '../../data/mockMultiRoleData';
 import { cloudSaveClient } from '../../services/supabaseService';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
@@ -303,6 +305,38 @@ export const ClientesModule: React.FC<Props> = ({
       const updated = [newClient, ...stored.filter((c) => c.idNumber !== cleanCedula)];
       saveStoredClients(updated);
       cloudSaveClient(newClient);
+
+      // Generar alertas diferenciadas por rol
+      const alertsToPush: SystemAlert[] = [];
+
+      // 1. Alerta para Matriz / Admin
+      alertsToPush.push({
+        id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'cliente_creado',
+        targetRole: 'admin',
+        title: 'Se creó un cliente',
+        message: `Se registró al cliente ${newClient.fullName} (${newClient.idNumber}) en ${newClient.workshopName}. Moto: ${newClient.motorcycleBrand} ${newClient.motorcycleModel}.`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: newClient.idNumber,
+      });
+
+      // 2. Alerta para Taller de la sede
+      if (newClient.workshopId) {
+        alertsToPush.push({
+          id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: 'cliente_creado',
+          targetRole: 'taller',
+          targetWorkshopId: newClient.workshopId,
+          title: 'Se creó un cliente',
+          message: `Se registró al cliente ${newClient.fullName} (${newClient.idNumber}) en tu sede. Moto: ${newClient.motorcycleBrand} ${newClient.motorcycleModel}.`,
+          timestamp: 'Ahora mismo',
+          read: false,
+          relatedId: newClient.idNumber,
+        });
+      }
+
+      addStoredAlerts(alertsToPush);
 
       // Guardar credenciales iniciales con cambio obligatorio de clave
       const accounts = JSON.parse(localStorage.getItem('starmotos_registered_accounts') || '{}');

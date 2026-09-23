@@ -25,19 +25,19 @@ function detectRoleFromUrl(): UserRole {
   // 1. Detección por Pathname directo
   if (path.includes('/admin')) return 'admin';
   if (path.includes('/taller')) return 'taller';
-  if (path.includes('/marca') || path.includes('/garante')) return 'garante';
+  if (path.includes('/marca') || path.includes('/garante') || path.includes('/garantia')) return 'garante';
   if (path.includes('/cliente')) return 'cliente';
 
   // 2. Detección por Hash (#/admin, #admin, etc.)
   if (hash.includes('admin')) return 'admin';
   if (hash.includes('taller')) return 'taller';
-  if (hash.includes('marca') || hash.includes('garante')) return 'garante';
+  if (hash.includes('marca') || hash.includes('garante') || hash.includes('garantia')) return 'garante';
   if (hash.includes('cliente')) return 'cliente';
 
   // 3. Detección por Query Params (?portal=admin o ?role=admin)
   if (search.includes('portal=admin') || search.includes('role=admin')) return 'admin';
   if (search.includes('portal=taller') || search.includes('role=taller')) return 'taller';
-  if (search.includes('portal=marca') || search.includes('portal=garante') || search.includes('role=garante')) return 'garante';
+  if (search.includes('portal=marca') || search.includes('portal=garante') || search.includes('portal=garantia') || search.includes('role=garante')) return 'garante';
   if (search.includes('portal=cliente') || search.includes('role=cliente')) return 'cliente';
 
   // 4. Último rol recordado si está en la raíz
@@ -106,7 +106,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       {/* ========================================================================= */}
       {/* LADO DERECHO: FORMULARIO INDEPENDIENTE SEGÚN EL ENLACE DEL ROL             */}
       {/* ========================================================================= */}
-      <div className="w-full lg:w-1/3 h-full flex flex-col justify-start sm:justify-center items-center bg-white px-4 py-3 sm:p-6 lg:p-8 overflow-y-auto">
+      <div className="w-full lg:w-1/3 h-full flex flex-col justify-start sm:justify-center items-center bg-white px-4 py-3 sm:p-6 lg:p-8 overflow-y-auto scroll-smooth pb-44 sm:pb-8">
         {/* LOGO HEADER GLOBAL */}
         <div className="w-full max-w-md text-center pt-2 pb-3 shrink-0">
           <div className="flex items-center justify-center gap-2.5 mb-2">

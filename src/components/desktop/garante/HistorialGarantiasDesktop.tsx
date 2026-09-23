@@ -22,6 +22,8 @@ export const HistorialGarantiasDesktop: React.FC<Props> = ({ historyRequests }) 
     const matchesStatus =
       statusFilter === 'all'
         ? true
+        : statusFilter === 'aceptada'
+        ? sInfo.canonical === 'aceptada' || sInfo.canonical === 'completada'
         : sInfo.canonical === statusFilter;
 
     const term = searchTerm.toLowerCase().trim();
@@ -36,9 +38,10 @@ export const HistorialGarantiasDesktop: React.FC<Props> = ({ historyRequests }) 
     return matchesSearch && matchesStatus;
   });
 
-  const countAceptadas = historyRequests.filter(
-    (w) => getWarrantyStatusInfo(w.status).canonical === 'aceptada'
-  ).length;
+  const countAceptadas = historyRequests.filter((w) => {
+    const c = getWarrantyStatusInfo(w.status).canonical;
+    return c === 'aceptada' || c === 'completada';
+  }).length;
   const countDenegadas = historyRequests.filter(
     (w) => getWarrantyStatusInfo(w.status).canonical === 'denegada'
   ).length;

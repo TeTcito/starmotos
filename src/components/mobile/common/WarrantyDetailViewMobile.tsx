@@ -25,6 +25,7 @@ import {
   Building2,
   Play,
   Film,
+  RotateCcw,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -99,13 +100,97 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
   // Auxiliares para cálculo de presupuesto oficial en taller
   const QUICK_LABOR_TIMES = ['30 min', '1 hora', '2 horas', '3 horas', '4 horas'];
-  const [laborTime, setLaborTime] = useState<string>('1 hora');
-  const [laborCost, setLaborCost] = useState<number>(25);
-  const [partsBudgetMap, setPartsBudgetMap] = useState<Record<string, number>>({});
+  const [laborTime, setLaborTime] = useState<string>(warranty.laborTime || '1 hora');
+  const [laborCost, setLaborCost] = useState<number>(warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0);
+  const [partsBudgetMap, setPartsBudgetMap] = useState<Record<string, number>>(() => {
+    if (!warranty.partsBudget) return {};
+    if (Array.isArray(warranty.partsBudget)) {
+      return warranty.partsBudget.reduce((acc, item) => {
+        acc[item.name] = item.cost;
+        return acc;
+      }, {} as Record<string, number>);
+    }
+    return warranty.partsBudget as Record<string, number>;
+  });
 
   const partsTotal = useMemo(() => {
-    return formData.partsTags.reduce((acc, tag) => acc + (partsBudgetMap[tag] || 0), 0);
+    return formData.partsTags.reduce((acc, tag) => acc + (Number(partsBudgetMap[tag]) || 0), 0);
   }, [formData.partsTags, partsBudgetMap]);
+
+  // Bloqueo total si la garantía ya fue aceptada, aprobada, denegada o completada
+  const isLocked = useMemo(() => {
+    return (
+      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(formData.status) ||
+      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(warranty.status)
+    );
+  }, [formData.status, warranty.status]);
+
+  // Seguimiento de cambios en presupuesto para mostrar/ocultar botones en Matriz
+  const isBudgetModified = useMemo(() => {
+    const origLaborTime = warranty.laborTime || '1 hora';
+    const origLaborCost = warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0;
+    let origMap: Record<string, number> = {};
+    if (warranty.partsBudget) {
+      if (Array.isArray(warranty.partsBudget)) {
+        origMap = warranty.partsBudget.reduce((acc, item) => {
+          acc[item.name] = item.cost;
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        origMap = warranty.partsBudget as Record<string, number>;
+      }
+    }
+
+    if (laborTime !== origLaborTime) return true;
+    if (Math.abs(laborCost - origLaborCost) > 0.001) return true;
+
+    for (const tag of formData.partsTags) {
+      const origVal = Number(origMap[tag] || 0);
+      const curVal = Number(partsBudgetMap[tag] || 0);
+      if (Math.abs(origVal - curVal) > 0.001) return true;
+    }
+    return false;
+  }, [warranty, laborTime, laborCost, partsBudgetMap, formData.partsTags]);
+
+  const handleCancelBudget = () => {
+    let origMap: Record<string, number> = {};
+    if (warranty.partsBudget) {
+      if (Array.isArray(warranty.partsBudget)) {
+        origMap = warranty.partsBudget.reduce((acc, item) => {
+          acc[item.name] = item.cost;
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        origMap = { ...(warranty.partsBudget as Record<string, number>) };
+      }
+    }
+    setPartsBudgetMap(origMap);
+    setLaborTime(warranty.laborTime || '1 hora');
+    setLaborCost(warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0);
+  };
+
+  const handleSaveBudget = () => {
+    const grandTotal = partsTotal + laborCost;
+    const updated: WarrantyRequest = {
+      ...warranty,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotal,
+      estimatedCost: grandTotal,
+    };
+    if (onSave) {
+      onSave(updated);
+    }
+    try {
+      const allStored = getStoredWarranties();
+      const updatedList = allStored.map((w) => (w.id === updated.id ? updated : w));
+      saveStoredWarranties(updatedList);
+    } catch {}
+    confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 } });
+    setToastMessage('✓ Presupuesto oficial guardado.');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // Input temporal para agregar tags de repuestos
   const [tagInput, setTagInput] = useState('');
@@ -156,7 +241,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       matrizNotes: formData.matrizNotes,
       garanteNotes: formData.garanteNotes,
       rejectionReason: formData.rejectionReason,
-      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 60,
+      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
     };
 
     if (onSave) {
@@ -528,26 +613,23 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Póliza</label>
-            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-800 uppercase flex items-center justify-between">
-              <span>
-                {formData.warrantyType === 'marca'
-                  ? `GARANTÍA OFICIAL DE MARCA (${formData.motorcycleBrand ? formData.motorcycleBrand.toUpperCase() : 'FÁBRICA'})`
-                  : formData.warrantyType === 'plus_taller'
-                  ? 'GARANTÍA PLUS STARMOTOS'
-                  : 'GARANTÍA DISPOSITIVO GPS SATELITAL'}
+            <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Cobertura / Póliza</label>
+            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-black text-blue-900 uppercase flex items-center justify-between">
+              <span>Garantía Oficial de Marca</span>
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
+                Oficial
               </span>
-              <select
-                value={formData.warrantyType}
-                onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value })}
-                className="opacity-0 w-6 h-6 absolute right-5 cursor-pointer"
-                title="Cambiar tipo de póliza"
-              >
-                <option value="marca">Garantía Oficial de Marca</option>
-                <option value="plus_taller">Garantía Plus StarMotos</option>
-                <option value="gps">GPS Satelital</option>
-              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-700 mb-1">Marca Garantía</label>
+            <input
+              type="text"
+              readOnly
+              value={warranty.targetBrand || warranty.garanteName || formData.motorcycleBrand || 'Garante Oficial'}
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-800 outline-none"
+            />
           </div>
         </div>
       )}
@@ -564,9 +646,9 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <span>2. Motocicleta Registrada</span>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-zinc-700 mb-1">Marca y Modelo</label>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 mb-1">Marca</label>
               <input
                 type="text"
                 value={formData.motorcycleBrand}
@@ -574,6 +656,9 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 placeholder="Marca"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 mb-1">Modelo</label>
               <input
                 type="text"
                 value={formData.motorcycleModel}
@@ -744,76 +829,103 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Modalidad de Resolución (2 Botones exactos del escritorio) */}
-          <div className="space-y-2 pt-1 border-t border-zinc-100">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-zinc-700">
-                Modalidad de Resolución <span className="text-red-500">*</span>
-              </label>
-              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                Seleccionada
-              </span>
-            </div>
+          {/* Modalidad de Resolución SOLO para Garante y Taller (Oculto en Matriz Central) */}
+          {viewerRole !== 'admin' && (
+            <div className="space-y-2 pt-1 border-t border-zinc-100">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-zinc-700">
+                  Modalidad de Resolución <span className="text-red-500">*</span>
+                </label>
+                {formData.resolutionType && (
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                    Seleccionada
+                  </span>
+                )}
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {/* Opción 1: Encargar al taller */}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, resolutionType: 'encargar_taller' })}
-                className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  formData.resolutionType === 'encargar_taller'
-                    ? 'border-indigo-600 bg-indigo-50/90 shadow-2xs ring-2 ring-indigo-200'
-                    : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                    <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
-                  </div>
-                  {formData.resolutionType === 'encargar_taller' && (
-                    <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                      <Check className="w-2.5 h-2.5" />
+              {viewerRole === 'taller' || isLocked ? (
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                    Estado de Resolución
+                  </span>
+                  {formData.resolutionType === 'encargar_taller' ? (
+                    <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                      <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
+                    </div>
+                  ) : formData.resolutionType === 'envio_repuesto' ? (
+                    <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                      <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
+                      <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+                      <span>Pendiente de dictamen técnico del Garante de Marca</span>
                     </div>
                   )}
                 </div>
-                <p className="text-[10px] text-zinc-500 leading-tight">
-                  El taller ejecuta el trabajo y factura repuestos / mano de obra.
-                </p>
-              </button>
-
-              {/* Opción 2: Envío de repuesto */}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, resolutionType: 'envio_repuesto' })}
-                className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                  formData.resolutionType === 'envio_repuesto'
-                    ? 'border-emerald-600 bg-emerald-50/90 shadow-2xs ring-2 ring-emerald-200'
-                    : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
-                  </div>
-                  {formData.resolutionType === 'envio_repuesto' && (
-                    <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                      <Check className="w-2.5 h-2.5" />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, resolutionType: 'encargar_taller' })}
+                    className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      formData.resolutionType === 'encargar_taller'
+                        ? 'border-indigo-600 bg-indigo-50/90 shadow-2xs ring-2 ring-indigo-200'
+                        : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
+                      </div>
+                      {formData.resolutionType === 'encargar_taller' && (
+                        <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                      )}
                     </div>
-                  )}
+                    <p className="text-[10px] text-zinc-500 leading-tight">
+                      El taller ejecuta el trabajo y factura repuestos / mano de obra.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, resolutionType: 'envio_repuesto' })}
+                    className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      formData.resolutionType === 'envio_repuesto'
+                        ? 'border-emerald-600 bg-emerald-50/90 shadow-2xs ring-2 ring-emerald-200'
+                        : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
+                      </div>
+                      {formData.resolutionType === 'envio_repuesto' && (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-zinc-500 leading-tight">
+                      Fábrica o Marca despacha directamente las piezas sin costo.
+                    </p>
+                  </button>
                 </div>
-                <p className="text-[10px] text-zinc-500 leading-tight">
-                  Fábrica o Marca despacha directamente las piezas sin costo.
-                </p>
-              </button>
+              )}
             </div>
-          </div>
+          )}
 
           {/* =============================================================== */}
-          {/* SECCIÓN DE PRESUPUESTO OFICIAL (SOLO SI 'Encargar al taller')   */}
+          {/* SECCIÓN DE PRESUPUESTO OFICIAL (SIEMPRE EN MATRIZ; EN GARANTE/TALLER SOLO SI ENCARGAR AL TALLER) */}
           {/* =============================================================== */}
-          {formData.resolutionType === 'encargar_taller' && (
+          {(viewerRole === 'admin' ||
+            ((viewerRole === 'garante' || viewerRole === 'taller') && formData.resolutionType === 'encargar_taller')) && (
             <div className="pt-3 border-t border-zinc-100 space-y-3 animate-fade-in">
               {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
               {Boolean(formData.garanteNotes || warranty.garanteNotes) && (
@@ -854,13 +966,21 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                       Presupuesto Oficial (Taller / Liquidación)
                     </h4>
                     <p className="text-[10px] text-zinc-500">
-                      Desglose de repuestos solicitados y mano de obra a liquidar
+                      {viewerRole === 'admin' && !isLocked
+                        ? 'Ingrese costos unitarios y tiempo de mano de obra'
+                        : 'Desglose oficial de repuestos y mano de obra'}
                     </p>
                   </div>
                 </div>
-                <span className="text-xs font-black font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
-                  ${parseFloat(formData.estimatedCost || '60').toFixed(2)} USD
-                </span>
+                {partsTotal + Number(laborCost || 0) > 0 ? (
+                  <span className="text-xs font-black font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                    ${(partsTotal + Number(laborCost || 0)).toFixed(2)} USD
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                    Pendiente Matriz
+                  </span>
+                )}
               </div>
 
               <div className="space-y-3 bg-zinc-50/70 p-3 rounded-xl border border-zinc-200">
@@ -884,24 +1004,32 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                           className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-zinc-200 text-xs"
                         >
                           <span className="font-semibold text-zinc-800 truncate flex-1">{tag}</span>
-                          <div className="relative w-24 shrink-0">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-[11px]">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={partsBudgetMap[tag] !== undefined ? partsBudgetMap[tag] : ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                const newMap = { ...partsBudgetMap, [tag]: val };
-                                setPartsBudgetMap(newMap);
-                                const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (newMap[t] || 0), 0);
-                                const newTotal = newPartsTotal + (laborCost || 0);
-                                setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
-                              }}
-                              className="w-full py-1 pl-5 pr-2 bg-zinc-50 border border-zinc-200 focus:border-indigo-600 focus:bg-white rounded-md text-xs font-mono font-bold text-right outline-none"
-                            />
+                          <div className="relative w-24 shrink-0 text-right">
+                            {viewerRole === 'admin' && !isLocked ? (
+                              <>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-[11px]">$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  value={partsBudgetMap[tag] !== undefined ? partsBudgetMap[tag] : ''}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    const newMap = { ...partsBudgetMap, [tag]: val };
+                                    setPartsBudgetMap(newMap);
+                                    const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (newMap[t] || 0), 0);
+                                    const newTotal = newPartsTotal + (laborCost || 0);
+                                    setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
+                                  }}
+                                  className="w-full py-1 pl-5 pr-2 bg-zinc-50 border border-zinc-200 focus:border-indigo-600 focus:bg-white rounded-md text-xs font-mono font-bold text-right outline-none"
+                                />
+                              </>
+                            ) : (
+                              <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded">
+                                ${(Number(partsBudgetMap[tag]) || 0).toFixed(2)} USD
+                              </span>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -918,64 +1046,104 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   <label className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider block">
                     2. Mano de Obra
                   </label>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 font-medium block mb-1">
-                      Tiempo Estimado de Demora:
-                    </span>
-                    <div className="grid grid-cols-5 gap-1">
-                      {QUICK_LABOR_TIMES.map((timeOption) => (
-                        <button
-                          key={timeOption}
-                          type="button"
-                          onClick={() => setLaborTime(timeOption)}
-                          className={`py-1 text-[10px] font-bold rounded-md border text-center transition cursor-pointer ${
-                            laborTime === timeOption
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
-                          }`}
-                        >
-                          {timeOption}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs text-zinc-700 font-bold">Valor Mano de Obra ($):</span>
-                    <div className="relative w-28">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={laborCost}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          setLaborCost(val);
-                          const newTotal = partsTotal + val;
-                          setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
-                        }}
-                        className="w-full py-1.5 pl-6 pr-2 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-right outline-none focus:border-indigo-600"
-                      />
+                  {viewerRole === 'admin' && !isLocked ? (
+                    <>
+                      <div>
+                        <span className="text-[10px] text-zinc-500 font-medium block mb-1">
+                          Tiempo Estimado de Demora:
+                        </span>
+                        <div className="grid grid-cols-5 gap-1">
+                          {QUICK_LABOR_TIMES.map((timeOption) => (
+                            <button
+                              key={timeOption}
+                              type="button"
+                              onClick={() => setLaborTime(timeOption)}
+                              className={`py-1 text-[10px] font-bold rounded-md border text-center transition cursor-pointer ${
+                                laborTime === timeOption
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                              }`}
+                            >
+                              {timeOption}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-zinc-700 font-bold">Valor Mano de Obra ($):</span>
+                        <div className="relative w-28">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={laborCost}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setLaborCost(val);
+                              const newTotal = partsTotal + val;
+                              setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
+                            }}
+                            className="w-full py-1.5 pl-6 pr-2 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-right outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Demora Estimada:</span>
+                        <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold rounded-md">
+                          {laborTime || '1 hora'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Costo Mano de Obra:</span>
+                        <span className="font-mono font-bold text-zinc-900">
+                          ${Number(laborCost || 0).toFixed(2)} USD
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* 3. Resumen y Total General Editable */}
+                {/* 3. Resumen y Total General */}
                 <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between">
                   <span className="text-xs font-black text-zinc-900">Total Liquidación:</span>
-                  <div className="relative w-28">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600 font-bold text-xs">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.estimatedCost}
-                      onChange={(e) => setFormData({ ...formData, estimatedCost: e.target.value })}
-                      className="w-full py-1.5 pl-6 pr-2 bg-white border-2 border-emerald-400 rounded-lg text-xs font-mono font-black text-emerald-800 text-right outline-none focus:border-emerald-600 shadow-2xs"
-                    />
-                  </div>
+                  {partsTotal + Number(laborCost || 0) > 0 ? (
+                    <span className="text-sm font-black font-mono text-emerald-700">
+                      ${(partsTotal + Number(laborCost || 0)).toFixed(2)} USD
+                    </span>
+                  ) : (
+                    <span className="text-xs font-black uppercase text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded-lg border border-amber-300">
+                      Pendiente Matriz
+                    </span>
+                  )}
                 </div>
+
+                {/* Botones de Presupuesto en Matriz: Solo si está modificado */}
+                {viewerRole === 'admin' && !isLocked && isBudgetModified && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-zinc-200 animate-slide-in">
+                    <button
+                      type="button"
+                      onClick={handleCancelBudget}
+                      className="flex-1 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Cancelar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveBudget}
+                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Guardar Presupuesto</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

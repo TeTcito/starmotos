@@ -13,4 +13,5 @@ export const STORAGE_KEYS = {
   TECHNICIANS: 'starmotos_shared_technicians_v5',
   GARANTES: 'starmotos_shared_garantes_v5',
   WORKSHOP_MANAGERS: 'starmotos_shared_workshop_managers_v5',
+  DICTAMENES: 'starmotos_shared_dictamenes_v5',
 } as const;

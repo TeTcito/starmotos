@@ -154,8 +154,8 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (registerForm.password.length < 6) {
-      setErrorMessage('La contraseña debe tener mínimo 6 caracteres.');
+    if (registerForm.password.length < 8) {
+      setErrorMessage('La contraseña debe tener mínimo 8 caracteres.');
       return;
     }
 
@@ -347,7 +347,7 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         </form>
       ) : (
         /* ===================== REGISTRO SENCILLO DE JEFE DE TALLER ===================== */
-        <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in">
+        <form onSubmit={handleRegisterSubmit} className="space-y-3 animate-fade-in pb-28 sm:pb-4">
           <div>
             <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
               Nombre Completo del Jefe de Taller <span className="text-red-500">*</span>
@@ -419,27 +419,59 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
                 Contraseña <span className="text-red-500">*</span>
               </label>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={registerForm.password}
-                onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                placeholder="Mín 6 car."
-                className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-amber-600"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={registerForm.password}
+                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                  placeholder="Mín. 8 caracteres"
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-amber-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <span className="text-[10px] text-zinc-400 mt-0.5 block">Mínimo 8 caracteres</span>
             </div>
             <div>
               <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1">
                 Confirmar <span className="text-red-500">*</span>
               </label>
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                required
-                value={registerForm.confirmPassword}
-                onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                placeholder="Repetir"
-                className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-amber-600"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={registerForm.confirmPassword}
+                  onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                  placeholder="Repetir clave"
+                  className="w-full pl-3 pr-8 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-amber-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer p-0.5"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {registerForm.confirmPassword && (
+                <span
+                  className={`text-[10px] mt-0.5 block font-bold ${
+                    registerForm.password === registerForm.confirmPassword
+                      ? 'text-emerald-600'
+                      : 'text-red-500'
+                  }`}
+                >
+                  {registerForm.password === registerForm.confirmPassword
+                    ? '✓ Coinciden'
+                    : '✗ No coinciden'}
+                </span>
+              )}
             </div>
           </div>
 

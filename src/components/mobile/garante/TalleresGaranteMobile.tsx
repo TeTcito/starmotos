@@ -58,7 +58,7 @@ export const TalleresGaranteMobile: React.FC<Props> = ({ workshops, warranties }
           ).length;
           const moneyApproved = wsWarranties
             .filter((w) => w.status === 'aprobada' || w.status === 'aceptada' || w.status === 'completada')
-            .reduce((acc, w) => acc + (w.estimatedCost || 60), 0);
+            .reduce((acc, w) => acc + ((w.totalBudget ?? w.estimatedCost) || 0), 0);
 
           const cleanPhone = ws.phone ? ws.phone.replace(/\D/g, '') : '';
 

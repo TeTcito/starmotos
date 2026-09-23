@@ -60,14 +60,14 @@ export const SidebarDrawer: React.FC<Props> = ({
   const menuItems: { id: ActiveSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: 'perfil',
-      label: 'Perfil',
+      label: 'Perfil del Cliente',
       icon: <User className="w-4 h-4" />,
     },
     {
-      id: 'eventos',
-      label: 'Eventos y Facturas',
-      icon: <Receipt className="w-4 h-4" />,
-      badge: 'Nuevo',
+      id: 'orden_activa',
+      label: 'Orden de Trabajo Activa',
+      icon: <Clock className="w-4 h-4" />,
+      badge: 'En Taller',
     },
     {
       id: 'agendar_cita',
@@ -76,30 +76,15 @@ export const SidebarDrawer: React.FC<Props> = ({
       badge: 'Turnos',
     },
     {
-      id: 'mi_moto',
-      label: 'Mi Moto',
-      icon: <Wrench className="w-4 h-4" />,
-    },
-    {
-      id: 'mantenimientos',
-      label: 'Mantenimientos',
-      icon: <Calendar className="w-4 h-4" />,
-    },
-    {
-      id: 'orden_activa',
-      label: 'Orden Activa',
-      icon: <Clock className="w-4 h-4" />,
-      badge: 'Taller',
+      id: 'eventos',
+      label: 'Evento de Facturas',
+      icon: <Receipt className="w-4 h-4" />,
+      badge: 'SRI',
     },
     {
       id: 'historial',
-      label: 'Historial',
+      label: 'Historial de Servicios y Garantía de Pólizas',
       icon: <History className="w-4 h-4" />,
-    },
-    {
-      id: 'garantias',
-      label: 'Garantías',
-      icon: <Sparkles className="w-4 h-4" />,
     },
   ];
 

@@ -9,14 +9,10 @@ import {
   Building2,
   Save,
   CheckCircle2,
-  Sparkles,
   MapPin,
-  Award,
-  Plus,
-  X,
   Briefcase,
-  Tag,
   AlertCircle,
+  Award,
 } from 'lucide-react';
 import { GaranteProfile } from '../../../types/customer';
 
@@ -25,21 +21,8 @@ interface Props {
   onUpdateProfile?: (updated: GaranteProfile) => void;
 }
 
-const COMMON_BRANDS = [
-  'Benelli',
-  'CFMOTO',
-  'Keeway',
-  'Brixton',
-  'Yamaha',
-  'Suzuki',
-  'Honda',
-  'Bajaj',
-  'Shineray',
-];
-
 export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile }) => {
   const [formData, setFormData] = useState<GaranteProfile>(profile);
-  const [newBrandInput, setNewBrandInput] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -52,46 +35,13 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAddBrand = (brandToAdd?: string) => {
-    const brand = (brandToAdd || newBrandInput).trim();
-    if (!brand) return;
-
-    const exists = formData.brandsRepresented.some(
-      (b) => b.trim().toLowerCase() === brand.toLowerCase()
-    );
-
-    if (exists) {
-      setErrorMessage(`La marca "${brand}" ya está en su lista.`);
-      setTimeout(() => setErrorMessage(''), 3000);
-      return;
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      brandsRepresented: [...prev.brandsRepresented, brand],
-    }));
-    setNewBrandInput('');
-    setErrorMessage('');
-  };
-
-  const handleRemoveBrand = (brandToRemove: string) => {
-    if (formData.brandsRepresented.length <= 1) {
-      setErrorMessage('Debe mantener al menos una marca respaldada.');
-      setTimeout(() => setErrorMessage(''), 3000);
-      return;
-    }
-    setFormData((prev) => ({
-      ...prev,
-      brandsRepresented: prev.brandsRepresented.filter((b) => b !== brandToRemove),
-    }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!formData.companyName.trim()) {
-      setErrorMessage('La razón social o empresa es obligatoria.');
+    const brandName = formData.companyName.trim();
+    if (!brandName) {
+      setErrorMessage('La razón social / marca es obligatoria.');
       return;
     }
     if (!formData.ruc.trim()) {
@@ -107,8 +57,14 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
       return;
     }
 
+    const updatedProfile: GaranteProfile = {
+      ...formData,
+      companyName: brandName,
+      brandsRepresented: [brandName],
+    };
+
     if (onUpdateProfile) {
-      onUpdateProfile(formData);
+      onUpdateProfile(updatedProfile);
     }
     setIsSaved(true);
     confetti({
@@ -160,70 +116,6 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
             <span>•</span>
             <span>{formData.phone || '0990000000'}</span>
           </div>
-        </div>
-      </div>
-
-      {/* Marcas Representadas (Interactivas) */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-zinc-700 flex items-center gap-1.5">
-            <Award className="w-3.5 h-3.5 text-purple-600" />
-            <span>Marcas Homologadas ({formData.brandsRepresented.length})</span>
-          </span>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
-          {formData.brandsRepresented.map((b) => (
-            <span
-              key={b}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 border border-purple-200 font-bold text-xs"
-            >
-              <span>{b}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveBrand(b)}
-                className="text-purple-400 hover:text-purple-800"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-
-        {/* Input para agregar marca en móvil */}
-        <div className="flex gap-2 pt-1">
-          <input
-            type="text"
-            value={newBrandInput}
-            onChange={(e) => setNewBrandInput(e.target.value)}
-            placeholder="Añadir marca..."
-            className="flex-1 px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs outline-none focus:bg-white focus:border-purple-600"
-          />
-          <button
-            type="button"
-            onClick={() => handleAddBrand()}
-            className="px-3 py-1.5 bg-zinc-900 text-white rounded-lg text-xs font-bold flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" />
-            <span>Añadir</span>
-          </button>
-        </div>
-
-        {/* Marcas rápidas */}
-        <div className="flex flex-wrap gap-1 pt-1">
-          {COMMON_BRANDS.filter(
-            (cb) => !formData.brandsRepresented.some((b) => b.toLowerCase() === cb.toLowerCase())
-          ).slice(0, 5).map((brand) => (
-            <button
-              key={brand}
-              type="button"
-              onClick={() => handleAddBrand(brand)}
-              className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 text-[10px] font-semibold flex items-center gap-0.5"
-            >
-              <Plus className="w-2.5 h-2.5 text-zinc-400" />
-              <span>{brand}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -306,36 +198,41 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
           />
         </div>
 
-        {/* Razón Social y RUC */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-700 flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-purple-600" />
-              <span>Razón Social *</span>
-            </label>
-            <input
-              type="text"
-              name="companyName"
-              value={formData.companyName}
-              onChange={handleChange}
-              required
-              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-semibold text-zinc-900 focus:bg-white focus:border-purple-600 outline-none"
-            />
-          </div>
-          <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-700 flex items-center gap-1">
-              <Tag className="w-3 h-3 text-zinc-500" />
-              <span>RUC *</span>
-            </label>
-            <input
-              type="text"
-              name="ruc"
-              value={formData.ruc}
-              onChange={handleChange}
-              required
-              className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-semibold text-zinc-900 font-mono focus:bg-white focus:border-purple-600 outline-none"
-            />
-          </div>
+        {/* Razón Social / Marca Garante */}
+        <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
+          <label className="text-[11px] font-bold text-zinc-700 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-purple-600" />
+            <span>Razón Social / Marca Garante *</span>
+          </label>
+          <input
+            type="text"
+            name="companyName"
+            value={formData.companyName}
+            onChange={handleChange}
+            required
+            placeholder="Ej: Benelli, CFMOTO, Keeway, Yamaha..."
+            className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-900 focus:bg-white focus:border-purple-600 outline-none"
+          />
+          <p className="text-[10px] text-zinc-500">
+            Esta razón social actúa directamente como la marca oficial respaldada y se vinculará a Alistamientos y Garantías.
+          </p>
+        </div>
+
+        {/* RUC Oficial */}
+        <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
+          <label className="text-[11px] font-bold text-zinc-700 flex items-center gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-zinc-500" />
+            <span>RUC Institucional *</span>
+          </label>
+          <input
+            type="text"
+            name="ruc"
+            value={formData.ruc}
+            onChange={handleChange}
+            required
+            placeholder="Ej: 1792849102001"
+            className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-semibold text-zinc-900 font-mono focus:bg-white focus:border-purple-600 outline-none"
+          />
         </div>
 
         {/* Dirección */}

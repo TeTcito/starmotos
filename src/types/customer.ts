@@ -500,12 +500,21 @@ export interface AlistamientoService {
 }
 
 // --- Alertas del Sistema ---
+export type AlertRole = 'admin' | 'taller' | 'garante' | 'cliente' | 'all';
+
 export type AlertType =
   | 'orden_creada'
   | 'estado_cambiado'
   | 'factura_emitida'
   | 'garantia_aprobada'
-  | 'garantia_rechazada';
+  | 'garantia_rechazada'
+  | 'cliente_creado'
+  | 'solicitud_garantia'
+  | 'garantia_validada'
+  | 'dictamen_emitido'
+  | 'cita_agendada'
+  | 'stock_bajo'
+  | 'info';
 
 export interface SystemAlert {
   id: string;
@@ -515,6 +524,11 @@ export interface SystemAlert {
   timestamp: string;
   read: boolean;
   relatedId?: string;
+  targetRole?: AlertRole;
+  targetRoles?: ('admin' | 'taller' | 'garante' | 'cliente')[];
+  targetWorkshopId?: string;
+  targetBrand?: string;
+  targetClientId?: string;
 }
 
 // --- Factura Admin ---
@@ -646,5 +660,28 @@ export interface UnifiedClient {
   lastServiceType: string;
   warrantiesCount: number;
   records: AlistamientoFullRecord[];
+}
+
+// --- Dictamen Oficial de Garantía Emitido por Garante de Marca ---
+export interface DictamenRecord {
+  id: string;
+  warrantyId: string;
+  requestNumber: string;
+  decision: 'aprobada' | 'rechazada' | 'aceptada' | 'denegada';
+  resolutionType?: 'envio_repuesto' | 'encargar_taller' | 'rechazo_tecnico' | string;
+  motorcycleBrand: string;
+  motorcycleModel: string;
+  motorcyclePlate?: string;
+  motorcycleVin?: string;
+  clientName: string;
+  clientIdNumber?: string;
+  garanteId?: string;
+  garanteName: string;
+  garanteCompany: string;
+  garanteNotes: string;
+  rejectionReason?: string;
+  data?: any;
+  createdAt: string;
+  updatedAt?: string;
 }
 

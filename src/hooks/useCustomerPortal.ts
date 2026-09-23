@@ -397,26 +397,32 @@ const INITIAL_WARRANTIES: WarrantyItem[] = [
   },
 ];
 
-// Lista de secciones válidas en el portal
+// Lista de secciones válidas en el portal (en orden estricto de usuario)
 export const VALID_SECTIONS: ActiveSection[] = [
-  'eventos',
-  'agendar_cita',
   'perfil',
+  'orden_activa',
+  'agendar_cita',
+  'eventos',
+  'historial',
+  // Secciones heredadas para compatibilidad con redirección
   'mi_moto',
   'mantenimientos',
-  'orden_activa',
-  'historial',
   'garantias',
 ];
 
 // Obtener sección desde el hash de la URL
 const getSectionFromHash = (): ActiveSection => {
-  if (typeof window === 'undefined') return 'eventos';
+  if (typeof window === 'undefined') return 'perfil';
   const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
+  // Redirecciones de módulos retirados hacia sus nuevas ubicaciones
+  if (cleanHash === 'mi_moto') return 'perfil';
+  if (cleanHash === 'mantenimientos') return 'agendar_cita';
+  if (cleanHash === 'garantias') return 'historial';
+
   if (VALID_SECTIONS.includes(cleanHash as ActiveSection)) {
     return cleanHash as ActiveSection;
   }
-  return 'eventos';
+  return 'perfil';
 };
 
 // Detección de entorno móvil / PWA
@@ -981,9 +987,9 @@ export function useCustomerPortal() {
       window.history.replaceState({ section: initialSection }, '', `#${initialSection}`);
     }
 
-    // En móvil, si arranca en 'eventos', agregar guard para interceptar el botón atrás
-    if (isMobile && initialSection === 'eventos') {
-      window.history.pushState({ section: 'eventos', isGuard: true }, '', '#eventos');
+    // En móvil, si arranca en 'perfil', agregar guard para interceptar el botón atrás
+    if (isMobile && initialSection === 'perfil') {
+      window.history.pushState({ section: 'perfil', isGuard: true }, '', '#perfil');
     }
 
     const handlePopState = () => {
@@ -1005,8 +1011,8 @@ export function useCustomerPortal() {
 
       const targetFromHash = getSectionFromHash();
 
-      // 3. En móvil: si ya estamos en la raíz ('eventos') y el usuario presiona Atrás
-      if (isMobile && activeSectionRef.current === 'eventos' && targetFromHash === 'eventos') {
+      // 3. En móvil: si ya estamos en la raíz ('perfil') y el usuario presiona Atrás
+      if (isMobile && activeSectionRef.current === 'perfil' && targetFromHash === 'perfil') {
         const now = Date.now();
         if (now - lastBackPressRef.current < 2000) {
           // Doble toque dentro de 2 segundos: permitir salida
@@ -1016,7 +1022,7 @@ export function useCustomerPortal() {
           // Primer toque: advertir al usuario y re-armar el guard
           lastBackPressRef.current = now;
           showToast('Presione atrás nuevamente para salir', 'info');
-          window.history.pushState({ section: 'eventos', isGuard: true }, '', '#eventos');
+          window.history.pushState({ section: 'perfil', isGuard: true }, '', '#perfil');
         }
         return;
       }
@@ -1170,7 +1176,7 @@ export function useCustomerPortal() {
   const logout = useCallback(() => {
     setIsAuthenticated(false);
     localStorage.removeItem('starmotos_auth');
-    setActiveSection('eventos', true);
+    setActiveSection('perfil', true);
   }, [setActiveSection]);
 
   // Actualizar perfil

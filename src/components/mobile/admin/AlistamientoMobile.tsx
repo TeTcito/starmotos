@@ -16,6 +16,7 @@ import {
   MaintenanceType,
 } from '../../../types/customer';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
+import { getRegisteredBrands } from '../../../data/mockMultiRoleData';
 
 interface Props {
   client: AlistamientoClient;
@@ -172,12 +173,18 @@ export const AlistamientoMobile: React.FC<Props> = ({
                 <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Marca</label>
                 <input
                   type="text"
+                  list="registered-brands-datalist"
                   value={motorcycle.brand}
                   onChange={(e) => setMotorcycle({ ...motorcycle, brand: e.target.value })}
                   placeholder="Ej: Benelli, CFMOTO..."
                   className="w-full px-3 py-1.5 text-xs font-bold bg-zinc-50 border border-zinc-300 rounded-lg"
                   required
                 />
+                <datalist id="registered-brands-datalist">
+                  {getRegisteredBrands().map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
               </div>
 
               <div>

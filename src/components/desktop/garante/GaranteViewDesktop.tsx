@@ -164,6 +164,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
           <div className="flex items-center gap-3.5 shrink-0">
             <NotificationsPopover
               role="garante"
+              brand={profile.companyName}
+              brandsRepresented={profile.brandsRepresented}
               alerts={alerts}
               warranties={warranties}
               onViewAll={() => setActiveSection('alertas_garante')}

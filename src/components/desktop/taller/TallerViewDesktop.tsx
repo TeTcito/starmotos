@@ -56,7 +56,7 @@ interface Props {
   onSaveFullAlistamiento: (record: AlistamientoFullRecord) => void;
   newWarrantyForm: any;
   setNewWarrantyForm: React.Dispatch<React.SetStateAction<any>>;
-  onCreateWarrantyRequest: () => boolean;
+  onCreateWarrantyRequest: (directReq?: WarrantyRequest) => boolean;
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
@@ -204,6 +204,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
 
             <NotificationsPopover
               role="taller"
+              workshopId={currentWs.id}
               alerts={alerts}
               warranties={warranties}
               orders={orders}

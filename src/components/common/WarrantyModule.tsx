@@ -35,13 +35,18 @@ import {
   Package,
   Play,
   Film,
+  Video,
+  RefreshCw,
+  RotateCcw,
+  Image as ImageIcon,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
 import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes } from '../../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
-import { compressImageBase64 } from '../../utils/imageCompressor';
+import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
+import { uploadWarrantyMedia } from '../../services/mediaStorage';
 
 // =========================================================================
 // 1. HELPERS DE ESTADO Y CANONIZACIÓN
@@ -244,14 +249,24 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
       </div>
 
       {/* Pie de la Tarjeta Cuadrada */}
-      <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
+      <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
         <div>
           <span className="text-[10px] uppercase font-bold text-zinc-400 block">
-            {warranty.totalBudget && warranty.totalBudget > 0 ? 'Presupuesto Aprobado' : 'Costo Reclamado'}
+            {warranty.totalBudget && warranty.totalBudget > 0 ? 'Presupuesto Aprobado' : 'Presupuesto'}
           </span>
-          <span className="text-xs font-black font-mono text-zinc-900">
-            ${((warranty.totalBudget && warranty.totalBudget > 0) ? warranty.totalBudget : (warranty.estimatedCost || 60)).toFixed(2)} USD
-          </span>
+          {warranty.totalBudget && warranty.totalBudget > 0 ? (
+            <span className="text-xs font-black font-mono text-emerald-700">
+              ${warranty.totalBudget.toFixed(2)} USD
+            </span>
+          ) : (warranty.estimatedCost && warranty.estimatedCost > 0) ? (
+            <span className="text-xs font-black font-mono text-zinc-900">
+              ${warranty.estimatedCost.toFixed(2)} USD
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              Pendiente Matriz
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -319,9 +334,32 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     setCurrentWarranty(warranty);
     setEditFormData(warranty);
     setGaranteSelectedResolution(warranty.resolutionType || null);
+
+    let pbMap: Record<string, number> = {};
+    if (warranty.partsBudget) {
+      if (Array.isArray(warranty.partsBudget)) {
+        pbMap = warranty.partsBudget.reduce((acc, item) => {
+          acc[item.name] = item.cost;
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        pbMap = { ...(warranty.partsBudget as Record<string, number>) };
+      }
+    }
+    setPartsBudgetMap(pbMap);
+    setLaborTime(warranty.laborTime || '1 hora');
+    setLaborCost(warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0);
   }, [warranty]);
 
   const statusInfo = getWarrantyStatusInfo(currentWarranty.status);
+
+  // Bloqueo total si la garantía ya fue aceptada, aprobada, denegada o completada
+  const isLocked = useMemo(() => {
+    return (
+      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(currentWarranty.status) ||
+      ['aceptada', 'denegada'].includes(statusInfo.canonical)
+    );
+  }, [currentWarranty.status, statusInfo.canonical]);
 
   // Estados locales para notas de revisión
   const [matrizInputNotes, setMatrizInputNotes] = useState(
@@ -350,7 +388,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     return currentWarranty.partsBudget as Record<string, number>;
   });
   const [laborTime, setLaborTime] = useState<string>(currentWarranty.laborTime || '1 hora');
-  const [laborCost, setLaborCost] = useState<number>(currentWarranty.laborCost || 0);
+  const [laborCost, setLaborCost] = useState<number>(currentWarranty.laborCost !== undefined ? Number(currentWarranty.laborCost) : 0);
 
   const parsedPartsList = useMemo(() => {
     if (currentWarranty.partsTags && currentWarranty.partsTags.length > 0) {
@@ -369,6 +407,51 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
   const partsTotal = Object.values(partsBudgetMap).reduce((sum, val) => sum + (Number(val) || 0), 0);
   const grandTotalBudget = partsTotal + (Number(laborCost) || 0);
+
+  // Determinar si el administrador ha modificado algún valor del presupuesto respecto a lo guardado
+  const isBudgetModified = useMemo(() => {
+    const origLaborTime = currentWarranty.laborTime || '1 hora';
+    const origLaborCost = currentWarranty.laborCost !== undefined ? Number(currentWarranty.laborCost) : 0;
+    let origMap: Record<string, number> = {};
+    if (currentWarranty.partsBudget) {
+      if (Array.isArray(currentWarranty.partsBudget)) {
+        origMap = currentWarranty.partsBudget.reduce((acc, item) => {
+          acc[item.name] = item.cost;
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        origMap = currentWarranty.partsBudget as Record<string, number>;
+      }
+    }
+
+    if (laborTime !== origLaborTime) return true;
+    if (Math.abs((Number(laborCost) || 0) - origLaborCost) > 0.001) return true;
+
+    for (const part of parsedPartsList) {
+      const origVal = Number(origMap[part] || 0);
+      const curVal = Number(partsBudgetMap[part] || 0);
+      if (Math.abs(origVal - curVal) > 0.001) return true;
+    }
+    return false;
+  }, [currentWarranty, laborTime, laborCost, partsBudgetMap, parsedPartsList]);
+
+  // Cancelar cambios de presupuesto y restaurar valores guardados
+  const handleCancelBudget = () => {
+    let origMap: Record<string, number> = {};
+    if (currentWarranty.partsBudget) {
+      if (Array.isArray(currentWarranty.partsBudget)) {
+        origMap = currentWarranty.partsBudget.reduce((acc, item) => {
+          acc[item.name] = item.cost;
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        origMap = { ...(currentWarranty.partsBudget as Record<string, number>) };
+      }
+    }
+    setPartsBudgetMap(origMap);
+    setLaborTime(currentWarranty.laborTime || '1 hora');
+    setLaborCost(currentWarranty.laborCost !== undefined ? Number(currentWarranty.laborCost) : 0);
+  };
 
   const handleSaveBudget = () => {
     const updated: WarrantyRequest = {
@@ -560,7 +643,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {viewerRole === 'admin' && (
+          {viewerRole === 'admin' && !isLocked && (
             <button
               type="button"
               onClick={() => {
@@ -1103,6 +1186,23 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Tipo de Cobertura / Póliza</label>
+                <div className="h-11 sm:h-12 px-4 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm font-bold text-blue-800 uppercase flex items-center">
+                  Garantía Oficial de Marca
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca Garantía</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={currentWarranty.targetBrand || currentWarranty.garanteName || currentWarranty.motorcycleBrand || 'Garante Oficial'}
+                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Taller de Origen</label>
                 <input
                   type="text"
@@ -1110,17 +1210,6 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   value={currentWarranty.tallerOrigin}
                   className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-800 cursor-not-allowed outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Tipo de Póliza</label>
-                <div className="h-11 sm:h-12 px-4 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm font-bold text-blue-800 uppercase flex items-center">
-                  {currentWarranty.warrantyType === 'marca'
-                    ? `Garantía Oficial de Marca ${currentWarranty.motorcycleBrand ? `(${currentWarranty.motorcycleBrand})` : ''}`
-                    : currentWarranty.warrantyType === 'plus_taller'
-                    ? 'Garantía Plus StarMotos'
-                    : 'GPS Satelital'}
-                </div>
               </div>
             </div>
           </div>
@@ -1135,14 +1224,25 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <span>2. Motocicleta Registrada</span>
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca y Modelo</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`${currentWarranty.motorcycleBrand} ${currentWarranty.motorcycleModel}`}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={currentWarranty.motorcycleBrand}
+                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Modelo</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={currentWarranty.motorcycleModel}
+                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1255,104 +1355,107 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 )}
               </div>
 
-              {/* Donde estaba el presupuesto: 2 bloques resumidos (Encargar al taller / Envío de repuesto) */}
-              <div className="space-y-2 pt-1 border-t border-zinc-100">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs sm:text-sm font-bold text-zinc-700">
-                    Modalidad de Resolución <span className="text-red-500">*</span>
-                  </label>
-                  {garanteSelectedResolution && (
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                      Seleccionada
-                    </span>
-                  )}
-                </div>
-
-                {viewerRole === 'taller' ? (
-                  <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                      Estado de Resolución
-                    </span>
-                    {currentWarranty.resolutionType === 'encargar_taller' ? (
-                      <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
-                        <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
-                      </div>
-                    ) : currentWarranty.resolutionType === 'envio_repuesto' ? (
-                      <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-                        <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
-                        <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                        <span>Pendiente de dictamen técnico del Garante de Marca</span>
-                      </div>
+              {/* Donde estaba el presupuesto: Modalidad de Resolución SOLO para Garante y Taller (Oculto en Matriz Central) */}
+              {viewerRole !== 'admin' && (
+                <div className="space-y-2 pt-1 border-t border-zinc-100">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs sm:text-sm font-bold text-zinc-700">
+                      Modalidad de Resolución <span className="text-red-500">*</span>
+                    </label>
+                    {garanteSelectedResolution && (
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        Seleccionada
+                      </span>
                     )}
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setGaranteSelectedResolution('encargar_taller')}
-                      className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        garanteSelectedResolution === 'encargar_taller'
-                          ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
-                          : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                          <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
-                        </div>
-                        {garanteSelectedResolution === 'encargar_taller' && (
-                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                            <Check className="w-2.5 h-2.5" />
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-zinc-500 leading-tight">
-                        El taller ejecuta el trabajo y factura repuestos / mano de obra.
-                      </p>
-                    </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setGaranteSelectedResolution('envio_repuesto')}
-                      className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        garanteSelectedResolution === 'envio_repuesto'
-                          ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
-                          : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
+                  {viewerRole === 'taller' || isLocked ? (
+                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                        Estado de Resolución
+                      </span>
+                      {currentWarranty.resolutionType === 'encargar_taller' ? (
+                        <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                          <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
                         </div>
-                        {garanteSelectedResolution === 'envio_repuesto' && (
-                          <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                            <Check className="w-2.5 h-2.5" />
+                      ) : currentWarranty.resolutionType === 'envio_repuesto' ? (
+                        <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                          <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
+                          <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
+                          <span>Pendiente de dictamen técnico del Garante de Marca</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setGaranteSelectedResolution('encargar_taller')}
+                        className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          garanteSelectedResolution === 'encargar_taller'
+                            ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
+                            : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
                           </div>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-zinc-500 leading-tight">
-                        Fábrica o Marca despacha directamente las piezas sin costo.
-                      </p>
-                    </button>
-                  </div>
-                )}
-              </div>
+                          {garanteSelectedResolution === 'encargar_taller' && (
+                            <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-tight">
+                          El taller ejecuta el trabajo y factura repuestos / mano de obra.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setGaranteSelectedResolution('envio_repuesto')}
+                        className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          garanteSelectedResolution === 'envio_repuesto'
+                            ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
+                            : 'border-zinc-200 bg-zinc-50 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
+                          </div>
+                          {garanteSelectedResolution === 'envio_repuesto' && (
+                            <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                              <Check className="w-2.5 h-2.5" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-tight">
+                          Fábrica o Marca despacha directamente las piezas sin costo.
+                        </p>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* SECCIÓN DE PRESUPUESTO OFICIAL (SE ACTIVA AL SELECCIONAR 'Encargar al taller') */}
-      {(viewerRole === 'admin' || viewerRole === 'garante') &&
-        (garanteSelectedResolution === 'encargar_taller' || currentWarranty.resolutionType === 'encargar_taller') &&
-        !isEditing && (
+      {/* SECCIÓN DE PRESUPUESTO OFICIAL (SIEMPRE VISIBLE EN MATRIZ; EN GARANTE/TALLER SOLO SI ENCARGAR AL TALLER) */}
+      {!isEditing &&
+        (viewerRole === 'admin' ||
+          ((viewerRole === 'garante' || viewerRole === 'taller') &&
+            (garanteSelectedResolution === 'encargar_taller' || currentWarranty.resolutionType === 'encargar_taller'))) && (
         <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
           {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
           {currentWarranty.garanteNotes && (
@@ -1403,20 +1506,28 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                   <span>Presupuesto de Repuestos & Mano de Obra (Taller)</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black border border-indigo-200">
-                    Encargado al Taller
+                    {viewerRole === 'admin' ? 'Editable Matriz Central' : 'Visualización Oficial'}
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-500">
-                  Valores unitarios en dólares ($ USD) para repuestos solicitados y costo/demora de mano de obra.
+                  {viewerRole === 'admin' && !isLocked
+                    ? 'Ingrese los valores unitarios en dólares ($ USD) y la mano de obra autorizada.'
+                    : 'Ficha oficial de costos autorizados para repuestos y mano de obra.'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-zinc-500">Total Liquidación:</span>
-              <span className="text-lg font-black font-mono text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
-                ${grandTotalBudget.toFixed(2)} USD
-              </span>
+              {grandTotalBudget > 0 ? (
+                <span className="text-lg font-black font-mono text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                  ${grandTotalBudget.toFixed(2)} USD
+                </span>
+              ) : (
+                <span className="text-xs font-black uppercase text-amber-700 bg-amber-50 px-3 py-1 rounded-xl border border-amber-200">
+                  Pendiente de Presupuesto (Matriz)
+                </span>
+              )}
             </div>
           </div>
 
@@ -1456,22 +1567,32 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                       </div>
 
                       <div className="relative w-28 shrink-0">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            setPartsBudgetMap((prev) => ({
-                              ...prev,
-                              [part]: val,
-                            }));
-                          }}
-                          className="w-full h-8 pl-5 pr-2 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
-                        />
+                        {viewerRole === 'admin' && !isLocked ? (
+                          <>
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setPartsBudgetMap((prev) => ({
+                                  ...prev,
+                                  [part]: val,
+                                }));
+                              }}
+                              className="w-full h-8 pl-5 pr-2 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
+                            />
+                          </>
+                        ) : (
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded-md">
+                              ${(Number(partsBudgetMap[part]) || 0).toFixed(2)} USD
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1485,49 +1606,71 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 2. Mano de Obra
               </label>
 
-              <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
-                {/* Arriba: Las horas / tiempo estimado de demora */}
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-600 mb-2">
-                    Tiempo Estimado de Demora (Clic Rápido):
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {QUICK_LABOR_TIMES.map((timeOption) => (
-                      <button
-                        key={timeOption}
-                        type="button"
-                        onClick={() => setLaborTime(timeOption)}
-                        className={`px-2 py-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
-                          laborTime === timeOption
-                            ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200'
-                            : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
-                        }`}
-                      >
-                        {timeOption}
-                      </button>
-                    ))}
+              {viewerRole === 'admin' && !isLocked ? (
+                <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
+                  {/* Arriba: Las horas / tiempo estimado de demora */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-2">
+                      Tiempo Estimado de Demora (Clic Rápido):
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {QUICK_LABOR_TIMES.map((timeOption) => (
+                        <button
+                          key={timeOption}
+                          type="button"
+                          onClick={() => setLaborTime(timeOption)}
+                          className={`px-2 py-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
+                            laborTime === timeOption
+                              ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-200'
+                              : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {timeOption}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Abajo: Poner el precio */}
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
-                    Valor Mano de Obra ($ USD):
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={laborCost !== undefined ? laborCost : ''}
-                      onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
-                      className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none"
-                    />
+                  {/* Abajo: Poner el precio */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-600 mb-1.5">
+                      Valor Mano de Obra ($ USD):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={laborCost !== undefined ? laborCost : ''}
+                        onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
+                        className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Modo puramente visual para Garante de Marca o garantía bloqueada */
+                <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
+                  <div>
+                    <span className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
+                      Tiempo Estimado de Demora:
+                    </span>
+                    <span className="inline-block px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs rounded-xl">
+                      {laborTime || '1 hora'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
+                      Valor Mano de Obra Autorizado:
+                    </span>
+                    <span className="font-mono font-black text-base text-zinc-900 bg-white px-3 py-1.5 rounded-xl border border-zinc-200 inline-block">
+                      ${(Number(laborCost) || 0).toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* APARTADO 3: RESUMEN DE COMPRA */}
@@ -1563,7 +1706,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
                   <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 flex items-center justify-between">
                     <span className="text-zinc-600 font-medium">Costo por Mantenimiento:</span>
-                    <span className="font-mono font-bold text-zinc-900">${laborCost.toFixed(2)} USD</span>
+                    <span className="font-mono font-bold text-zinc-900">${Number(laborCost || 0).toFixed(2)} USD</span>
                   </div>
 
                   <div className="p-3 bg-emerald-50 rounded-xl border-2 border-emerald-400 flex items-center justify-between">
@@ -1573,21 +1716,39 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                       </span>
                       <span className="text-[10px] text-emerald-700 font-medium">Liquidación Autorizada</span>
                     </div>
-                    <span className="text-xl font-black font-mono text-emerald-700">
-                      ${grandTotalBudget.toFixed(2)} USD
-                    </span>
+                    {grandTotalBudget > 0 ? (
+                      <span className="text-xl font-black font-mono text-emerald-700">
+                        ${grandTotalBudget.toFixed(2)} USD
+                      </span>
+                    ) : (
+                      <span className="text-xs font-black uppercase text-amber-700 bg-amber-100/60 px-2.5 py-1 rounded-lg border border-amber-300">
+                        Pendiente Matriz
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Botón de Guardar Presupuesto */}
-                <button
-                  type="button"
-                  onClick={handleSaveBudget}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Guardar Presupuesto Oficial</span>
-                </button>
+                {/* Botones de Presupuesto en Matriz: Solo se muestran si el Administrador modificó los valores */}
+                {viewerRole === 'admin' && !isLocked && isBudgetModified && (
+                  <div className="flex items-center gap-2 pt-1 animate-slide-in">
+                    <button
+                      type="button"
+                      onClick={handleCancelBudget}
+                      className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Cancelar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveBudget}
+                      className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Guardar Presupuesto Oficial</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1964,36 +2125,65 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   onCancel,
   onSubmit,
   clients = [],
-  defaultTallerOrigin = 'StarMotos Express Quevedo',
-  defaultTallerOriginId = 'taller-quevedo',
+  defaultTallerOrigin = 'StarMotos Taller Oficial',
+  defaultTallerOriginId = 'matriz-la-mana',
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+
+  useEffect(() => {
+    const handleGarantesUpdated = () => {
+      setRegisteredBrands(getRegisteredBrands());
+    };
+    window.addEventListener('starmotos_garantes_updated', handleGarantesUpdated);
+    return () => {
+      window.removeEventListener('starmotos_garantes_updated', handleGarantesUpdated);
+    };
+  }, []);
 
   const [formData, setFormData] = useState({
     clientName: '',
     clientIdNumber: '',
     clientPhone: '',
-    motorcycleBrand: 'Benelli',
-    motorcycleModel: 'TRK 502X ABS',
+    targetBrand: '',
+    motorcycleBrand: '',
+    motorcycleModel: '',
     motorcyclePlate: '',
     motorcycleVin: '',
     motorNumber: '',
     ramvNumber: '',
-    motorcycleMileage: 12000,
-    warrantyType: 'marca' as 'marca' | 'plus_taller' | 'gps',
+    motorcycleMileage: '' as any,
+    warrantyType: 'marca' as const,
     issueDescription: '',
     partsRequired: '',
     resolutionType: undefined as 'encargar_taller' | 'envio_repuesto' | undefined,
-    photos: [] as string[],
   });
+
+  // 5 slots de fotos obligatorias y 2 slots de videos obligatorios
+  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null]);
+  const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
+  const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<string | null>(null);
+
+  const activeSlotRef = useRef<{ type: 'photo' | 'video'; index: number } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const PHOTO_SLOT_GUIDES = [
+    { title: 'Foto 1: Vista General', desc: 'Fotografía panorámica lateral completa de la motocicleta.' },
+    { title: 'Foto 2: Serie / Chasis (VIN)', desc: 'Foto nítida del número de chasis grabado en el chasis o cabezote.' },
+    { title: 'Foto 3: Odómetro / Tacómetro', desc: 'Foto clara del tablero digital o análogo mostrando el kilometraje.' },
+    { title: 'Foto 4: Pieza Averiada', desc: 'Primer plano del componente averiado o zona del desperfecto.' },
+    { title: 'Foto 5: Ángulo Complementario', desc: 'Evidencia adicional, número de serie de repuesto o vista opuesta.' },
+  ];
+
+  const VIDEO_SLOT_GUIDES = [
+    { title: 'Video 1: Demostración de Falla', desc: 'Grabación clara en funcionamiento mostrando el ruido, fuga o falla.' },
+    { title: 'Video 2: Inspección Funcional', desc: 'Verificación del encendido, aceleración o respuesta del sistema.' },
+  ];
 
   const [partTagInput, setPartTagInput] = useState('');
   const [partsTags, setPartsTags] = useState<string[]>([]);
-
   const [searchStatus, setSearchStatus] = useState<{ type: 'success' | 'warning'; message: string } | null>(null);
-  const [urlInput, setUrlInput] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [previewZoomImage, setPreviewZoomImage] = useState<string | null>(null);
 
   const handleAddPartTag = () => {
     const trimmed = partTagInput.trim();
@@ -2035,7 +2225,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       const clientName = foundClient?.fullName || (foundAlist ? `${foundAlist.nombres} ${foundAlist.apellidos}`.trim() : '');
       const clientIdNumber = foundClient?.idNumber || foundAlist?.cedulaRuc || '';
       const clientPhone = foundClient?.phone || foundAlist?.celular1 || '';
-      const motorcycleBrand = foundClient?.motorcycleBrand || (foundAlist?.modeloMarca ? foundAlist.modeloMarca.split(' ')[0] : 'Benelli');
+      const motorcycleBrand = foundClient?.motorcycleBrand || (foundAlist?.modeloMarca ? foundAlist.modeloMarca.split(' ')[0] : '');
       const motorcycleModel = foundClient?.motorcycleModel || foundAlist?.modeloMarca || '';
       const motorcyclePlate = (foundClient?.motorcyclePlate || foundAlist?.placa || '').toUpperCase();
       const motorcycleVin = foundClient?.motorcycleVin || foundAlist?.chasis || '';
@@ -2043,7 +2233,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       const ramvNumber = (foundAlist?.ramv || foundClient?.ramvNumber || '').toUpperCase();
       const motorcycleMileage = foundClient?.motorcycleMileage !== undefined
         ? foundClient.motorcycleMileage
-        : (foundAlist?.kilometraje !== undefined ? foundAlist.kilometraje : 1000);
+        : (foundAlist?.kilometraje !== undefined ? foundAlist.kilometraje : '');
 
       setFormData((prev) => ({
         ...prev,
@@ -2056,7 +2246,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         motorcycleVin: motorcycleVin || prev.motorcycleVin,
         motorNumber: motorNumber || prev.motorNumber,
         ramvNumber: ramvNumber || prev.ramvNumber,
-        motorcycleMileage: motorcycleMileage !== undefined ? motorcycleMileage : prev.motorcycleMileage,
+        motorcycleMileage: motorcycleMileage !== undefined && motorcycleMileage !== '' ? motorcycleMileage : prev.motorcycleMileage,
       }));
       setSearchStatus({
         type: 'success',
@@ -2065,85 +2255,219 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     } else {
       setSearchStatus({
         type: 'warning',
-        message: 'No encontrado en registro. Puede ingresar los datos manualmente.',
+        message: 'No encontrado en registro. Ingrese los datos manualmente.',
       });
     }
   };
 
-  // Carga de imágenes desde archivos locales (comprimidas)
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
-      const compressed = await compressImageBase64(file);
-      if (compressed) {
-        setFormData((prev) => ({
-          ...prev,
-          photos: [...prev.photos, compressed],
-        }));
-      }
-    }
-    e.target.value = '';
-  };
-
-  // Drag & drop de imágenes (comprimidas)
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
-
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
-      const compressed = await compressImageBase64(file);
-      if (compressed) {
-        setFormData((prev) => ({
-          ...prev,
-          photos: [...prev.photos, compressed],
-        }));
-      }
+  // Disparadores de carga por slot
+  const handleTriggerPhotoUpload = (index: number) => {
+    activeSlotRef.current = { type: 'photo', index };
+    if (photoInputRef.current) {
+      photoInputRef.current.value = '';
+      photoInputRef.current.click();
     }
   };
 
-  // Pegar imágenes con Ctrl + V (comprimidas)
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          const compressed = await compressImageBase64(file);
-          if (compressed) {
-            setFormData((prev) => ({
-              ...prev,
-              photos: [...prev.photos, compressed],
-            }));
-          }
+  const handleTriggerVideoUpload = (index: number) => {
+    activeSlotRef.current = { type: 'video', index };
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+      videoInputRef.current.click();
+    }
+  };
+
+  // Procesamiento de selección de archivo de foto (conversión y compresión a WebP + subida a nube)
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const active = activeSlotRef.current;
+    if (!file || !active || active.type !== 'photo') return;
+    setUploadingSlot({ type: 'photo', index: active.index });
+    try {
+      const compressed = await compressImageBase64(file);
+      if (compressed) {
+        setPhotoSlots((prev) => {
+          const next = [...prev];
+          next[active.index] = compressed;
+          return next;
+        });
+
+        // Subir a la nube en segundo plano para obtener URL pública permanente
+        uploadWarrantyMedia(compressed, `foto_${active.index + 1}`)
+          .then((cloudUrl) => {
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              setPhotoSlots((prev) => {
+                const next = [...prev];
+                next[active.index] = cloudUrl;
+                return next;
+              });
+            }
+          })
+          .catch((err) => console.warn('Subida de foto en segundo plano:', err));
+      }
+    } catch (err) {
+      console.error('Error al comprimir foto:', err);
+      alert('Ocurrió un error al comprimir la fotografía.');
+    } finally {
+      setUploadingSlot(null);
+      e.target.value = '';
+    }
+  };
+
+  // Procesamiento de selección de archivo de video (subida directa a Storage + compresión de respaldo)
+  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const active = activeSlotRef.current;
+    if (!file || !active || active.type !== 'video') return;
+    setUploadingSlot({ type: 'video', index: active.index });
+    try {
+      // 1. Previsualización local inmediata
+      const previewUrl = URL.createObjectURL(file);
+      setVideoSlots((prev) => {
+        const next = [...prev];
+        next[active.index] = previewUrl;
+        return next;
+      });
+
+      // 2. Subida directa del archivo binario a Supabase Storage
+      const cloudUrl = await uploadWarrantyMedia(file, `video_${active.index + 1}`);
+      if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+        setVideoSlots((prev) => {
+          const next = [...prev];
+          next[active.index] = cloudUrl;
+          return next;
+        });
+      } else {
+        // Fallback local con compresión ligera
+        const compressed = await compressVideoBase64(file);
+        if (compressed) {
+          setVideoSlots((prev) => {
+            const next = [...prev];
+            next[active.index] = compressed;
+            return next;
+          });
         }
       }
+    } catch (err) {
+      console.error('Error al comprimir video:', err);
+      alert('Ocurrió un error al comprimir el video.');
+    } finally {
+      setUploadingSlot(null);
+      e.target.value = '';
     }
   };
 
-  // Agregar imagen por URL
-  const handleAddImageUrl = () => {
-    if (!urlInput.trim()) return;
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...prev.photos, urlInput.trim()],
-    }));
-    setUrlInput('');
+  // Drag & drop en slots
+  const handleSlotDrop = async (e: React.DragEvent, type: 'photo' | 'video', index: number) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (type === 'photo') {
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor arrastre una imagen válida (JPG, PNG, WEBP).');
+        return;
+      }
+      setUploadingSlot({ type: 'photo', index });
+      try {
+        const compressed = await compressImageBase64(file);
+        if (compressed) {
+          setPhotoSlots((prev) => {
+            const next = [...prev];
+            next[index] = compressed;
+            return next;
+          });
+          uploadWarrantyMedia(compressed, `foto_${index + 1}`).then((cloudUrl) => {
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              setPhotoSlots((prev) => {
+                const next = [...prev];
+                next[index] = cloudUrl;
+                return next;
+              });
+            }
+          }).catch((err) => console.warn(err));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setUploadingSlot(null);
+      }
+    } else {
+      if (!file.type.startsWith('video/')) {
+        alert('Por favor arrastre un video válido (MP4, WEBM, MOV).');
+        return;
+      }
+      setUploadingSlot({ type: 'video', index });
+      try {
+        const previewUrl = URL.createObjectURL(file);
+        setVideoSlots((prev) => {
+          const next = [...prev];
+          next[index] = previewUrl;
+          return next;
+        });
+        const cloudUrl = await uploadWarrantyMedia(file, `video_${index + 1}`);
+        if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+          setVideoSlots((prev) => {
+            const next = [...prev];
+            next[index] = cloudUrl;
+            return next;
+          });
+        } else {
+          const compressed = await compressVideoBase64(file);
+          if (compressed) {
+            setVideoSlots((prev) => {
+              const next = [...prev];
+              next[index] = compressed;
+              return next;
+            });
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setUploadingSlot(null);
+      }
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotoSlots((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setVideoSlots((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.clientName.trim() || !formData.clientIdNumber.trim() || !formData.issueDescription.trim()) {
-      alert('Por favor complete los campos obligatorios del cliente y la falla.');
+    if (uploadingSlot !== null) {
+      alert('Por favor espere a que termine de cargarse el archivo seleccionado antes de emitir la solicitud.');
       return;
     }
+
+    if (!formData.clientName.trim() || !formData.clientIdNumber.trim() || !formData.issueDescription.trim()) {
+      alert('Por favor complete los campos obligatorios del cliente y la descripción del reclamo.');
+      return;
+    }
+
+    if (!formData.targetBrand.trim()) {
+      alert('Por favor seleccione la Marca Garantía registrada.');
+      return;
+    }
+
+    const loadedPhotos = photoSlots.filter(Boolean) as string[];
+    const loadedVideos = videoSlots.filter(Boolean) as string[];
+
+
 
     const newReq: WarrantyRequest = {
       id: `gar-${Date.now()}`,
@@ -2158,25 +2482,20 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       clientPhone: formData.clientPhone.trim(),
       motorcycleBrand: formData.motorcycleBrand.trim(),
       motorcycleModel: formData.motorcycleModel.trim(),
-      motorcyclePlate: formData.motorcyclePlate.trim().toUpperCase(),
+      motorcyclePlate: formData.motorcyclePlate.trim().toUpperCase() || 'SIN PLACA',
       motorcycleVin: formData.motorcycleVin.trim().toUpperCase() || `VIN-${Date.now()}`,
       motorNumber: formData.motorNumber.trim().toUpperCase(),
       ramvNumber: formData.ramvNumber.trim().toUpperCase(),
       motorcycleMileage: Number(formData.motorcycleMileage) || 0,
-      warrantyType: formData.warrantyType,
-      targetBrand: formData.motorcycleBrand.trim(),
-      garanteName: formData.warrantyType === 'marca' ? formData.motorcycleBrand.trim() : undefined,
+      warrantyType: 'marca',
+      targetBrand: formData.targetBrand.trim(),
+      garanteName: formData.targetBrand.trim(),
       issueDescription: formData.issueDescription.trim(),
       partsTags: partsTags.length > 0 ? partsTags : (formData.partsRequired ? [formData.partsRequired] : []),
       partsRequired: partsTags.join(', ') || formData.partsRequired.trim(),
       resolutionType: undefined,
-      diagnosticPhotos:
-        formData.photos.length > 0
-          ? formData.photos
-          : [
-              'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-            ],
-      status: 'en_revision', // Nace En Revisión para Matriz
+      diagnosticPhotos: [...loadedPhotos, ...loadedVideos],
+      status: 'en_revision',
       tallerOrigin: defaultTallerOrigin,
       tallerOriginId: defaultTallerOriginId,
       estimatedCost: 0,
@@ -2189,15 +2508,21 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   return (
     <form
       onSubmit={handleFormSubmit}
-      onPaste={handlePaste}
       className="w-full space-y-6 animate-slide-in"
     >
+      {/* Inputs invisibles para fotos y videos */}
       <input
-        ref={fileInputRef}
+        ref={photoInputRef}
         type="file"
         accept="image/*"
-        multiple
-        onChange={handleFileSelect}
+        onChange={handlePhotoFileChange}
+        className="hidden"
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleVideoFileChange}
         className="hidden"
       />
 
@@ -2297,50 +2622,48 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               />
             </div>
 
+            {/* Tipo de Cobertura / Póliza: Solo Garantía Oficial de Marca sin opciones para elegir */}
             <div>
               <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                Tipo de Cobertura / Póliza <span className="text-red-500">*</span>
+                Tipo de Cobertura / Póliza
               </label>
-              <select
-                value={formData.warrantyType}
-                onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
-                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none cursor-pointer"
-              >
-                <option value="marca">
-                  Garantía Oficial de Marca {formData.motorcycleBrand ? `(${formData.motorcycleBrand})` : ''}
-                </option>
-                <option value="plus_taller">Garantía Plus StarMotos</option>
-                <option value="gps">Garantía Dispositivo GPS Satelital</option>
-              </select>
+              <div className="w-full h-11 sm:h-12 px-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-black text-blue-900">Garantía Oficial de Marca</span>
+                </div>
+                <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
+                  Oficial
+                </span>
+              </div>
             </div>
 
-            {/* Selector de Marca / Garante Responsable sincronizado con la Base de Datos */}
-            {formData.warrantyType === 'marca' && (
-              <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1.5 animate-fade-in">
-                <label className="block text-xs font-black text-purple-950 uppercase tracking-wider">
-                  Marca / Garante con quien es la Garantía <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.motorcycleBrand}
-                  onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                  className="w-full h-10 px-3 bg-white border border-purple-300 focus:border-purple-600 rounded-lg text-xs sm:text-sm font-bold text-purple-900 outline-none cursor-pointer"
-                >
-                  {getRegisteredBrands().map((b) => (
-                    <option key={b} value={b}>
-                      {b} (Garante Oficial Registrado)
-                    </option>
-                  ))}
-                  <option value="OTRA">+ Otra Marca / Garante no listado</option>
-                </select>
-                <p className="text-[10px] text-purple-700 font-medium">
-                  Sincronizado en tiempo real con las marcas y garantes oficiales registrados en la base de datos.
-                </p>
-              </div>
-            )}
+            {/* Marca Garantía: Sincronizada únicamente con marcas y garantes registrados con su Razón Social */}
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                Marca Garantía (Razón Social Registrada) <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.targetBrand}
+                onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none cursor-pointer"
+              >
+                <option value="" disabled>Seleccione la Razón Social de la Marca</option>
+                {registeredBrands.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-zinc-500 mt-1">
+                Razón Social de marcas y garantes oficiales registrados en el sistema.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Columna 2: Vehículo */}
+        {/* Columna 2: Vehículo (Completamente vacío en estado inicial) */}
         <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
           <div className="space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
@@ -2361,11 +2684,11 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   list="registered-brands-datalist"
                   value={formData.motorcycleBrand}
                   onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                  placeholder="Ej: Benelli"
+                  placeholder="Ej: Marca de la moto"
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
                 />
                 <datalist id="registered-brands-datalist">
-                  {getRegisteredBrands().map((b) => (
+                  {registeredBrands.map((b) => (
                     <option key={b} value={b} />
                   ))}
                 </datalist>
@@ -2379,7 +2702,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   required
                   value={formData.motorcycleModel}
                   onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
-                  placeholder="Ej: TRK 502X"
+                  placeholder="Ej: Modelo de la moto"
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
                 />
               </div>
@@ -2392,7 +2715,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   type="text"
                   value={formData.motorcyclePlate}
                   onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
-                  placeholder="PBX-8492"
+                  placeholder="Ej: PBX-8492"
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
                 />
               </div>
@@ -2401,8 +2724,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <input
                   type="number"
                   value={formData.motorcycleMileage}
-                  onChange={(e) => setFormData({ ...formData, motorcycleMileage: Number(e.target.value) })}
-                  placeholder="12000"
+                  onChange={(e) => setFormData({ ...formData, motorcycleMileage: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="Ej: 5000"
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
                 />
               </div>
@@ -2414,7 +2737,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 type="text"
                 value={formData.motorcycleVin}
                 onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
-                placeholder="LBBP57008PA..."
+                placeholder="Ej: LBBP57008PA..."
                 className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
               />
             </div>
@@ -2444,7 +2767,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
           </div>
         </div>
 
-        {/* Columna 3: Reclamo Técnico & Presupuesto */}
+        {/* Columna 3: Reclamo Técnico & Repuestos */}
         <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
           <div className="space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
@@ -2521,8 +2844,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         </div>
       </div>
 
-      {/* Evidencias e Imágenes de la Garantía (1/3 o 1/4 controles a la izq, 2/3 galería fotos a la der) */}
-      <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm space-y-4">
+      {/* Evidencias e Inspección Visual: Fotos y Videos Opcionales */}
+      <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -2530,199 +2853,303 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-black text-zinc-900">
-                Evidencias Fotográficas e Inspección Visual
+                Evidencias Técnicas e Inspección Visual
               </h3>
               <p className="text-xs text-zinc-500">
-                Adjunte fotos del daño, número de chasis, tacómetro y piezas averiadas.
+                Adjunte las evidencias fotográficas y videos que considere necesarios (opcionales, se comprimen automáticamente).
               </p>
             </div>
           </div>
 
-          <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold">
-            {formData.photos.length} imagen{formData.photos.length === 1 ? '' : 'es'} adjunta{formData.photos.length === 1 ? '' : 's'}
-          </span>
-        </div>
-
-        {/* Estructura dividida: 1/3 panel de carga a la izquierda, 2/3 fotos a la derecha */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Panel Izquierdo: Cuadro de Subida (4 cols de 12 ~ 33%) */}
-          <div className="lg:col-span-4 space-y-3">
-            {/* Zona Drag & Drop / Seleccionar */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setIsDragging(false);
-              }}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
-                isDragging
-                  ? 'border-blue-600 bg-blue-50/80 scale-[1.01]'
-                  : 'border-zinc-300 hover:border-blue-400 bg-zinc-50/50 hover:bg-blue-50/20'
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-3 py-1 rounded-lg text-xs font-bold border ${
+                photoSlots.filter(Boolean).length > 0
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-zinc-50 text-zinc-600 border-zinc-200'
               }`}
             >
-              <div className="w-11 h-11 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5">
-                <UploadCloud className="w-5 h-5" />
-              </div>
-              <p className="text-xs sm:text-sm font-bold text-zinc-800">
-                Arrastra imágenes aquí o <span className="text-blue-600 underline">haz clic</span>
-              </p>
-              <p className="text-[11px] text-zinc-500 mt-1">
-                JPG, PNG, WEBP o pega con <kbd className="px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded font-mono text-[10px]">Ctrl+V</kbd>
-              </p>
+              {photoSlots.filter(Boolean).length}/5 Fotos Adjuntas
+            </span>
+            <span
+              className={`px-3 py-1 rounded-lg text-xs font-bold border ${
+                videoSlots.filter(Boolean).length > 0
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+              }`}
+            >
+              {videoSlots.filter(Boolean).length}/2 Videos Adjuntos
+            </span>
+          </div>
+        </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-98"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Subir desde Computador</span>
-              </button>
-            </div>
-
-            {/* Input para agregar imagen por URL directa */}
+        {/* Sección 1: Fotografías de Peritaje */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <LinkIcon className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddImageUrl();
-                    }
-                  }}
-                  placeholder="Pegar URL de imagen directa..."
-                  className="w-full h-10 pl-8 pr-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 outline-none focus:border-blue-500 focus:bg-white"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleAddImageUrl}
-                className="px-3 h-10 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition shrink-0"
-              >
-                + URL
-              </button>
+              <ImageIcon className="w-4 h-4 text-blue-600" />
+              <h4 className="text-xs sm:text-sm font-bold text-zinc-800 uppercase tracking-wider">
+                1. Fotografías de Peritaje (Hasta 5 - Opcionales)
+              </h4>
             </div>
+            <span className="text-[11px] text-zinc-400">Formato WebP optimizado</span>
           </div>
 
-          {/* Panel Derecho: Galería de Imágenes de Evidencia (8 cols de 12 ~ 67%) */}
-          <div className="lg:col-span-8 bg-zinc-50/60 rounded-2xl border border-zinc-200/80 p-4 min-h-[220px]">
-            {formData.photos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[200px] text-center p-4">
-                <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mb-2">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <p className="text-sm font-bold text-zinc-700">
-                  No hay imágenes adjuntadas
-                </p>
-                <p className="text-xs text-zinc-400 max-w-sm mt-1">
-                  Las fotos que suba el jefe de taller como evidencia del reclamo se mostrarán aquí.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {formData.photos.map((p, idx) => {
-                  const isVideo = isVideoUrl(p);
-                  return (
-                    <div
-                      key={idx}
-                      className="group relative aspect-video rounded-xl overflow-hidden border border-zinc-200 bg-zinc-900 shadow-2xs"
-                    >
-                      {isVideo ? (
-                        <div className="w-full h-full relative flex items-center justify-center bg-black">
-                          <video
-                            src={p}
-                            className="w-full h-full object-cover opacity-80"
-                            preload="metadata"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
-                              <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
-                            </div>
-                          </div>
-                          <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
-                            <Film className="w-2.5 h-2.5" /> Video
-                          </span>
-                        </div>
-                      ) : (
-                        <img
-                          src={p}
-                          alt={`Evidencia ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewZoomImage(p);
-                          }}
-                          className="w-8 h-8 bg-white/90 hover:bg-white text-zinc-800 rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                          title="Ampliar evidencia"
-                        >
-                          <ZoomIn className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFormData((prev) => ({
-                              ...prev,
-                              photos: prev.photos.filter((_, i) => i !== idx),
-                            }));
-                          }}
-                          className="w-8 h-8 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition shadow-xs"
-                          title="Eliminar evidencia"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[10px] font-mono font-bold pointer-events-none z-10">
-                        #{idx + 1}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {photoSlots.map((photo, idx) => {
+              const guide = PHOTO_SLOT_GUIDES[idx];
+              const isUploading = uploadingSlot?.type === 'photo' && uploadingSlot?.index === idx;
+
+              return (
+                <div
+                  key={`photo-slot-${idx}`}
+                  className="flex flex-col h-full bg-zinc-50/70 border border-zinc-200 rounded-xl overflow-hidden p-2.5 space-y-2 hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-zinc-700">Foto #{idx + 1}</span>
+                    {photo ? (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-0.5">
+                        <Check className="w-3 h-3" /> Lista
                       </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    ) : (
+                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
+                        Opcional
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Recuadro de carga / vista previa */}
+                  <div
+                    onClick={() => !isUploading && handleTriggerPhotoUpload(idx)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleSlotDrop(e, 'photo', idx)}
+                    className={`relative w-full aspect-video sm:aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
+                      photo
+                        ? 'border-emerald-300 bg-black'
+                        : 'border-zinc-300 hover:border-blue-500 bg-white hover:bg-blue-50/20'
+                    }`}
+                  >
+                    {isUploading ? (
+                      <div className="flex flex-col items-center justify-center p-2 text-center">
+                        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-1.5" />
+                        <span className="text-[10px] font-bold text-blue-600">Comprimiendo WebP...</span>
+                      </div>
+                    ) : photo ? (
+                      <>
+                        <img
+                          src={photo}
+                          alt={guide.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewMedia(photo);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-white/90 hover:bg-white text-zinc-900 flex items-center justify-center transition cursor-pointer shadow-xs"
+                            title="Ampliar foto"
+                          >
+                            <ZoomIn className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTriggerPhotoUpload(idx);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                            title="Reemplazar foto"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemovePhoto(idx);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                            title="Eliminar foto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-2 text-center text-zinc-400 group hover:text-blue-600 transition">
+                        <Camera className="w-6 h-6 mb-1 text-zinc-400" />
+                        <span className="text-[11px] font-bold text-zinc-700">Subir Foto</span>
+                        <span className="text-[9px] text-zinc-400">Clic o arrastrar</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-zinc-500 font-medium leading-tight">
+                    {guide.title.split(': ')[1] || guide.title}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sección 2: Videos Demostrativos */}
+        <div className="space-y-3 pt-3 border-t border-zinc-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Film className="w-4 h-4 text-purple-600" />
+              <h4 className="text-xs sm:text-sm font-bold text-zinc-800 uppercase tracking-wider">
+                2. Videos de Evidencia Dinámica (Hasta 2 - Opcionales)
+              </h4>
+            </div>
+            <span className="text-[11px] text-zinc-400">Compresión WebM ligera (&lt; 35s)</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {videoSlots.map((video, idx) => {
+              const guide = VIDEO_SLOT_GUIDES[idx];
+              const isUploading = uploadingSlot?.type === 'video' && uploadingSlot?.index === idx;
+
+              return (
+                <div
+                  key={`video-slot-${idx}`}
+                  className="flex flex-col bg-purple-50/30 border border-purple-200/80 rounded-xl overflow-hidden p-3 space-y-2 hover:border-purple-400 transition-colors"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-purple-950 flex items-center gap-1.5">
+                      <Film className="w-3.5 h-3.5 text-purple-600" />
+                      {guide.title}
+                    </span>
+                    {video ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Video Cargado
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+                        Opcional
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Recuadro de carga de video */}
+                  <div
+                    onClick={() => !isUploading && handleTriggerVideoUpload(idx)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleSlotDrop(e, 'video', idx)}
+                    className={`relative w-full aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
+                      video
+                        ? 'border-purple-400 bg-black'
+                        : 'border-purple-300 hover:border-purple-600 bg-white hover:bg-purple-50/50'
+                    }`}
+                  >
+                    {isUploading ? (
+                      <div className="flex flex-col items-center justify-center p-3 text-center">
+                        <div className="w-7 h-7 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mb-2" />
+                        <span className="text-xs font-bold text-purple-800">Optimizando y comprimiendo video...</span>
+                        <span className="text-[10px] text-zinc-500 mt-0.5">Adaptando a formato ligero WebM</span>
+                      </div>
+                    ) : video ? (
+                      <>
+                        <video
+                          src={video}
+                          className="w-full h-full object-cover opacity-85"
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-10 h-10 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
+                            <Play className="w-5 h-5 fill-white ml-0.5 text-white" />
+                          </div>
+                        </div>
+                        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewMedia(video);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-white/90 hover:bg-white text-zinc-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                            title="Reproducir video"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Reproducir</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTriggerVideoUpload(idx);
+                            }}
+                            className="p-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-xs"
+                            title="Reemplazar video"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveVideo(idx);
+                            }}
+                            className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition cursor-pointer shadow-xs"
+                            title="Eliminar video"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center p-3 text-center text-purple-400 hover:text-purple-700 transition">
+                        <Film className="w-8 h-8 mb-1.5 text-purple-500" />
+                        <span className="text-xs font-bold text-purple-950">Subir Video #{idx + 1}</span>
+                        <span className="text-[10px] text-zinc-500 mt-0.5">MP4, WEBM, MOV o arrastrar archivo</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-zinc-600 leading-relaxed font-medium">
+                    {guide.desc}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Lightbox Zoom Modal */}
-      {previewZoomImage && (
+      {/* Lightbox / Reproductor Zoom Modal */}
+      {previewMedia && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setPreviewZoomImage(null)}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewMedia(null)}
         >
           <div
-            className="relative max-w-4xl max-h-[90vh] bg-zinc-900 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700"
+            className="relative max-w-4xl max-h-[90vh] bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl border border-zinc-700 flex flex-col items-center justify-center p-2"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
-              onClick={() => setPreviewZoomImage(null)}
-              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-10 text-sm font-bold"
+              onClick={() => setPreviewMedia(null)}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center cursor-pointer transition z-20 text-sm font-bold"
             >
               ✕
             </button>
-            <img
-              src={previewZoomImage}
-              alt="Evidencia ampliada"
-              className="max-h-[85vh] w-auto object-contain mx-auto"
-            />
+            {isVideoUrl(previewMedia) ? (
+              <video
+                src={previewMedia}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[85vh] w-auto max-w-full rounded-xl"
+              />
+            ) : (
+              <img
+                src={previewMedia}
+                alt="Evidencia ampliada"
+                className="max-h-[85vh] w-auto object-contain mx-auto rounded-xl"
+              />
+            )}
           </div>
         </div>
       )}

@@ -20,11 +20,8 @@ import { ActiveSection } from '../SidebarDrawer';
 import { EventsDesktop } from './EventsDesktop';
 import { ScheduleAppointmentDesktop } from './ScheduleAppointmentDesktop';
 import { ProfileDesktop } from './ProfileDesktop';
-import { MotorcycleDesktop } from './MotorcycleDesktop';
-import { MaintenancesDesktop } from './MaintenancesDesktop';
 import { ActiveOrderDesktop } from './ActiveOrderDesktop';
 import { HistoryDesktop } from './HistoryDesktop';
-import { WarrantiesDesktop } from './WarrantiesDesktop';
 import { ModalPortal } from '../common/ModalPortal';
 import { NotificationsPopover } from '../common/NotificationsPopover';
 import {
@@ -85,10 +82,10 @@ export const CustomerViewDesktop: React.FC<Props> = ({
       icon: <User className="w-4 h-4" />,
     },
     {
-      id: 'eventos',
-      label: 'Eventos y Facturas',
-      icon: <Receipt className="w-4 h-4" />,
-      badge: 'Nuevo',
+      id: 'orden_activa',
+      label: 'Orden de Trabajo Activa',
+      icon: <Clock className="w-4 h-4" />,
+      badge: 'En Taller',
     },
     {
       id: 'agendar_cita',
@@ -97,42 +94,27 @@ export const CustomerViewDesktop: React.FC<Props> = ({
       badge: 'Turnos',
     },
     {
-      id: 'mi_moto',
-      label: 'Ficha de mi Moto',
-      icon: <Wrench className="w-4 h-4" />,
-    },
-    {
-      id: 'mantenimientos',
-      label: 'Mantenimientos y Citas',
-      icon: <Calendar className="w-4 h-4" />,
-    },
-    {
-      id: 'orden_activa',
-      label: 'Orden de Trabajo Activa',
-      icon: <Clock className="w-4 h-4" />,
-      badge: 'En Taller',
+      id: 'eventos',
+      label: 'Evento de Facturas',
+      icon: <Receipt className="w-4 h-4" />,
+      badge: 'SRI',
     },
     {
       id: 'historial',
-      label: 'Historial de Servicios',
+      label: 'Historial de Servicios y Garantía de Pólizas',
       icon: <History className="w-4 h-4" />,
-    },
-    {
-      id: 'garantias',
-      label: 'Garantías y Pólizas',
-      icon: <Sparkles className="w-4 h-4" />,
     },
   ];
 
   const sectionTitles: Record<ActiveSection, string> = {
-    eventos: 'Eventos, Mantenimientos y Facturas SRI',
-    agendar_cita: 'Agendar Cita Técnica en Taller',
-    perfil: 'Perfil del Cliente y Facturación',
-    mi_moto: 'Ficha Técnica de mi Motocicleta',
-    mantenimientos: 'Mantenimientos Programados y Citas',
+    perfil: 'Perfil del Cliente',
     orden_activa: 'Orden de Trabajo Activa',
-    historial: 'Historial Completo de Mantenimientos',
-    garantias: 'Garantías y Pólizas Vigentes',
+    agendar_cita: 'Agendar Cita Técnica en Taller',
+    eventos: 'Evento de Facturas, Mantenimientos y SRI',
+    historial: 'Historial de Servicios y Garantía de Pólizas',
+    mi_moto: 'Perfil del Cliente',
+    mantenimientos: 'Agendar Cita Técnica',
+    garantias: 'Historial de Servicios y Garantía de Pólizas',
   };
 
   const handleWhatsAppAdvisor = () => {
@@ -288,29 +270,13 @@ export const CustomerViewDesktop: React.FC<Props> = ({
         {/* CONTENIDO PRINCIPAL: ALINEADO A LA IZQUIERDA Y EXPANDIDO SIMÉTRICAMENTE */}
         <main className="flex-1 overflow-y-auto px-6 lg:px-8 py-6 w-full bg-white">
           <div className="w-full">
-            {activeSection === 'eventos' && (
-              <EventsDesktop
-                history={history}
-                motorcycle={motorcycle}
-                profile={profile}
-              />
-            )}
-
             {activeSection === 'perfil' && (
-              <ProfileDesktop profile={profile} onUpdateProfile={updateProfile} />
-            )}
-
-            {activeSection === 'mi_moto' && (
-              <MotorcycleDesktop motorcycle={motorcycle} onUpdateMotorcycle={updateMotorcycle} />
-            )}
-
-            {activeSection === 'mantenimientos' && (
-              <MaintenancesDesktop
-                scheduledMaintenances={scheduledMaintenances}
-                onScheduleNewMaintenance={addScheduledMaintenance}
+              <ProfileDesktop
+                profile={profile}
+                onUpdateProfile={updateProfile}
                 motorcycle={motorcycle}
+                onUpdateMotorcycle={updateMotorcycle}
                 branches={branches}
-                onNavigateToSchedule={() => setActiveSection('agendar_cita')}
               />
             )}
 
@@ -333,18 +299,44 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                   if (window.history.length > 1) {
                     window.history.back();
                   } else {
-                    setActiveSection('mantenimientos');
+                    setActiveSection('perfil');
                   }
                 }}
               />
             )}
 
-            {activeSection === 'historial' && (
-              <HistoryDesktop history={history} />
+            {activeSection === 'eventos' && (
+              <EventsDesktop
+                history={history}
+                motorcycle={motorcycle}
+                profile={profile}
+              />
             )}
 
-            {activeSection === 'garantias' && (
-              <WarrantiesDesktop warranties={warranties} />
+            {(activeSection === 'historial' || activeSection === 'garantias') && (
+              <HistoryDesktop history={history} warranties={warranties} />
+            )}
+
+            {/* Fallbacks para compatibilidad con rutas guardadas en historial */}
+            {activeSection === 'mi_moto' && (
+              <ProfileDesktop
+                profile={profile}
+                onUpdateProfile={updateProfile}
+                motorcycle={motorcycle}
+                onUpdateMotorcycle={updateMotorcycle}
+                branches={branches}
+              />
+            )}
+
+            {activeSection === 'mantenimientos' && (
+              <ScheduleAppointmentDesktop
+                motorcycle={motorcycle}
+                profile={profile}
+                branches={branches}
+                scheduledMaintenances={scheduledMaintenances}
+                onScheduleNewMaintenance={addScheduledMaintenance}
+                onBack={() => setActiveSection('perfil')}
+              />
             )}
           </div>
         </main>

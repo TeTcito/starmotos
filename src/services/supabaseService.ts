@@ -10,8 +10,10 @@ import {
   Technician,
   GaranteProfile,
   WorkshopManagerAccount,
+  DictamenRecord,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { uploadWarrantyMedia } from './mediaStorage';
 
 let isRealtimeInitialized = false;
 let isSyncing = false;
@@ -21,10 +23,35 @@ let isSyncing = false;
 // =========================================================================
 
 const TOMBSTONES_STORAGE_KEY = 'starmotos_deleted_tombstones_v1';
+const TOMBSTONES_SHARED_STORAGE_KEY = 'starmotos_shared_deleted_tombstones_v1';
+
+// Bus de sincronización inter-pestañas en tiempo real
+export const syncBus = typeof window !== 'undefined' && 'BroadcastChannel' in window
+  ? new BroadcastChannel('starmotos_sync_bus')
+  : null;
+
+if (syncBus) {
+  syncBus.onmessage = (event) => {
+    if (event.data?.type === 'WARRANTY_DELETED' && Array.isArray(event.data.ids)) {
+      addDeletedTombstone(...event.data.ids);
+      const raw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+      if (raw) {
+        try {
+          const current: WarrantyRequest[] = JSON.parse(raw);
+          const filtered = current.filter(
+            (w) => !event.data.ids.includes(w.id) && (!w.requestNumber || !event.data.ids.includes(w.requestNumber))
+          );
+          localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(filtered));
+          window.dispatchEvent(new Event('starmotos_warranties_updated'));
+        } catch (_) {}
+      }
+    }
+  };
+}
 
 export function getDeletedTombstones(): Set<string> {
   try {
-    const raw = localStorage.getItem(TOMBSTONES_STORAGE_KEY);
+    const raw = localStorage.getItem(TOMBSTONES_STORAGE_KEY) || localStorage.getItem(TOMBSTONES_SHARED_STORAGE_KEY);
     if (raw) {
       const list = JSON.parse(raw);
       if (Array.isArray(list)) {
@@ -41,16 +68,37 @@ export function addDeletedTombstone(...ids: (string | undefined | null)[]) {
   try {
     const current = getDeletedTombstones();
     let added = false;
+    const cleanList: string[] = [];
     for (const id of ids) {
       if (!id) continue;
       const clean = String(id).trim();
-      if (clean && !current.has(clean)) {
-        current.add(clean);
-        added = true;
+      if (clean) {
+        cleanList.push(clean);
+        if (!current.has(clean)) {
+          current.add(clean);
+          added = true;
+        }
       }
     }
     if (added) {
-      localStorage.setItem(TOMBSTONES_STORAGE_KEY, JSON.stringify(Array.from(current)));
+      const serialized = JSON.stringify(Array.from(current));
+      localStorage.setItem(TOMBSTONES_STORAGE_KEY, serialized);
+      localStorage.setItem(TOMBSTONES_SHARED_STORAGE_KEY, serialized);
+
+      // Notificar a otras pestañas instantáneamente
+      syncBus?.postMessage({ type: 'WARRANTY_DELETED', ids: cleanList });
+
+      // Persistir en tabla deleted_tombstones de Supabase para toda la red de sedes
+      if (cleanList.length > 0) {
+        const rows = cleanList.map((cleanId) => ({
+          id: cleanId,
+          record_type: 'warranty',
+          created_at: new Date().toISOString(),
+        }));
+        supabase.from('deleted_tombstones').upsert(rows, { onConflict: 'id' }).then(({ error }) => {
+          if (error) console.warn('[Supabase] Warning guardando deleted_tombstones:', error.message);
+        });
+      }
     }
   } catch (e) {
     console.error('Error adding tombstone', e);
@@ -70,7 +118,15 @@ export function removeDeletedTombstone(...ids: (string | undefined | null)[]) {
       }
     }
     if (removed) {
-      localStorage.setItem(TOMBSTONES_STORAGE_KEY, JSON.stringify(Array.from(current)));
+      const serialized = JSON.stringify(Array.from(current));
+      localStorage.setItem(TOMBSTONES_STORAGE_KEY, serialized);
+      localStorage.setItem(TOMBSTONES_SHARED_STORAGE_KEY, serialized);
+      for (const id of ids) {
+        if (id) {
+          const clean = String(id).trim();
+          supabase.from('deleted_tombstones').delete().eq('id', clean).then(() => {});
+        }
+      }
     }
   } catch (e) {
     console.error('Error removing tombstone', e);
@@ -100,6 +156,14 @@ export async function syncAllFromSupabase(): Promise<{
   isSyncing = true;
 
   try {
+    // 0. Sincronizar registros eliminados (tombstones) globales desde Supabase primero
+    try {
+      const { data: cloudTombstones } = await supabase.from('deleted_tombstones').select('id');
+      if (cloudTombstones && Array.isArray(cloudTombstones)) {
+        addDeletedTombstone(...cloudTombstones.map((t) => t.id));
+      }
+    } catch (_) {}
+
     const tombstones = getDeletedTombstones();
 
     // -----------------------------------------------------------------------
@@ -117,25 +181,69 @@ export async function syncAllFromSupabase(): Promise<{
           .map((row) => row.data as WarrantyRequest)
           .filter(Boolean);
 
-        // Filtrar garantías eliminadas (tombstones) y eliminarlas proactivamente de Supabase
+        // Filtrar únicamente garantías explícitamente eliminadas (tombstones)
         const cloudWarranties: WarrantyRequest[] = [];
         for (const w of rawCloudWarranties) {
           if (!w || !w.id) continue;
           const isDeleted =
             tombstones.has(w.id) ||
-            (w.requestNumber && tombstones.has(w.requestNumber)) ||
-            (w.clientIdNumber && tombstones.has(w.clientIdNumber));
+            (w.requestNumber && tombstones.has(w.requestNumber));
 
           if (isDeleted) {
-            cloudDeleteWarranty(w.id);
+            cloudDeleteWarranty(w.id, w.requestNumber);
           } else {
             cloudWarranties.push(w);
           }
         }
 
-        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cloudWarranties));
+        // Fusión bidireccional inteligente: no pisar garantías locales recién emitidas ni resucitar eliminadas
+        const existingLocalRaw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+        let localList: WarrantyRequest[] = [];
+        if (existingLocalRaw) {
+          try {
+            localList = JSON.parse(existingLocalRaw);
+          } catch (_) {}
+        }
+        const cloudIds = new Set(cloudWarranties.map((w) => w.id));
+        const mergedWarranties = [...cloudWarranties];
+        for (const loc of localList) {
+          if (!loc || !loc.id) continue;
+          const isTombstoned =
+            tombstones.has(loc.id) ||
+            (loc.requestNumber && tombstones.has(loc.requestNumber));
+
+          if (isTombstoned) {
+            // Proactivamente asegurar eliminación en la nube y no reincorporar
+            cloudDeleteWarranty(loc.id, loc.requestNumber);
+            continue;
+          }
+
+          if (!cloudIds.has(loc.id)) {
+            mergedWarranties.push(loc);
+            cloudSaveWarranty(loc);
+          }
+        }
+
+        try {
+          localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(mergedWarranties));
+        } catch (quotaErr) {
+          console.warn('LocalStorage lleno al sincronizar garantías desde Supabase:', quotaErr);
+          const safeMerged = mergedWarranties.map((w) => {
+            if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
+            return {
+              ...w,
+              diagnosticPhotos: w.diagnosticPhotos.map((item) =>
+                typeof item === 'string' && item.length > 30000 ? item.slice(0, 500) : item
+              ),
+            };
+          });
+          try {
+            localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(safeMerged));
+          } catch (_) {}
+        }
+
         window.dispatchEvent(new Event('starmotos_warranties_updated'));
-        warrantiesCount = cloudWarranties.length;
+        warrantiesCount = mergedWarranties.length;
       }
     } catch (e) {
       console.warn('Error sincronizando garantías:', e);
@@ -345,6 +453,26 @@ export async function syncAllFromSupabase(): Promise<{
       console.warn('Error sincronizando jefes de taller:', e);
     }
 
+    // -----------------------------------------------------------------------
+    // 10. DICTÁMENES OFICIALES DE GARANTÍA
+    // -----------------------------------------------------------------------
+    try {
+      const { data: dictamenesData, error: dicErr } = await supabase
+        .from('dictamenes')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!dicErr && dictamenesData) {
+        const items: DictamenRecord[] = dictamenesData.map((row) => row.data as DictamenRecord).filter(Boolean);
+        if (items.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.DICTAMENES, JSON.stringify(items));
+          window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error sincronizando dictamenes:', e);
+    }
+
     return {
       warrantiesCount,
       alistamientosCount,
@@ -370,16 +498,41 @@ export async function syncAllFromSupabase(): Promise<{
 
 export async function cloudSaveWarranty(w: WarrantyRequest) {
   try {
-    removeDeletedTombstone(w.id, w.requestNumber, w.clientIdNumber);
+    removeDeletedTombstone(w.id, w.requestNumber);
+
+    // Asegurar que si hay fotos o videos en base64 se suban al Storage y se usen URLs
+    let cleanW = { ...w };
+    if (w.diagnosticPhotos && w.diagnosticPhotos.length > 0) {
+      const hasBase64 = w.diagnosticPhotos.some(
+        (p) => typeof p === 'string' && (p.startsWith('data:') || p.startsWith('blob:'))
+      );
+      if (hasBase64) {
+        const uploaded = await Promise.all(
+          w.diagnosticPhotos.map(async (item, idx) => {
+            if (typeof item === 'string' && (item.startsWith('data:') || item.startsWith('blob:'))) {
+              try {
+                const cloudUrl = await uploadWarrantyMedia(item, `gar_${w.id}_${idx}`);
+                return cloudUrl || item;
+              } catch (_) {
+                return item;
+              }
+            }
+            return item;
+          })
+        );
+        cleanW.diagnosticPhotos = uploaded;
+      }
+    }
+
     const payload = {
-      id: w.id,
-      request_number: w.requestNumber || null,
-      client_name: w.clientName || null,
-      client_id_number: w.clientIdNumber || null,
-      status: w.status || 'en_revision',
-      taller_origin: w.tallerOrigin || 'StarMotos Taller',
-      taller_origin_id: w.tallerOriginId || 'taller-principal',
-      data: w,
+      id: cleanW.id,
+      request_number: cleanW.requestNumber || null,
+      client_name: cleanW.clientName || null,
+      client_id_number: cleanW.clientIdNumber || null,
+      status: cleanW.status || 'en_revision',
+      taller_origin: cleanW.tallerOrigin || 'StarMotos Taller',
+      taller_origin_id: cleanW.tallerOriginId || 'taller-principal',
+      data: cleanW,
       updated_at: new Date().toISOString(),
     };
 
@@ -446,18 +599,24 @@ export async function cloudSaveClient(c: TallerClient) {
 // ELIMINACIONES EN LA NUBE (DEFINITIVAS Y EN CASCADA)
 // =========================================================================
 
-export async function cloudDeleteWarranty(id: string) {
-  if (!id) return;
-  addDeletedTombstone(id);
-  try {
-    const cleanId = id.trim();
-    const { error } = await supabase
-      .from('warranties')
-      .delete()
-      .or(`id.eq.${cleanId},request_number.eq.${cleanId}`);
-    if (error) console.error('[Supabase] Error eliminando garantía:', error);
-  } catch (err) {
-    console.error('[Supabase] Excepción eliminando garantía:', err);
+export async function cloudDeleteWarranty(...identifiers: (string | undefined | null)[]) {
+  const cleanList = identifiers
+    .map((i) => (i ? String(i).trim() : ''))
+    .filter(Boolean);
+  if (cleanList.length === 0) return;
+
+  addDeletedTombstone(...cleanList);
+
+  for (const cleanId of cleanList) {
+    try {
+      await supabase.from('warranties').delete().eq('id', cleanId);
+    } catch (_) {}
+    try {
+      await supabase.from('warranties').delete().eq('request_number', cleanId);
+    } catch (_) {}
+    try {
+      await supabase.from('alerts').delete().eq('related_id', cleanId);
+    } catch (_) {}
   }
 }
 
@@ -683,6 +842,52 @@ export async function cloudDeleteWorkshopManager(id: string) {
   }
 }
 
+export async function cloudSaveDictamen(d: DictamenRecord) {
+  try {
+    const payload = {
+      id: d.id,
+      warranty_id: d.warrantyId,
+      request_number: d.requestNumber || null,
+      decision: d.decision,
+      resolution_type: d.resolutionType || null,
+      motorcycle_brand: d.motorcycleBrand || null,
+      motorcycle_model: d.motorcycleModel || null,
+      motorcycle_plate: d.motorcyclePlate || null,
+      motorcycle_vin: d.motorcycleVin || null,
+      client_name: d.clientName || null,
+      client_id_number: d.clientIdNumber || null,
+      garante_id: d.garanteId || null,
+      garante_name: d.garanteName || null,
+      garante_company: d.garanteCompany || null,
+      garante_notes: d.garanteNotes || null,
+      rejection_reason: d.rejectionReason || null,
+      data: d,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('dictamenes').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('[Supabase] Error guardando dictamen:', error);
+    }
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando dictamen:', err);
+  }
+}
+
+export async function cloudDeleteDictamen(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('dictamenes').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando dictamen:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando dictamen:', err);
+  }
+}
+
+export async function cloudPurgeQuevedoWarranties() {
+  // No-op intencional: las garantías anteriores ya fueron depuradas. No purgar nuevas solicitudes de Quevedo.
+}
+
 // =========================================================================
 // 3. SUSCRIPCIÓN EN TIEMPO REAL (REALTIME BROADCAST MULTI-DISPOSITIVO)
 // =========================================================================
@@ -709,6 +914,30 @@ export function initSupabaseRealtime() {
   // Suscribirse al canal en tiempo real
   const channel = supabase
     .channel('starmotos_global_realtime')
+    // Eliminaciones sincronizadas en tiempo real (Tombstones globales)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'deleted_tombstones' },
+      (payload) => {
+        try {
+          const tombstoneId = (payload.new as any)?.id || (payload.old as any)?.id;
+          if (tombstoneId) {
+            addDeletedTombstone(tombstoneId);
+            const raw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+            if (raw) {
+              const current: WarrantyRequest[] = JSON.parse(raw);
+              const filtered = current.filter(
+                (w) => w.id !== tombstoneId && w.requestNumber !== tombstoneId
+              );
+              localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(filtered));
+              window.dispatchEvent(new Event('starmotos_warranties_updated'));
+            }
+          }
+        } catch (e) {
+          console.error('Error procesando realtime tombstone:', e);
+        }
+      }
+    )
     // Garantías
     .on(
       'postgres_changes',
@@ -723,8 +952,7 @@ export function initSupabaseRealtime() {
             if (
               newDoc &&
               !isDeletedTombstone(newDoc.id) &&
-              !isDeletedTombstone(newDoc.requestNumber) &&
-              !isDeletedTombstone(newDoc.clientIdNumber)
+              (!newDoc.requestNumber || !isDeletedTombstone(newDoc.requestNumber))
             ) {
               if (!current.some((w) => w.id === newDoc.id)) {
                 current = [newDoc, ...current];
@@ -735,8 +963,7 @@ export function initSupabaseRealtime() {
             if (updatedDoc) {
               if (
                 isDeletedTombstone(updatedDoc.id) ||
-                isDeletedTombstone(updatedDoc.requestNumber) ||
-                isDeletedTombstone(updatedDoc.clientIdNumber)
+                (updatedDoc.requestNumber && isDeletedTombstone(updatedDoc.requestNumber))
               ) {
                 current = current.filter((w) => w.id !== updatedDoc.id);
               } else {
@@ -744,12 +971,32 @@ export function initSupabaseRealtime() {
               }
             }
           } else if (payload.eventType === 'DELETE') {
-            const deletedId = payload.old.id;
-            addDeletedTombstone(deletedId);
-            current = current.filter((w) => w.id !== deletedId);
+            const deletedId = (payload.old as any)?.id;
+            const reqNum = (payload.old as any)?.request_number;
+            if (deletedId) addDeletedTombstone(deletedId);
+            if (reqNum) addDeletedTombstone(reqNum);
+            current = current.filter(
+              (w) => (!deletedId || w.id !== deletedId) && (!reqNum || w.requestNumber !== reqNum)
+            );
           }
 
-          localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
+          try {
+            localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
+          } catch (err) {
+            console.warn('Realtime: quota exceeded en localStorage, optimizando:', err);
+            const safeCurrent = current.map((w) => {
+              if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
+              return {
+                ...w,
+                diagnosticPhotos: w.diagnosticPhotos.map((item) =>
+                  typeof item === 'string' && item.length > 30000 ? item.slice(0, 500) : item
+                ),
+              };
+            });
+            try {
+              localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(safeCurrent));
+            } catch (_) {}
+          }
           window.dispatchEvent(new Event('starmotos_warranties_updated'));
         } catch (e) {
           console.error('Error procesando realtime warranties:', e);
@@ -1007,6 +1254,37 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
         } catch (e) {
           console.error('Error procesando realtime workshop managers:', e);
+        }
+      }
+    )
+    // Dictámenes Oficiales de Garantía
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'dictamenes' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.DICTAMENES);
+          let current: DictamenRecord[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as DictamenRecord;
+            if (newDoc && !current.some((d) => d.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as DictamenRecord;
+            if (updatedDoc) {
+              current = current.map((d) => (d.id === updatedDoc.id ? updatedDoc : d));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            current = current.filter((d) => d.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.DICTAMENES, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime dictamenes:', e);
         }
       }
     )

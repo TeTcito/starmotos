@@ -33,13 +33,10 @@ export const ForceChangePasswordModal: React.FC<Props> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Validaciones dinámicas
+  // Validaciones simplificadas: solo mínimo 8 caracteres y confirmación
   const hasMinLength = newPassword.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
-  const isPasswordValid = hasMinLength && hasLetter && hasNumber && hasSpecial && passwordsMatch;
+  const isPasswordValid = hasMinLength && passwordsMatch;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +47,8 @@ export const ForceChangePasswordModal: React.FC<Props> = ({
       return;
     }
 
-    if (!hasMinLength || !hasLetter || !hasNumber || !hasSpecial) {
-      setErrorMessage('La contraseña debe cumplir con todos los requerimientos de seguridad.');
+    if (!hasMinLength) {
+      setErrorMessage('La contraseña debe tener mínimo 8 caracteres.');
       return;
     }
 
@@ -252,41 +249,15 @@ export const ForceChangePasswordModal: React.FC<Props> = ({
 
                 <div
                   className={`flex items-center gap-1.5 ${
-                    hasLetter ? 'text-emerald-700 font-semibold' : 'text-zinc-400'
+                    passwordsMatch ? 'text-emerald-700 font-semibold' : 'text-zinc-400'
                   }`}
                 >
-                  {hasLetter ? (
+                  {passwordsMatch ? (
                     <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   ) : (
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 mx-1 shrink-0" />
                   )}
-                  <span>Al menos una letra</span>
-                </div>
-
-                <div
-                  className={`flex items-center gap-1.5 ${
-                    hasNumber ? 'text-emerald-700 font-semibold' : 'text-zinc-400'
-                  }`}
-                >
-                  {hasNumber ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 mx-1 shrink-0" />
-                  )}
-                  <span>Al menos un número</span>
-                </div>
-
-                <div
-                  className={`flex items-center gap-1.5 ${
-                    hasSpecial ? 'text-emerald-700 font-semibold' : 'text-zinc-400'
-                  }`}
-                >
-                  {hasSpecial ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 mx-1 shrink-0" />
-                  )}
-                  <span>Símbolo (@#$%)</span>
+                  <span>Las claves coinciden</span>
                 </div>
               </div>
             </div>

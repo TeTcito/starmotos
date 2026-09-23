@@ -5,11 +5,8 @@ import { SidebarDrawer, ActiveSection } from '../SidebarDrawer';
 import { EventsMobile } from './EventsMobile';
 import { ScheduleAppointmentMobile } from './ScheduleAppointmentMobile';
 import { ProfileMobile } from './ProfileMobile';
-import { MotorcycleMobile } from './MotorcycleMobile';
-import { MaintenancesMobile } from './MaintenancesMobile';
 import { ActiveOrderMobile } from './ActiveOrderMobile';
 import { HistoryMobile } from './HistoryMobile';
-import { WarrantiesMobile } from './WarrantiesMobile';
 import { FileCheck } from 'lucide-react';
 import { ModalPortal } from '../common/ModalPortal';
 import {
@@ -68,14 +65,14 @@ export const CustomerViewMobile: React.FC<Props> = ({
   approveQuotation,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
-    eventos: 'Eventos y Facturas',
+    perfil: 'Perfil del Cliente',
+    orden_activa: 'Orden de Trabajo Activa',
     agendar_cita: 'Agendar Cita',
-    perfil: 'Perfil',
-    mi_moto: 'Mi Moto',
-    mantenimientos: 'Mantenimientos',
-    orden_activa: 'Orden Activa',
-    historial: 'Historial',
-    garantias: 'Garantías',
+    eventos: 'Evento de Facturas',
+    historial: 'Historial y Garantías',
+    mi_moto: 'Perfil del Cliente',
+    mantenimientos: 'Agendar Cita',
+    garantias: 'Historial y Garantías',
   };
 
   return (
@@ -106,11 +103,21 @@ export const CustomerViewMobile: React.FC<Props> = ({
 
       {/* 3. Contenido Principal Móvil */}
       <main className="max-w-md mx-auto px-4 py-4">
-        {activeSection === 'eventos' && (
-          <EventsMobile
-            history={history}
-            motorcycle={motorcycle}
+        {activeSection === 'perfil' && (
+          <ProfileMobile
             profile={profile}
+            onUpdateProfile={updateProfile}
+            motorcycle={motorcycle}
+            onUpdateMotorcycle={updateMotorcycle}
+            branches={branches}
+          />
+        )}
+
+        {activeSection === 'orden_activa' && (
+          <ActiveOrderMobile
+            activeOrder={activeOrder}
+            motorcycle={motorcycle}
+            onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
           />
         )}
 
@@ -125,44 +132,44 @@ export const CustomerViewMobile: React.FC<Props> = ({
               if (window.history.length > 1) {
                 window.history.back();
               } else {
-                setActiveSection('mantenimientos');
+                setActiveSection('perfil');
               }
             }}
           />
         )}
 
-        {activeSection === 'perfil' && (
-          <ProfileMobile profile={profile} onUpdateProfile={updateProfile} />
+        {activeSection === 'eventos' && (
+          <EventsMobile
+            history={history}
+            motorcycle={motorcycle}
+            profile={profile}
+          />
         )}
 
+        {(activeSection === 'historial' || activeSection === 'garantias') && (
+          <HistoryMobile history={history} warranties={warranties} />
+        )}
+
+        {/* Fallbacks para compatibilidad con rutas guardadas */}
         {activeSection === 'mi_moto' && (
-          <MotorcycleMobile motorcycle={motorcycle} onUpdateMotorcycle={updateMotorcycle} />
+          <ProfileMobile
+            profile={profile}
+            onUpdateProfile={updateProfile}
+            motorcycle={motorcycle}
+            onUpdateMotorcycle={updateMotorcycle}
+            branches={branches}
+          />
         )}
 
         {activeSection === 'mantenimientos' && (
-          <MaintenancesMobile
+          <ScheduleAppointmentMobile
+            motorcycle={motorcycle}
+            profile={profile}
+            branches={branches}
             scheduledMaintenances={scheduledMaintenances}
             onScheduleNewMaintenance={addScheduledMaintenance}
-            motorcycle={motorcycle}
-            branches={branches}
-            onNavigateToSchedule={() => setActiveSection('agendar_cita')}
+            onBack={() => setActiveSection('perfil')}
           />
-        )}
-
-        {activeSection === 'orden_activa' && (
-          <ActiveOrderMobile
-            activeOrder={activeOrder}
-            motorcycle={motorcycle}
-            onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
-          />
-        )}
-
-        {activeSection === 'historial' && (
-          <HistoryMobile history={history} />
-        )}
-
-        {activeSection === 'garantias' && (
-          <WarrantiesMobile warranties={warranties} />
         )}
       </main>
 

@@ -8,11 +8,13 @@ import { TallerPortal } from './TallerPortal';
 import { GarantePortal } from './GarantePortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { initSupabaseRealtime } from './services/supabaseService';
+import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
 
 function App() {
-  // Inicializar sincronización en tiempo real con Supabase
+  // Inicializar sincronización en tiempo real con Supabase y asistente de teclado móvil
   useEffect(() => {
     initSupabaseRealtime();
+    initMobileKeyboardHelper();
   }, []);
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -43,7 +45,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    const logoutRole = role === 'garante' ? 'marca' : role;
+    const logoutRole = role === 'garante' ? 'garantia' : role;
     setIsAuthenticated(false);
     localStorage.removeItem('starmotos_auth');
     localStorage.removeItem('starmotos_role');

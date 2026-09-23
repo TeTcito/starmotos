@@ -1,5 +1,5 @@
 // src/components/mobile/common/NewWarrantyFormMobile.tsx
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   User,
@@ -24,18 +24,25 @@ import {
   Play,
   Film,
   Image as ImageIcon,
+  ShieldCheck,
+  RefreshCw,
+  Video,
 } from 'lucide-react';
 import {
   WarrantyRequest,
   TallerClient,
 } from '../../../types/customer';
 import { getStoredFullAlistamientos, getRegisteredBrands } from '../../../data/mockMultiRoleData';
-import { compressImageBase64 } from '../../../utils/imageCompressor';
+import { compressImageBase64, compressVideoBase64 } from '../../../utils/imageCompressor';
+import { uploadWarrantyMedia } from '../../../services/mediaStorage';
 
 export const isVideoUrl = (url?: string): boolean => {
   if (!url) return false;
   return (
     url.startsWith('data:video/') ||
+    url.includes('/garantias/video_') ||
+    url.includes('/video_') ||
+    url.includes('_video_') ||
     /\.(mp4|webm|ogg|mov|m4v|quicktime)(\?.*)?$/i.test(url)
   );
 };
@@ -55,24 +62,33 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   defaultTallerOrigin = 'StarMotos Sede Matriz',
   defaultTallerOriginId = 'sede-matriz',
 }) => {
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+
+  useEffect(() => {
+    const handleGarantesUpdated = () => {
+      setRegisteredBrands(getRegisteredBrands());
+    };
+    window.addEventListener('starmotos_garantes_updated', handleGarantesUpdated);
+    return () => {
+      window.removeEventListener('starmotos_garantes_updated', handleGarantesUpdated);
+    };
+  }, []);
 
   // Pestañas activas: cliente, moto, reclamo, fotos
   const [activeTab, setActiveTab] = useState<'cliente' | 'moto' | 'reclamo' | 'fotos'>('cliente');
 
-  // Estado del formulario
+  // Estado del formulario (vacío en estado inicial sin marcas ni kilometraje prellenados)
   const [formData, setFormData] = useState({
     clientName: '',
     clientIdNumber: '',
     clientPhone: '',
     tallerOrigin: defaultTallerOrigin,
-    warrantyType: 'marca' as 'marca' | 'plus_taller' | 'gps',
-    motorcycleBrand: 'Benelli',
-    motorcycleModel: 'TRK 502X ABS',
+    warrantyType: 'marca' as const,
+    targetBrand: '',
+    motorcycleBrand: '',
+    motorcycleModel: '',
     motorcyclePlate: '',
-    motorcycleMileage: 0,
+    motorcycleMileage: '' as any,
     motorcycleVin: '',
     motorNumber: '',
     ramvNumber: '',
@@ -82,6 +98,28 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     estimatedCost: '60',
     photos: [] as string[],
   });
+
+  // 5 slots de fotos obligatorias y 2 slots de videos obligatorios
+  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null]);
+  const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
+  const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
+
+  const activeSlotRef = useRef<{ type: 'photo' | 'video'; index: number } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const PHOTO_SLOT_GUIDES = [
+    { title: 'Foto 1: Vista General', desc: 'Panorámica lateral de la moto' },
+    { title: 'Foto 2: Chasis (VIN)', desc: 'Grabado legible del chasis' },
+    { title: 'Foto 3: Odómetro', desc: 'Kilometraje en el tablero' },
+    { title: 'Foto 4: Pieza Averiada', desc: 'Primer plano del daño' },
+    { title: 'Foto 5: Complementaria', desc: 'Ángulo adicional o código' },
+  ];
+
+  const VIDEO_SLOT_GUIDES = [
+    { title: 'Video 1: Demostración Falla', desc: 'Muestra de ruido o fuga en vivo' },
+    { title: 'Video 2: Inspección Funcional', desc: 'Prueba de encendido o aceleración' },
+  ];
 
   // Repuestos en tags
   const [partsTags, setPartsTags] = useState<string[]>([]);
@@ -100,8 +138,6 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   // Estados de interfaz y búsqueda
   const [searchStatus, setSearchStatus] = useState<{ type: 'success' | 'warning'; message: string } | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [urlInputValue, setUrlInputValue] = useState('');
 
   // Agregar tag de repuesto
   const handleAddTag = () => {
@@ -148,7 +184,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       const clientName = foundClient?.fullName || (foundAlist ? `${foundAlist.nombres} ${foundAlist.apellidos}`.trim() : '');
       const clientIdNumber = foundClient?.idNumber || foundAlist?.cedulaRuc || '';
       const clientPhone = foundClient?.phone || foundAlist?.celular1 || '';
-      const motorcycleBrand = foundClient?.motorcycleBrand || (foundAlist?.modeloMarca ? foundAlist.modeloMarca.split(' ')[0] : 'Benelli');
+      const motorcycleBrand = foundClient?.motorcycleBrand || (foundAlist?.modeloMarca ? foundAlist.modeloMarca.split(' ')[0] : '');
       const motorcycleModel = foundClient?.motorcycleModel || foundAlist?.modeloMarca || '';
       const motorcyclePlate = (foundClient?.motorcyclePlate || foundAlist?.placa || '').toUpperCase();
       const motorcycleVin = foundClient?.motorcycleVin || foundAlist?.chasis || '';
@@ -156,7 +192,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       const ramvNumber = (foundAlist?.ramv || foundClient?.ramvNumber || '').toUpperCase();
       const motorcycleMileage = foundClient?.motorcycleMileage !== undefined
         ? foundClient.motorcycleMileage
-        : (foundAlist?.kilometraje !== undefined ? foundAlist.kilometraje : 1000);
+        : (foundAlist?.kilometraje !== undefined ? foundAlist.kilometraje : '');
 
       setFormData((prev) => ({
         ...prev,
@@ -169,7 +205,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
         motorcycleVin: motorcycleVin || prev.motorcycleVin,
         motorNumber: motorNumber || prev.motorNumber,
         ramvNumber: ramvNumber || prev.ramvNumber,
-        motorcycleMileage: Number(motorcycleMileage) || 0,
+        motorcycleMileage: motorcycleMileage !== undefined && motorcycleMileage !== '' ? motorcycleMileage : prev.motorcycleMileage,
       }));
 
       setSearchStatus({
@@ -184,91 +220,134 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     }
   };
 
-  // Subir fotos o videos desde archivos o cámara
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Subir fotos o videos por slot
+  const handleTriggerPhotoUpload = (index: number) => {
+    activeSlotRef.current = { type: 'photo', index };
+    if (photoInputRef.current) {
+      photoInputRef.current.value = '';
+      photoInputRef.current.click();
+    }
+  };
 
-    setIsUploadingMedia(true);
+  const handleTriggerVideoUpload = (index: number) => {
+    activeSlotRef.current = { type: 'video', index };
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+      videoInputRef.current.click();
+    }
+  };
+
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const active = activeSlotRef.current;
+    if (!file || !active || active.type !== 'photo') return;
+    setUploadingSlot({ type: 'photo', index: active.index });
     try {
-      const newItems: string[] = [];
-      for (const file of Array.from(files)) {
-        if (file.type.startsWith('video/')) {
-          if (file.size > 50 * 1024 * 1024) {
-            alert(`El video "${file.name}" supera los 50 MB. Por favor seleccione un video más corto.`);
-            continue;
-          }
-          const base64Video = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          if (base64Video) {
-            newItems.push(base64Video);
-          }
-        } else if (file.type.startsWith('image/')) {
-          const compressed = await compressImageBase64(file);
-          if (compressed) {
-            newItems.push(compressed);
-          }
-        }
-      }
+      const compressed = await compressImageBase64(file);
+      if (compressed) {
+        setPhotoSlots((prev) => {
+          const next = [...prev];
+          next[active.index] = compressed;
+          return next;
+        });
 
-      if (newItems.length > 0) {
-        setFormData((prev) => ({
-          ...prev,
-          photos: [...prev.photos, ...newItems],
-        }));
+        // Subida asíncrona a Supabase Storage bucket warranty-media
+        uploadWarrantyMedia(compressed, `foto_movil_${active.index + 1}`)
+          .then((cloudUrl) => {
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              setPhotoSlots((prev) => {
+                const next = [...prev];
+                next[active.index] = cloudUrl;
+                return next;
+              });
+            }
+          })
+          .catch((err) => console.warn('Subida en background falló:', err));
       }
     } catch (err) {
-      console.error('Error al procesar archivo multimedia:', err);
-      alert('Ocurrió un error al procesar el archivo seleccionado.');
+      console.error('Error al comprimir foto:', err);
+      alert('Error al comprimir la fotografía.');
     } finally {
-      setIsUploadingMedia(false);
+      setUploadingSlot(null);
       e.target.value = '';
     }
   };
 
-  // Agregar imagen por URL
-  const handleAddImageUrl = () => {
-    const url = urlInputValue.trim();
-    if (!url) return;
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...prev.photos, url],
-    }));
-    setUrlInputValue('');
-    setShowUrlInput(false);
+  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const active = activeSlotRef.current;
+    if (!file || !active || active.type !== 'video') return;
+    setUploadingSlot({ type: 'video', index: active.index });
+    try {
+      // Previsualización local inmediata
+      const previewUrl = URL.createObjectURL(file);
+      setVideoSlots((prev) => {
+        const next = [...prev];
+        next[active.index] = previewUrl;
+        return next;
+      });
+
+      // Subida directa del archivo a Supabase Storage
+      const cloudUrl = await uploadWarrantyMedia(file, `video_movil_${active.index + 1}`);
+      if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+        setVideoSlots((prev) => {
+          const next = [...prev];
+          next[active.index] = cloudUrl;
+          return next;
+        });
+      } else {
+        const compressed = await compressVideoBase64(file);
+        if (compressed) {
+          setVideoSlots((prev) => {
+            const next = [...prev];
+            next[active.index] = compressed;
+            return next;
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error al comprimir video:', err);
+      alert('Error al procesar y comprimir el video.');
+    } finally {
+      setUploadingSlot(null);
+      e.target.value = '';
+    }
   };
 
-  // Eliminar foto
   const handleRemovePhoto = (idx: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== idx),
-    }));
+    setPhotoSlots((prev) => {
+      const next = [...prev];
+      next[idx] = null;
+      return next;
+    });
   };
 
-  // Cargar fotos de prueba
-  const handleAddSamplePhotos = () => {
-    const samples = [
-      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-    ];
-    setFormData((prev) => ({
-      ...prev,
-      photos: [...prev.photos, ...samples],
-    }));
+  const handleRemoveVideo = (idx: number) => {
+    setVideoSlots((prev) => {
+      const next = [...prev];
+      next[idx] = null;
+      return next;
+    });
   };
 
   // Validación y envío del formulario
   const handleFormSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    if (uploadingSlot !== null) {
+      alert('Por favor espere a que termine de cargarse el archivo seleccionado antes de emitir la solicitud.');
+      return;
+    }
+
     if (!formData.clientName.trim() || !formData.clientIdNumber.trim()) {
       setActiveTab('cliente');
       alert('Por favor ingrese la cédula y el nombre del cliente.');
+      return;
+    }
+
+    if (!formData.motorcycleBrand.trim()) {
+      setActiveTab('cliente');
+      alert('Por favor seleccione la Marca Garantía registrada.');
       return;
     }
 
@@ -277,6 +356,11 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       alert('Por favor detalle la falla reportada en el reclamo técnico.');
       return;
     }
+
+    const loadedPhotos = photoSlots.filter(Boolean) as string[];
+    const loadedVideos = videoSlots.filter(Boolean) as string[];
+
+
 
     const newReq: WarrantyRequest = {
       id: `gar-${Date.now()}`,
@@ -287,9 +371,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       clientPhone: formData.clientPhone.trim(),
       tallerOrigin: formData.tallerOrigin.trim() || defaultTallerOrigin,
       tallerOriginId: defaultTallerOriginId,
-      warrantyType: formData.warrantyType,
-      targetBrand: formData.motorcycleBrand.trim(),
-      garanteName: formData.warrantyType === 'marca' ? formData.motorcycleBrand.trim() : undefined,
+      warrantyType: 'marca',
+      targetBrand: formData.targetBrand.trim(),
+      garanteName: formData.targetBrand.trim(),
       motorcycleBrand: formData.motorcycleBrand.trim(),
       motorcycleModel: formData.motorcycleModel.trim(),
       motorcyclePlate: formData.motorcyclePlate.trim().toUpperCase() || 'SIN PLACA',
@@ -302,14 +386,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       partsTags: partsTags,
       partsRequired: partsTags.join(', '),
       resolutionType: formData.resolutionType,
-      diagnosticPhotos:
-        formData.photos.length > 0
-          ? formData.photos
-          : [
-              'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-            ],
+      diagnosticPhotos: [...loadedPhotos, ...loadedVideos],
       status: 'en_revision',
-      estimatedCost: formData.resolutionType === 'encargar_taller' ? parseFloat(formData.estimatedCost) || 60 : 0,
+      estimatedCost: formData.resolutionType === 'encargar_taller' ? parseFloat(formData.estimatedCost) || 0 : 0,
     };
 
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.65 } });
@@ -333,23 +412,21 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
 
   return (
     <div className="w-full flex flex-col min-h-0 space-y-3 -mt-1.5 animate-fade-in">
-      {/* Selector para Cámara directa (Foto / Video) */}
+      {/* Selector para Foto */}
       <input
-        ref={cameraInputRef}
+        ref={photoInputRef}
         type="file"
-        accept="image/*,video/*"
-        capture="environment"
-        onChange={handleFileSelect}
+        accept="image/*"
+        onChange={handlePhotoFileChange}
         className="hidden"
       />
 
-      {/* Selector para Galería / Archivos existentes */}
+      {/* Selector para Video */}
       <input
-        ref={galleryInputRef}
+        ref={videoInputRef}
         type="file"
-        accept="image/*,video/*"
-        multiple
-        onChange={handleFileSelect}
+        accept="video/*"
+        onChange={handleVideoFileChange}
         className="hidden"
       />
 
@@ -551,36 +628,40 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             />
           </div>
 
+          {/* Tipo de Póliza: Solo Garantía Oficial de Marca */}
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Póliza</label>
-            <select
-              value={formData.warrantyType}
-              onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
-              className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-blue-900 uppercase outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
-            >
-              <option value="marca">Garantía Oficial de Marca ({formData.motorcycleBrand || 'Fábrica'})</option>
-              <option value="plus_taller">Garantía Plus StarMotos</option>
-              <option value="gps">Garantía GPS Satelital</option>
-            </select>
+            <div className="w-full px-3 py-2.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-black text-blue-900">Garantía Oficial de Marca</span>
+              </div>
+              <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
+                Oficial
+              </span>
+            </div>
           </div>
 
-          {formData.warrantyType === 'marca' && (
-            <div className="p-2.5 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1 animate-fade-in">
-              <label className="block text-[11px] font-black text-purple-950 uppercase tracking-wider">
-                Marca / Garante Responsable *
-              </label>
-              <select
-                value={formData.motorcycleBrand}
-                onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                className="w-full px-2.5 py-2 bg-white border border-purple-300 focus:border-purple-600 rounded-lg text-xs font-bold text-purple-900 outline-none cursor-pointer"
-              >
-                {getRegisteredBrands().map((b) => (
-                  <option key={b} value={b}>{b} (Garante Oficial)</option>
-                ))}
-                <option value="OTRA">+ Otra Marca / Garante</option>
-              </select>
-            </div>
-          )}
+          {/* Marca Garantía: Sincronizada únicamente con marcas y garantes registrados con su Razón Social */}
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-zinc-700">
+              Marca Garantía (Razón Social Registrada) <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              value={formData.targetBrand}
+              onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
+            >
+              <option value="" disabled>Seleccione la Razón Social de la Marca</option>
+              {registeredBrands.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-zinc-400">
+              Razón Social oficial de marcas registradas en el sistema.
+            </p>
+          </div>
         </div>
       )}
 
@@ -596,29 +677,30 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             <span>2. Motocicleta Registrada</span>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-zinc-700 mb-1">Marca y Modelo</label>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <input
-                  type="text"
-                  list="mobile-brands-datalist"
-                  value={formData.motorcycleBrand}
-                  onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
-                  placeholder="Marca (Ej: Benelli)"
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-                />
-                <datalist id="mobile-brands-datalist">
-                  {getRegisteredBrands().map((b) => (
-                    <option key={b} value={b} />
-                  ))}
-                </datalist>
-              </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 mb-1">Marca</label>
+              <input
+                type="text"
+                list="mobile-brands-datalist"
+                value={formData.motorcycleBrand}
+                onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
+                placeholder="Marca de la moto"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+              />
+              <datalist id="mobile-brands-datalist">
+                {registeredBrands.map((b) => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 mb-1">Modelo</label>
               <input
                 type="text"
                 value={formData.motorcycleModel}
                 onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
-                placeholder="Modelo (Ej: TRK 502X)"
+                placeholder="Modelo de la moto"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
               />
             </div>
@@ -650,8 +732,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 <input
                   type="number"
                   min="0"
+                  placeholder="Ej: 5000"
                   value={formData.motorcycleMileage}
-                  onChange={(e) => setFormData({ ...formData, motorcycleMileage: Number(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, motorcycleMileage: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white pr-8"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-zinc-400">
@@ -997,181 +1080,244 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 6. BLOQUE 4: INSPECCIÓN VISUAL DEL DAÑO (FOTOGRAFÍAS)                     */}
+      {/* 6. BLOQUE 4: INSPECCIÓN VISUAL DEL DAÑO (FOTOGRAFÍAS Y VIDEOS)             */}
       {/* ========================================================================= */}
       {activeTab === 'fotos' && (
-        <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-2xs space-y-3.5 animate-fade-in">
+        <div className="bg-white p-4 rounded-2xl border border-zinc-200 shadow-2xs space-y-4 animate-fade-in">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
             <h4 className="text-xs sm:text-sm font-black text-zinc-900 tracking-tight flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Camera className="w-4 h-4" />
               </div>
-              <span>
-                Evidencias de la Falla ({formData.photos.length})
-              </span>
+              <span>Evidencias Técnicas</span>
             </h4>
-            <span className="text-[10px] text-zinc-400">Fotos & Videos</span>
-          </div>
-
-          {/* Botones principales: Cámara y Galería */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={isUploadingMedia}
-              className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
-            >
-              <Camera className="w-4 h-4 shrink-0" />
-              <span>Cámara (Foto / Video)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={isUploadingMedia}
-              className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
-            >
-              <ImageIcon className="w-4 h-4 shrink-0" />
-              <span>Galería / Archivos</span>
-            </button>
-          </div>
-
-          {/* Opciones secundarias: URL y Muestra */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowUrlInput(!showUrlInput)}
-              className="flex-1 py-1.5 px-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
-              title="Agregar por URL"
-            >
-              <LinkIcon className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Pegar URL</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleAddSamplePhotos}
-              className="flex-1 py-1.5 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
-              title="Cargar Fotos de Muestra"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Fotos Muestra</span>
-            </button>
-          </div>
-
-          {/* Indicador de carga de archivo */}
-          {isUploadingMedia && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-700 animate-pulse">
-              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
-              <span>Procesando archivo multimedia (comprimiendo foto / cargando video)...</span>
-            </div>
-          )}
-
-          {/* Input de URL si está activo */}
-          {showUrlInput && (
-            <div className="flex gap-1.5 p-2 bg-zinc-50 border border-zinc-200 rounded-xl animate-fade-in">
-              <input
-                type="url"
-                value={urlInputValue}
-                onChange={(e) => setUrlInputValue(e.target.value)}
-                placeholder="https://ejemplo.com/foto.jpg o .mp4"
-                className="flex-1 px-2.5 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600"
-              />
-              <button
-                type="button"
-                onClick={handleAddImageUrl}
-                className="px-3 bg-blue-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  photoSlots.filter(Boolean).length > 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                }`}
               >
-                Agregar
-              </button>
+                {photoSlots.filter(Boolean).length}/5 Fotos
+              </span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  videoSlots.filter(Boolean).length > 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                }`}
+              >
+                {videoSlots.filter(Boolean).length}/2 Videos
+              </span>
             </div>
-          )}
+          </div>
 
-          {/* Galería de fotos y videos agregados */}
-          {formData.photos.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              {formData.photos.map((url, idx) => {
-                const isVideo = isVideoUrl(url);
+          {/* Sección 1: Fotos de Peritaje */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-zinc-800 uppercase tracking-wide flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                1. Fotos de Peritaje (Hasta 5 - Opcionales)
+              </span>
+              <span className="text-[10px] text-zinc-400">WebP ultraligero</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {photoSlots.map((photo, idx) => {
+                const guide = PHOTO_SLOT_GUIDES[idx];
+                const isUploading = uploadingSlot?.type === 'photo' && uploadingSlot?.index === idx;
+
                 return (
                   <div
-                    key={idx}
-                    className="aspect-video rounded-xl overflow-hidden border border-zinc-200 block group relative shadow-2xs bg-zinc-900"
+                    key={`mob-photo-${idx}`}
+                    className={`relative rounded-xl border-2 p-2 flex flex-col justify-between ${
+                      photo
+                        ? 'border-emerald-300 bg-zinc-900'
+                        : 'border-dashed border-zinc-300 bg-zinc-50/70 hover:border-blue-400'
+                    }`}
                   >
-                    {isVideo ? (
-                      <div
-                        onClick={() => setZoomImage(url)}
-                        className="w-full h-full relative cursor-pointer flex items-center justify-center bg-black"
-                      >
-                        <video
-                          src={url}
-                          className="w-full h-full object-cover opacity-80"
-                          preload="metadata"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
-                            <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
-                          </div>
-                        </div>
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-red-600/90 text-white rounded text-[8px] font-bold uppercase tracking-wider flex items-center gap-0.5">
-                          <Film className="w-2.5 h-2.5" /> Video
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-zinc-700 truncate">{guide.title}</span>
+                      {photo ? (
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded">
+                          ✓ Lista
                         </span>
-                      </div>
-                    ) : (
-                      <img
-                        src={url}
-                        alt={`Evidencia ${idx + 1}`}
-                        onClick={() => setZoomImage(url)}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-                      />
-                    )}
-
-                    <div className="absolute top-1 right-1 flex items-center gap-1 z-10">
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePhoto(idx)}
-                        className="w-6 h-6 rounded-full bg-red-600/90 text-white flex items-center justify-center cursor-pointer hover:bg-red-700 transition shadow-2xs"
-                        title="Eliminar evidencia"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      ) : (
+                        <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
+                          Opcional
+                        </span>
+                      )}
                     </div>
-                    <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 bg-black/60 text-white rounded text-[9px] font-mono font-bold z-10">
-                      #{idx + 1}
-                    </span>
+
+                    <div
+                      onClick={() => !isUploading && handleTriggerPhotoUpload(idx)}
+                      className="relative w-full aspect-video rounded-lg overflow-hidden flex items-center justify-center cursor-pointer bg-zinc-100"
+                    >
+                      {isUploading ? (
+                        <div className="flex flex-col items-center justify-center p-1 text-center">
+                          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-1" />
+                          <span className="text-[9px] font-bold text-blue-600">Comprimiendo...</span>
+                        </div>
+                      ) : photo ? (
+                        <>
+                          <img src={photo} alt={guide.title} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setZoomImage(photo);
+                              }}
+                              className="w-7 h-7 rounded bg-white/90 text-zinc-900 flex items-center justify-center"
+                              title="Ampliar foto"
+                            >
+                              <ZoomIn className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerPhotoUpload(idx);
+                              }}
+                              className="w-7 h-7 rounded bg-blue-600 text-white flex items-center justify-center"
+                              title="Reemplazar foto"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemovePhoto(idx);
+                              }}
+                              className="w-7 h-7 rounded bg-red-600 text-white flex items-center justify-center"
+                              title="Eliminar foto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-zinc-400">
+                          <Camera className="w-5 h-5 mb-0.5" />
+                          <span className="text-[10px] font-bold text-zinc-700">+ Subir Foto</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-zinc-500 mt-1 truncate">{guide.desc}</span>
                   </div>
                 );
               })}
             </div>
-          ) : (
-            <div className="py-6 border-2 border-dashed border-zinc-300 rounded-xl flex flex-col items-center justify-center text-center bg-zinc-50/70 p-4 space-y-2.5">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <Camera className="w-6 h-6" />
-                <Film className="w-6 h-6" />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-zinc-700 block">Adjunta fotos o videos de la falla</span>
-                <span className="text-[10px] text-zinc-400">Toma foto/video directo con la cámara o selecciona desde tus archivos</span>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Usar Cámara</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
-                >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>Abrir Galería</span>
-                </button>
-              </div>
+          </div>
+
+          {/* Sección 2: Videos Demostrativos */}
+          <div className="space-y-2 pt-2 border-t border-zinc-100">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-purple-900 uppercase tracking-wide flex items-center gap-1.5">
+                <Film className="w-3.5 h-3.5 text-purple-600" />
+                2. Videos Demostrativos (Hasta 2 - Opcionales)
+              </span>
+              <span className="text-[10px] text-zinc-400">WebM ligero (&lt; 35s)</span>
             </div>
-          )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {videoSlots.map((video, idx) => {
+                const guide = VIDEO_SLOT_GUIDES[idx];
+                const isUploading = uploadingSlot?.type === 'video' && uploadingSlot?.index === idx;
+
+                return (
+                  <div
+                    key={`mob-video-${idx}`}
+                    className={`relative rounded-xl border-2 p-2.5 flex flex-col justify-between ${
+                      video
+                        ? 'border-purple-400 bg-zinc-900'
+                        : 'border-dashed border-purple-300 bg-purple-50/30 hover:border-purple-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-bold text-purple-950 truncate flex items-center gap-1">
+                        <Film className="w-3 h-3 text-purple-600" /> {guide.title}
+                      </span>
+                      {video ? (
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded">
+                          ✓ Video Listo
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
+                          Opcional
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      onClick={() => !isUploading && handleTriggerVideoUpload(idx)}
+                      className="relative w-full aspect-video rounded-lg overflow-hidden flex items-center justify-center cursor-pointer bg-zinc-950"
+                    >
+                      {isUploading ? (
+                        <div className="flex flex-col items-center justify-center p-2 text-center">
+                          <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-1" />
+                          <span className="text-[10px] font-bold text-purple-300">Optimizando video...</span>
+                        </div>
+                      ) : video ? (
+                        <>
+                          <video src={video} className="w-full h-full object-cover opacity-80" preload="metadata" />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg">
+                              <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setZoomImage(video);
+                              }}
+                              className="px-2.5 py-1 rounded bg-white text-zinc-900 text-[10px] font-bold flex items-center gap-1"
+                              title="Reproducir video"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>Ver</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerVideoUpload(idx);
+                              }}
+                              className="p-1.5 rounded bg-purple-600 text-white"
+                              title="Reemplazar video"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveVideo(idx);
+                              }}
+                              className="p-1.5 rounded bg-red-600 text-white"
+                              title="Eliminar video"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-purple-400">
+                          <Film className="w-6 h-6 mb-1 text-purple-500" />
+                          <span className="text-xs font-bold text-purple-900">+ Subir Video #{idx + 1}</span>
+                          <span className="text-[9px] text-zinc-500">{guide.desc}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

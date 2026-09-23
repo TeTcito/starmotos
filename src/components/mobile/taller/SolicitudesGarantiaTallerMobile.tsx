@@ -43,7 +43,7 @@ interface Props {
   currentWorkshopId?: string;
   newForm?: any;
   setNewForm?: React.Dispatch<React.SetStateAction<any>>;
-  onCreateRequest?: () => boolean;
+  onCreateRequest?: (directReq?: WarrantyRequest) => boolean | void;
 }
 
 export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
@@ -270,7 +270,9 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
             setSelectedWarrantyForDetail(updated);
             setLocalWarranties((prev) => {
               const next = prev.map((item) => (item.id === updated.id ? updated : item));
-              saveStoredWarranties(next);
+              const allW = getStoredWarranties();
+              const merged = allW.map((item) => (item.id === updated.id ? updated : item));
+              saveStoredWarranties(merged);
               return next;
             });
           }}
@@ -289,9 +291,10 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               tallerOrigin: currentWorkshopName,
               tallerOriginId: currentWorkshopId || newReq.tallerOriginId || 'matriz-la-mana',
             };
-            const updated = [reqWithOrigin, ...localWarranties];
-            setLocalWarranties(updated);
-            saveStoredWarranties(updated);
+            setLocalWarranties((prev) => [reqWithOrigin, ...prev]);
+            const allWarranties = getStoredWarranties();
+            const merged = [reqWithOrigin, ...allWarranties.filter((w) => w.id !== reqWithOrigin.id)];
+            saveStoredWarranties(merged);
 
             // Alerta de sistema
             const newAlert: SystemAlert = {
@@ -304,6 +307,10 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               relatedId: reqWithOrigin.id,
             };
             saveStoredAlerts([newAlert, ...getStoredAlerts()]);
+
+            if (onCreateRequest) {
+              onCreateRequest(reqWithOrigin);
+            }
 
             setShowCreateModal(false);
           }}
@@ -540,9 +547,15 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
                             <span>{photosCount}</span>
                           </span>
                         )}
-                        <span className="font-bold text-zinc-900">
-                          ${(w.estimatedCost || 60).toFixed(2)} USD
-                        </span>
+                        {(w.totalBudget !== undefined && w.totalBudget > 0) || (w.estimatedCost !== undefined && w.estimatedCost > 0) ? (
+                          <span className="font-bold text-zinc-900">
+                            ${((w.totalBudget !== undefined && w.totalBudget > 0 ? w.totalBudget : w.estimatedCost) || 0).toFixed(2)} USD
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                            Pendiente Matriz
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

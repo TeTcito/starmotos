@@ -477,7 +477,6 @@ try {
 // Garantías
 export function getStoredWarranties(): WarrantyRequest[] {
   try {
-    removeDeletedTombstone('gar-1790270366447', 'GAR-2026-9135');
     const stored = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
     if (stored) {
       const parsed: WarrantyRequest[] = JSON.parse(stored);
@@ -488,19 +487,26 @@ export function getStoredWarranties(): WarrantyRequest[] {
           !isDeletedTombstone(w.id) &&
           (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
       );
-      if (!filtered.some((w) => w.id === 'gar-1790270366447' || w.requestNumber === 'GAR-2026-9135')) {
+      if (
+        !isDeletedTombstone('gar-1790270366447') &&
+        !isDeletedTombstone('GAR-2026-9135') &&
+        !filtered.some((w) => w.id === 'gar-1790270366447' || w.requestNumber === 'GAR-2026-9135')
+      ) {
         filtered.unshift(RESTORED_WARRANTY_9135);
         safeSaveWarrantiesToLocalStorage(filtered);
       }
       return filtered;
     } else {
-      safeSaveWarrantiesToLocalStorage([RESTORED_WARRANTY_9135]);
-      return [RESTORED_WARRANTY_9135];
+      if (!isDeletedTombstone('gar-1790270366447') && !isDeletedTombstone('GAR-2026-9135')) {
+        safeSaveWarrantiesToLocalStorage([RESTORED_WARRANTY_9135]);
+        return [RESTORED_WARRANTY_9135];
+      }
+      return [];
     }
   } catch (e) {
     console.error('Error reading warranties from localStorage', e);
   }
-  return [RESTORED_WARRANTY_9135];
+  return !isDeletedTombstone('gar-1790270366447') && !isDeletedTombstone('GAR-2026-9135') ? [RESTORED_WARRANTY_9135] : [];
 }
 
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {

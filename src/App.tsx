@@ -69,7 +69,7 @@ function App() {
         </>
       )}
 
-      {/* PWA Install Prompt (solo móviles) */}
+      {/* PWA Install Prompt — se muestra a todos los que no tienen la app instalada */}
       <PWAInstallPrompt />
     </>
   );

@@ -55,6 +55,7 @@ interface Props {
   warranties?: WarrantyRequest[];
   onNavigateToAlistamiento?: (clientCedula?: string) => void;
   onDeleteClient?: (idOrCedula: string) => void;
+  isMatriz?: boolean;
 }
 
 export const ClientesModuleMobile: React.FC<Props> = ({
@@ -66,6 +67,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
   warranties = [],
   onNavigateToAlistamiento,
   onDeleteClient,
+  isMatriz = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
@@ -284,9 +286,10 @@ export const ClientesModuleMobile: React.FC<Props> = ({
       const override = clientOverrides[client.cedulaRuc];
       const wsName = override?.workshopName || client.workshopName;
       const wsId = client.workshopId;
+      const isMatrizUser = isMatriz || currentWorkshopId === 'matriz-la-mana' || role === 'admin';
 
       // Filtro de Sede / Taller
-      if (role === 'taller' && tallerScope === 'local' && currentWorkshopId) {
+      if (role === 'taller' && tallerScope === 'local' && currentWorkshopId && !isMatrizUser) {
         const isMatchLocal =
           wsId === currentWorkshopId ||
           (wsName && wsName.toLowerCase().includes(currentWorkshopId.toLowerCase()));

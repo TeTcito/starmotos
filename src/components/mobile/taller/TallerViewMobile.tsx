@@ -64,6 +64,9 @@ interface Props {
   onDeleteAllReadAlerts?: () => void;
   currentWorkshop?: Workshop;
   onUpdateWorkshop?: (updated: Partial<Workshop>) => void;
+  isMatriz?: boolean;
+  selectedWorkshopFilter?: string;
+  onSelectWorkshopFilter?: (wsId: string) => void;
 }
 
 export const TallerViewMobile: React.FC<Props> = ({
@@ -93,6 +96,9 @@ export const TallerViewMobile: React.FC<Props> = ({
   currentWorkshop,
   onUpdateWorkshop,
   onDeleteTechnician,
+  isMatriz = false,
+  selectedWorkshopFilter = 'all',
+  onSelectWorkshopFilter,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeWorkshopId] = useState<string>(() => {
@@ -175,6 +181,28 @@ export const TallerViewMobile: React.FC<Props> = ({
           />
         </div>
       </header>
+
+      {/* Barra de Sede para Matriz Central en Móvil */}
+      {isMatriz && workshops && workshops.length > 0 && (
+        <div className="bg-blue-800 text-white px-4 py-2 flex items-center justify-between text-xs border-t border-blue-600 shadow-inner">
+          <div className="flex items-center gap-1.5 font-bold">
+            <Building2 className="w-3.5 h-3.5 text-blue-200" />
+            <span>Sede:</span>
+          </div>
+          <select
+            value={selectedWorkshopFilter || 'all'}
+            onChange={(e) => onSelectWorkshopFilter?.(e.target.value)}
+            className="bg-blue-900 border border-blue-400 rounded-lg px-2 py-1 text-white font-bold text-xs outline-none max-w-[230px] truncate"
+          >
+            <option value="all">🏢 Todas las Sedes (Red Nacional)</option>
+            {workshops.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
@@ -273,6 +301,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             onAddOrigin={onAddOrigin}
             onSaveRecord={onSaveFullAlistamiento}
             recentRecords={fullAlistamientos}
+            isMatriz={isMatriz}
           />
         )}
         {activeSection === 'solicitudes_garantia' && (
@@ -294,6 +323,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             fullAlistamientos={fullAlistamientos}
             clients={clients}
             warranties={warranties}
+            isMatriz={isMatriz}
             onNavigateToAlistamiento={() => {
               setActiveSection('alistamiento_taller');
             }}

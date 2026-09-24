@@ -64,6 +64,9 @@ interface Props {
   onDeleteAllReadAlerts?: () => void;
   currentWorkshop?: Workshop;
   onUpdateWorkshop?: (updated: Partial<Workshop>) => void;
+  isMatriz?: boolean;
+  selectedWorkshopFilter?: string;
+  onSelectWorkshopFilter?: (wsId: string) => void;
 }
 
 export const TallerViewDesktop: React.FC<Props> = ({
@@ -93,6 +96,9 @@ export const TallerViewDesktop: React.FC<Props> = ({
   currentWorkshop,
   onUpdateWorkshop,
   onDeleteTechnician,
+  isMatriz = false,
+  selectedWorkshopFilter = 'all',
+  onSelectWorkshopFilter,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
 
@@ -102,9 +108,11 @@ export const TallerViewDesktop: React.FC<Props> = ({
     workshops.find((w) => w.id === 'matriz-la-mana') ||
     workshops[0];
 
-  const tallerTechs = technicians.filter(
-    (t) => t.workshopId === currentWs.id || t.workshopName.toLowerCase().includes(currentWs.name.toLowerCase())
-  );
+  const tallerTechs = isMatriz && selectedWorkshopFilter === 'all'
+    ? technicians
+    : technicians.filter(
+        (t) => t.workshopId === currentWs.id || t.workshopName.toLowerCase().includes(currentWs.name.toLowerCase())
+      );
 
   const menuItems: { id: TallerSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -200,6 +208,26 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 <ArrowLeft className="w-4 h-4" />
                 <span>Regresar al Listado</span>
               </button>
+            )}
+
+            {/* Selector de Sede Global para Matriz */}
+            {isMatriz && workshops && workshops.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-blue-800/90 border border-blue-400/80 rounded-xl px-2.5 py-1 text-xs text-white shadow-xs">
+                <Building2 className="w-3.5 h-3.5 text-blue-200 shrink-0" />
+                <span className="font-bold text-blue-100 hidden 2xl:inline">Sede:</span>
+                <select
+                  value={selectedWorkshopFilter || 'all'}
+                  onChange={(e) => onSelectWorkshopFilter?.(e.target.value)}
+                  className="bg-transparent text-white font-bold outline-none cursor-pointer text-xs"
+                >
+                  <option value="all" className="text-zinc-900 bg-white">🏢 Todas las Sedes (Red Nacional)</option>
+                  {workshops.map((w) => (
+                    <option key={w.id} value={w.id} className="text-zinc-900 bg-white">
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             <NotificationsPopover
@@ -372,6 +400,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 recentRecords={fullAlistamientos}
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
+                isMatriz={isMatriz}
               />
             )}
             {activeSection === 'solicitudes_garantia' && (
@@ -392,6 +421,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 fullAlistamientos={fullAlistamientos}
                 clients={clients}
                 warranties={warranties}
+                isMatriz={isMatriz}
                 onNavigateToAlistamiento={() => {
                   setActiveSection('alistamiento_taller');
                   setAlistamientoViewMode('form');
@@ -405,6 +435,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 onAddTechnician={onAddTechnician}
                 onDeleteTechnician={onDeleteTechnician}
                 currentWorkshopId={currentWs.id}
+                isMatriz={isMatriz}
               />
             )}
             {activeSection === 'inventario' && <InventarioDesktop inventory={inventory} />}

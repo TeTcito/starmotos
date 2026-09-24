@@ -41,6 +41,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     currentWorkshop,
     updateWorkshopProfile,
     toastMessage,
+    isMatriz,
+    selectedWorkshopFilter,
+    setSelectedWorkshopFilter,
   } = portal;
 
   return (
@@ -73,6 +76,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           onDeleteAllReadAlerts={deleteAllReadAlerts}
           currentWorkshop={currentWorkshop}
           onUpdateWorkshop={updateWorkshopProfile}
+          isMatriz={isMatriz}
+          selectedWorkshopFilter={selectedWorkshopFilter}
+          onSelectWorkshopFilter={setSelectedWorkshopFilter}
         />
       ) : (
         <TallerViewMobile
@@ -102,6 +108,9 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           onDeleteAllReadAlerts={deleteAllReadAlerts}
           currentWorkshop={currentWorkshop}
           onUpdateWorkshop={updateWorkshopProfile}
+          isMatriz={isMatriz}
+          selectedWorkshopFilter={selectedWorkshopFilter}
+          onSelectWorkshopFilter={setSelectedWorkshopFilter}
         />
       )}
 

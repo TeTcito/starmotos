@@ -87,56 +87,82 @@ export function useTallerPortal() {
     );
   }, [workshops, activeWorkshopId]);
 
-  // --- FILTRADO ESTRICTO MULTI-TENANT POR SEDE ---
-  // Cada taller solo puede ver los datos correspondientes a su propio taller.
-  // El admin tiene su propio portal separado (useAdminPortal) y no pasa por aquí.
+  // Identificar si la sede actual es Matriz Central
+  const isMatriz = useMemo(() => {
+    const wsId = currentWorkshop?.id || activeWorkshopId;
+    if (wsId === 'matriz-la-mana' || wsId === 'sede-matriz') return true;
+    const name = (currentWorkshop?.name || '').toLowerCase();
+    return name.includes('matriz');
+  }, [currentWorkshop, activeWorkshopId]);
+
+  // Filtro de sede para Matriz (permite supervisar toda la red nacional o enfocar una sede específica)
+  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
+
+  // --- FILTRADO MULTI-TENANT POR SEDE (CON VISIBILIDAD CENTRAL PARA MATRIZ) ---
+  // Las sucursales solo ven sus propios datos.
+  // La Matriz puede ver la red completa de todos los talleres ('all') o filtrar por sede.
 
   const filteredOrders = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return orders;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
     return orders.filter((o) => {
       if (o.workshopId) {
         return o.workshopId === targetWsId;
       }
       return false;
     });
-  }, [orders, activeWorkshopId, currentWorkshop]);
+  }, [orders, isMatriz, selectedWorkshopFilter, activeWorkshopId, currentWorkshop]);
 
   const filteredWarranties = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return warranties;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
+    const targetWs = workshops.find((w) => w.id === targetWsId) || currentWorkshop;
     return warranties.filter((w) => {
       if (w.tallerOriginId) {
         return w.tallerOriginId === targetWsId;
       }
-      if (w.tallerOrigin && currentWorkshop) {
+      if (w.tallerOrigin && targetWs) {
         const cleanOrigin = w.tallerOrigin.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
+        const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
         return cleanOrigin && (cleanOrigin.includes(cleanWs) || cleanWs.includes(cleanOrigin) || (cityPart && cleanOrigin.includes(cityPart)));
       }
       return false;
     });
-  }, [warranties, activeWorkshopId, currentWorkshop]);
+  }, [warranties, isMatriz, selectedWorkshopFilter, workshops, activeWorkshopId, currentWorkshop]);
 
   const filteredFullAlistamientos = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return fullAlistamientos;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
+    const targetWs = workshops.find((w) => w.id === targetWsId) || currentWorkshop;
     return fullAlistamientos.filter((a) => {
       // 1. Si tiene sedeId explícito, DEBE coincidir con la sede activa
       if (a.sedeId) {
         return a.sedeId === targetWsId;
       }
-      // 2. Si no tiene sedeId, comparar estrictamente por nombre específico o ciudad (nunca por la palabra genérica "starmotos")
-      if (a.sede && currentWorkshop) {
+      // 2. Si no tiene sedeId, comparar estrictamente por nombre específico o ciudad
+      if (a.sede && targetWs) {
         const cleanSede = a.sede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
+        const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
         return cleanSede && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede) || (cityPart && cleanSede.includes(cityPart)));
       }
       return false;
     });
-  }, [fullAlistamientos, activeWorkshopId, currentWorkshop]);
+  }, [fullAlistamientos, isMatriz, selectedWorkshopFilter, workshops, activeWorkshopId, currentWorkshop]);
 
   const filteredClients = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return clients;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
+    const targetWs = workshops.find((w) => w.id === targetWsId) || currentWorkshop;
     const cedulasInSede = new Set(
       filteredFullAlistamientos.map((a) => a.cedulaRuc.trim().toLowerCase()).filter(Boolean)
     );
@@ -150,36 +176,42 @@ export function useTallerPortal() {
         return true;
       }
       // 3. Fallback: comparar estrictamente por nombre de sede o ciudad
-      if (c.workshopName && currentWorkshop) {
+      if (c.workshopName && targetWs) {
         const cleanCws = c.workshopName.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cleanWs = currentWorkshop.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-        const cityPart = currentWorkshop.city.toLowerCase().split(',')[0].trim();
+        const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
         if (cleanCws && (cleanCws.includes(cleanWs) || cleanWs.includes(cleanCws) || (cityPart && cleanCws.includes(cityPart)))) {
           return true;
         }
       }
       return false;
     });
-  }, [clients, filteredFullAlistamientos, activeWorkshopId, currentWorkshop]);
+  }, [clients, isMatriz, selectedWorkshopFilter, workshops, filteredFullAlistamientos, activeWorkshopId, currentWorkshop]);
 
   const filteredTechnicians = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return technicians;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
     return technicians.filter((t) => {
       if (t.workshopId) {
         return t.workshopId === targetWsId;
       }
       return false;
     });
-  }, [technicians, activeWorkshopId, currentWorkshop]);
+  }, [technicians, isMatriz, selectedWorkshopFilter, activeWorkshopId, currentWorkshop]);
 
-  // Alertas exclusivas de este taller / sede
+  // Alertas (la Matriz puede ver todas las alertas de talleres de la red)
   const filteredAlerts = useMemo(() => {
-    const targetWsId = currentWorkshop?.id || activeWorkshopId;
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return allAlerts.filter(a => a.targetRole === 'taller' || a.targetRole === 'admin' || !a.targetRole);
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
     return filterAlertsForRole(allAlerts, {
       role: 'taller',
       workshopId: targetWsId,
     });
-  }, [allAlerts, activeWorkshopId, currentWorkshop]);
+  }, [allAlerts, isMatriz, selectedWorkshopFilter, activeWorkshopId, currentWorkshop]);
 
   // Sincronización entre ventanas o localStorage
   useEffect(() => {
@@ -642,6 +674,9 @@ export function useTallerPortal() {
     setIsSidebarOpen,
     activeWorkshopId,
     currentWorkshop,
+    isMatriz,
+    selectedWorkshopFilter,
+    setSelectedWorkshopFilter,
     orders: filteredOrders,
     updateOrderStatus,
     warranties: filteredWarranties,

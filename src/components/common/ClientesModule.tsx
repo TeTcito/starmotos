@@ -139,6 +139,7 @@ interface Props {
   warranties?: WarrantyRequest[];
   onNavigateToAlistamiento?: (clientCedula?: string) => void;
   onDeleteClient?: (idOrCedula: string) => void;
+  isMatriz?: boolean;
 }
 
 export const ClientesModule: React.FC<Props> = ({
@@ -150,6 +151,7 @@ export const ClientesModule: React.FC<Props> = ({
   warranties = [],
   onNavigateToAlistamiento,
   onDeleteClient,
+  isMatriz = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
@@ -524,14 +526,16 @@ export const ClientesModule: React.FC<Props> = ({
   const filteredClients = useMemo(() => {
     let result = unifiedClients.filter((client) => {
       // Filtro de alcance por rol
-      if (role === 'taller' && currentWorkshopId) {
+      const isMatrizUser = isMatriz || currentWorkshopId === 'matriz-la-mana' || role === 'admin';
+
+      if (role === 'taller' && currentWorkshopId && !isMatrizUser) {
         const matchesWorkshop =
           client.workshopId === currentWorkshopId ||
           client.records.some((r) => r.sedeId === currentWorkshopId);
         if (!matchesWorkshop) return false;
       }
 
-      if (role === 'admin' && selectedWorkshopFilter !== 'all') {
+      if ((role === 'admin' || isMatrizUser) && selectedWorkshopFilter !== 'all') {
         const matchesSelected =
           client.workshopId === selectedWorkshopFilter ||
           client.records.some((r) => r.sedeId === selectedWorkshopFilter);
@@ -2201,7 +2205,7 @@ export const ClientesModule: React.FC<Props> = ({
           </div>
 
           {/* Selector de Sede para Matriz */}
-          {role === 'admin' && (
+          {(role === 'admin' || isMatriz || currentWorkshopId === 'matriz-la-mana') && (
             <div className="w-44 shrink-0">
               <select
                 value={selectedWorkshopFilter}

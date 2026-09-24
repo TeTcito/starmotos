@@ -60,6 +60,15 @@
     <meta name="apple-mobile-web-app-title" content="StarMotos" />
     <link rel="apple-touch-icon" href="/pwa-512.png" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      // Capturar evento de instalación PWA de forma inmediata para no perderlo
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('starmotos_pwa_prompt_ready'));
+      });
+    </script>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

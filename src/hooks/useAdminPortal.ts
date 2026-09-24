@@ -86,8 +86,8 @@ export function useAdminPortal() {
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
   const [clients, setClients] = useState<TallerClient[]>(getStoredClients);
-  const [orders] = useState<TallerOrder[]>(getStoredOrders);
-  const [inventory] = useState<InventoryItem[]>(getStoredInventory);
+  const [orders, setOrders] = useState<TallerOrder[]>(getStoredOrders);
+  const [inventory, setInventory] = useState<InventoryItem[]>(getStoredInventory);
   const [adminProfile, setAdminProfile] = useState<AdminProfile>(getStoredAdminProfile);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -100,6 +100,10 @@ export function useAdminPortal() {
     const handleAlistamientosUpdate = () => setFullAlistamientos(getStoredFullAlistamientos());
     const handleClientsUpdate = () => setClients(getStoredClients());
     const handleAdminProfileUpdate = () => setAdminProfile(getStoredAdminProfile());
+    const handleOrdersUpdate = () => setOrders(getStoredOrders());
+    const handleInventoryUpdate = () => setInventory(getStoredInventory());
+    const handleInvoicesUpdate = () => setInvoices(getStoredInvoices());
+    const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -110,6 +114,10 @@ export function useAdminPortal() {
         handleAlistamientosUpdate();
         handleClientsUpdate();
         handleAdminProfileUpdate();
+        handleOrdersUpdate();
+        handleInventoryUpdate();
+        handleInvoicesUpdate();
+        handleWorkshopsUpdate();
       }
     };
 
@@ -120,6 +128,10 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
     window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
     window.addEventListener('starmotos_admin_profile_updated', handleAdminProfileUpdate);
+    window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    window.addEventListener('starmotos_inventory_updated', handleInventoryUpdate);
+    window.addEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
+    window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('storage', handleStorageEvent);
 
     return () => {
@@ -130,6 +142,10 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_alistamientos_updated', handleAlistamientosUpdate);
       window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
       window.removeEventListener('starmotos_admin_profile_updated', handleAdminProfileUpdate);
+      window.removeEventListener('starmotos_orders_updated', handleOrdersUpdate);
+      window.removeEventListener('starmotos_inventory_updated', handleInventoryUpdate);
+      window.removeEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
+      window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);

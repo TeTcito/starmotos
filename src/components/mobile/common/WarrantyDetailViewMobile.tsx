@@ -13,6 +13,8 @@ import {
   ZoomIn,
   Tag,
   Check,
+  Plus,
+  PlusCircle,
   Printer,
   MessageCircle,
   Save,
@@ -48,6 +50,7 @@ interface Props {
   onSendToGarante?: (id: string, notes?: string) => void;
   onApproveWarranty?: (id: string, notes: string, resolutionType: 'encargar_taller' | 'envio_repuesto') => void;
   onRejectWarranty?: (id: string, reason: string) => void;
+  onCreateNewRequest?: () => void;
 }
 
 export const WarrantyDetailViewMobile: React.FC<Props> = ({
@@ -60,6 +63,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   onSendToGarante,
   onApproveWarranty,
   onRejectWarranty,
+  onCreateNewRequest,
 }) => {
   // Pestañas activas: cliente, moto, reclamo, dictamen
   const [activeTab, setActiveTab] = useState<'cliente' | 'moto' | 'reclamo' | 'dictamen'>('cliente');
@@ -117,13 +121,21 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     return formData.partsTags.reduce((acc, tag) => acc + (Number(partsBudgetMap[tag]) || 0), 0);
   }, [formData.partsTags, partsBudgetMap]);
 
-  // Bloqueo total si la garantía ya fue aceptada, aprobada, denegada o completada
+  // Denegada oficialmente por Garante o Matriz
+  const isDenied = useMemo(() => {
+    const s1 = (formData.status || '').toLowerCase();
+    const s2 = (warranty.status || '').toLowerCase();
+    return ['denegada', 'rechazada'].includes(s1) || ['denegada', 'rechazada'].includes(s2);
+  }, [formData.status, warranty.status]);
+
+  // Bloqueo total si la garantía ya fue denegada, rechazada, aceptada, aprobada o completada
   const isLocked = useMemo(() => {
     return (
-      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(formData.status) ||
-      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(warranty.status)
+      isDenied ||
+      ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(formData.status) ||
+      ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(warranty.status)
     );
-  }, [formData.status, warranty.status]);
+  }, [isDenied, formData.status, warranty.status]);
 
   // Seguimiento de cambios en presupuesto para mostrar/ocultar botones en Matriz
   const isBudgetModified = useMemo(() => {
@@ -217,6 +229,10 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   // Guardar cambios
   const handleSave = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isLocked) {
+      alert('Esta solicitud de garantía se encuentra finalizada o denegada y está bloqueada para modificaciones.');
+      return;
+    }
 
     const updated: WarrantyRequest = {
       ...warranty,
@@ -431,15 +447,30 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </a>
           )}
 
-          {/* Guardar */}
-          <button
-            type="button"
-            onClick={() => handleSave()}
-            className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shadow-xs"
-            title="Guardar Cambios"
-          >
-            <Save className="w-4 h-4" />
-          </button>
+          {/* Guardar (Oculto si está bloqueada o denegada) */}
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title="Guardar Cambios"
+            >
+              <Save className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Botón rápido "+ Nueva" si la solicitud está denegada */}
+          {isDenied && onCreateNewRequest && (
+            <button
+              type="button"
+              onClick={onCreateNewRequest}
+              className="h-8 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition cursor-pointer"
+              title="Crear Nueva Solicitud"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold">Nueva</span>
+            </button>
+          )}
 
           {/* Eliminar (Solo Admin) */}
           {viewerRole === 'admin' && onDelete && (
@@ -475,6 +506,40 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Banner de Solicitud Denegada / Bloqueada con botón de Nueva Solicitud */}
+      {isDenied && (
+        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-3.5 space-y-2.5 animate-fade-in shadow-2xs">
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+              <XCircle className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs sm:text-sm font-black text-red-950">
+                  Solicitud Denegada
+                </h4>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-red-200 text-red-900 uppercase">
+                  Bloqueada
+                </span>
+              </div>
+              <p className="text-[11px] text-red-800 leading-relaxed mt-0.5">
+                Esta solicitud ha sido denegada oficialmente por la Marca. La edición se encuentra bloqueada tanto para Matriz como para el Taller.
+              </p>
+            </div>
+          </div>
+          {onCreateNewRequest && (
+            <button
+              type="button"
+              onClick={onCreateNewRequest}
+              className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Crear Nueva Solicitud de Garantía</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Toast Feedback */}
       {toastMessage && (
@@ -561,9 +626,10 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Cédula o RUC</label>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.clientIdNumber}
               onChange={(e) => setFormData({ ...formData, clientIdNumber: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -571,10 +637,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Nombre Completo</label>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.clientName}
               onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
               required
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white uppercase"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -595,10 +662,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </div>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.clientPhone}
               onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
               placeholder="0990000000"
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -606,9 +674,10 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Taller de Origen</label>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.tallerOrigin}
               onChange={(e) => setFormData({ ...formData, tallerOrigin: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -651,20 +720,22 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Marca</label>
               <input
                 type="text"
+                disabled={isLocked}
                 value={formData.motorcycleBrand}
                 onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
                 placeholder="Marca"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-700 mb-1">Modelo</label>
               <input
                 type="text"
+                disabled={isLocked}
                 value={formData.motorcycleModel}
                 onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
                 placeholder="Modelo"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -673,20 +744,23 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-bold text-zinc-700">Placa</label>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, motorcyclePlate: 'SIN PLACA' })}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                >
-                  S/P
-                </button>
+                {!isLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, motorcyclePlate: 'SIN PLACA' })}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                  >
+                    S/P
+                  </button>
+                )}
               </div>
               <input
                 type="text"
+                disabled={isLocked}
                 value={formData.motorcyclePlate}
                 onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
                 placeholder="SIN PLACA"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -695,9 +769,10 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 <input
                   type="number"
                   min="0"
+                  disabled={isLocked}
                   value={formData.motorcycleMileage}
                   onChange={(e) => setFormData({ ...formData, motorcycleMileage: e.target.value })}
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white pr-8"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white pr-8 disabled:opacity-75 disabled:cursor-not-allowed"
                 />
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono text-zinc-400">
                   km
@@ -710,9 +785,10 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Serie o Chasis (VIN)</label>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.motorcycleVin}
               onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -721,20 +797,22 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Número de Motor</label>
               <input
                 type="text"
+                disabled={isLocked}
                 value={formData.motorNumber}
                 onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
                 placeholder="S/N"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-700 mb-1">Número de RAMV</label>
               <input
                 type="text"
+                disabled={isLocked}
                 value={formData.ramvNumber}
                 onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase() })}
                 placeholder="S/N"
-                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -743,10 +821,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">N° Factura / Ticket</label>
             <input
               type="text"
+              disabled={isLocked}
               value={formData.invoiceNumber}
               onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
               placeholder="FAC-2026-4869"
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -761,16 +840,17 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <Wrench className="w-4 h-4" />
             </div>
-            <span>3. Reclamo Técnico & Modalidad</span>
+            <span>3. Reclamo & Diagnóstico</span>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Falla Reportada</label>
             <textarea
               rows={3}
+              disabled={isLocked}
               value={formData.issueDescription}
               onChange={(e) => setFormData({ ...formData, issueDescription: e.target.value })}
-              className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 outline-none focus:border-blue-600 focus:bg-white resize-none leading-relaxed"
+              className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 outline-none focus:border-blue-600 focus:bg-white resize-none leading-relaxed disabled:opacity-75 disabled:cursor-not-allowed"
               placeholder="Descripción del reclamo reportado..."
             />
           </div>
@@ -780,28 +860,30 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">
               Repuestos Requeridos ({formData.partsTags.length})
             </label>
-            <div className="flex gap-1.5 mb-2">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddTag();
-                  }
-                }}
-                placeholder="Escriba repuesto y pulse +..."
-                className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-blue-600 focus:bg-white"
-              />
-              <button
-                type="button"
-                onClick={handleAddTag}
-                className="px-3 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition"
-              >
-                +
-              </button>
-            </div>
+            {!isLocked && (
+              <div className="flex gap-1.5 mb-2">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  placeholder="Escriba repuesto y pulse +..."
+                  className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-blue-600 focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  className="px-3 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition"
+                >
+                  +
+                </button>
+              </div>
+            )}
 
             {formData.partsTags.length > 0 ? (
               <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-50 border border-zinc-200 rounded-xl min-h-[44px]">
@@ -812,13 +894,15 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   >
                     <Tag className="w-3 h-3 text-blue-600 shrink-0" />
                     <span>{tag}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(idx)}
-                      className="text-blue-500 hover:text-red-600 ml-0.5 cursor-pointer font-bold"
-                    >
-                      ✕
-                    </button>
+                    {!isLocked && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(idx)}
+                        className="text-blue-500 hover:text-red-600 ml-0.5 cursor-pointer font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -828,98 +912,6 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </p>
             )}
           </div>
-
-          {/* Modalidad de Resolución SOLO para Matriz Central (Oculto en Taller) */}
-          {viewerRole === 'admin' && (
-            <div className="space-y-2 pt-1 border-t border-zinc-100">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-zinc-700">
-                  Modalidad de Resolución <span className="text-red-500">*</span>
-                </label>
-                {formData.resolutionType && (
-                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                    Seleccionada
-                  </span>
-                )}
-              </div>
-
-              {isLocked ? (
-                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                    Estado de Resolución
-                  </span>
-                  {formData.resolutionType === 'encargar_taller' ? (
-                    <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
-                      <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                      <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
-                    </div>
-                  ) : formData.resolutionType === 'envio_repuesto' ? (
-                    <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-                      <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
-                      <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                      <span>Pendiente de dictamen técnico del Garante de Marca</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, resolutionType: 'encargar_taller' })}
-                    className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      formData.resolutionType === 'encargar_taller'
-                        ? 'border-indigo-600 bg-indigo-50/90 shadow-2xs ring-2 ring-indigo-200'
-                        : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                        <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
-                      </div>
-                      {formData.resolutionType === 'encargar_taller' && (
-                        <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 leading-tight">
-                      El taller ejecuta el trabajo y factura repuestos / mano de obra.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, resolutionType: 'envio_repuesto' })}
-                    className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                      formData.resolutionType === 'envio_repuesto'
-                        ? 'border-emerald-600 bg-emerald-50/90 shadow-2xs ring-2 ring-emerald-200'
-                        : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
-                      </div>
-                      {formData.resolutionType === 'envio_repuesto' && (
-                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                          <Check className="w-2.5 h-2.5" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 leading-tight">
-                      Fábrica o Marca despacha directamente las piezas sin costo.
-                    </p>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* =============================================================== */}
           {/* SECCIÓN DE PRESUPUESTO OFICIAL (SIEMPRE EN MATRIZ; EN GARANTE/TALLER SOLO SI ENCARGAR AL TALLER) */}
@@ -1288,7 +1280,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
           {/* CUADRO: DENEGACIÓN OFICIAL */}
           {(formData.status === 'denegada' || formData.status === 'rechazada' || Boolean(formData.rejectionReason)) && (
-            <div className="p-4 rounded-2xl border-2 border-red-300 bg-red-50/90 text-red-900 space-y-2 shadow-2xs animate-fade-in">
+            <div className="p-4 rounded-2xl border-2 border-red-300 bg-red-50/90 text-red-900 space-y-2.5 shadow-2xs animate-fade-in">
               <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
                 <XCircle className="w-4 h-4 text-red-600 shrink-0" />
                 <span>Garantía DENEGADA Oficialmente por la Marca</span>
@@ -1306,6 +1298,16 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <p className="text-[10px] text-red-700 opacity-80 font-mono">
                 {warranty.rejectedAt || 'Hoy, Dictamen Garante Oficial'}
               </p>
+              {onCreateNewRequest && (
+                <button
+                  type="button"
+                  onClick={onCreateNewRequest}
+                  className="mt-2 w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Crear Nueva Solicitud de Garantía</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -1554,15 +1556,29 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </button>
             )}
 
-          {/* Guardar Cambios */}
-          <button
-            type="button"
-            onClick={() => handleSave()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>Guardar Cambios</span>
-          </button>
+          {/* Guardar Cambios si no está bloqueada */}
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Guardar Cambios</span>
+            </button>
+          )}
+
+          {/* Botón Nueva Solicitud si está denegada */}
+          {isDenied && onCreateNewRequest && (
+            <button
+              type="button"
+              onClick={onCreateNewRequest}
+              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ Crear Nueva Solicitud</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'starmotos-v47';
+const CACHE_NAME = 'starmotos-v48';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -8,7 +8,11 @@ const ASSETS_TO_CACHE = [
   '/pwa-192.png',
   '/pwa-512.png',
   '/pwa-maskable-512.png',
-  '/manifest.json'
+  '/manifest.json',
+  '/manifest-admin.json',
+  '/manifest-taller.json',
+  '/manifest-garante.json',
+  '/manifest-cliente.json'
 ];
 
 // Install Event

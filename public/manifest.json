@@ -1,7 +1,7 @@
 {
   "short_name": "StarMotos",
-  "name": "StarMotos - Portal de Clientes",
-  "description": "Portal oficial de clientes de StarMotos. Seguimiento en tiempo real y gestión técnica de motocicletas.",
+  "name": "StarMotos | Plataforma Integral",
+  "description": "Plataforma integral de gestión técnica, administración matriz, talleres y clientes StarMotos.",
   "icons": [
     {
       "src": "/pwa-192.png",
@@ -25,15 +25,38 @@
   "start_url": "/",
   "id": "/",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#2563eb",
   "display": "standalone",
   "orientation": "portrait-primary",
   "scope": "/",
-  "related_applications": [
+  "shortcuts": [
     {
-      "platform": "webapp",
-      "url": "https://starmotos-portal.web.app/manifest.json"
+      "name": "StarMotos Administración",
+      "short_name": "Admin",
+      "description": "Panel central de administración y gestión de sedes",
+      "url": "/?portal=admin#talleres",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "StarMotos Jefe de Taller",
+      "short_name": "Taller",
+      "description": "Órdenes de trabajo, alistamientos PDI y mecánicos",
+      "url": "/?portal=taller#perfil_taller",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "StarMotos Garantías de Marca",
+      "short_name": "Garantías",
+      "description": "Auditoría técnica y dictamen oficial de marca",
+      "url": "/?portal=garantia#solicitudes_garante",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "StarMotos Portal de Clientes",
+      "short_name": "Clientes",
+      "description": "Seguimiento en tiempo real de tu moto y citas",
+      "url": "/?portal=cliente#eventos",
+      "icons": [{ "src": "/pwa-192.png", "sizes": "192x192" }]
     }
-  ],
-  "prefer_related_applications": false
+  ]
 }

@@ -10,6 +10,35 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { initSupabaseRealtime, syncAllFromSupabase } from './services/supabaseService';
 import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
 
+function detectInitialRole(): UserRole {
+  if (typeof window === 'undefined') return 'cliente';
+  const search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  const path = window.location.pathname.toLowerCase();
+
+  if (search.includes('portal=admin') || search.includes('role=admin') || hash.includes('admin') || path.includes('/admin')) return 'admin';
+  if (search.includes('portal=taller') || search.includes('role=taller') || hash.includes('taller') || path.includes('/taller')) return 'taller';
+  if (
+    search.includes('portal=marca') ||
+    search.includes('portal=garante') ||
+    search.includes('portal=garantia') ||
+    search.includes('role=garante') ||
+    hash.includes('garante') ||
+    hash.includes('garantia') ||
+    path.includes('/garantia') ||
+    path.includes('/marca')
+  ) {
+    return 'garante';
+  }
+  if (search.includes('portal=cliente') || search.includes('role=cliente') || hash.includes('cliente') || path.includes('/cliente')) return 'cliente';
+
+  const savedRole = localStorage.getItem('starmotos_role') as UserRole;
+  if (savedRole && ['admin', 'taller', 'garante', 'cliente'].includes(savedRole)) return savedRole;
+  const prefRole = localStorage.getItem('starmotos_preferred_login_role') as UserRole;
+  if (prefRole && ['admin', 'taller', 'garante', 'cliente'].includes(prefRole)) return prefRole;
+  return 'cliente';
+}
+
 function App() {
   // Inicializar sincronización en tiempo real con Supabase y asistente de teclado móvil
   useEffect(() => {
@@ -28,13 +57,12 @@ function App() {
     return localStorage.getItem('starmotos_auth') === 'true';
   });
 
-  const [role, setRole] = useState<UserRole>(() => {
-    const savedRole = localStorage.getItem('starmotos_role') as UserRole;
-    return savedRole || 'cliente';
-  });
+  const [role, setRole] = useState<UserRole>(detectInitialRole);
+  const [loginActiveRole, setLoginActiveRole] = useState<UserRole>(detectInitialRole);
 
   const handleLogin = (selectedRole: UserRole) => {
     setRole(selectedRole);
+    setLoginActiveRole(selectedRole);
     setIsAuthenticated(true);
     localStorage.setItem('starmotos_role', selectedRole);
     localStorage.setItem('starmotos_auth', 'true');
@@ -60,16 +88,22 @@ function App() {
     localStorage.removeItem('starmotos_auth');
     localStorage.removeItem('starmotos_role');
     localStorage.setItem('starmotos_preferred_login_role', role);
+    setLoginActiveRole(role);
     try {
-      window.history.pushState(null, '', `/login/${logoutRole}`);
+      window.history.pushState(null, '', `/?portal=${logoutRole}`);
     } catch (_) {}
     window.location.hash = '';
   };
 
+  const activeAppRole = isAuthenticated ? role : loginActiveRole;
+
   return (
     <>
       {!isAuthenticated ? (
-        <LoginView onLoginSuccess={handleLogin} />
+        <LoginView
+          onLoginSuccess={handleLogin}
+          onRoleActiveChange={setLoginActiveRole}
+        />
       ) : (
         <>
           {role === 'admin' && <AdminPortal onLogout={handleLogout} />}
@@ -79,8 +113,8 @@ function App() {
         </>
       )}
 
-      {/* PWA Install Prompt — se muestra a todos los que no tienen la app instalada */}
-      <PWAInstallPrompt />
+      {/* PWA Install Prompt — Adaptado a cada rol (Admin, Taller, Garante, Cliente) */}
+      <PWAInstallPrompt currentRole={activeAppRole} />
     </>
   );
 }

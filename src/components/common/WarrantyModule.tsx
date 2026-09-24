@@ -1080,33 +1080,35 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Modalidad de Resolución</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditFormData({ ...editFormData, resolutionType: 'encargar_taller' })}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                      editFormData.resolutionType === 'encargar_taller'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-zinc-50 border-zinc-200 text-zinc-700'
-                    }`}
-                  >
-                    🔧 Encargar a Taller
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditFormData({ ...editFormData, resolutionType: 'envio_repuesto' })}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                      editFormData.resolutionType === 'envio_repuesto'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-zinc-50 border-zinc-200 text-zinc-700'
-                    }`}
-                  >
-                    📦 Envío Repuesto
-                  </button>
+              {viewerRole === 'garante' && (
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1">Modalidad de Resolución</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, resolutionType: 'encargar_taller' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                        editFormData.resolutionType === 'encargar_taller'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-700'
+                      }`}
+                    >
+                      🔧 Encargar a Taller
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditFormData({ ...editFormData, resolutionType: 'envio_repuesto' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                        editFormData.resolutionType === 'envio_repuesto'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-zinc-50 border-zinc-200 text-zinc-700'
+                      }`}
+                    >
+                      📦 Envío Repuesto
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 mb-1">Estado de la Solicitud</label>
                 <select
@@ -1355,8 +1357,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 )}
               </div>
 
-              {/* Modalidad de Resolución SOLO para Garante y Matriz Central (Oculto en Taller) */}
-              {viewerRole !== 'taller' && (
+              {/* Modalidad de Resolución: Solo editable para Garante Oficial */}
+              {viewerRole === 'garante' ? (
                 <div className="space-y-2 pt-1 border-t border-zinc-100">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs sm:text-sm font-bold text-zinc-700">
@@ -1445,7 +1447,24 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     </div>
                   )}
                 </div>
-              )}
+              ) : currentWarranty.resolutionType ? (
+                <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                    Resolución Dictaminada por la Marca
+                  </span>
+                  {currentWarranty.resolutionType === 'encargar_taller' ? (
+                    <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                      <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                      <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

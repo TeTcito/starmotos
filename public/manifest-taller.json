@@ -1,0 +1,32 @@
+{
+  "short_name": "StarMotos Taller",
+  "name": "StarMotos - Jefe de Taller",
+  "description": "Gestión técnica de órdenes de trabajo, alistamientos PDI, mecánicos e inventario StarMotos.",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/?portal=taller#perfil_taller",
+  "id": "/?portal=taller",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}

@@ -216,6 +216,10 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
           }}
           onValidateWarranty={onValidateWarranty}
           onSendToGarante={onSendToGarante}
+          onCreateNewRequest={() => {
+            setSelectedWarrantyForDetail(null);
+            setIsEmitting(true);
+          }}
         />
       )}
 

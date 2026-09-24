@@ -276,6 +276,10 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               return next;
             });
           }}
+          onCreateNewRequest={() => {
+            setSelectedWarrantyForDetail(null);
+            setShowCreateModal(true);
+          }}
         />
       )}
 

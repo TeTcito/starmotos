@@ -1,0 +1,32 @@
+{
+  "short_name": "StarMotos Garantías",
+  "name": "StarMotos - Garantías de Marca",
+  "description": "Portal oficial de auditoría técnica, dictamen oficial y liquidación de garantías StarMotos.",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/?portal=garantia#solicitudes_garante",
+  "id": "/?portal=garantia",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/"
+}

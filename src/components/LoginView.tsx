@@ -6,12 +6,14 @@ import { CustomerLoginView } from './login/CustomerLoginView';
 import { TallerLoginView } from './login/TallerLoginView';
 import { GaranteLoginView } from './login/GaranteLoginView';
 import { OFFICIAL_CORPORATE_ACCOUNTS, CorporateAccount } from '../data/authAccounts';
+import { updateWebManifestForRole } from './PWAInstallPrompt';
 
 export { OFFICIAL_CORPORATE_ACCOUNTS };
 export type { CorporateAccount };
 
 interface Props {
   onLoginSuccess: (role: UserRole) => void;
+  onRoleActiveChange?: (role: UserRole) => void;
 }
 
 function detectRoleFromUrl(): UserRole {
@@ -48,12 +50,20 @@ function detectRoleFromUrl(): UserRole {
   return 'cliente';
 }
 
-export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
+export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange }) => {
   const [activeRole, setActiveRole] = useState<UserRole>(detectRoleFromUrl);
 
   useEffect(() => {
+    onRoleActiveChange?.(activeRole);
+    updateWebManifestForRole(activeRole);
+  }, [activeRole, onRoleActiveChange]);
+
+  useEffect(() => {
     const handleUrlChange = () => {
-      setActiveRole(detectRoleFromUrl());
+      const detected = detectRoleFromUrl();
+      setActiveRole(detected);
+      onRoleActiveChange?.(detected);
+      updateWebManifestForRole(detected);
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
@@ -61,7 +71,22 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
     };
-  }, []);
+  }, [onRoleActiveChange]);
+
+  const switchRole = (newRole: UserRole) => {
+    setActiveRole(newRole);
+    const portalUrls: Record<UserRole, string> = {
+      admin: '/?portal=admin',
+      taller: '/?portal=taller',
+      garante: '/?portal=garantia',
+      cliente: '/?portal=cliente',
+    };
+    try {
+      window.history.pushState(null, '', portalUrls[newRole]);
+    } catch (_) {}
+    onRoleActiveChange?.(newRole);
+    updateWebManifestForRole(newRole);
+  };
 
   return (
     <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-white flex flex-col lg:flex-row overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -123,8 +148,56 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           </div>
         </div>
 
+        {/* SELECTOR DE ACCESO DIRECTO POR ROL */}
+        <div className="w-full max-w-sm flex items-center justify-center p-1 bg-zinc-100 rounded-xl gap-1 text-[11px] font-bold mt-1 mb-2">
+          <button
+            type="button"
+            onClick={() => switchRole('cliente')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+              activeRole === 'cliente'
+                ? 'bg-white text-blue-600 shadow-xs font-black'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Clientes
+          </button>
+          <button
+            type="button"
+            onClick={() => switchRole('taller')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+              activeRole === 'taller'
+                ? 'bg-white text-emerald-700 shadow-xs font-black'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Taller
+          </button>
+          <button
+            type="button"
+            onClick={() => switchRole('garante')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+              activeRole === 'garante'
+                ? 'bg-white text-purple-700 shadow-xs font-black'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Garantías
+          </button>
+          <button
+            type="button"
+            onClick={() => switchRole('admin')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+              activeRole === 'admin'
+                ? 'bg-white text-red-600 shadow-xs font-black'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            Matriz
+          </button>
+        </div>
+
         {/* RENDERIZADO EXCLUSIVO E INDEPENDIENTE DEL FORMULARIO */}
-        <div className="w-full flex justify-center pt-2.5">
+        <div className="w-full flex justify-center pt-1">
           {activeRole === 'admin' && (
             <AdminLoginView onLoginSuccess={onLoginSuccess} />
           )}

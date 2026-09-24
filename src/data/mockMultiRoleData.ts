@@ -1119,6 +1119,21 @@ export function deleteStoredClient(idOrCedula: string) {
       }
     } catch (_) {}
 
+    // 5. Limpiar órdenes de taller vinculadas a este cliente
+    try {
+      const currentOrders = getStoredOrders();
+      const remainingOrders = currentOrders.filter(
+        (o) =>
+          o.clientIdNumber !== clean &&
+          o.alistamientoId !== clean &&
+          (target?.idNumber ? o.clientIdNumber !== target.idNumber : true)
+      );
+      if (remainingOrders.length !== currentOrders.length) {
+        localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(remainingOrders));
+        window.dispatchEvent(new Event('starmotos_orders_updated'));
+      }
+    } catch (_) {}
+
     // 5. Eliminar en Supabase (en cascada)
     cloudDeleteClient(clean);
   } catch (e) {
@@ -1296,6 +1311,15 @@ export function deleteStoredAlistamiento(id: string) {
     safeSaveAlistamientosToLocalStorage(current);
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
     cloudDeleteAlistamiento(clean);
+
+    // Eliminar también en cascada cualquier orden de trabajo vinculada a este alistamiento
+    const allOrders = getStoredOrders();
+    const updatedOrders = allOrders.filter(
+      (o) => o.alistamientoId !== clean && o.id !== clean
+    );
+    if (updatedOrders.length !== allOrders.length) {
+      saveStoredOrders(updatedOrders);
+    }
   } catch (e) {
     console.error('Error deleting alistamiento', e);
   }

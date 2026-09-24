@@ -721,6 +721,14 @@ export async function cloudDeleteAlistamiento(id: string) {
       .delete()
       .or(`id.eq.${cleanId},cedula_ruc.eq.${cleanId}`);
     if (error) console.error('[Supabase] Error eliminando alistamiento:', error);
+
+    // Eliminar también en cascada cualquier orden de trabajo vinculada
+    try {
+      await supabase
+        .from('orders')
+        .delete()
+        .or(`data->>alistamientoId.eq.${cleanId}`);
+    } catch (_) {}
   } catch (err) {
     console.error('[Supabase] Excepción eliminando alistamiento:', err);
   }
@@ -751,6 +759,14 @@ export async function cloudDeleteClient(idOrCedula: string) {
       .delete()
       .eq('client_id_number', clean);
     if (warErr) console.error('[Supabase] Error eliminando garantías vinculadas:', warErr);
+
+    // 4. Eliminar de órdenes de taller cualquier orden del cliente
+    try {
+      await supabase
+        .from('orders')
+        .delete()
+        .or(`data->>clientIdNumber.eq.${clean},data->>alistamientoId.eq.${clean}`);
+    } catch (_) {}
   } catch (err) {
     console.error('[Supabase] Excepción eliminando cliente:', err);
   }

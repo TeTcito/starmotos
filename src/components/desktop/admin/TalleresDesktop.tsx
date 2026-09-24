@@ -2,9 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { 
   Building2, ArrowLeft, Wrench, ShieldCheck, Users, Package, Clock, 
   CheckCircle2, AlertTriangle, MapPin, Phone, TrendingUp, DollarSign, 
-  FileText, ChevronRight, User 
+  FileText, ChevronRight, User, Search, ChevronDown
 } from 'lucide-react';
 import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Technician, TallerOrder, InventoryItem, AdminInvoice } from '../../../types/customer';
+import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp } from '../../common/AlistamientoWizard';
+import { saveStoredOrders, getStoredOrders } from '../../../data/mockMultiRoleData';
 
 interface Props {
   workshops: Workshop[];
@@ -15,6 +17,7 @@ interface Props {
   orders: TallerOrder[];
   inventory: InventoryItem[];
   invoices: AdminInvoice[];
+  onUpdateOrderStatus?: (orderId: string, newStatus: string) => void;
 }
 
 const getStatusLabel = (status: string) => {
@@ -43,6 +46,11 @@ const getOrderStatusLabel = (status: string) => {
     'control_calidad': { label: 'Control Calidad', bg: 'bg-purple-50', text: 'text-purple-800' },
     'lista_retiro': { label: 'Lista Retiro', bg: 'bg-emerald-50', text: 'text-emerald-800' },
     'entregada': { label: 'Entregada', bg: 'bg-green-50', text: 'text-green-800' },
+    'inicio': { label: 'Inicio', bg: 'bg-zinc-100', text: 'text-zinc-800' },
+    'en_proceso': { label: 'En Proceso', bg: 'bg-blue-50', text: 'text-blue-800' },
+    'trabajando': { label: 'Trabajando', bg: 'bg-amber-50', text: 'text-amber-800' },
+    'listo_para_entregar': { label: 'Listo Retiro', bg: 'bg-emerald-50', text: 'text-emerald-800' },
+    'entregado': { label: 'Entregado', bg: 'bg-green-50', text: 'text-green-800' },
   };
   return map[status] || { label: status, bg: 'bg-zinc-100', text: 'text-zinc-700' };
 };
@@ -55,10 +63,24 @@ export const TalleresDesktop: React.FC<Props> = ({
   technicians,
   orders,
   inventory,
-  invoices
+  invoices,
+  onUpdateOrderStatus,
 }) => {
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
   const [selectedProvince, setSelectedProvince] = useState<string>('Todas');
+  const [searchWorkshop, setSearchWorkshop] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [orderSearch, setOrderSearch] = useState('');
+
+  const handleOrderStatusChange = (orderId: string, newStatus: string) => {
+    if (onUpdateOrderStatus) {
+      onUpdateOrderStatus(orderId, newStatus);
+    } else {
+      const stored = getStoredOrders();
+      const updated = stored.map(o => o.id === orderId ? { ...o, status: newStatus as any } : o);
+      saveStoredOrders(updated);
+    }
+  };
 
   // Helpers and Memos
   const getWorkshopOrders = (wsId: string) => orders.filter(o => (o as any).workshopId === wsId || (o as any).tallerId === wsId);
@@ -68,10 +90,57 @@ export const TalleresDesktop: React.FC<Props> = ({
     return ['Todas', ...provs.sort()];
   }, [workshops]);
 
+  const getWorkshopLatestActivity = (wsId: string): number => {
+    let latest = 0;
+    // 1. Alistamientos del taller
+    const wsAls = fullAlistamientos.filter(a => matchRecordToWorkshop(a, wsId, workshops));
+    for (const a of wsAls) {
+      const ts = getRecordTimestamp(a);
+      if (ts > latest) latest = ts;
+    }
+    // 2. Órdenes del taller
+    const wsOrds = orders.filter(o => (o as any).workshopId === wsId || (o as any).tallerId === wsId);
+    for (const o of wsOrds) {
+      const dateStr = o.createdAt || o.entryDate;
+      if (dateStr) {
+        const ts = new Date(dateStr).getTime();
+        if (!isNaN(ts) && ts > latest) latest = ts;
+      }
+    }
+    // 3. Garantías del taller
+    const wsWarrs = warranties.filter(w => w.tallerOriginId === wsId || (w as any).tallerOrigin === wsId);
+    for (const w of wsWarrs) {
+      if (w.createdAt) {
+        const ts = new Date(w.createdAt).getTime();
+        if (!isNaN(ts) && ts > latest) latest = ts;
+      }
+    }
+    return latest;
+  };
+
   const filteredWorkshops = useMemo(() => {
-    if (selectedProvince === 'Todas') return workshops;
-    return workshops.filter(w => w.province === selectedProvince);
-  }, [workshops, selectedProvince]);
+    let result = workshops;
+    if (selectedProvince !== 'Todas') {
+      result = result.filter(w => w.province === selectedProvince);
+    }
+    if (searchWorkshop.trim() !== '') {
+      const q = searchWorkshop.toLowerCase();
+      result = result.filter(w => 
+        w.name.toLowerCase().includes(q) || 
+        w.city.toLowerCase().includes(q) || 
+        w.code.toLowerCase().includes(q) || 
+        w.manager.toLowerCase().includes(q)
+      );
+    }
+    // Siempre poner el más reciente primero que tenga algún cambio o actividad
+    return [...result].sort((a, b) => {
+      const actA = getWorkshopLatestActivity(a.id);
+      const actB = getWorkshopLatestActivity(b.id);
+      if (actA !== actB) return actB - actA;
+      return a.name.localeCompare(b.name);
+    });
+  }, [workshops, selectedProvince, searchWorkshop, fullAlistamientos, orders, warranties]);
+
 
   // Global Metrics
   const globalActiveOrders = useMemo(() => {
@@ -96,10 +165,30 @@ export const TalleresDesktop: React.FC<Props> = ({
     const wsOrders = getWorkshopOrders(ws.id);
     const activeWsOrders = wsOrders.length > 0 ? wsOrders.filter(o => o.status !== 'entregada').length : ws.activeOrders;
     
+    let filteredWsOrders = wsOrders;
+    if (orderStatusFilter !== 'all') {
+      filteredWsOrders = filteredWsOrders.filter(o => o.status === orderStatusFilter);
+    }
+    if (orderSearch.trim()) {
+      const q = orderSearch.toLowerCase();
+      filteredWsOrders = filteredWsOrders.filter(o => 
+        o.otNumber.toLowerCase().includes(q) || 
+        o.clientName.toLowerCase().includes(q) || 
+        o.plate.toLowerCase().includes(q)
+      );
+    }
+    filteredWsOrders = [...filteredWsOrders].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.entryDate ? new Date(a.entryDate).getTime() : 0);
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.entryDate ? new Date(b.entryDate).getTime() : 0);
+      if (dateA !== dateB) return dateB - dateA;
+      return b.id.localeCompare(a.id);
+    });
+
     const wsWarranties = warranties.filter(w => w.tallerOriginId === ws.id || w.tallerOrigin === ws.name || (w as any).tallerOrigin === ws.id);
     const warrantiesInProcess = wsWarranties.filter(w => !['completada', 'denegada', 'rechazada'].includes(w.status)).length;
     
-    const wsAlistamientos = fullAlistamientos.filter(a => a.sedeId === ws.id || a.sede === ws.name);
+    const wsAlistamientos = fullAlistamientos.filter(a => matchRecordToWorkshop(a, ws.id, workshops));
+    const sortedWsAlistamientos = [...wsAlistamientos].sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
     const wsClients = clients.filter(c => c.workshopId === ws.id || c.workshopName === ws.name);
     const wsTechnicians = technicians.filter(t => t.workshopId === ws.id || t.workshopName === ws.name);
     
@@ -107,9 +196,12 @@ export const TalleresDesktop: React.FC<Props> = ({
     const wsInventoryCount = wsInventory.length;
     const wsLowStockCount = wsInventory.filter(i => i.stock <= (i.minStock || 5)).length;
 
-    const alistamientosTotal = wsAlistamientos.reduce((acc, a) => acc + (a.valorServicio || 0), 0);
-    const ordersTotal = wsOrders.reduce((acc, o) => acc + (o.totalCost || 0), 0);
+    const alistamientosTotal = wsAlistamientos.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : Number(a.valorServicio || 0)), 0);
+    const ordersTotal = wsOrders.reduce((acc, o) => acc + Number(o.totalCost || 0), 0);
     const totalIngresos = alistamientosTotal + ordersTotal;
+
+    const totalCobrado = wsAlistamientos.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : (a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0))), 0) + ordersTotal;
+    const totalPendiente = Math.max(0, totalIngresos - totalCobrado);
 
     return (
       <div className="flex flex-col gap-6 animate-fade-in pb-10">
@@ -223,6 +315,10 @@ export const TalleresDesktop: React.FC<Props> = ({
               <span className="text-[11px] font-semibold uppercase tracking-wider">Ingresos Tot.</span>
             </div>
             <span className="text-2xl font-bold text-zinc-800">USD {totalIngresos.toFixed(2)}</span>
+            <div className="flex justify-between items-center mt-2 text-[10px]">
+               <span className="text-emerald-600 font-medium">Cobrado: ${totalCobrado.toFixed(2)}</span>
+               <span className="text-rose-600 font-medium">Pendiente: ${totalPendiente.toFixed(2)}</span>
+            </div>
           </div>
         </div>
 
@@ -231,14 +327,35 @@ export const TalleresDesktop: React.FC<Props> = ({
           <div className="flex flex-col gap-6">
             {/* Órdenes */}
             <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
-                <h3 className="font-bold text-sm text-zinc-800 flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-zinc-500" />
-                  Órdenes de Trabajo
-                </h3>
+              <div className="p-4 border-b border-zinc-100 flex flex-col gap-3 bg-zinc-50">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-zinc-800 flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-zinc-500" />
+                    Órdenes de Trabajo
+                  </h3>
+                  <div className="relative">
+                    <input type="text" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="Buscar orden..." className="pl-8 pr-3 py-1.5 bg-white border border-zinc-200 rounded-md text-xs w-48 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2" />
+                  </div>
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                  {['all', 'recepcion', 'diagnostico', 'en_reparacion', 'control_calidad', 'lista_retiro', 'entregada'].map(st => (
+                    <button
+                      key={st}
+                      onClick={() => setOrderStatusFilter(st)}
+                      className={`px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                        orderStatusFilter === st 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {st === 'all' ? 'Todos' : getOrderStatusLabel(st).label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="p-0 overflow-auto max-h-[300px]">
-                {wsOrders.length > 0 ? (
+                {filteredWsOrders.length > 0 ? (
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-white sticky top-0 border-b border-zinc-200">
                       <tr>
@@ -249,8 +366,15 @@ export const TalleresDesktop: React.FC<Props> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
-                      {wsOrders.map(o => {
+                      {filteredWsOrders.map(o => {
                         const stat = getOrderStatusLabel(o.status);
+                        const isSetA = ['recepcion', 'diagnostico', 'cotizacion_pendiente', 'en_reparacion', 'control_calidad', 'lista_retiro', 'entregada'].includes(o.status);
+                        const flow = isSetA
+                          ? ['recepcion', 'diagnostico', 'cotizacion_pendiente', 'en_reparacion', 'control_calidad', 'lista_retiro', 'entregada']
+                          : ['inicio', 'en_proceso', 'trabajando', 'listo_para_entregar', 'entregado'];
+                        const idx = flow.indexOf(o.status);
+                        const nextStatuses = idx !== -1 && idx < flow.length - 1 ? flow.slice(idx + 1) : [];
+                        const isDelivered = o.status === 'entregada' || o.status === 'entregado' || nextStatuses.length === 0;
                         return (
                           <tr key={o.id} className="hover:bg-zinc-50 transition-colors">
                             <td className="py-3 px-4 text-sm font-medium text-blue-700">{o.otNumber}</td>
@@ -259,9 +383,32 @@ export const TalleresDesktop: React.FC<Props> = ({
                               <div className="text-xs text-zinc-500">{o.motorcycleInfo} | {o.plate}</div>
                             </td>
                             <td className="py-3 px-4">
-                              <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-semibold ${stat.bg} ${stat.text}`}>
-                                {stat.label}
-                              </span>
+                              {isDelivered ? (
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${stat.bg} ${stat.text}`}>
+                                  {stat.label}
+                                </span>
+                              ) : (
+                                <div className="relative group inline-block">
+                                  <button className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${stat.bg} ${stat.text}`}>
+                                    {stat.label}
+                                    <ChevronDown className="w-3 h-3" />
+                                  </button>
+                                  <div className="absolute left-0 top-full mt-1 w-36 bg-white border border-zinc-200 rounded-lg shadow-lg hidden group-hover:block z-10">
+                                    {nextStatuses.map(ns => {
+                                      const nextStat = getOrderStatusLabel(ns);
+                                      return (
+                                        <button 
+                                          key={ns} 
+                                          onClick={() => handleOrderStatusChange(o.id, ns)}
+                                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 ${nextStat.text}`}
+                                        >
+                                          {nextStat.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-sm font-medium text-zinc-800 text-right">
                               USD {o.totalCost.toFixed(2)}
@@ -286,8 +433,8 @@ export const TalleresDesktop: React.FC<Props> = ({
                 </h3>
               </div>
               <div className="p-4 overflow-auto max-h-[300px] flex flex-col gap-3">
-                {wsAlistamientos.length > 0 ? (
-                  wsAlistamientos.slice(0, 10).map(a => (
+                {sortedWsAlistamientos.length > 0 ? (
+                  sortedWsAlistamientos.slice(0, 10).map(a => (
                     <div key={a.id} className="flex items-center justify-between p-3 border border-zinc-100 rounded-xl hover:border-emerald-200 transition-colors bg-white">
                       <div>
                         <div className="text-sm font-medium text-zinc-800">{a.nombres} {a.apellidos}</div>
@@ -431,6 +578,12 @@ export const TalleresDesktop: React.FC<Props> = ({
           </h1>
           <p className="text-sm text-zinc-500 mt-1">Gestión consolidada de sucursales y puntos de servicio autorizado.</p>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+             <input type="text" value={searchWorkshop} onChange={e => setSearchWorkshop(e.target.value)} placeholder="Buscar taller..." className="pl-9 pr-4 py-2 bg-white border border-zinc-200 rounded-lg text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+             <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
+          </div>
+        </div>
       </div>
 
       {/* Provinces filter */}
@@ -494,7 +647,7 @@ export const TalleresDesktop: React.FC<Props> = ({
       </div>
 
       {/* Grid of Compact Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {filteredWorkshops.map(ws => {
           const isMatriz = ws.id === 'matriz-la-mana' || ws.name.toLowerCase().includes('matriz');
           
@@ -506,12 +659,12 @@ export const TalleresDesktop: React.FC<Props> = ({
             <div 
               key={ws.id}
               onClick={() => setSelectedWorkshopId(ws.id)}
-              className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-md transition-all ${
+              className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all flex flex-col ${
                 isMatriz ? 'border-blue-400 ring-1 ring-blue-400/20' : 'border-zinc-200 hover:border-blue-300'
               }`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <span className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[10px] font-mono tracking-wider">
+              <div className="flex items-start justify-between mb-1.5">
+                <span className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[9px] font-mono tracking-wider">
                   {ws.code}
                 </span>
                 <div className="flex items-center gap-1.5" title={ws.status}>
@@ -519,27 +672,23 @@ export const TalleresDesktop: React.FC<Props> = ({
                 </div>
               </div>
               
-              <h3 className="text-sm font-bold text-zinc-800 line-clamp-1">{ws.name}</h3>
-              <div className="text-[11px] text-zinc-500 mt-0.5 mb-1 flex items-center gap-1">
+              <h3 className="text-[13px] font-bold text-zinc-800 line-clamp-1">{ws.name}</h3>
+              <div className="text-[10px] text-zinc-500 mt-0.5 mb-2 flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 {ws.city}
               </div>
-              <div className="text-[11px] text-zinc-600 mb-3 flex items-center gap-1">
-                <User className="w-3 h-3 text-zinc-400" />
-                <span className="truncate">{ws.manager}</span>
-              </div>
 
-              <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-zinc-100">
-                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[10px] text-zinc-600" title="Órdenes">
-                  <Wrench className="w-3 h-3 text-zinc-400" />
+              <div className="flex items-center gap-1 mt-auto pt-2 border-t border-zinc-100">
+                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Órdenes">
+                  <Wrench className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsOrdersCount}</span>
                 </div>
-                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[10px] text-zinc-600" title="Garantías">
-                  <ShieldCheck className="w-3 h-3 text-zinc-400" />
+                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Garantías">
+                  <ShieldCheck className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsWarrantiesCount}</span>
                 </div>
-                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[10px] text-zinc-600" title="Mecánicos">
-                  <Users className="w-3 h-3 text-zinc-400" />
+                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Mecánicos">
+                  <Users className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsMechanicsCount}</span>
                 </div>
               </div>

@@ -280,6 +280,7 @@ export const AdminViewMobile: React.FC<Props> = ({
             onDeleteRecord={onDeleteFullAlistamiento}
             recentRecords={fullAlistamientos}
             isMatriz={true}
+            orders={orders}
           />
         )}
         {activeSection === 'clientes_admin' && (

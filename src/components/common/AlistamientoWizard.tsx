@@ -40,6 +40,7 @@ import {
   ServiceActionType,
   Workshop,
   TallerClient,
+  TallerOrder,
 } from '../../types/customer';
 import {
   querySriMock,
@@ -47,6 +48,7 @@ import {
   saveStoredClients,
   getStoredFullAlistamientos,
   getRegisteredBrands,
+  getStoredOrders,
 } from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
@@ -68,6 +70,7 @@ interface Props {
   isMatriz?: boolean;
   selectedWorkshopFilter?: string;
   onSelectWorkshopFilter?: (wsId: string) => void;
+  orders?: TallerOrder[];
 }
 
 export const isPdiOnlyRecord = (record: AlistamientoFullRecord | AlistamientoFormData): boolean => {
@@ -117,6 +120,64 @@ export const matchRecordToWorkshop = (
   return false;
 };
 
+export const getRecordTimestamp = (r: AlistamientoFullRecord): number => {
+  // 1. Si el ID contiene timestamp numérico de Date.now() (ej. als-1727185338000)
+  const idMatch = (r.id || '').match(/(\d{12,14})/);
+  if (idMatch) {
+    const ts = Number(idMatch[1]);
+    if (!isNaN(ts) && ts > 1600000000000) return ts;
+  }
+
+  // 2. Si fechaServicio (YYYY-MM-DD) y horaServicio (HH:mm) están presentes
+  if (r.fechaServicio) {
+    const time = r.horaServicio ? (r.horaServicio.length === 5 ? `${r.horaServicio}:00` : r.horaServicio) : '00:00:00';
+    const parsed = Date.parse(`${r.fechaServicio}T${time}`);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Si createdAt tiene fecha legible estándar o ISO
+  if (r.createdAt) {
+    const parsed = Date.parse(r.createdAt);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  return 0;
+};
+
+export const getRecordOrderStatus = (
+  record: AlistamientoFullRecord,
+  ordersList: TallerOrder[] = []
+): 'completed' | 'in_progress' | null => {
+  if (!ordersList || ordersList.length === 0) return null;
+  // 1. Coincidencia directa por alistamientoId
+  let order = ordersList.find((o) => o.alistamientoId && o.alistamientoId === record.id);
+  // 2. Coincidencia si el ID del alistamiento coincide con el ID de la orden
+  if (!order) {
+    order = ordersList.find((o) => o.id === record.id);
+  }
+  // 3. Coincidencia de respaldo por cédula y placa
+  if (!order && record.cedulaRuc) {
+    const cleanPlate = (record.placa || '').trim().toUpperCase();
+    const hasValidPlate = cleanPlate && cleanPlate !== 'S/P' && cleanPlate !== 'EN TRÁMITE' && cleanPlate !== 'ENTRAMITE';
+    order = ordersList.find((o) => {
+      if (o.clientIdNumber !== record.cedulaRuc) return false;
+      if (hasValidPlate && o.plate) {
+        return o.plate.trim().toUpperCase() === cleanPlate;
+      }
+      return false;
+    });
+  }
+
+  if (!order) return null;
+
+  const st = (order.status || '').toLowerCase().trim();
+  if (st === 'entregado' || st === 'entregada') {
+    return 'completed';
+  }
+  // Cualquier otro estado activo en taller ('inicio', 'en_proceso', 'trabajando', 'listo_para_entregar', 'recepcion', etc.)
+  return 'in_progress';
+};
+
 export const AlistamientoWizard: React.FC<Props> = ({
   defaultAtendidoPor,
   defaultSede,
@@ -134,6 +195,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   isMatriz = false,
   selectedWorkshopFilter: propSelectedWorkshopFilter,
   onSelectWorkshopFilter,
+  orders: propOrders,
 }) => {
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
@@ -175,6 +237,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
   >('recientes');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const RECORDS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterPayment, filterDateRange, sortBy, selectedWorkshopFilter]);
+
   // Marcas registradas en tiempo real de los garantes oficiales
   const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
 
@@ -189,6 +259,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
       window.removeEventListener('starmotos_garante_profile_updated', handleBrandsUpdate);
     };
   }, []);
+
+  // Órdenes de trabajo para colorear filas según estado de taller (verde suave si entregada, amarillo suave si en proceso)
+  const [internalOrders, setInternalOrders] = useState<TallerOrder[]>(() => getStoredOrders());
+
+  useEffect(() => {
+    const handleOrdersUpdate = () => {
+      setInternalOrders(getStoredOrders());
+    };
+    window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    return () => {
+      window.removeEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    };
+  }, []);
+
+  const effectiveOrders = propOrders || internalOrders;
 
   const handleResetFilters = () => {
     setFilterPayment('all');
@@ -247,8 +332,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     tecnicoId: technicians[0]?.id || '',
     kilometraje: '',
     aceite: 'con_aceite',
-    nivelAceite: 'optimo',
-    tipoAceite: 'Katana 20W50',
+    nivelAceite: 'mineral',
+    tipoAceite: '10W-30',
     numeroFactura: '',
     numeroTicket: '',
     valorServicio: '',
@@ -264,6 +349,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
     evidenciaTransferencia: '',
     createdAt: '',
   });
+
+  const [customOilTypes, setCustomOilTypes] = useState<string[]>([]);
+  const [showCustomOilInput, setShowCustomOilInput] = useState(false);
+  const [newCustomOil, setNewCustomOil] = useState('');
+
+  const handleAddCustomOil = () => {
+    if (newCustomOil.trim() && !customOilTypes.includes(newCustomOil.trim())) {
+      setCustomOilTypes([...customOilTypes, newCustomOil.trim()]);
+      setNewCustomOil('');
+      setShowCustomOilInput(false);
+    }
+  };
 
   const [isSearching, setIsSearching] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
@@ -509,14 +606,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
     // 5. Ordenamiento
     return [...base].sort((a, b) => {
       if (sortBy === 'recientes') {
-        const dateA = a.fechaServicio || a.createdAt || '';
-        const dateB = b.fechaServicio || b.createdAt || '';
-        return dateB.localeCompare(dateA);
+        const timeA = getRecordTimestamp(a);
+        const timeB = getRecordTimestamp(b);
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || '').localeCompare(a.id || '');
       }
       if (sortBy === 'antiguos') {
-        const dateA = a.fechaServicio || a.createdAt || '';
-        const dateB = b.fechaServicio || b.createdAt || '';
-        return dateA.localeCompare(dateB);
+        const timeA = getRecordTimestamp(a);
+        const timeB = getRecordTimestamp(b);
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'cliente_asc') {
         const nameA = `${a.nombres} ${a.apellidos}`.trim().toLowerCase();
@@ -595,6 +694,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
       totalOperaciones: filteredRecords.length,
     };
   }, [filteredRecords]);
+
+  // Paginación derivada
+  const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * RECORDS_PER_PAGE, currentPage * RECORDS_PER_PAGE);
 
   // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
   const clientHistoricalRecords = useMemo(() => {
@@ -859,8 +962,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
       tecnicoId: technicians[0]?.id || '',
       kilometraje: '',
       aceite: 'con_aceite',
-      nivelAceite: 'optimo',
-      tipoAceite: 'Katana 20W50',
+      nivelAceite: 'mineral',
+      tipoAceite: '10W-30',
       numeroFactura: '',
       numeroTicket: '',
       valorServicio: '',
@@ -916,8 +1019,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
         : (technicians[0]?.id || ''),
       kilometraje: record.kilometraje || '',
       aceite: record.aceite || 'con_aceite',
-      nivelAceite: record.nivelAceite || 'optimo',
-      tipoAceite: record.tipoAceite || 'Katana 20W50',
+      nivelAceite: record.nivelAceite || 'mineral',
+      tipoAceite: record.tipoAceite || '10W-30',
       numeroFactura: '',
       numeroTicket: '',
       valorServicio: 35.0,
@@ -1555,7 +1658,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 {/* Técnico y Aceite */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1">Técnico Responsable</label>
                     <input
@@ -1571,20 +1674,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1">Tipo de Aceite</label>
                     <select
-                      value={detailFormData.tipoAceite || 'Katana 20W50'}
+                      value={detailFormData.nivelAceite || 'mineral'}
+                      onChange={(e) => setDetailFormData({ ...detailFormData, nivelAceite: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                    >
+                      <option value="mineral">Mineral</option>
+                      <option value="semisintetico">Semisintético</option>
+                      <option value="sintetico">Sintético</option>
+                      <option value="full_sintetico">Full Sintético</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Viscosidad / Grado</label>
+                    <select
+                      value={detailFormData.tipoAceite || '10W-30'}
                       onChange={(e) => setDetailFormData({ ...detailFormData, tipoAceite: e.target.value })}
                       className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
                     >
-                      <option value="Katana 10W30">Katana 10/30</option>
-                      <option value="Katana 20W50">Katana 20/50</option>
-                      <option value="Katana 15W40">Katana 15/40</option>
-                      <option value="Motul 5000">Motul 5000</option>
-                      <option value="Motul 7100">Motul 7100</option>
-                      <option value="Motor 1 20W50">Motor 1 20/50</option>
-                      <option value="Shineray 20W50">Shineray 20/50</option>
-                      <option value="4T Mineral 20W50">20W50 Mineral</option>
-                      <option value="4T Semi 10W40">10W40 Semi</option>
-                      <option value="Castrol Actevo 20W50">Castrol 20W50</option>
+                      <option value="10W-30">10W-30</option>
+                      <option value="10W-40">10W-40</option>
+                      <option value="15W-40">15W-40</option>
+                      <option value="15W-50">15W-50</option>
+                      <option value="20W-40">20W-40</option>
+                      <option value="20W-50">20W-50</option>
+                      <option value="25W-50">25W-50</option>
+                      <option value="5W-30">5W-30</option>
+                      <option value="5W-40">5W-40</option>
+                      {customOilTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
                       <option value="Sin Tipo">N/A</option>
                     </select>
                   </div>
@@ -2476,10 +2595,26 @@ export const AlistamientoWizard: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Tabla Tipo Excel de Alistamientos */}
-          {filteredRecords.length > 0 ? (
-            <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
-              <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
+            {/* Barra de Leyenda de Estados de Taller y Conteo */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 text-xs shrink-0 select-none">
+              <span className="font-semibold text-zinc-500 text-[11px]">
+                {filteredRecords.length} alistamiento{filteredRecords.length === 1 ? '' : 's'} registrado{filteredRecords.length === 1 ? '' : 's'}
+              </span>
+              <div className="flex items-center gap-3 text-[11px] font-semibold">
+                <div className="flex items-center gap-1.5" title="Alistamientos cuya orden de trabajo en taller ya fue completada y entregada">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span>
+                  <span className="text-emerald-800">Orden Entregada (Fila Verde)</span>
+                </div>
+                <div className="flex items-center gap-1.5" title="Alistamientos con orden de trabajo iniciada o en proceso de mantenimiento en taller">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-2xs animate-pulse"></span>
+                  <span className="text-amber-800">En Proceso en Taller (Fila Amarilla)</span>
+                </div>
+              </div>
+            </div>
+
+            {filteredRecords.length > 0 ? (
+              <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
+                <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
                 <table className="w-full table-fixed text-left text-xs border-collapse">
                   <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
                     <tr className="text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 select-none">
@@ -2497,17 +2632,41 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 text-zinc-800">
-                    {filteredRecords.map((record, idx) => {
+                    {paginatedRecords.map((record, i) => {
+                      const idx = (currentPage - 1) * RECORDS_PER_PAGE + i;
+                      const orderStatus = getRecordOrderStatus(record, effectiveOrders);
+
+                      let rowBgClass = 'even:bg-zinc-50/40 hover:bg-blue-50/70 active:bg-blue-100/70 text-zinc-800';
+                      let statusTooltip = `Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`;
+
+                      if (orderStatus === 'completed') {
+                        rowBgClass = 'bg-emerald-50/75 hover:bg-emerald-100/80 active:bg-emerald-200/70 text-emerald-950';
+                        statusTooltip = `[ORDEN ENTREGADA / COMPLETADA] Ficha técnica de ${record.nombres} ${record.apellidos}`;
+                      } else if (orderStatus === 'in_progress') {
+                        rowBgClass = 'bg-amber-50/75 hover:bg-amber-100/80 active:bg-amber-200/70 text-amber-950';
+                        statusTooltip = `[MANTENIMIENTO EN PROCESO EN TALLER] Ficha técnica de ${record.nombres} ${record.apellidos}`;
+                      }
+
                       return (
                         <tr
                           key={record.id}
                           onClick={() => handleOpenRecordDetail(record)}
-                          className="cursor-pointer hover:bg-blue-50/70 active:bg-blue-100/70 transition-colors divide-x divide-zinc-200/70 even:bg-zinc-50/40 select-none group"
-                          title={`Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`}
+                          className={`cursor-pointer transition-colors divide-x divide-zinc-200/70 select-none group ${rowBgClass}`}
+                          title={statusTooltip}
                         >
                           {/* 1. # */}
-                          <td className="px-1 py-2 text-center font-mono text-zinc-400 text-[11px] bg-zinc-50/50">
-                            {idx + 1}
+                          <td className={`px-1 py-2 text-center font-mono text-[11px] ${orderStatus ? 'bg-transparent' : 'bg-zinc-50/50'}`}>
+                            <div className="flex items-center justify-center gap-1">
+                              {orderStatus === 'completed' && (
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs" title="Orden entregada" />
+                              )}
+                              {orderStatus === 'in_progress' && (
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse shadow-2xs" title="En proceso en taller" />
+                              )}
+                              <span className={orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
+                                {idx + 1}
+                              </span>
+                            </div>
                           </td>
 
                           {/* 2. Cliente */}
@@ -2742,6 +2901,63 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </tfoot>
                 </table>
               </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="bg-white border-t border-zinc-200 p-3 flex items-center justify-between shadow-sm z-10 shrink-0">
+                  <div className="text-xs font-semibold text-zinc-600">
+                    Mostrando {(currentPage - 1) * RECORDS_PER_PAGE + 1}-{Math.min(currentPage * RECORDS_PER_PAGE, filteredRecords.length)} de {filteredRecords.length} registros
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs flex items-center"
+                    >
+                      Anterior
+                    </button>
+                    <div className="flex items-center gap-1 hidden sm:flex px-1">
+                      {(() => {
+                        const maxVisible = 5;
+                        let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                        let end = Math.min(totalPages, start + maxVisible - 1);
+                        if (end - start + 1 < maxVisible) {
+                          start = Math.max(1, end - maxVisible + 1);
+                        }
+                        
+                        const pages = [];
+                        if (start > 1) {
+                          pages.push(
+                            <button key="1" type="button" onClick={() => setCurrentPage(1)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === 1 ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>1</button>
+                          );
+                          if (start > 2) pages.push(<span key="ellipsis1" className="text-zinc-400 text-xs font-bold tracking-wider px-0.5">...</span>);
+                        }
+                        for (let i = start; i <= end; i++) {
+                          pages.push(
+                            <button key={i} type="button" onClick={() => setCurrentPage(i)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === i ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>{i}</button>
+                          );
+                        }
+                        if (end < totalPages) {
+                          if (end < totalPages - 1) pages.push(<span key="ellipsis2" className="text-zinc-400 text-xs font-bold tracking-wider px-0.5">...</span>);
+                          pages.push(
+                            <button key={totalPages} type="button" onClick={() => setCurrentPage(totalPages)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === totalPages ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>{totalPages}</button>
+                          );
+                        }
+                        return pages;
+                      })()}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs flex items-center"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-white border border-zinc-200 rounded-xl">
@@ -3282,12 +3498,43 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 {/* Aceite: 3 datos seguidos en una fila (Estado | Nivel | Tipo) */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                    Control de Aceite (Estado / Nivel / Tipo)
-                  </label>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Control de Aceite
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomOilInput(!showCustomOilInput)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar Aceite</span>
+                    </button>
+                  </div>
+
+                  {showCustomOilInput && (
+                    <div className="flex gap-2 mb-2 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                      <input
+                        type="text"
+                        value={newCustomOil}
+                        onChange={(e) => setNewCustomOil(e.target.value)}
+                        placeholder="Nueva Viscosidad..."
+                        className="flex-1 px-2 py-1 text-xs border border-emerald-200 rounded outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomOil}
+                        className="px-2 py-1 text-xs bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700"
+                      >
+                        Añadir
+                      </button>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-3 gap-2">
                     <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Estado</label>
                       <select
                         value={formData.aceite}
                         onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
@@ -3299,34 +3546,38 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </div>
 
                     <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Tipo de Aceite</label>
                       <select
-                        value={formData.nivelAceite || 'optimo'}
+                        value={formData.nivelAceite || 'mineral'}
                         onChange={(e) => setFormData({ ...formData, nivelAceite: e.target.value })}
                         className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
-                        <option value="optimo">Nivel Óptimo</option>
-                        <option value="alto">Nivel Alto</option>
-                        <option value="medio">Nivel Medio</option>
-                        <option value="bajo">Nivel Bajo</option>
+                        <option value="mineral">Mineral</option>
+                        <option value="semisintetico">Semisintético</option>
+                        <option value="sintetico">Sintético</option>
+                        <option value="full_sintetico">Full Sintético</option>
                       </select>
                     </div>
 
                     <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Viscosidad / Grado</label>
                       <select
-                        value={formData.tipoAceite || 'Katana 20W50'}
+                        value={formData.tipoAceite || '10W-30'}
                         onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
                         className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
                       >
-                        <option value="Katana 10W30">Katana 10/30</option>
-                        <option value="Katana 20W50">Katana 20/50</option>
-                        <option value="Katana 15W40">Katana 15/40</option>
-                        <option value="Motul 5000">Motul 5000</option>
-                        <option value="Motul 7100">Motul 7100</option>
-                        <option value="Motor 1 20W50">Motor 1 20/50</option>
-                        <option value="Shineray 20W50">Shineray 20/50</option>
-                        <option value="4T Mineral 20W50">20W50 Mineral</option>
-                        <option value="4T Semi 10W40">10W40 Semi</option>
-                        <option value="Castrol Actevo 20W50">Castrol 20W50</option>
+                        <option value="10W-30">10W-30</option>
+                        <option value="10W-40">10W-40</option>
+                        <option value="15W-40">15W-40</option>
+                        <option value="15W-50">15W-50</option>
+                        <option value="20W-40">20W-40</option>
+                        <option value="20W-50">20W-50</option>
+                        <option value="25W-50">25W-50</option>
+                        <option value="5W-30">5W-30</option>
+                        <option value="5W-40">5W-40</option>
+                        {customOilTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
                         <option value="Sin Tipo">N/A</option>
                       </select>
                     </div>

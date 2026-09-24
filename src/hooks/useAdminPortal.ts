@@ -45,6 +45,7 @@ import {
   deleteStoredAlerts,
   querySriMock,
   getStoredOrders,
+  saveStoredOrders,
   getStoredInventory,
   getStoredAdminProfile,
   saveStoredAdminProfile,
@@ -825,7 +826,12 @@ export function useAdminPortal() {
   const deleteFullAlistamiento = useCallback((id: string) => {
     deleteStoredAlistamiento(id);
     setFullAlistamientos((prev) => prev.filter((r) => r.id !== id && r.cedulaRuc !== id));
-    showToast('Alistamiento eliminado correctamente.', 'info');
+    setOrders((prev) => {
+      const updated = prev.filter((o) => o.alistamientoId !== id && o.id !== id);
+      saveStoredOrders(updated);
+      return updated;
+    });
+    showToast('Alistamiento y orden de trabajo eliminados correctamente.', 'info');
   }, [showToast]);
 
   // Eliminar cliente y cuenta de usuario de forma definitiva
@@ -837,6 +843,11 @@ export function useAdminPortal() {
     setClients((prev) => prev.filter((c) => c.id !== idOrCedula && c.idNumber !== idOrCedula));
     setFullAlistamientos((prev) => prev.filter((r) => r.cedulaRuc !== idOrCedula && r.id !== idOrCedula));
     setWarranties((prev) => prev.filter((w) => w.clientIdNumber !== idOrCedula));
+    setOrders((prev) => {
+      const updated = prev.filter((o) => o.clientIdNumber !== idOrCedula && o.alistamientoId !== idOrCedula);
+      saveStoredOrders(updated);
+      return updated;
+    });
 
     // 3. Eliminar cuenta de credenciales de login si existía
     try {

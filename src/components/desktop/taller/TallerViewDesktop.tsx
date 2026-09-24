@@ -367,14 +367,14 @@ export const TallerViewDesktop: React.FC<Props> = ({
         {/* CONTENIDO PRINCIPAL */}
         <main
           className={`flex-1 w-full bg-white ${
-            activeSection === 'clientes_taller'
+            activeSection === 'clientes_taller' || activeSection === 'alistamiento_taller'
               ? 'overflow-hidden flex flex-col p-4'
               : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-5'
           }`}
         >
           <div
             className={`w-full ${
-              activeSection === 'clientes_taller'
+              activeSection === 'clientes_taller' || activeSection === 'alistamiento_taller'
                 ? 'flex-1 min-h-0 flex flex-col'
                 : ''
             }`}
@@ -405,6 +405,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 isMatriz={isMatriz}
                 selectedWorkshopFilter={selectedWorkshopFilter}
                 onSelectWorkshopFilter={onSelectWorkshopFilter}
+                orders={orders}
               />
             )}
             {activeSection === 'solicitudes_garantia' && (

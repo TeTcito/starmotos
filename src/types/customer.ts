@@ -615,6 +615,7 @@ export interface TallerOrder {
   workshopName?: string;
   alistamientoId?: string;
   servicesSummary?: string;
+  createdAt?: string;
 }
 
 // --- Perfil Garante ---

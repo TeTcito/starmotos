@@ -306,6 +306,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             isMatriz={isMatriz}
             selectedWorkshopFilter={selectedWorkshopFilter}
             onSelectWorkshopFilter={onSelectWorkshopFilter}
+            orders={orders}
           />
         )}
         {activeSection === 'solicitudes_garantia' && (

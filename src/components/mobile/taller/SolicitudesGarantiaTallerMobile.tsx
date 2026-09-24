@@ -317,6 +317,8 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
           clients={clients}
           defaultTallerOrigin={currentWorkshopName}
           defaultTallerOriginId={currentWorkshopId || 'matriz-la-mana'}
+          viewerRole="taller"
+          isMatriz={false}
         />
       )}
 

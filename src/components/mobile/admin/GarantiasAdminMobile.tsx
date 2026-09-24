@@ -186,6 +186,8 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
         clients={clients}
         defaultTallerOrigin="StarMotos Sede Matriz"
         defaultTallerOriginId="sede-matriz"
+        viewerRole="admin"
+        isMatriz={true}
       />
     );
   }

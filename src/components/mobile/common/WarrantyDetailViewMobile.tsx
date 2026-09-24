@@ -829,8 +829,8 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Modalidad de Resolución SOLO para Garante y Taller (Oculto en Matriz Central) */}
-          {viewerRole !== 'admin' && (
+          {/* Modalidad de Resolución SOLO para Matriz Central (Oculto en Taller) */}
+          {viewerRole === 'admin' && (
             <div className="space-y-2 pt-1 border-t border-zinc-100">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-zinc-700">
@@ -843,7 +843,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 )}
               </div>
 
-              {viewerRole === 'taller' || isLocked ? (
+              {isLocked ? (
                 <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
                   <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
                     Estado de Resolución

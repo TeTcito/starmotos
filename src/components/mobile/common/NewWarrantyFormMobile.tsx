@@ -53,6 +53,8 @@ interface Props {
   clients?: TallerClient[];
   defaultTallerOrigin?: string;
   defaultTallerOriginId?: string;
+  viewerRole?: 'admin' | 'taller';
+  isMatriz?: boolean;
 }
 
 export const NewWarrantyFormMobile: React.FC<Props> = ({
@@ -61,7 +63,10 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   clients = [],
   defaultTallerOrigin = 'StarMotos Sede Matriz',
   defaultTallerOriginId = 'sede-matriz',
+  viewerRole = 'taller',
+  isMatriz = false,
 }) => {
+  const isMatrizMode = Boolean(isMatriz || viewerRole === 'admin');
   const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
 
   useEffect(() => {
@@ -385,10 +390,10 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       issueDescription: formData.issueDescription.trim(),
       partsTags: partsTags,
       partsRequired: partsTags.join(', '),
-      resolutionType: formData.resolutionType,
+      resolutionType: isMatrizMode ? formData.resolutionType : undefined,
       diagnosticPhotos: [...loadedPhotos, ...loadedVideos],
       status: 'en_revision',
-      estimatedCost: formData.resolutionType === 'encargar_taller' ? parseFloat(formData.estimatedCost) || 0 : 0,
+      estimatedCost: isMatrizMode && formData.resolutionType === 'encargar_taller' ? parseFloat(formData.estimatedCost) || 0 : 0,
     };
 
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.65 } });
@@ -870,8 +875,11 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Modalidad de Resolución (2 Botones interactivos) */}
-          <div className="space-y-2 pt-1 border-t border-zinc-100">
+          {/* Modalidad de Resolución SOLO para Matriz */}
+          {isMatrizMode && (
+            <>
+              {/* Modalidad de Resolución (2 Botones interactivos) */}
+              <div className="space-y-2 pt-1 border-t border-zinc-100">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-zinc-700">
                 Modalidad de Resolución <span className="text-red-500">*</span>
@@ -1076,8 +1084,10 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
+    </div>
+  )}
 
       {/* ========================================================================= */}
       {/* 6. BLOQUE 4: INSPECCIÓN VISUAL DEL DAÑO (FOTOGRAFÍAS Y VIDEOS)             */}

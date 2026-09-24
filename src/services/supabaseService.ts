@@ -13,7 +13,7 @@ import {
   DictamenRecord,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { uploadWarrantyMedia } from './mediaStorage';
+import { uploadWarrantyMedia, saveMediaToIndexedDB } from './mediaStorage';
 
 let isRealtimeInitialized = false;
 let isSyncing = false;
@@ -138,6 +138,60 @@ export function isDeletedTombstone(id?: string | null): boolean {
   const clean = String(id).trim();
   if (!clean) return false;
   return getDeletedTombstones().has(clean);
+}
+
+/**
+ * Guarda alistamientos en LocalStorage de forma segura con protección contra límite de cuota (QuotaExceededError).
+ * Si las fotos en Base64 exceden el espacio del navegador (~5MB), las fotos pesadas se respaldan
+ * en IndexedDB y se almacena una versión optimizada y ligera en LocalStorage para garantizar que NUNCA
+ * se bloquee la visualización de alistamientos en Matriz ni en ninguna sede.
+ */
+export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRecord[]): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(records));
+    return true;
+  } catch (quotaErr) {
+    console.warn('[Storage] LocalStorage lleno al guardar alistamientos, optimizando fotos a IndexedDB:', quotaErr);
+    try {
+      // Nivel 1: Conservar registros completos pero aligerar fotos > 15KB respaldándolas en IndexedDB
+      const optimized = records.map((r) => {
+        let copy = { ...r };
+        if (r.fotos && r.fotos.length > 0) {
+          copy.fotos = r.fotos.map((f, i) => {
+            if (typeof f === 'string' && f.length > 15000) {
+              try {
+                saveMediaToIndexedDB(`als_foto_${r.id}_${i}`, f);
+              } catch (_) {}
+              return f.slice(0, 300);
+            }
+            return f;
+          });
+        }
+        if (typeof r.evidenciaTransferencia === 'string' && r.evidenciaTransferencia.length > 15000) {
+          try {
+            saveMediaToIndexedDB(`als_evidencia_${r.id}`, r.evidenciaTransferencia);
+          } catch (_) {}
+        }
+        return copy;
+      });
+      localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(optimized));
+      return true;
+    } catch (quotaErr2) {
+      console.warn('[Storage] Quota aún excedida, guardando metadatos de alistamiento sin fotos en LocalStorage:', quotaErr2);
+      try {
+        // Nivel 2: Guardar todos los datos esenciales del alistamiento con array fotos vacío
+        const stripped = records.map((r) => ({
+          ...r,
+          fotos: [],
+        }));
+        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(stripped));
+        return true;
+      } catch (quotaErr3) {
+        console.error('[Storage] Error crítico al persistir alistamientos en LocalStorage:', quotaErr3);
+        return false;
+      }
+    }
+  }
 }
 
 // =========================================================================
@@ -279,9 +333,36 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(cloudAlistamientos));
+        // Fusión bidireccional inteligente: no pisar alistamientos locales no sincronizados
+        const existingLocalRaw = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
+        let localList: AlistamientoFullRecord[] = [];
+        if (existingLocalRaw) {
+          try {
+            localList = JSON.parse(existingLocalRaw);
+          } catch (_) {}
+        }
+        const cloudIds = new Set(cloudAlistamientos.map((a) => a.id));
+        const mergedAlistamientos = [...cloudAlistamientos];
+        for (const loc of localList) {
+          if (!loc || !loc.id) continue;
+          const isTombstoned =
+            tombstones.has(loc.id) ||
+            (loc.cedulaRuc && tombstones.has(loc.cedulaRuc.trim()));
+
+          if (isTombstoned) {
+            cloudDeleteAlistamiento(loc.id);
+            continue;
+          }
+
+          if (!cloudIds.has(loc.id)) {
+            mergedAlistamientos.push(loc);
+            cloudSaveAlistamiento(loc);
+          }
+        }
+
+        safeSaveAlistamientosToLocalStorage(mergedAlistamientos);
         window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
-        alistamientosCount = cloudAlistamientos.length;
+        alistamientosCount = mergedAlistamientos.length;
       }
     } catch (e) {
       console.warn('Error sincronizando alistamientos:', e);
@@ -566,6 +647,7 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
       sede_id: rec.sedeId || 'taller-principal',
       placa: rec.placa || null,
       chasis: rec.chasis || null,
+      evidencia_transferencia: rec.evidenciaTransferencia || rec.comprobantePagoUrl || null,
       data: rec,
       updated_at: new Date().toISOString(),
     };
@@ -1050,7 +1132,7 @@ export function initSupabaseRealtime() {
             current = current.filter((a) => a.id !== deletedId);
           }
 
-          localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(current));
+          safeSaveAlistamientosToLocalStorage(current);
           window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
         } catch (e) {
           console.error('Error procesando realtime alistamientos:', e);

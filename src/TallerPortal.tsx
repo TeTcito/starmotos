@@ -26,6 +26,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
     technicians,
     origins,
     fullAlistamientos,
+    rawFullAlistamientos,
     addTechnician,
     deleteTechnician,
     addOrigin,
@@ -62,6 +63,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           technicians={technicians}
           origins={origins}
           fullAlistamientos={fullAlistamientos}
+          rawFullAlistamientos={rawFullAlistamientos}
           onAddTechnician={addTechnician}
           onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}
@@ -94,6 +96,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           technicians={technicians}
           origins={origins}
           fullAlistamientos={fullAlistamientos}
+          rawFullAlistamientos={rawFullAlistamientos}
           onAddTechnician={addTechnician}
           onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}

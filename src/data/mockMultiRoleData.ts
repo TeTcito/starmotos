@@ -39,6 +39,7 @@ import {
   removeDeletedTombstone,
   isDeletedTombstone,
   syncBus,
+  safeSaveAlistamientosToLocalStorage,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -1093,7 +1094,7 @@ export function deleteStoredClient(idOrCedula: string) {
             r.id !== clean &&
             (target?.idNumber ? r.cedulaRuc !== target.idNumber : true)
         );
-        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(remainingAls));
+        safeSaveAlistamientosToLocalStorage(remainingAls);
         window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
       }
     } catch (_) {}
@@ -1268,7 +1269,7 @@ export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
         !isDeletedTombstone(r.id) &&
         (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
     );
-    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(cleanList));
+    safeSaveAlistamientosToLocalStorage(cleanList);
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
     if (cleanList.length > 0) {
       cleanList.forEach((r) => cloudSaveAlistamiento(r));
@@ -1292,7 +1293,7 @@ export function deleteStoredAlistamiento(id: string) {
     }
 
     const current = stored.filter((r) => r.id !== clean);
-    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(current));
+    safeSaveAlistamientosToLocalStorage(current);
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
     cloudDeleteAlistamiento(clean);
   } catch (e) {

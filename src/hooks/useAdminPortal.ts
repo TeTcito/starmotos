@@ -49,7 +49,7 @@ import {
   getStoredAdminProfile,
   saveStoredAdminProfile,
 } from '../data/mockMultiRoleData';
-import { cloudSaveWarranty } from '../services/supabaseService';
+import { cloudSaveWarranty, syncAllFromSupabase } from '../services/supabaseService';
 
 export const ADMIN_SECTIONS: AdminSectionMobile[] = [
   'talleres',
@@ -133,6 +133,9 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('storage', handleStorageEvent);
+
+    // Sincronización proactiva de arranque para asegurar que Matriz reciba toda la red
+    syncAllFromSupabase();
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -779,7 +782,24 @@ export function useAdminPortal() {
     };
     setInvoices((prev) => {
       const exists = prev.some((i) => i.invoiceNumber === record.numeroFactura);
-      if (exists) return prev;
+      if (exists) {
+        const updated = prev.map((i) =>
+          i.invoiceNumber === record.numeroFactura
+            ? {
+                ...i,
+                clientName: `${record.nombres} ${record.apellidos}`.trim(),
+                clientIdNumber: record.cedulaRuc,
+                date: record.fechaServicio,
+                subtotal: Number((record.valorServicio / 1.15).toFixed(2)),
+                iva: Number((record.valorServicio - record.valorServicio / 1.15).toFixed(2)),
+                total: record.valorServicio,
+                workshopName: record.sede,
+              }
+            : i
+        );
+        saveStoredInvoices(updated);
+        return updated;
+      }
       const updated = [newInv, ...prev];
       saveStoredInvoices(updated);
       return updated;

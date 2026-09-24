@@ -50,6 +50,7 @@ interface Props {
   technicians: Technician[];
   origins: string[];
   fullAlistamientos: AlistamientoFullRecord[];
+  rawFullAlistamientos?: AlistamientoFullRecord[];
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
@@ -82,6 +83,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
   technicians,
   origins,
   fullAlistamientos,
+  rawFullAlistamientos,
   onAddTechnician,
   onAddOrigin,
   onSaveFullAlistamiento,
@@ -397,10 +399,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 onAddTechnician={onAddTechnician}
                 onAddOrigin={onAddOrigin}
                 onSaveRecord={onSaveFullAlistamiento}
-                recentRecords={fullAlistamientos}
+                recentRecords={isMatriz && rawFullAlistamientos ? rawFullAlistamientos : fullAlistamientos}
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
                 isMatriz={isMatriz}
+                selectedWorkshopFilter={selectedWorkshopFilter}
+                onSelectWorkshopFilter={onSelectWorkshopFilter}
               />
             )}
             {activeSection === 'solicitudes_garantia' && (
@@ -418,7 +422,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 role="taller"
                 currentWorkshopId={currentWs.id}
                 workshops={workshops}
-                fullAlistamientos={fullAlistamientos}
+                fullAlistamientos={isMatriz && rawFullAlistamientos ? rawFullAlistamientos : fullAlistamientos}
                 clients={clients}
                 warranties={warranties}
                 isMatriz={isMatriz}

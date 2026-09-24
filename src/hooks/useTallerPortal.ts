@@ -33,6 +33,7 @@ import {
   getStoredWorkshops,
   saveStoredWorkshops,
 } from '../data/mockMultiRoleData';
+import { syncAllFromSupabase } from '../services/supabaseService';
 import { Technician, AlistamientoFullRecord, Workshop, TallerSectionMobile } from '../types/customer';
 
 
@@ -246,6 +247,9 @@ export function useTallerPortal() {
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('storage', handleStorageEvent);
+
+    // Sincronización proactiva de arranque para garantizar datos actualizados de la red
+    syncAllFromSupabase();
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
@@ -687,6 +691,7 @@ export function useTallerPortal() {
     technicians: filteredTechnicians,
     origins,
     fullAlistamientos: filteredFullAlistamientos,
+    rawFullAlistamientos: fullAlistamientos,
     addTechnician,
     deleteTechnician,
     addOrigin,

@@ -7,7 +7,7 @@ import { AdminPortal } from './AdminPortal';
 import { TallerPortal } from './TallerPortal';
 import { GarantePortal } from './GarantePortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { initSupabaseRealtime } from './services/supabaseService';
+import { initSupabaseRealtime, syncAllFromSupabase } from './services/supabaseService';
 import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
 
 function App() {
@@ -15,6 +15,13 @@ function App() {
   useEffect(() => {
     initSupabaseRealtime();
     initMobileKeyboardHelper();
+
+    // Sincronización periódica de respaldo cada 45s para toda la red de sedes
+    const syncInterval = setInterval(() => {
+      syncAllFromSupabase();
+    }, 45000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -31,6 +38,9 @@ function App() {
     setIsAuthenticated(true);
     localStorage.setItem('starmotos_role', selectedRole);
     localStorage.setItem('starmotos_auth', 'true');
+
+    // Sincronizar inmediatamente al iniciar sesión para cargar todos los datos de las sedes
+    syncAllFromSupabase();
 
     // Limpiar hash o redirigir según el rol para evitar colisiones de rutas previas
     if (selectedRole === 'admin') {

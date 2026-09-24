@@ -66,6 +66,8 @@ interface Props {
   viewMode?: 'list' | 'form';
   onViewModeChange?: (mode: 'list' | 'form') => void;
   isMatriz?: boolean;
+  selectedWorkshopFilter?: string;
+  onSelectWorkshopFilter?: (wsId: string) => void;
 }
 
 export const isPdiOnlyRecord = (record: AlistamientoFullRecord | AlistamientoFormData): boolean => {
@@ -74,6 +76,45 @@ export const isPdiOnlyRecord = (record: AlistamientoFullRecord | AlistamientoFor
   const hasOtherPaidServices = services.some((s) => s === 'mantenimiento' || s === 'engrasado');
   if (hasPdi && !hasOtherPaidServices) return true;
   return Number(record.valorServicio || 0) === 0 && Number(record.montoPagado || 0) === 0 && hasPdi;
+};
+
+export const matchRecordToWorkshop = (
+  record: AlistamientoFullRecord,
+  targetWsId: string,
+  workshopsList: Workshop[] = []
+): boolean => {
+  if (!targetWsId || targetWsId === 'all') return true;
+  // 1. Coincidencia directa por sedeId
+  if (record.sedeId && record.sedeId === targetWsId) return true;
+
+  // 2. Coincidencia por información del taller
+  const targetWs = workshopsList.find((w) => w.id === targetWsId);
+  if (!targetWs) {
+    return record.sede === targetWsId;
+  }
+
+  // Coincidencia exacta por nombre
+  if (record.sede && record.sede.toLowerCase().trim() === targetWs.name.toLowerCase().trim()) return true;
+
+  // Coincidencia resiliente por subcadena de ciudad o nombre
+  if (record.sede) {
+    const cleanSede = record.sede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
+    if (cleanSede && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede) || (cityPart && cleanSede.includes(cityPart)))) {
+      return true;
+    }
+  }
+
+  // Coincidencia si el sedeId contiene el nombre de la ciudad
+  if (record.sedeId && targetWs.city) {
+    const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
+    if (cityPart && record.sedeId.toLowerCase().includes(cityPart)) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 export const AlistamientoWizard: React.FC<Props> = ({
@@ -91,6 +132,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
   viewMode: externalViewMode,
   onViewModeChange,
   isMatriz = false,
+  selectedWorkshopFilter: propSelectedWorkshopFilter,
+  onSelectWorkshopFilter,
 }) => {
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
@@ -104,9 +147,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Referencia para selector de archivos del computador/dispositivo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Identificar si la sede actual es Matriz Central de forma resiliente
+  const effectiveIsMatriz = Boolean(
+    isMatriz ||
+    defaultSedeId === 'matriz-la-mana' ||
+    defaultSedeId === 'sede-matriz' ||
+    (defaultSede && defaultSede.toLowerCase().includes('matriz'))
+  );
+
   // Búsqueda y Filtro de Sede en el listado
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
+  const [internalWorkshopFilter, setInternalWorkshopFilter] = useState<string>('all');
+  const selectedWorkshopFilter = propSelectedWorkshopFilter !== undefined ? propSelectedWorkshopFilter : internalWorkshopFilter;
+
+  const handleSelectWorkshopFilter = (wsId: string) => {
+    setInternalWorkshopFilter(wsId);
+    onSelectWorkshopFilter?.(wsId);
+  };
 
   // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
   const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi'>('all');
@@ -204,6 +261,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     observaciones: '',
     proximoMantenimientoKm: '',
     fotos: [],
+    evidenciaTransferencia: '',
     createdAt: '',
   });
 
@@ -214,6 +272,105 @@ export const AlistamientoWizard: React.FC<Props> = ({
     fields: string[];
     stepTarget: 1 | 2 | 3;
   } | null>(null);
+
+  // Modal Flotante de Abono & Evidencias
+  const [abonoModalRecord, setAbonoModalRecord] = useState<AlistamientoFullRecord | null>(null);
+  const [abonoFormData, setAbonoFormData] = useState<{
+    montoAbono: string;
+    metodoPago: AlistamientoFullRecord['metodoPago'];
+    evidenciaTransferencia: string;
+    numeroFactura: string;
+    esSuma: boolean;
+  }>({
+    montoAbono: '',
+    metodoPago: 'Efectivo',
+    evidenciaTransferencia: '',
+    numeroFactura: '',
+    esSuma: true,
+  });
+
+  const handleOpenAbonoModal = (record: AlistamientoFullRecord) => {
+    setAbonoModalRecord(record);
+    const valServ = Number(record.valorServicio) || 0;
+    const currentAbono = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
+    const currentPend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
+    setAbonoFormData({
+      montoAbono: currentPend > 0 ? String(currentPend) : '',
+      metodoPago: record.metodoPago || 'Efectivo',
+      evidenciaTransferencia: record.evidenciaTransferencia || record.comprobantePagoUrl || '',
+      numeroFactura: record.numeroFactura || '',
+      esSuma: true,
+    });
+  };
+
+  const handleSaveAbono = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!abonoModalRecord) return;
+
+    const valServ = Number(abonoModalRecord.valorServicio) || 0;
+    const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+    const inputAbono = parseFloat(abonoFormData.montoAbono) || 0;
+
+    // Si está en modo suma (predeterminado), se suma el nuevo abono a lo recaudado previamente
+    const nuevoTotalPagado = abonoFormData.esSuma
+      ? Math.min(valServ, prevPagado + inputAbono)
+      : Math.min(valServ, inputAbono);
+
+    const nuevoSaldo = Math.max(0, valServ - nuevoTotalPagado);
+    const isPaidInFull = nuevoSaldo <= 0.01;
+
+    const fechaAbono = new Date().toLocaleDateString('es-EC');
+    const horaAbono = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    const abonoEfectivo = abonoFormData.esSuma ? inputAbono : Math.max(0, nuevoTotalPagado - prevPagado);
+
+    const nuevoItemAbono = {
+      id: `abn-${Date.now()}`,
+      fecha: fechaAbono,
+      hora: horaAbono,
+      monto: abonoEfectivo,
+      metodoPago: abonoFormData.metodoPago,
+      evidenciaTransferencia: abonoFormData.evidenciaTransferencia || undefined,
+      numeroFactura: abonoFormData.numeroFactura || undefined,
+      saldoRestante: nuevoSaldo,
+      registradoPor: defaultAtendidoPor || 'Taller',
+    };
+
+    const updatedHistorial = [...(abonoModalRecord.historialAbonos || []), nuevoItemAbono];
+    const nota = `\n[Abono ${fechaAbono} ${horaAbono}: +$${abonoEfectivo.toFixed(2)} (${abonoFormData.metodoPago}). Saldo rest.: $${nuevoSaldo.toFixed(2)}]`;
+    const updatedObservaciones = ((abonoModalRecord.observaciones || '').trim() + nota).trim();
+
+    const updatedRecord: AlistamientoFullRecord = {
+      ...abonoModalRecord,
+      abono: nuevoTotalPagado,
+      montoPagado: nuevoTotalPagado,
+      saldoPendiente: nuevoSaldo,
+      metodoPago: abonoFormData.metodoPago,
+      esCredito: abonoFormData.metodoPago === 'Crédito' ? true : (!isPaidInFull && Boolean(abonoModalRecord.esCredito)),
+      evidenciaTransferencia: abonoFormData.evidenciaTransferencia || abonoModalRecord.evidenciaTransferencia,
+      comprobantePagoUrl: abonoFormData.evidenciaTransferencia || abonoModalRecord.comprobantePagoUrl,
+      numeroFactura: abonoFormData.numeroFactura || abonoModalRecord.numeroFactura,
+      historialAbonos: updatedHistorial,
+      observaciones: updatedObservaciones,
+    };
+
+    onSaveRecord(updatedRecord);
+
+    if (isPaidInFull) {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#10b981', '#059669', '#34d399', '#f59e0b'],
+      });
+    }
+
+    if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
+      setSelectedRecordForDetail(updatedRecord);
+      setDetailFormData(updatedRecord);
+    }
+
+    setAbonoModalRecord(null);
+  };
 
   // Modales rápidos
   const [showAddTechModal, setShowAddTechModal] = useState(false);
@@ -262,11 +419,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
   const filteredRecords = useMemo(() => {
     const base = recentRecords.filter((r) => {
       // 1. Restricción por Sede
-      if (!isMatriz && defaultSedeId) {
-        const matchesSede = r.sedeId === defaultSedeId || r.sede === defaultSede;
+      if (!effectiveIsMatriz && defaultSedeId) {
+        const matchesSede = matchRecordToWorkshop(r, defaultSedeId, workshops);
         if (!matchesSede) return false;
       } else if (selectedWorkshopFilter !== 'all') {
-        const matchesWs = r.sedeId === selectedWorkshopFilter || r.sede === selectedWorkshopFilter;
+        const matchesWs = matchRecordToWorkshop(r, selectedWorkshopFilter, workshops);
         if (!matchesWs) return false;
       }
 
@@ -393,7 +550,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     selectedWorkshopFilter,
     defaultSedeId,
     defaultSede,
-    isMatriz,
+    effectiveIsMatriz,
+    workshops,
     filterPayment,
     filterDateRange,
     customStartDate,
@@ -411,17 +569,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
     let countConSaldo = 0;
 
     filteredRecords.forEach((r) => {
-      const valor = Number(r.valorServicio) || 0;
-      const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
-      const pendiente = r.saldoPendiente !== undefined 
+      const isPdi = isPdiOnlyRecord(r);
+      const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
+      const pagado = isPdi ? 0 : (r.abono !== undefined && r.abono !== '' ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined && r.saldoPendiente !== '' 
         ? Number(r.saldoPendiente) 
-        : Math.max(0, valor - pagado);
+        : Math.max(0, valor - pagado));
 
       totalFacturado += valor;
       totalRecaudado += pagado;
       totalPendiente += pendiente;
 
-      if (pendiente > 0) countConSaldo++;
+      if (pendiente > 0.01) countConSaldo++;
       if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
       if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
     });
@@ -516,7 +675,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setSearchFeedback(null);
 
     // 1. Primero verificar si ya existe en el historial local de alistamientos de esta sede
-    const allAlistamientos = isMatriz
+    const allAlistamientos = effectiveIsMatriz
       ? [...recentRecords, ...getStoredFullAlistamientos()]
       : recentRecords.filter((r) => r.sedeId === defaultSedeId || r.sede === defaultSede);
     const existingRec = allAlistamientos.find(
@@ -549,7 +708,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     }
 
     // 2. Buscar en base de datos de clientes registrados de esta sede
-    const storedClients = isMatriz
+    const storedClients = effectiveIsMatriz
       ? getStoredClients()
       : getStoredClients().filter((c) => c.workshopId === defaultSedeId || c.workshopName === defaultSede);
     const existingClient = storedClients.find(
@@ -894,7 +1053,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     e.preventDefault();
     if (!newTechData.name.trim()) return;
 
-    const wsId = (!isMatriz || !newTechData.workshopId) ? defaultSedeId : newTechData.workshopId;
+    const wsId = (!effectiveIsMatriz || !newTechData.workshopId) ? defaultSedeId : newTechData.workshopId;
     const targetWorkshop = workshops.find((w) => w.id === wsId) || workshops.find((w) => w.id === defaultSedeId);
     onAddTechnician({
       name: newTechData.name.toUpperCase(),
@@ -1125,6 +1284,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <span>WhatsApp</span>
                 </a>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedRecordForDetail) {
+                    handleOpenAbonoModal({
+                      ...selectedRecordForDetail,
+                      ...detailFormData,
+                      year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
+                    } as AlistamientoFullRecord);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                title="Registrar abono o evidencia de pago"
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Abonar</span>
+              </button>
 
               <button
                 type="button"
@@ -1585,6 +1762,69 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Evidencia de Transferencia en Ficha Técnica / Edición */}
+                    {(detailFormData.metodoPago === 'Transferencia' || (detailFormData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-zinc-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[10px] font-bold text-blue-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3 h-3 text-blue-700" />
+                            Comprobante / Evidencia de Transferencia
+                          </span>
+                          {detailFormData.evidenciaTransferencia && (
+                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Comprobante cargado
+                            </span>
+                          )}
+                        </label>
+                        {detailFormData.evidenciaTransferencia ? (
+                          <div className="rounded-lg border border-blue-200 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={detailFormData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-12 h-12 rounded overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={detailFormData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold text-zinc-900 truncate">Comprobante de transferencia</p>
+                              <p className="text-[9px] text-zinc-500">Clic para ver en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDetailFormData({ ...detailFormData, evidenciaTransferencia: '' })}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-2.5 border border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-lg cursor-pointer transition-all hover:bg-blue-50/50">
+                            <Camera className="w-4 h-4 text-blue-600 mb-0.5" />
+                            <span className="text-[11px] font-bold text-blue-950">Subir foto del comprobante</span>
+                            <span className="text-[9px] text-zinc-400">JPG, PNG o captura</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setDetailFormData({ ...detailFormData, evidenciaTransferencia: compressed });
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1669,6 +1909,45 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
               </div>
             )}
+
+            {/* Evidencia de Transferencia Bancaria (Comprobante de Pago) en Ficha Técnica */}
+            {detailFormData.evidenciaTransferencia && (
+              <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-emerald-950 tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Evidencia de Abono / Comprobante de Transferencia</span>
+                  </h4>
+                  <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                    Abonado: ${(Number(detailFormData.abono ?? detailFormData.montoPagado) || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <a
+                    href={detailFormData.evidenciaTransferencia}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-lg overflow-hidden border border-emerald-300 block group relative shadow-xs bg-white shrink-0"
+                    title="Clic para ver comprobante en tamaño completo"
+                  >
+                    <img
+                      src={detailFormData.evidenciaTransferencia}
+                      alt="Comprobante de Transferencia"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  </a>
+                  <div className="text-xs text-zinc-600 space-y-1">
+                    <p className="font-bold text-zinc-800">Comprobante bancario verificado</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Evidencia registrada para el servicio de {detailFormData.nombres} {detailFormData.apellidos}.
+                    </p>
+                    <p className="text-[11px] text-zinc-600 font-mono">
+                      Método: <strong>{detailFormData.metodoPago}</strong> • Saldo pendiente: <strong className={Number(detailFormData.saldoPendiente || 0) > 0 ? 'text-rose-600' : 'text-emerald-700'}>${(Number(detailFormData.saldoPendiente) || 0).toFixed(2)}</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer del Formulario */}
@@ -1739,7 +2018,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   {recentRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
-                  ${recentRecords.reduce((acc, r) => acc + (isPdiOnlyRecord(r) ? 0 : (Number(r.montoPagado) || Number(r.valorServicio) || 0)), 0).toFixed(2)} Facturado
+                  ${recentRecords.reduce((acc, r) => acc + (isPdiOnlyRecord(r) ? 0 : (Number(r.valorServicio) || 0)), 0).toFixed(2)} Facturado
                 </span>
               </div>
             </div>
@@ -1814,17 +2093,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
               </button>
 
               {/* Filtro de Sede / Taller (Solo disponible para Matriz) */}
-              {isMatriz && workshops && workshops.length > 0 && (
+              {effectiveIsMatriz && workshops && workshops.length > 0 && (
                 <div className="h-12 sm:h-13 bg-white border border-zinc-300 rounded-xl px-3 flex items-center shrink-0 shadow-2xs">
                   <Building2 className="w-4 h-4 text-blue-600 mr-2 shrink-0" />
                   <select
                     value={selectedWorkshopFilter}
-                    onChange={(e) => setSelectedWorkshopFilter(e.target.value)}
+                    onChange={(e) => handleSelectWorkshopFilter(e.target.value)}
                     className="bg-transparent text-xs sm:text-sm font-bold text-zinc-800 outline-none cursor-pointer"
                   >
                     <option value="all">🏢 Todas las Sedes ({recentRecords.length})</option>
                     {workshops.map((w) => {
-                      const count = recentRecords.filter((r) => r.sedeId === w.id || r.sede === w.name).length;
+                      const count = recentRecords.filter((r) => matchRecordToWorkshop(r, w.id, workshops)).length;
                       return (
                         <option key={w.id} value={w.id}>
                           {w.name} ({count})
@@ -2171,7 +2450,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <th className="w-[8.5%] px-2 py-2 truncate">Técnico</th>
                       <th className="w-[6%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
                       <th className="w-[7.5%] px-2 py-2 truncate">Factura</th>
-                      <th className="w-[8.5%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
+                      <th className="w-[10%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 text-zinc-800">
@@ -2262,12 +2541,30 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             <span className="truncate block text-xs font-medium">{record.tecnicoResponsable}</span>
                           </td>
 
-                          {/* 9. Valor */}
-                          <td className="px-2 py-2 text-right font-mono font-bold text-zinc-900 whitespace-nowrap text-xs">
+                          {/* 9. Valor & Estado Contable */}
+                          <td className="px-2 py-2 text-right font-mono whitespace-nowrap text-xs">
                             {isPdiOnlyRecord(record) ? (
                               <span className="text-zinc-400 font-bold text-center block">-</span>
                             ) : (
-                              `$${(Number(record.montoPagado) || Number(record.valorServicio) || 0).toFixed(2)}`
+                              (() => {
+                                const val = Number(record.valorServicio) || 0;
+                                const pag = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                                const pend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                                return (
+                                  <div className="flex flex-col items-end leading-tight">
+                                    <span className="font-bold text-zinc-900 text-xs">${val.toFixed(2)}</span>
+                                    {pend > 0.01 ? (
+                                      <span className="text-[10px] text-rose-600 font-black" title={`Pendiente: $${pend.toFixed(2)} (Abonado: $${pag.toFixed(2)})`}>
+                                        Debe: ${pend.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-emerald-700 font-bold" title={`Pagado al 100% ($${pag.toFixed(2)})`}>
+                                        Pagado
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()
                             )}
                           </td>
 
@@ -2279,6 +2576,37 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           {/* 11. Acciones */}
                           <td className="px-1.5 py-2 text-center whitespace-nowrap">
                             <div className="inline-flex items-center justify-center gap-1">
+                              {/* Botón de Dinero / Abono (Verde si está pagado, Rojo si falta abonar) */}
+                              {(() => {
+                                const val = Number(record.valorServicio) || 0;
+                                const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                                const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                                const isPdi = isPdiOnlyRecord(record);
+                                const isPaid = isPdi || val <= 0 || pend <= 0.01;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenAbonoModal(record);
+                                    }}
+                                    className={`p-1 rounded-lg border transition-all cursor-pointer shadow-2xs ${
+                                      isPaid
+                                        ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
+                                        : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-300 animate-pulse'
+                                    }`}
+                                    title={
+                                      isPaid
+                                        ? `Todo abonado ($${pag.toFixed(2)}). Clic para gestionar pagos o evidencias.`
+                                        : `Falta abonar: $${pend.toFixed(2)} pendientes. Clic para registrar abono.`
+                                    }
+                                  >
+                                    <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
+                                  </button>
+                                );
+                              })()}
+
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2338,19 +2666,34 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <tfoot className="sticky bottom-0 bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px] shadow-xs z-10">
                     <tr className="divide-x divide-zinc-200">
                       <td colSpan={8} className="px-3 py-2 text-right font-mono uppercase tracking-wider text-[11px]">
-                        Total ({filteredRecords.length} registros):
+                        Totales ({filteredRecords.length} registros):
                       </td>
-                      <td className="px-2 py-2 text-right font-mono text-emerald-700 font-black text-xs whitespace-nowrap">
-                        ${filteredRecords.reduce((sum, r) => sum + (isPdiOnlyRecord(r) ? 0 : (Number(r.montoPagado) || Number(r.valorServicio) || 0)), 0).toFixed(2)}
+                      <td className="px-2 py-2 text-right font-mono whitespace-nowrap">
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-zinc-900 font-black text-xs">${statsMetrics.totalFacturado.toFixed(2)}</span>
+                          <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${statsMetrics.totalRecaudado.toFixed(2)}</span>
+                          {statsMetrics.totalPendiente > 0.01 && (
+                            <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${statsMetrics.totalPendiente.toFixed(2)}</span>
+                          )}
+                        </div>
                       </td>
                       <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
-                        <span className="font-bold text-blue-700">
-                          {filteredRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI OK
-                        </span>{' '}
-                        •{' '}
-                        <span className="font-bold text-purple-700">
-                          {filteredRecords.filter((r) => r.serviciosRealizados.includes('mantenimiento')).length} Mantenimientos
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <span className="text-blue-700">{statsMetrics.countPdi} PDI OK</span>
+                            <span>•</span>
+                            <span className="text-purple-700">{statsMetrics.countMantenimiento} Mantenimientos</span>
+                          </div>
+                          {statsMetrics.countConSaldo > 0 ? (
+                            <span className="text-[10px] font-bold text-rose-600">
+                              ⚠️ {statsMetrics.countConSaldo} cliente(s) con saldo por cobrar
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-emerald-700">
+                              ✓ Al día sin saldos pendientes
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   </tfoot>
@@ -3140,6 +3483,69 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Evidencia de Transferencia Bancaria (Solo visible si es Transferencia) */}
+                    {(formData.metodoPago === 'Transferencia' || (formData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-emerald-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                            Comprobante / Evidencia de Transferencia Bancaria
+                          </span>
+                          {formData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Comprobante cargado
+                            </span>
+                          )}
+                        </label>
+                        {formData.evidenciaTransferencia ? (
+                          <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={formData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-14 h-14 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={formData.evidenciaTransferencia}
+                                alt="Comprobante de transferencia"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante bancario registrado</p>
+                              <p className="text-[10px] text-zinc-500">Clic en la imagen para abrir en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-emerald-50/50">
+                            <Camera className="w-5 h-5 text-emerald-600 mb-1" />
+                            <span className="text-xs font-bold text-emerald-900">Subir foto o captura del comprobante</span>
+                            <span className="text-[10px] text-zinc-500">JPG, PNG o foto del comprobante de transferencia</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3891,6 +4297,69 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* Evidencia de Transferencia Bancaria Móvil (Solo visible si es Transferencia) */}
+                    {(formData.metodoPago === 'Transferencia' || (formData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-emerald-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                            Comprobante de Transferencia
+                          </span>
+                          {formData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Cargado
+                            </span>
+                          )}
+                        </label>
+                        {formData.evidenciaTransferencia ? (
+                          <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-2">
+                            <a
+                              href={formData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-12 h-12 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={formData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante registrado</p>
+                              <p className="text-[10px] text-zinc-500">Clic para ver</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded-lg cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-emerald-50/50">
+                            <Camera className="w-5 h-5 text-emerald-600 mb-1" />
+                            <span className="text-xs font-bold text-emerald-900">Subir comprobante de transferencia</span>
+                            <span className="text-[10px] text-zinc-500">Foto o captura bancaria</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -4119,6 +4588,295 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. MODAL FLOTANTE: ABONAR / REGISTRAR PAGO                                 */}
+      {/* ========================================================================= */}
+      {abonoModalRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in max-h-[90vh] overflow-y-auto">
+            {/* Cabecera */}
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-900">
+                    Registrar Abono / Pago
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-medium">
+                    {abonoModalRecord.nombres} {abonoModalRecord.apellidos} • {abonoModalRecord.placa || abonoModalRecord.modeloMarca}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAbonoModalRecord(null)}
+                className="text-zinc-400 hover:text-zinc-700 cursor-pointer p-1 rounded-lg hover:bg-zinc-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Resumen Financiero del Servicio */}
+            {(() => {
+              const valServ = Number(abonoModalRecord.valorServicio) || 0;
+              const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+              const saldoActual = abonoModalRecord.saldoPendiente !== undefined && abonoModalRecord.saldoPendiente !== '' ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
+              const inputVal = parseFloat(abonoFormData.montoAbono) || 0;
+              
+              // Si es modo suma, el total pagado es prevPagado + inputVal; sino, es inputVal directo
+              const nuevoTotalPagado = abonoFormData.esSuma
+                ? Math.min(valServ, prevPagado + inputVal)
+                : Math.min(valServ, inputVal);
+              const nuevoSaldo = Math.max(0, valServ - nuevoTotalPagado);
+
+              return (
+                <div className="space-y-3 text-xs">
+                  <div className="grid grid-cols-3 gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center font-mono">
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Valor Total</span>
+                      <span className="text-sm font-black text-zinc-900">${valServ.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Cobrado Previo</span>
+                      <span className="text-sm font-black text-emerald-700">${prevPagado.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Saldo Actual</span>
+                      <span className={`text-sm font-black ${saldoActual > 0.01 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        ${saldoActual.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Selector de Modo: Sumar Abono (Recomendado) vs Ajustar Total Acumulado */}
+                  <div className="flex items-center justify-between p-2 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs">
+                    <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                      {abonoFormData.esSuma ? 'Modo: Sumar nuevo abono a lo ya cobrado' : 'Modo: Corregir total acumulado'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAbonoFormData((prev) => ({
+                        ...prev,
+                        esSuma: !prev.esSuma,
+                        montoAbono: prev.esSuma ? String(nuevoTotalPagado) : (saldoActual > 0 ? String(saldoActual) : ''),
+                      }))}
+                      className="text-[10px] text-emerald-800 underline font-semibold hover:text-emerald-950 cursor-pointer"
+                    >
+                      {abonoFormData.esSuma ? 'Editar total directo' : 'Volver a modo suma'}
+                    </button>
+                  </div>
+
+                  {/* Formulario de Abono */}
+                  <form onSubmit={handleSaveAbono} className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-black uppercase text-zinc-700">
+                          {abonoFormData.esSuma ? 'Monto a abonar hoy ($) *' : 'Total acumulado cobrado ($) *'}
+                        </label>
+                        {saldoActual > 0.01 && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAbonoFormData((prev) => ({
+                                  ...prev,
+                                  esSuma: true,
+                                  montoAbono: String(saldoActual),
+                                }));
+                              }}
+                              className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold hover:bg-emerald-200 cursor-pointer"
+                            >
+                              Liquidar Saldo (${saldoActual.toFixed(2)})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAbonoFormData((prev) => ({
+                                  ...prev,
+                                  esSuma: true,
+                                  montoAbono: String((saldoActual / 2).toFixed(2)),
+                                }));
+                              }}
+                              className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold hover:bg-blue-200 cursor-pointer"
+                            >
+                              50% (${(saldoActual / 2).toFixed(2)})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <DollarSign className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={valServ > 0 ? valServ * 1.5 : 99999}
+                          value={abonoFormData.montoAbono}
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const val = cleanNumberInput(e.target.value);
+                            setAbonoFormData((prev) => ({ ...prev, montoAbono: val }));
+                          }}
+                          placeholder="0.00"
+                          required
+                          className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-300 rounded-xl font-mono text-base font-bold text-zinc-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                        />
+                      </div>
+
+                      {/* Desglose Contable en Tiempo Real */}
+                      <div className="mt-2 p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1 font-mono text-[11px]">
+                        <div className="flex items-center justify-between text-zinc-600 font-sans">
+                          <span>Ya cobrado previamente:</span>
+                          <span className="font-mono font-bold text-zinc-800">${prevPagado.toFixed(2)}</span>
+                        </div>
+                        {abonoFormData.esSuma && inputVal > 0 && (
+                          <div className="flex items-center justify-between text-emerald-700 font-sans">
+                            <span className="flex items-center gap-1 font-bold">
+                              <Plus className="w-3 h-3" /> Este nuevo abono a sumar:
+                            </span>
+                            <span className="font-mono font-black text-emerald-800">+${inputVal.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="border-t border-zinc-200 pt-1 flex items-center justify-between font-bold">
+                          <span className="font-sans text-zinc-800">Nuevo Total Cobrado:</span>
+                          <span className="text-emerald-700 font-black text-xs">${nuevoTotalPagado.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="font-sans text-zinc-800">Saldo Pendiente Restante:</span>
+                          <span className={`font-black text-xs ${nuevoSaldo <= 0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            ${nuevoSaldo.toFixed(2)} {nuevoSaldo <= 0.01 ? '(¡100% Liquidado!)' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Método de Pago */}
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-zinc-700 mb-1">
+                        Método / Tipo de Pago *
+                      </label>
+                      <select
+                        value={abonoFormData.metodoPago}
+                        onChange={(e) => {
+                          const met = e.target.value as AlistamientoFullRecord['metodoPago'];
+                          setAbonoFormData((prev) => ({ ...prev, metodoPago: met }));
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 cursor-pointer"
+                      >
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                        <option value="Tarjeta">💳 Tarjeta Débito / Crédito</option>
+                        <option value="Crédito">📋 Crédito Directo</option>
+                        <option value="Mixto">🔄 Mixto</option>
+                      </select>
+                    </div>
+
+                    {/* Subida de Evidencia Fotográfica (SOLO SI ES TRANSFERENCIA) */}
+                    {(abonoFormData.metodoPago === 'Transferencia' || abonoFormData.metodoPago?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-blue-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-blue-700" />
+                            Comprobante / Evidencia de Transferencia *
+                          </span>
+                          {abonoFormData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Foto cargada
+                            </span>
+                          )}
+                        </label>
+
+                        {abonoFormData.evidenciaTransferencia ? (
+                          <div className="relative rounded-xl border border-blue-300 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={abonoFormData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-16 h-16 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block relative"
+                            >
+                              <img
+                                src={abonoFormData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante guardado</p>
+                              <p className="text-[10px] text-zinc-500">Clic en la imagen para ver en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setAbonoFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              title="Cambiar o eliminar imagen"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-blue-50/50">
+                            <Camera className="w-6 h-6 text-blue-600 mb-1" />
+                            <span className="text-xs font-bold text-blue-950">Subir foto o captura del comprobante</span>
+                            <span className="text-[10px] text-zinc-500">JPG, PNG o foto desde el móvil</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setAbonoFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+
+                    {/* N° Factura / Ticket Opcional */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                        N° Factura o Comprobante (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={abonoFormData.numeroFactura}
+                        onChange={(e) => setAbonoFormData((prev) => ({ ...prev, numeroFactura: e.target.value }))}
+                        placeholder="Ej: 001-002-0004523"
+                        className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-emerald-600"
+                      />
+                    </div>
+
+                    {/* Botones de Acción */}
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAbonoModalRecord(null)}
+                        className="flex-1 py-2.5 border border-zinc-300 rounded-xl font-bold text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Guardar Abono</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

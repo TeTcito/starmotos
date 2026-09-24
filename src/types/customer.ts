@@ -443,7 +443,22 @@ export interface AlistamientoFullRecord {
   observaciones: string;
   proximoMantenimientoKm: number;
   fotos: string[];
+  evidenciaTransferencia?: string;
+  comprobantePagoUrl?: string;
+  historialAbonos?: AbonoRecord[];
   createdAt: string;
+}
+
+export interface AbonoRecord {
+  id: string;
+  fecha: string;
+  hora?: string;
+  monto: number;
+  metodoPago: string;
+  evidenciaTransferencia?: string;
+  numeroFactura?: string;
+  saldoRestante: number;
+  registradoPor?: string;
 }
 
 export type AlistamientoFormData = Omit<

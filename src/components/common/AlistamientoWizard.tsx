@@ -1022,6 +1022,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
   // Reusar datos de un cliente existente para nuevo servicio
   const handleNewServiceForExisting = (record: AlistamientoFullRecord | AlistamientoFormData) => {
+    const prevServicios = Array.isArray(record.serviciosRealizados) ? record.serviciosRealizados : [];
+    let nextServicios: ServiceActionType[] = ['engrasado'];
+    if (prevServicios.includes('engrasado')) {
+      nextServicios = ['mantenimiento'];
+    } else if (prevServicios.includes('alistamiento_pdi')) {
+      nextServicios = ['engrasado'];
+    } else {
+      nextServicios = ['mantenimiento'];
+    }
+
     setFormData({
       id: '',
       atendidoPor: defaultAtendidoPor,
@@ -1042,7 +1052,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       placa: record.placa,
       modeloMarca: record.modeloMarca,
       color: record.color || '',
-      serviciosRealizados: ['mantenimiento'],
+      serviciosRealizados: nextServicios,
       tecnicoResponsable: (record.tecnicoResponsable && technicians.some((t) => t.name === record.tecnicoResponsable))
         ? record.tecnicoResponsable
         : (technicians[0]?.name || ''),
@@ -1055,14 +1065,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
       tipoAceite: record.tipoAceite || '10W-30',
       numeroFactura: '',
       numeroTicket: '',
-      valorServicio: 35.0,
-      montoPagado: 35.0,
-      abono: 35.0,
-      saldoPendiente: 0,
+      valorServicio: '',
+      montoPagado: '',
+      abono: '',
+      saldoPendiente: '',
       esCredito: false,
       mesesCredito: 3,
       metodoPago: 'Efectivo',
-      observaciones: `Mantenimiento subsecuente. Cliente C.I. ${record.cedulaRuc}.`,
+      observaciones: `Servicio subsecuente. Cliente C.I. ${record.cedulaRuc}.`,
       proximoMantenimientoKm: '',
       fotos: [],
       createdAt: '',
@@ -1175,11 +1185,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
         valor = 0;
         pagado = 0;
         abono = 0;
-        saldo = 0;
-      } else if (valor === 0 && updatedServicios.some((s) => s === 'mantenimiento' || s === 'engrasado')) {
-        valor = 35.0;
-        pagado = 35.0;
-        abono = 35.0;
         saldo = 0;
       }
 

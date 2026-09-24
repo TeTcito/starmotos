@@ -595,7 +595,7 @@ export function canDeleteWarranty(warranty?: WarrantyRequest | null): {
   return { canDelete: true };
 }
 
-export function deleteStoredWarranty(id: string): boolean {
+export function deleteStoredWarranty(id: string, force: boolean = false): boolean {
   try {
     const cleanId = id.trim();
     const stored = getStoredWarranties();
@@ -606,7 +606,7 @@ export function deleteStoredWarranty(id: string): boolean {
         (w.requestNumber && w.requestNumber.toLowerCase() === cleanId.toLowerCase())
     );
 
-    if (target) {
+    if (target && !force) {
       const deleteCheck = canDeleteWarranty(target);
       if (!deleteCheck.canDelete) {
         alert(deleteCheck.reason || 'Las garantías aceptadas solo se pueden eliminar después de 30 días de su resolución oficial.');
@@ -669,6 +669,15 @@ export function deleteStoredWarranty(id: string): boolean {
     console.error('Error deleting warranty', e);
     return false;
   }
+}
+
+// Exponer función de programador para forzar borrado inmediato desde la consola del navegador
+if (typeof window !== 'undefined') {
+  (window as any).forceDeleteWarranty = (id: string) => {
+    const res = deleteStoredWarranty(id, true);
+    console.log(`[Developer] forceDeleteWarranty("${id}"):`, res ? 'Eliminada con éxito en cascada' : 'Fallo al eliminar');
+    return res;
+  };
 }
 
 /**

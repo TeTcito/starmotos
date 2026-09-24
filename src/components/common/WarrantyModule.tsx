@@ -40,10 +40,11 @@ import {
   RotateCcw,
   Image as ImageIcon,
   PlusCircle,
+  X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
-import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes } from '../../data/mockMultiRoleData';
+import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes, canDeleteWarranty } from '../../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
@@ -194,21 +195,32 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
               <span>{statusInfo.label}</span>
             </div>
 
-            {viewerRole === 'admin' && onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber} de ${warranty.clientName}?`)) {
-                    onDelete(warranty.id);
-                  }
-                }}
-                className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                title="Eliminar Solicitud de Garantía"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {viewerRole === 'admin' && onDelete && (() => {
+              const deleteCheck = canDeleteWarranty(warranty);
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!deleteCheck.canDelete) {
+                      alert(deleteCheck.reason);
+                      return;
+                    }
+                    if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber} de ${warranty.clientName}?`)) {
+                      onDelete(warranty.id);
+                    }
+                  }}
+                  className={`p-1 rounded transition-colors cursor-pointer ${
+                    deleteCheck.canDelete
+                      ? 'text-zinc-400 hover:text-red-600 hover:bg-red-50'
+                      : 'text-zinc-300 hover:text-amber-600 hover:bg-amber-50 opacity-60'
+                  }`}
+                  title={deleteCheck.canDelete ? 'Eliminar Solicitud de Garantía' : deleteCheck.reason}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              );
+            })()}
           </div>
         </div>
 
@@ -328,14 +340,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   onCreateNewRequest,
 }) => {
   const [currentWarranty, setCurrentWarranty] = useState<WarrantyRequest>(warranty);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editFormData, setEditFormData] = useState<WarrantyRequest>(warranty);
-  const [editPartTagInput, setEditPartTagInput] = useState('');
+  const [newPartInput, setNewPartInput] = useState('');
 
   // Sincronizar si cambia el prop warranty
   useEffect(() => {
     setCurrentWarranty(warranty);
-    setEditFormData(warranty);
     setGaranteSelectedResolution(warranty.resolutionType || null);
 
     let pbMap: Record<string, number> = {};
@@ -445,6 +454,43 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     return false;
   }, [currentWarranty, laborTime, laborCost, partsBudgetMap, parsedPartsList]);
 
+  // Decisión del Gerente de Marca sobre la propuesta económica de Matriz ('acepto' | 'no_acepto')
+  const [garanteProposalDecision, setGaranteProposalDecision] = useState<'acepto' | 'no_acepto'>('acepto');
+
+  // Observaciones individuales por repuesto introducidas por el Garante
+  const [partsObservations, setPartsObservations] = useState<Record<string, string>>(() => {
+    return currentWarranty.partsObservations || {};
+  });
+
+  // Habilitar edición de repuestos: Admin en Matriz o Garante en modo re-presupuesto ('no_acepto')
+  const canEditParts = !isLocked && (viewerRole === 'admin' || (viewerRole === 'garante' && garanteProposalDecision === 'no_acepto'));
+  // Habilitar edición de mano de obra: EXCLUSIVO del taller / Matriz (NO editable por Garante)
+  const canEditLabor = !isLocked && viewerRole === 'admin';
+
+  // Guardar re-presupuesto y observaciones de repuestos por parte del Garante
+  const handleSaveGaranteParts = () => {
+    const updated: WarrantyRequest = {
+      ...currentWarranty,
+      partsBudget: partsBudgetMap,
+      partsObservations,
+      totalBudget: grandTotalBudget,
+      estimatedCost: grandTotalBudget,
+    };
+    setCurrentWarranty(updated);
+    const all = getStoredWarranties();
+    saveStoredWarranties(all.map((w) => (w.id === updated.id ? updated : w)));
+    try {
+      cloudSaveWarranty(updated);
+    } catch (e) {
+      console.warn('Cloud save error', e);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+    setToastMessage('✓ Valores y observaciones de repuestos guardados correctamente por la Marca.');
+    confetti({ particleCount: 50, spread: 60 });
+  };
+
   // Cancelar cambios de presupuesto y restaurar valores guardados
   const handleCancelBudget = () => {
     let origMap: Record<string, number> = {};
@@ -473,7 +519,6 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       estimatedCost: grandTotalBudget,
     };
     setCurrentWarranty(updated);
-    setEditFormData(updated);
 
     const all = getStoredWarranties();
     const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
@@ -490,18 +535,61 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     confetti({ particleCount: 50, spread: 50, origin: { y: 0.7 } });
   };
 
-  const handleSaveEditMode = (e: React.FormEvent) => {
-    e.preventDefault();
+  const canAdminEdit = viewerRole === 'admin' && !isDenied;
+
+  const handleAddPartTag = () => {
+    const t = newPartInput.trim();
+    if (!t) return;
+    const currentTags =
+      currentWarranty.partsTags && currentWarranty.partsTags.length > 0
+        ? [...currentWarranty.partsTags]
+        : currentWarranty.partsRequired
+        ? currentWarranty.partsRequired.split(',').map((p) => p.trim()).filter(Boolean)
+        : [];
+    if (!currentTags.includes(t)) {
+      const nextTags = [...currentTags, t];
+      setCurrentWarranty({
+        ...currentWarranty,
+        partsTags: nextTags,
+        partsRequired: nextTags.join(', '),
+      });
+    }
+    setNewPartInput('');
+  };
+
+  const handleRemovePartTag = (idx: number) => {
+    const currentTags =
+      currentWarranty.partsTags && currentWarranty.partsTags.length > 0
+        ? [...currentWarranty.partsTags]
+        : currentWarranty.partsRequired
+        ? currentWarranty.partsRequired.split(',').map((p) => p.trim()).filter(Boolean)
+        : [];
+    const nextTags = currentTags.filter((_, i) => i !== idx);
+    setCurrentWarranty({
+      ...currentWarranty,
+      partsTags: nextTags,
+      partsRequired: nextTags.join(', '),
+    });
+  };
+
+  const handleSaveAdminChanges = () => {
     const updated: WarrantyRequest = {
-      ...editFormData,
-      motorcycleVin: editFormData.motorcycleVin.toUpperCase(),
-      motorcyclePlate: editFormData.motorcyclePlate.toUpperCase(),
-      motorNumber: editFormData.motorNumber?.toUpperCase(),
-      ramvNumber: editFormData.ramvNumber?.toUpperCase(),
-      partsRequired: editFormData.partsTags?.join(', ') || editFormData.partsRequired,
+      ...currentWarranty,
+      motorcycleVin: (currentWarranty.motorcycleVin || '').toUpperCase(),
+      motorcyclePlate: (currentWarranty.motorcyclePlate || '').toUpperCase(),
+      motorNumber: currentWarranty.motorNumber?.toUpperCase(),
+      ramvNumber: currentWarranty.ramvNumber?.toUpperCase(),
+      partsRequired:
+        currentWarranty.partsTags && currentWarranty.partsTags.length > 0
+          ? currentWarranty.partsTags.join(', ')
+          : currentWarranty.partsRequired,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotalBudget,
+      estimatedCost: grandTotalBudget,
     };
     setCurrentWarranty(updated);
-    setIsEditing(false);
 
     const all = getStoredWarranties();
     const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
@@ -514,16 +602,48 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     if (onUpdateWarranty) {
       onUpdateWarranty(updated);
     }
-    setToastMessage('✓ Solicitud de garantía actualizada exitosamente por Administrador.');
-    confetti({ particleCount: 50, spread: 60 });
+    setToastMessage('✓ Solicitud de garantía actualizada exitosamente por Matriz Central.');
+    confetti({ particleCount: 45, spread: 55, origin: { y: 0.6 } });
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const handleMatrizApprove = () => {
+    const updated: WarrantyRequest = {
+      ...currentWarranty,
+      motorcycleVin: (currentWarranty.motorcycleVin || '').toUpperCase(),
+      motorcyclePlate: (currentWarranty.motorcyclePlate || '').toUpperCase(),
+      motorNumber: currentWarranty.motorNumber?.toUpperCase(),
+      ramvNumber: currentWarranty.ramvNumber?.toUpperCase(),
+      partsRequired:
+        currentWarranty.partsTags && currentWarranty.partsTags.length > 0
+          ? currentWarranty.partsTags.join(', ')
+          : currentWarranty.partsRequired,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotalBudget,
+      estimatedCost: grandTotalBudget,
+      matrizNotes: matrizInputNotes,
+      status: 'en_proceso',
+    };
+    setCurrentWarranty(updated);
+
+    const all = getStoredWarranties();
+    const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
+    saveStoredWarranties(updatedList);
+    try {
+      cloudSaveWarranty(updated);
+    } catch (e) {
+      console.warn('Cloud save error', e);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
     if (onValidateByMatriz) {
       onValidateByMatriz(currentWarranty.id, matrizInputNotes);
-      setToastMessage('✓ Solicitud aceptada por Matriz. Puesta EN PROCESO hacia el Garante de Marca.');
-      confetti({ particleCount: 60, spread: 60 });
     }
+    setToastMessage('✓ Solicitud aceptada por Matriz. Puesta EN PROCESO hacia el Garante de Marca.');
+    confetti({ particleCount: 60, spread: 60 });
   };
 
   const handleMatrizReject = () => {
@@ -531,10 +651,31 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       alert('Por favor ingrese el motivo del rechazo en Matriz.');
       return;
     }
-    if (onRejectByMatriz) {
-      onRejectByMatriz(currentWarranty.id, rejectReasonInput);
-      setToastMessage('✕ Solicitud rechazada por Matriz.');
+    const updated: WarrantyRequest = {
+      ...currentWarranty,
+      status: 'denegada',
+      rejectionReason: rejectReasonInput.trim(),
+      matrizNotes: matrizInputNotes,
+      rejectedAt: 'Hoy, Matriz Central',
+    };
+    setCurrentWarranty(updated);
+
+    const all = getStoredWarranties();
+    const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
+    saveStoredWarranties(updatedList);
+    try {
+      cloudSaveWarranty(updated);
+    } catch (e) {
+      console.warn('Cloud save error', e);
     }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+    if (onRejectByMatriz) {
+      onRejectByMatriz(currentWarranty.id, rejectReasonInput.trim());
+    }
+    setShowRejectBox(false);
+    setToastMessage('✕ Solicitud rechazada por Matriz.');
   };
 
   const handleGaranteApproveEncargar = () => {
@@ -548,6 +689,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       garanteNotes: garanteInputNotes,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
       partsBudget: partsBudgetMap,
+      partsObservations,
       laborTime,
       laborCost,
       totalBudget: grandTotalBudget,
@@ -578,6 +720,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       resolutionType: 'envio_repuesto',
       garanteNotes: garanteInputNotes,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      partsObservations,
       totalBudget: 0,
       estimatedCost: 0,
     };
@@ -653,23 +796,15 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {viewerRole === 'admin' && !isLocked && (
+          {canAdminEdit && (
             <button
               type="button"
-              onClick={() => {
-                if (isEditing) {
-                  setEditFormData(currentWarranty);
-                }
-                setIsEditing(!isEditing);
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer ${
-                isEditing
-                  ? 'bg-zinc-800 text-white hover:bg-zinc-700'
-                  : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-              }`}
+              onClick={handleSaveAdminChanges}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
+              title="Guardar cualquier cambio realizado a los datos de la solicitud"
             >
-              <Pencil className="w-4 h-4" />
-              <span>{isEditing ? 'Cancelar Edición' : 'Editar Solicitud'}</span>
+              <Save className="w-4 h-4" />
+              <span>Guardar Cambios</span>
             </button>
           )}
 
@@ -696,22 +831,38 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </a>
           )}
 
-          {viewerRole === 'admin' && onDelete && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${currentWarranty.requestNumber} de ${currentWarranty.clientName}?`)) {
-                  onDelete(currentWarranty.id);
-                  onBack();
-                }
-              }}
-              className="px-3.5 py-2 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Eliminar esta garantía"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Eliminar</span>
-            </button>
-          )}
+          {viewerRole === 'admin' && onDelete && (() => {
+            const deleteCheck = canDeleteWarranty(currentWarranty);
+            if (!deleteCheck.canDelete) {
+              return (
+                <button
+                  type="button"
+                  onClick={() => alert(deleteCheck.reason)}
+                  className="px-3.5 py-2 bg-zinc-100 hover:bg-amber-50 text-zinc-400 hover:text-amber-800 border border-zinc-200 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer opacity-70"
+                  title={deleteCheck.reason}
+                >
+                  <Trash2 className="w-4 h-4 text-zinc-400" />
+                  <span>Protegida ({deleteCheck.daysRemaining}d)</span>
+                </button>
+              );
+            }
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${currentWarranty.requestNumber} de ${currentWarranty.clientName}?`)) {
+                    onDelete(currentWarranty.id);
+                    onBack();
+                  }
+                }}
+                className="px-3.5 py-2 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Eliminar esta garantía"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Eliminar</span>
+              </button>
+            );
+          })()}
 
           {isDenied && onCreateNewRequest && (
             <button
@@ -835,416 +986,212 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
       </div>
 
-      {/* FORMULARIO: MODO EDICIÓN ADMINISTRADOR O MODO LECTURA */}
-      {isEditing ? (
-        <form onSubmit={handleSaveEditMode} className="space-y-6">
-          <div className="bg-amber-50/70 border-2 border-amber-300 p-4 rounded-2xl flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Pencil className="w-5 h-5 text-amber-700" />
+      {/* 3 COLUMNAS: CLIENTE, VEHÍCULO Y RECLAMO TÉCNICO (DIRECTAMENTE EDITABLES EN MATRIZ CENTRAL) */}
+      <div className="space-y-4">
+        {canAdminEdit && (
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border-2 border-blue-200 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <Pencil className="w-4 h-4" />
+              </div>
               <div>
-                <span className="text-xs sm:text-sm font-black text-amber-950 block">Modo Edición Habilitado (Administrador Matriz)</span>
-                <span className="text-xs text-amber-800">Modifique cualquier dato del cliente, motocicleta o falla y presione Guardar Cambios.</span>
+                <span className="text-xs sm:text-sm font-black text-blue-950 block">
+                  Edición Habilitada para Matriz Central
+                </span>
+                <span className="text-[11px] text-blue-800">
+                  Puede corregir cualquier dato del cliente, motocicleta o avería directamente. Los cambios se guardan al presionar Guardar o al Aceptar la solicitud.
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 bg-white border border-zinc-300 text-zinc-700 rounded-xl text-xs font-bold hover:bg-zinc-100 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                onClick={handleSaveAdminChanges}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
               >
                 <Save className="w-4 h-4" />
                 <span>Guardar Cambios</span>
               </button>
             </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* Columna 1 Edición: Cliente */}
-            <div className="bg-white p-6 rounded-2xl border-2 border-blue-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-100 text-sm font-black text-zinc-900">
-                <User className="w-4 h-4 text-blue-600" />
-                <span>1. Cliente & Cobertura</span>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Cédula o RUC</label>
-                <input
-                  type="text"
-                  value={editFormData.clientIdNumber}
-                  onChange={(e) => setEditFormData({ ...editFormData, clientIdNumber: e.target.value })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Nombre Completo</label>
-                <input
-                  type="text"
-                  value={editFormData.clientName}
-                  onChange={(e) => setEditFormData({ ...editFormData, clientName: e.target.value })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={editFormData.clientPhone || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, clientPhone: e.target.value })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Taller Origen</label>
-                <input
-                  type="text"
-                  value={editFormData.tallerOrigin}
-                  onChange={(e) => setEditFormData({ ...editFormData, tallerOrigin: e.target.value })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Póliza</label>
-                <select
-                  value={editFormData.warrantyType}
-                  onChange={(e) => setEditFormData({ ...editFormData, warrantyType: e.target.value as any })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold"
-                >
-                  <option value="marca">Garantía Oficial de Marca ({editFormData.motorcycleBrand || 'Fábrica'})</option>
-                  <option value="plus_taller">Garantía Plus StarMotos</option>
-                  <option value="gps">Garantía Dispositivo GPS Satelital</option>
-                </select>
-              </div>
-              {editFormData.warrantyType === 'marca' && (
-                <div className="pt-1.5 animate-fade-in">
-                  <label className="block text-xs font-black text-purple-900 mb-1">Marca / Garante Responsable (BD)</label>
-                  <select
-                    value={editFormData.motorcycleBrand}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorcycleBrand: e.target.value, targetBrand: e.target.value })}
-                    className="w-full h-11 px-3 bg-purple-50 border border-purple-300 focus:border-purple-600 rounded-xl text-xs font-bold text-purple-900 cursor-pointer"
-                  >
-                    {getRegisteredBrands().map((b) => (
-                      <option key={b} value={b}>{b} (Garante Oficial)</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Columna 2 Edición: Vehículo */}
-            <div className="bg-white p-6 rounded-2xl border-2 border-blue-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-100 text-sm font-black text-zinc-900">
-                <Bike className="w-4 h-4 text-blue-600" />
-                <span>2. Motocicleta Registrada</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Marca</label>
-                  <input
-                    type="text"
-                    value={editFormData.motorcycleBrand}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorcycleBrand: e.target.value })}
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Modelo</label>
-                  <input
-                    type="text"
-                    value={editFormData.motorcycleModel}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorcycleModel: e.target.value })}
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Placa</label>
-                  <input
-                    type="text"
-                    value={editFormData.motorcyclePlate}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorcyclePlate: e.target.value.toUpperCase() })}
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Kilometraje</label>
-                  <input
-                    type="number"
-                    value={editFormData.motorcycleMileage}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorcycleMileage: Number(e.target.value) || 0 })}
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">VIN / Chasis</label>
-                <input
-                  type="text"
-                  value={editFormData.motorcycleVin}
-                  onChange={(e) => setEditFormData({ ...editFormData, motorcycleVin: e.target.value.toUpperCase() })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">N° Motor</label>
-                  <input
-                    type="text"
-                    value={editFormData.motorNumber || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, motorNumber: e.target.value.toUpperCase() })}
-                    placeholder="S/N"
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">N° RAMV</label>
-                  <input
-                    type="text"
-                    value={editFormData.ramvNumber || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, ramvNumber: e.target.value.toUpperCase() })}
-                    placeholder="S/N"
-                    className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">N° Factura / Ticket</label>
-                <input
-                  type="text"
-                  value={editFormData.invoiceNumber || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, invoiceNumber: e.target.value })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Columna 3 Edición: Falla y Repuestos */}
-            <div className="bg-white p-6 rounded-2xl border-2 border-blue-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-100 text-sm font-black text-zinc-900">
-                <Wrench className="w-4 h-4 text-blue-600" />
-                <span>3. Falla, Repuestos & Estado</span>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Descripción de la Falla</label>
-                <textarea
-                  rows={3}
-                  value={editFormData.issueDescription}
-                  onChange={(e) => setEditFormData({ ...editFormData, issueDescription: e.target.value })}
-                  className="w-full p-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Repuestos Requeridos (Tags)</label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={editPartTagInput}
-                    onChange={(e) => setEditPartTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const t = editPartTagInput.trim();
-                        if (t) {
-                          const currentTags = editFormData.partsTags || [];
-                          if (!currentTags.includes(t)) {
-                            setEditFormData({ ...editFormData, partsTags: [...currentTags, t] });
-                          }
-                          setEditPartTagInput('');
-                        }
-                      }
-                    }}
-                    placeholder="Escriba repuesto y presione Enter..."
-                    className="flex-1 h-10 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const t = editPartTagInput.trim();
-                      if (t) {
-                        const currentTags = editFormData.partsTags || [];
-                        if (!currentTags.includes(t)) {
-                          setEditFormData({ ...editFormData, partsTags: [...currentTags, t] });
-                        }
-                        setEditPartTagInput('');
-                      }
-                    }}
-                    className="px-3 bg-zinc-200 text-zinc-800 rounded-xl text-xs font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(editFormData.partsTags || []).map((tag, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-lg text-xs font-bold">
-                      <span>{tag}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditFormData({
-                            ...editFormData,
-                            partsTags: (editFormData.partsTags || []).filter((_, i) => i !== idx),
-                          });
-                        }}
-                        className="text-blue-500 hover:text-red-600"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              {viewerRole === 'garante' && (
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">Modalidad de Resolución</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, resolutionType: 'encargar_taller' })}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                        editFormData.resolutionType === 'encargar_taller'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-zinc-50 border-zinc-200 text-zinc-700'
-                      }`}
-                    >
-                      🔧 Encargar a Taller
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, resolutionType: 'envio_repuesto' })}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                        editFormData.resolutionType === 'envio_repuesto'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-zinc-50 border-zinc-200 text-zinc-700'
-                      }`}
-                    >
-                      📦 Envío Repuesto
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 mb-1">Estado de la Solicitud</label>
-                <select
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as WarrantyRequestStatus })}
-                  className="w-full h-11 px-3 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold"
-                >
-                  <option value="en_revision">En Revisión (Matriz)</option>
-                  <option value="en_proceso">En Proceso (Garante Marca)</option>
-                  <option value="en_proceso_aceptacion_2">En Proceso de Aceptación 2 (Taller Encargado)</option>
-                  <option value="aceptada">Aceptada / Aprobada por Marca</option>
-                  <option value="denegada">Denegada / Rechazada</option>
-                  <option value="completada">Completada</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="px-6 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 rounded-xl text-xs font-bold"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Todos los Cambios</span>
-            </button>
-          </div>
-        </form>
-      ) : (
-        /* FORMULARIO MODO LECTURA: 3 COLUMNAS SIMÉTRICAS */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          {/* COLUMNA 1: CLIENTE Y SEDE */}
+          {/* ========================================================= */}
+          {/* COLUMNA 1: CLIENTE Y SEDE                                */}
+          {/* ========================================================= */}
           <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4" />
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div className="flex items-center gap-2.5 text-sm sm:text-base font-black text-zinc-900">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <span>1. Datos del Cliente & Sede</span>
                 </div>
-                <span>1. Datos del Cliente & Sede</span>
+                {canAdminEdit && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
+                    Editable
+                  </span>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Cédula o RUC</label>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                  Cédula o RUC {canAdminEdit && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.clientIdNumber}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono font-bold text-zinc-900 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.clientIdNumber || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientIdNumber: e.target.value })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono font-bold outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
+                  }`}
+                  placeholder="0999999999"
                 />
               </div>
 
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Nombre Completo</label>
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
+                  Nombre Completo {canAdminEdit && <span className="text-red-500">*</span>}
+                </label>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.clientName}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.clientName || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientName: e.target.value })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-bold outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
+                  }`}
+                  placeholder="Nombre y Apellidos"
                 />
               </div>
 
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Teléfono de Contacto</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs sm:text-sm font-bold text-zinc-700">Teléfono de Contacto</label>
+                  {currentWarranty.clientPhone && (
+                    <a
+                      href={`https://wa.me/593${currentWarranty.clientPhone.replace(/\D/g, '').replace(/^0/, '')}?text=Hola%20${encodeURIComponent(
+                        currentWarranty.clientName || ''
+                      )},%20le%20escribimos%20de%20StarMotos%20sobre%20su%20solicitud%20de%20garantía%20${currentWarranty.requestNumber}.`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  )}
+                </div>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.clientPhone || '0990000000'}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.clientPhone || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientPhone: e.target.value })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                  }`}
+                  placeholder="0990000000"
                 />
               </div>
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Tipo de Cobertura / Póliza</label>
-                <div className="h-11 sm:h-12 px-4 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm font-bold text-blue-800 uppercase flex items-center">
-                  Garantía Oficial de Marca
-                </div>
+                {canAdminEdit ? (
+                  <select
+                    value={currentWarranty.warrantyType || 'marca'}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, warrantyType: e.target.value as any })}
+                    className="w-full h-11 sm:h-12 px-3.5 bg-white border-2 border-blue-200 focus:border-blue-600 rounded-xl text-xs sm:text-sm font-bold text-blue-900 cursor-pointer outline-none"
+                  >
+                    <option value="marca">Garantía Oficial de Marca ({currentWarranty.motorcycleBrand || 'Fábrica'})</option>
+                    <option value="plus_taller">Garantía Plus StarMotos</option>
+                    <option value="gps">Garantía Dispositivo GPS Satelital</option>
+                  </select>
+                ) : (
+                  <div className="h-11 sm:h-12 px-4 bg-blue-50 border border-blue-200 rounded-xl text-xs sm:text-sm font-bold text-blue-800 uppercase flex items-center">
+                    {currentWarranty.warrantyType === 'plus_taller'
+                      ? 'Garantía Plus StarMotos'
+                      : currentWarranty.warrantyType === 'gps'
+                      ? 'Garantía Dispositivo GPS'
+                      : 'Garantía Oficial de Marca'}
+                  </div>
+                )}
               </div>
 
+              {/* Marca Garantía / Garante Responsable */}
               <div>
-                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca Garantía</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={currentWarranty.targetBrand || currentWarranty.garanteName || currentWarranty.motorcycleBrand || 'Garante Oficial'}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
-                />
+                <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca / Garante Responsable</label>
+                {canAdminEdit && currentWarranty.warrantyType === 'marca' ? (
+                  <select
+                    value={currentWarranty.motorcycleBrand || currentWarranty.targetBrand || ''}
+                    onChange={(e) =>
+                      setCurrentWarranty({
+                        ...currentWarranty,
+                        motorcycleBrand: e.target.value,
+                        targetBrand: e.target.value,
+                      })
+                    }
+                    className="w-full h-11 sm:h-12 px-3.5 bg-purple-50 border-2 border-purple-300 focus:border-purple-600 rounded-xl text-xs sm:text-sm font-bold text-purple-950 cursor-pointer outline-none"
+                  >
+                    {getRegisteredBrands().map((b) => (
+                      <option key={b} value={b}>
+                        {b} (Garante Oficial)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    readOnly
+                    value={currentWarranty.targetBrand || currentWarranty.garanteName || currentWarranty.motorcycleBrand || 'Garante Oficial'}
+                    className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                  />
+                )}
               </div>
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Taller de Origen</label>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.tallerOrigin}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-800 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.tallerOrigin || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, tallerOrigin: e.target.value })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-semibold outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                  }`}
+                  placeholder="Taller Emisor"
                 />
               </div>
             </div>
           </div>
 
-          {/* COLUMNA 2: VEHÍCULO */}
+          {/* ========================================================= */}
+          {/* COLUMNA 2: VEHÍCULO                                      */}
+          {/* ========================================================= */}
           <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Bike className="w-4 h-4" />
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div className="flex items-center gap-2.5 text-sm sm:text-base font-black text-zinc-900">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Bike className="w-4 h-4" />
+                  </div>
+                  <span>2. Motocicleta Registrada</span>
                 </div>
-                <span>2. Motocicleta Registrada</span>
+                {canAdminEdit && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
+                    Editable
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1252,18 +1199,28 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca</label>
                   <input
                     type="text"
-                    readOnly
-                    value={currentWarranty.motorcycleBrand}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                    readOnly={!canAdminEdit}
+                    value={currentWarranty.motorcycleBrand || ''}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleBrand: e.target.value })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-bold outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
+                    }`}
                   />
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Modelo</label>
                   <input
                     type="text"
-                    readOnly
-                    value={currentWarranty.motorcycleModel}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold text-zinc-900 cursor-not-allowed outline-none"
+                    readOnly={!canAdminEdit}
+                    value={currentWarranty.motorcycleModel || ''}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleModel: e.target.value })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-bold outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
+                    }`}
                   />
                 </div>
               </div>
@@ -1273,18 +1230,29 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Placa</label>
                   <input
                     type="text"
-                    readOnly
-                    value={currentWarranty.motorcyclePlate || 'SIN PLACA'}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono font-bold text-zinc-800 cursor-not-allowed outline-none"
+                    readOnly={!canAdminEdit}
+                    value={currentWarranty.motorcyclePlate || ''}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcyclePlate: e.target.value.toUpperCase() })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono font-bold outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                    }`}
+                    placeholder="SIN PLACA"
                   />
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Kilometraje</label>
                   <input
-                    type="text"
-                    readOnly
-                    value={`${currentWarranty.motorcycleMileage || 0} km`}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+                    type={canAdminEdit ? 'number' : 'text'}
+                    readOnly={!canAdminEdit}
+                    value={canAdminEdit ? (currentWarranty.motorcycleMileage ?? 0) : `${currentWarranty.motorcycleMileage || 0} km`}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleMileage: Number(e.target.value) || 0 })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 font-bold text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                    }`}
                   />
                 </div>
               </div>
@@ -1293,9 +1261,14 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Serie o Chasis (VIN)</label>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.motorcycleVin}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.motorcycleVin || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleVin: e.target.value.toUpperCase() })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 font-bold text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                  }`}
                 />
               </div>
 
@@ -1304,18 +1277,30 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Número de Motor</label>
                   <input
                     type="text"
-                    readOnly
-                    value={currentWarranty.motorNumber || 'S/N'}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 cursor-not-allowed outline-none"
+                    readOnly={!canAdminEdit}
+                    value={currentWarranty.motorNumber || ''}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorNumber: e.target.value.toUpperCase() })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                    }`}
+                    placeholder="S/N"
                   />
                 </div>
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Número de RAMV</label>
                   <input
                     type="text"
-                    readOnly
-                    value={currentWarranty.ramvNumber || 'S/N'}
-                    className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 cursor-not-allowed outline-none"
+                    readOnly={!canAdminEdit}
+                    value={currentWarranty.ramvNumber || ''}
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, ramvNumber: e.target.value.toUpperCase() })}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
+                      canAdminEdit
+                        ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                    }`}
+                    placeholder="S/N"
                   />
                 </div>
               </div>
@@ -1324,31 +1309,52 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">N° Factura / Ticket</label>
                 <input
                   type="text"
-                  readOnly
-                  value={currentWarranty.invoiceNumber || 'TCK-2026-GAR'}
-                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono text-zinc-800 cursor-not-allowed outline-none"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.invoiceNumber || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, invoiceNumber: e.target.value })}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
+                  }`}
+                  placeholder="TCK-2026-GAR"
                 />
               </div>
             </div>
           </div>
 
-          {/* COLUMNA 3: RECLAMO TÉCNICO & COSTO */}
+          {/* ========================================================= */}
+          {/* COLUMNA 3: RECLAMO TÉCNICO & REPUESTOS                   */}
+          {/* ========================================================= */}
           <div className="bg-white p-6 sm:p-7 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-blue-200 transition-colors">
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 text-sm sm:text-base font-black text-zinc-900">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Wrench className="w-4 h-4" />
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div className="flex items-center gap-2.5 text-sm sm:text-base font-black text-zinc-900">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Wrench className="w-4 h-4" />
+                  </div>
+                  <span>3. Reclamo Técnico & Modalidad</span>
                 </div>
-                <span>3. Reclamo Técnico & Modalidad</span>
+                {canAdminEdit && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
+                    Editable
+                  </span>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Falla Reportada</label>
                 <textarea
                   rows={3}
-                  readOnly
-                  value={currentWarranty.issueDescription}
-                  className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-900 cursor-not-allowed outline-none resize-none leading-relaxed"
+                  readOnly={!canAdminEdit}
+                  value={currentWarranty.issueDescription || ''}
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, issueDescription: e.target.value })}
+                  className={`w-full p-4 rounded-xl text-sm outline-none leading-relaxed transition-all ${
+                    canAdminEdit
+                      ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900 resize-y'
+                      : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed resize-none'
+                  }`}
+                  placeholder="Descripción de la avería técnica..."
                 />
               </div>
 
@@ -1356,117 +1362,118 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
                   Repuestos Requeridos ({parsedPartsList.length})
                 </label>
+
+                {/* Input para agregar nuevos repuestos en Matriz */}
+                {canAdminEdit && (
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={newPartInput}
+                      onChange={(e) => setNewPartInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddPartTag();
+                        }
+                      }}
+                      placeholder="Escribir repuesto y presionar Enter..."
+                      className="flex-1 h-10 px-3 bg-white border-2 border-blue-200 focus:border-blue-600 rounded-xl text-xs font-medium outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddPartTag}
+                      className="px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar</span>
+                    </button>
+                  </div>
+                )}
+
                 {parsedPartsList.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5 p-2 bg-zinc-50 border border-zinc-200 rounded-xl min-h-[44px]">
                     {parsedPartsList.map((tag, idx) => (
                       <span
                         key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-blue-200 text-blue-900 rounded-lg text-xs font-bold shadow-2xs"
                       >
-                        <Tag className="w-3 h-3 text-blue-600" />
+                        <Tag className="w-3 h-3 text-blue-600 shrink-0" />
                         <span>{tag}</span>
+                        {canAdminEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePartTag(idx)}
+                            className="text-blue-400 hover:text-red-600 ml-0.5 cursor-pointer font-bold transition"
+                            title="Eliminar este repuesto"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <input
-                    type="text"
-                    readOnly
-                    value="Sin repuestos desglosados"
-                    className="w-full h-11 sm:h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-500 cursor-not-allowed outline-none"
-                  />
+                  <p className="text-xs text-zinc-400 italic p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
+                    No se especificaron repuestos en la solicitud.
+                  </p>
                 )}
               </div>
 
-              {/* Modalidad de Resolución: Solo editable para Garante Oficial */}
-              {viewerRole === 'garante' ? (
-                <div className="space-y-2 pt-1 border-t border-zinc-100">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs sm:text-sm font-bold text-zinc-700">
-                      Modalidad de Resolución <span className="text-red-500">*</span>
-                    </label>
-                    {garanteSelectedResolution && (
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                        Seleccionada
-                      </span>
-                    )}
-                  </div>
-
-                  {isLocked ? (
-                    <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                        Estado de Resolución
-                      </span>
-                      {currentWarranty.resolutionType === 'encargar_taller' ? (
-                        <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+              {/* Selector de Modalidad si es Garante o muestra informativa si ya dictaminó */}
+              {viewerRole === 'garante' && !isLocked ? (
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-1.5">Modalidad Dictaminada</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGaranteSelectedResolution('encargar_taller')}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        garanteSelectedResolution === 'encargar_taller'
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-200 font-bold'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
                           <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                          <span>Encargado al Taller (Repuestos y Mano de Obra autorizados)</span>
+                          <span className="text-xs font-black text-zinc-900 leading-tight">Encargar a taller</span>
                         </div>
-                      ) : currentWarranty.resolutionType === 'envio_repuesto' ? (
-                        <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-                          <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Envío de Repuesto Directo desde Fábrica / Importador</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-amber-800 font-medium text-xs">
-                          <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />
-                          <span>Pendiente de dictamen técnico del Garante de Marca</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setGaranteSelectedResolution('encargar_taller')}
-                        className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          garanteSelectedResolution === 'encargar_taller'
-                            ? 'border-indigo-600 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-200'
-                            : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
-                            <span className="text-xs font-black text-zinc-900 leading-tight">Encargar al taller</span>
+                        {garanteSelectedResolution === 'encargar_taller' && (
+                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
                           </div>
-                          {garanteSelectedResolution === 'encargar_taller' && (
-                            <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                              <Check className="w-2.5 h-2.5" />
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-zinc-500 leading-tight">
-                          El taller ejecuta el trabajo y factura repuestos / mano de obra.
-                        </p>
-                      </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-tight">
+                        Taller repara y se reconocen repuestos y mano de obra.
+                      </p>
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setGaranteSelectedResolution('envio_repuesto')}
-                        className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          garanteSelectedResolution === 'envio_repuesto'
-                            ? 'border-emerald-600 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-200'
-                            : 'border-zinc-200 bg-zinc-50 hover:bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <Package className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
-                          </div>
-                          {garanteSelectedResolution === 'envio_repuesto' && (
-                            <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                              <Check className="w-2.5 h-2.5" />
-                            </div>
-                          )}
+                    <button
+                      type="button"
+                      onClick={() => setGaranteSelectedResolution('envio_repuesto')}
+                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        garanteSelectedResolution === 'envio_repuesto'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-200 font-bold'
+                          : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="text-xs font-black text-zinc-900 leading-tight">Envío de repuesto</span>
                         </div>
-                        <p className="text-[10px] text-zinc-500 leading-tight">
-                          Fábrica o Marca despacha directamente las piezas sin costo.
-                        </p>
-                      </button>
-                    </div>
-                  )}
+                        {garanteSelectedResolution === 'envio_repuesto' && (
+                          <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-tight">
+                        Fábrica o Marca despacha directamente las piezas sin costo.
+                      </p>
+                    </button>
+                  </div>
                 </div>
               ) : currentWarranty.resolutionType ? (
                 <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
@@ -1489,16 +1496,48 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* MENSAJES INFORMATIVOS PARA EL GERENTE DE MARCA SEGÚN MODALIDAD */}
+      {viewerRole === 'garante' && !isLocked && garanteSelectedResolution === 'envio_repuesto' && (
+        <div className="bg-emerald-50/80 border-2 border-emerald-200 rounded-2xl p-5 shadow-2xs flex items-start gap-3.5 animate-fade-in">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+            <Package className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-xs sm:text-sm font-black text-emerald-950">
+              Modalidad Seleccionada: Envío de Repuesto desde Fábrica / Garante
+            </h4>
+            <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+              La marca despachará directamente las piezas de fábrica a la sede sin costo alguno. No se genera presupuesto ni liquidación de repuestos o mano de obra con el taller. Puede formalizar su aprobación en la sección inferior de dictamen.
+            </p>
+          </div>
+        </div>
       )}
 
-      {/* SECCIÓN DE PRESUPUESTO OFICIAL (SIEMPRE VISIBLE EN MATRIZ; EN GARANTE/TALLER SOLO SI ENCARGAR AL TALLER) */}
-      {!isEditing &&
-        (viewerRole === 'admin' ||
-          ((viewerRole === 'garante' || viewerRole === 'taller') &&
-            (garanteSelectedResolution === 'encargar_taller' || currentWarranty.resolutionType === 'encargar_taller'))) && (
+      {viewerRole === 'garante' && !isLocked && !garanteSelectedResolution && (
+        <div className="bg-purple-50/80 border-2 border-purple-200 rounded-2xl p-5 shadow-2xs flex items-start gap-3.5 animate-fade-in">
+          <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-xs sm:text-sm font-black text-purple-950">
+              Seleccione la Modalidad de Resolución en la Columna 3
+            </h4>
+            <p className="text-xs text-purple-800 mt-0.5 leading-relaxed">
+              Marque <strong>"Encargar al taller"</strong> si autoriza al taller para realizar el trabajo y liquidar repuestos / mano de obra (se habilitará el presupuesto para su revisión y auditoría), o <strong>"Envío de repuesto"</strong> si la marca despachará directamente las piezas de fábrica.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* SECCIÓN DE PRESUPUESTO OFICIAL (EN MATRIZ SIEMPRE; EN GARANTE Y TALLER SOLO SI SE MARCA ENCARGAR AL TALLER) */}
+      {(viewerRole === 'admin' ||
+        ((viewerRole === 'garante' || viewerRole === 'taller') &&
+          (garanteSelectedResolution === 'encargar_taller' || currentWarranty.resolutionType === 'encargar_taller'))) && (
         <div className="bg-white border-2 border-indigo-200 rounded-2xl p-6 shadow-sm space-y-5 animate-fade-in">
-          {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
-          {currentWarranty.garanteNotes && (
+          {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA (SI YA FUE EMITIDO) */}
+          {currentWarranty.garanteNotes && isLocked && (
             <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border-2 border-indigo-300 rounded-2xl p-5 shadow-xs space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
@@ -1546,12 +1585,20 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <h3 className="text-base font-black text-zinc-900 flex items-center gap-2">
                   <span>Presupuesto de Repuestos & Mano de Obra (Taller)</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black border border-indigo-200">
-                    {viewerRole === 'admin' ? 'Editable Matriz Central' : 'Visualización Oficial'}
+                    {viewerRole === 'admin'
+                      ? 'Editable Matriz Central'
+                      : viewerRole === 'garante' && !isLocked
+                      ? garanteProposalDecision === 'no_acepto'
+                        ? 'Modo Re-presupuestación (Marca)'
+                        : 'Propuesta de Matriz (En Revisión)'
+                      : 'Visualización Oficial'}
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-500">
                   {viewerRole === 'admin' && !isLocked
                     ? 'Ingrese los valores unitarios en dólares ($ USD) y la mano de obra autorizada.'
+                    : viewerRole === 'garante' && !isLocked
+                    ? 'Revise los valores remitidos por Matriz. Puede aceptarlos o re-presupuestar ajustando precios antes del dictamen.'
                     : 'Ficha oficial de costos autorizados para repuestos y mano de obra.'}
                 </p>
               </div>
@@ -1571,7 +1618,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             </div>
           </div>
 
-          {/* DISTRIBUCIÓN EN 3 APARTADOS: 1. PRESUPUESTO SOLICITADO, 2. MANO DE OBRA, 3. RESUMEN DE COMPRA */}
+          {/* DISTRIBUCIÓN EN 3 APARTADOS: 1. PRESUPUESTO SOLICITADO, 2. MANO DE OBRA, 3. RESUMEN DE COMPRA & OBSERVACIONES */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
             {/* APARTADO 1: PRESUPUESTO SOLICITADO (REPUESTOS) */}
             <div className="space-y-3">
@@ -1591,62 +1638,112 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   No se especificaron repuestos desglosados en esta solicitud.
                 </p>
               ) : (
-                <div className="flex flex-col space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <div className="flex flex-col space-y-2 max-h-[420px] overflow-y-auto pr-1">
                   {parsedPartsList.map((part, idx) => (
                     <div
                       key={idx}
-                      className="p-2.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs flex items-center justify-between gap-2"
+                      className="p-2.5 bg-zinc-50 hover:bg-white border border-zinc-200 hover:border-indigo-300 rounded-xl transition-all shadow-2xs space-y-2"
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">
-                          #{idx + 1}
-                        </span>
-                        <span className="text-xs font-bold text-zinc-800 truncate" title={part}>
-                          {part}
-                        </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-zinc-800 truncate" title={part}>
+                            {part}
+                          </span>
+                        </div>
+
+                        <div className="relative w-28 shrink-0">
+                          {canEditParts ? (
+                            <>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setPartsBudgetMap((prev) => ({
+                                    ...prev,
+                                    [part]: val,
+                                  }));
+                                }}
+                                className={`w-full h-8 pl-5 pr-2 bg-white border rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right ${
+                                  viewerRole === 'garante'
+                                    ? 'border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-100'
+                                    : 'border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100'
+                                }`}
+                              />
+                            </>
+                          ) : (
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded-md">
+                                ${(Number(partsBudgetMap[part]) || 0).toFixed(2)} USD
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="relative w-28 shrink-0">
-                        {viewerRole === 'admin' && !isLocked ? (
-                          <>
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                setPartsBudgetMap((prev) => ({
-                                  ...prev,
-                                  [part]: val,
-                                }));
-                              }}
-                              className="w-full h-8 pl-5 pr-2 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right"
-                            />
-                          </>
-                        ) : (
-                          <div className="text-right">
-                            <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded-md">
-                              ${(Number(partsBudgetMap[part]) || 0).toFixed(2)} USD
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      {/* Bloque de Observación específico para cada repuesto al Re-presupuestar */}
+                      {viewerRole === 'garante' && !isLocked && garanteProposalDecision === 'no_acepto' ? (
+                        <div className="pt-2 border-t border-amber-200/60 flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-amber-900 flex items-center gap-1">
+                            <Pencil className="w-3 h-3 text-amber-600" />
+                            <span>Observación / Justificación ({part}):</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={`Escriba la justificación del ajuste de ${part}...`}
+                            value={partsObservations[part] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPartsObservations((prev) => ({ ...prev, [part]: val }));
+                            }}
+                            className="w-full h-7 px-2.5 bg-amber-50/50 border border-amber-300 focus:border-amber-600 focus:bg-white rounded-lg text-xs text-zinc-900 outline-none"
+                          />
+                        </div>
+                      ) : partsObservations[part] ? (
+                        <div className="pt-1.5 border-t border-zinc-150 flex items-start gap-1 text-[11px] text-amber-900 bg-amber-50/60 p-1.5 rounded-lg border border-amber-200/60">
+                          <span className="font-bold shrink-0">Obs. Marca:</span>
+                          <span className="line-clamp-2">{partsObservations[part]}</span>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
+
+                  {/* Botón para guardar el re-presupuesto de repuestos por parte del Garante */}
+                  {viewerRole === 'garante' && !isLocked && garanteProposalDecision === 'no_acepto' && (
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSaveGaranteParts}
+                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Guardar Re-presupuesto y Observaciones</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* APARTADO 2: MANO DE OBRA CALIFICADA */}
+            {/* APARTADO 2: MANO DE OBRA CALIFICADA (SOLO EDITABLE POR TALLER / MATRIZ) */}
             <div className="space-y-3">
-              <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-                2. Mano de Obra
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
+                  2. Mano de Obra
+                </label>
+                <span className="text-[10px] text-zinc-400 font-medium">
+                  {canEditLabor ? 'Editable Matriz' : 'Dictaminado por Taller'}
+                </span>
+              </div>
 
-              {viewerRole === 'admin' && !isLocked ? (
+              {canEditLabor ? (
                 <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
                   {/* Arriba: Las horas / tiempo estimado de demora */}
                   <div>
@@ -1691,7 +1788,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                 </div>
               ) : (
-                /* Modo puramente visual para Garante de Marca o garantía bloqueada */
+                /* Modo puramente visual para Garante o lectura */
                 <div className="bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200 space-y-4">
                   <div>
                     <span className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
@@ -1703,20 +1800,25 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                   <div>
                     <span className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
-                      Valor Mano de Obra Autorizado:
+                      Valor Mano de Obra (Taller):
                     </span>
                     <span className="font-mono font-black text-base text-zinc-900 bg-white px-3 py-1.5 rounded-xl border border-zinc-200 inline-block">
                       ${(Number(laborCost) || 0).toFixed(2)} USD
                     </span>
                   </div>
+                  {viewerRole === 'garante' && !isLocked && (
+                    <p className="text-[10px] text-zinc-400 italic">
+                      Nota: La mano de obra es dictaminada y ejecutada exclusivamente por el taller autorizado.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* APARTADO 3: RESUMEN DE COMPRA */}
+            {/* APARTADO 3: RESUMEN DE COMPRA & LIQUIDACIÓN */}
             <div className="space-y-3">
               <label className="block text-xs font-black uppercase text-zinc-700 tracking-wider">
-                3. Resumen de Compra
+                3. Resumen & Liquidación
               </label>
 
               <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 shadow-xs space-y-3.5">
@@ -1768,7 +1870,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                 </div>
 
-                {/* Botones de Presupuesto en Matriz: Solo se muestran si el Administrador modificó los valores */}
+                {/* Botones de Presupuesto en Matriz: Solo si el Administrador modificó los valores */}
                 {viewerRole === 'admin' && !isLocked && isBudgetModified && (
                   <div className="flex items-center gap-2 pt-1 animate-slide-in">
                     <button
@@ -1792,6 +1894,61 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* BARRA DE DECISIÓN DEBAJO DE LA PROPUESTA: ACEPTO O NO ACEPTO (GARANTE DE MARCA) */}
+          {viewerRole === 'garante' && !isLocked && (
+            <div className="pt-4 border-t-2 border-indigo-100 bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-blue-50/70 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-indigo-950 flex items-center gap-2">
+                    <span>¿Acepta la propuesta económica enviada por Matriz?</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border bg-white text-indigo-700 border-indigo-200">
+                      Dictamen Marca
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-indigo-900/80 font-medium">
+                    {garanteProposalDecision === 'acepto'
+                      ? 'Ha seleccionado Aceptar la propuesta: se aprueban los valores de repuestos de Matriz tal cual. Puede formalizar el dictamen oficial en la sección inferior.'
+                      : 'Ha seleccionado No Aceptar (Re-presupuestar): los precios de cada repuesto y su bloque de observación individual están habilitados arriba. Guarde los cambios y formalice la resolución inferior.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGaranteProposalDecision('acepto')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                    garanteProposalDecision === 'acepto'
+                      ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300'
+                      : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Acepto</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGaranteProposalDecision('no_acepto');
+                    setGaranteSelectedResolution('encargar_taller');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                    garanteProposalDecision === 'no_acepto'
+                      ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300'
+                      : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                  <span>No Acepto (Re-presupuestar)</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

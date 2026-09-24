@@ -309,18 +309,21 @@ export function useGarantePortal() {
     notesOverride?: string,
     resolutionTypeOverride?: 'encargar_taller' | 'envio_repuesto'
   ) => {
-    const targetWarranty = idOverride ? warranties.find((w) => w.id === idOverride) : selectedWarranty;
-    if (!targetWarranty) return;
+    const storedWarranties = getStoredWarranties();
+    const storedTarget = idOverride ? storedWarranties.find((w) => w.id === idOverride) : null;
+    const baseTarget = storedTarget || (idOverride ? warranties.find((w) => w.id === idOverride) : selectedWarranty);
+    if (!baseTarget) return;
 
-    const finalNotes = notesOverride || reviewNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.';
-    const finalResolution = resolutionTypeOverride || targetWarranty.resolutionType || 'envio_repuesto';
+    const finalNotes = notesOverride || reviewNotes || baseTarget.garanteNotes || 'Aprobado según especificaciones de garantía oficial de fábrica.';
+    const finalResolution = resolutionTypeOverride || baseTarget.resolutionType || 'envio_repuesto';
     const newStatus: WarrantyRequestStatus = 'aceptada';
 
     setWarranties((prev) => {
       const updated = prev.map((w) =>
-        w.id === targetWarranty.id
+        w.id === baseTarget.id
           ? {
               ...w,
+              ...baseTarget,
               status: newStatus,
               resolutionType: finalResolution,
               garanteNotes: finalNotes,
@@ -335,22 +338,22 @@ export function useGarantePortal() {
     // Registrar dictamen oficial en base de datos
     const newDictamen: DictamenRecord = {
       id: `dic-${Date.now()}`,
-      warrantyId: targetWarranty.id,
-      requestNumber: targetWarranty.requestNumber,
+      warrantyId: baseTarget.id,
+      requestNumber: baseTarget.requestNumber,
       decision: 'aprobada',
       resolutionType: finalResolution,
-      motorcycleBrand: targetWarranty.motorcycleBrand,
-      motorcycleModel: targetWarranty.motorcycleModel,
-      motorcyclePlate: targetWarranty.motorcyclePlate,
-      motorcycleVin: targetWarranty.motorcycleVin,
-      clientName: targetWarranty.clientName,
-      clientIdNumber: targetWarranty.clientIdNumber,
+      motorcycleBrand: baseTarget.motorcycleBrand,
+      motorcycleModel: baseTarget.motorcycleModel,
+      motorcyclePlate: baseTarget.motorcyclePlate,
+      motorcycleVin: baseTarget.motorcycleVin,
+      clientName: baseTarget.clientName,
+      clientIdNumber: baseTarget.clientIdNumber,
       garanteId: profile?.id || 'garante-oficial',
       garanteName: profile?.contactName || profile?.companyName || 'Garante Oficial',
-      garanteCompany: profile?.companyName || targetWarranty.motorcycleBrand,
+      garanteCompany: profile?.companyName || baseTarget.motorcycleBrand,
       garanteNotes: finalNotes,
       data: {
-        ...targetWarranty,
+        ...baseTarget,
         status: newStatus,
         resolutionType: finalResolution,
         garanteNotes: finalNotes,
@@ -370,12 +373,12 @@ export function useGarantePortal() {
       id: `alt-gar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'garantia_aprobada',
       targetRole: 'garante',
-      targetBrand: targetWarranty.motorcycleBrand,
+      targetBrand: baseTarget.motorcycleBrand,
       title: 'Dictamen Aprobado Emitido',
-      message: `Has autorizado la cobertura de la solicitud #${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand} ${targetWarranty.motorcycleModel}). Resolución: ${resText}.`,
+      message: `Has autorizado la cobertura de la solicitud #${baseTarget.requestNumber} (${baseTarget.motorcycleBrand} ${baseTarget.motorcycleModel}). Resolución: ${resText}.`,
       timestamp: 'Ahora mismo',
       read: false,
-      relatedId: targetWarranty.id,
+      relatedId: baseTarget.id,
     });
 
     // Alerta para Matriz / Admin
@@ -384,24 +387,24 @@ export function useGarantePortal() {
       type: 'garantia_aprobada',
       targetRole: 'admin',
       title: 'Dictamen Favorable de Marca Recibido',
-      message: `El Garante oficial de ${targetWarranty.motorcycleBrand} autorizó la cobertura de la solicitud #${targetWarranty.requestNumber} (${targetWarranty.clientName}). Resolución: ${resText}.`,
+      message: `El Garante oficial de ${baseTarget.motorcycleBrand} autorizó la cobertura de la solicitud #${baseTarget.requestNumber} (${baseTarget.clientName}). Resolución: ${resText}.`,
       timestamp: 'Ahora mismo',
       read: false,
-      relatedId: targetWarranty.id,
+      relatedId: baseTarget.id,
     });
 
     // Alerta para Taller de origen
-    if (targetWarranty.tallerOriginId) {
+    if (baseTarget.tallerOriginId) {
       alertsToPush.push({
         id: `alt-tal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: 'garantia_aprobada',
         targetRole: 'taller',
-        targetWorkshopId: targetWarranty.tallerOriginId,
+        targetWorkshopId: baseTarget.tallerOriginId,
         title: '¡Garantía Aprobada por la Marca!',
-        message: `La solicitud #${targetWarranty.requestNumber} (${targetWarranty.clientName} - ${targetWarranty.motorcycleBrand}) fue aprobada por el Garante oficial. Resolución: ${resText}.`,
+        message: `La solicitud #${baseTarget.requestNumber} (${baseTarget.clientName} - ${baseTarget.motorcycleBrand}) fue aprobada por el Garante oficial. Resolución: ${resText}.`,
         timestamp: 'Ahora mismo',
         read: false,
-        relatedId: targetWarranty.id,
+        relatedId: baseTarget.id,
       });
     }
 
@@ -417,8 +420,8 @@ export function useGarantePortal() {
     setIsActionModalOpen(false);
     showToast(
       finalResolution === 'encargar_taller'
-        ? `Garantía ${targetWarranty.requestNumber} procesada: ENCARGADA A TALLER (Aceptación 2).`
-        : `Garantía ${targetWarranty.requestNumber} ACEPTADA: Envío de Repuesto.`,
+        ? `Garantía ${baseTarget.requestNumber} procesada: ENCARGADA A TALLER (Aceptación 2).`
+        : `Garantía ${baseTarget.requestNumber} ACEPTADA: Envío de Repuesto.`,
       'success'
     );
   }, [selectedWarranty, reviewNotes, warranties, profile, showToast]);

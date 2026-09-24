@@ -351,6 +351,7 @@ export interface WarrantyRequest {
   partsTags?: string[];
   resolutionType?: 'encargar_taller' | 'envio_repuesto';
   partsBudget?: Record<string, number> | Array<{ name: string; cost: number }>;
+  partsObservations?: Record<string, string>;
   laborTime?: string;
   laborCost?: number;
   totalBudget?: number;

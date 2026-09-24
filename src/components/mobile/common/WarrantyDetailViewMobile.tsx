@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   AlertCircle,
   DollarSign,
+  Pencil,
   X,
   Building2,
   Play,
@@ -36,6 +37,7 @@ import {
 import {
   saveStoredWarranties,
   getStoredWarranties,
+  canDeleteWarranty,
 } from '../../../data/mockMultiRoleData';
 import { getWarrantyStatusInfo } from '../../common/WarrantyModule';
 import { isVideoUrl } from './NewWarrantyFormMobile';
@@ -164,6 +166,39 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     return false;
   }, [warranty, laborTime, laborCost, partsBudgetMap, formData.partsTags]);
 
+  // Decisión del Garante sobre la propuesta ('acepto' | 'no_acepto')
+  const [garanteProposalDecision, setGaranteProposalDecision] = useState<'acepto' | 'no_acepto'>('acepto');
+
+  // Observaciones individuales por repuesto introducidas por el Garante
+  const [partsObservations, setPartsObservations] = useState<Record<string, string>>(() => {
+    return warranty.partsObservations || {};
+  });
+
+  const canEditParts = !isLocked && (viewerRole === 'admin' || (viewerRole === 'garante' && garanteProposalDecision === 'no_acepto'));
+  const canEditLabor = !isLocked && viewerRole === 'admin';
+
+  const handleSaveGaranteParts = () => {
+    const grandTotal = partsTotal + laborCost;
+    const updated: WarrantyRequest = {
+      ...warranty,
+      partsBudget: partsBudgetMap,
+      partsObservations,
+      totalBudget: grandTotal,
+      estimatedCost: grandTotal,
+    };
+    if (onSave) {
+      onSave(updated);
+    }
+    try {
+      const allStored = getStoredWarranties();
+      const updatedList = allStored.map((w) => (w.id === updated.id ? updated : w));
+      saveStoredWarranties(updatedList);
+    } catch {}
+    confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 } });
+    setToastMessage('✓ Re-presupuesto y observaciones de repuestos guardados.');
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const handleCancelBudget = () => {
     let origMap: Record<string, number> = {};
     if (warranty.partsBudget) {
@@ -283,7 +318,8 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     const finalNotes =
       formData.garanteNotes.trim() ||
       'Dictamen oficial favorable emitido por la Gerencia de Garantías de la Marca.';
-    const finalResolution = formData.resolutionType || 'envio_repuesto';
+    const finalResolution = formData.resolutionType || 'encargar_taller';
+    const finalTotal = partsTotal + Number(laborCost || 0);
 
     const updated: WarrantyRequest = {
       ...warranty,
@@ -291,6 +327,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       garanteNotes: finalNotes,
       resolutionType: finalResolution,
       approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      partsBudget: partsBudgetMap,
+      partsObservations,
+      laborTime: laborTime,
+      laborCost: Number(laborCost || 0),
+      totalBudget: finalTotal,
+      estimatedCost: finalTotal,
     };
 
     setFormData((prev) => ({
@@ -298,6 +340,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       status: 'aceptada',
       garanteNotes: finalNotes,
       resolutionType: finalResolution,
+      estimatedCost: finalTotal.toFixed(2),
     }));
 
     if (onApproveWarranty) {
@@ -472,26 +515,41 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </button>
           )}
 
-          {/* Eliminar (Solo Admin) */}
-          {viewerRole === 'admin' && onDelete && (
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber}?`
-                  )
-                ) {
-                  onDelete(warranty.id);
-                  onBack();
-                }
-              }}
-              className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white active:scale-95 text-red-600 border border-red-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-              title="Eliminar Solicitud"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          {/* Eliminar (Solo Admin con bloqueo de 30 días si está aceptada) */}
+          {viewerRole === 'admin' && onDelete && (() => {
+            const deleteCheck = canDeleteWarranty(warranty);
+            if (!deleteCheck.canDelete) {
+              return (
+                <button
+                  type="button"
+                  onClick={() => alert(deleteCheck.reason)}
+                  className="w-8 h-8 rounded-lg bg-zinc-100 text-zinc-400 border border-zinc-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs opacity-70"
+                  title={deleteCheck.reason}
+                >
+                  <Trash2 className="w-4 h-4 text-zinc-400" />
+                </button>
+              );
+            }
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber}?`
+                    )
+                  ) {
+                    onDelete(warranty.id);
+                    onBack();
+                  }
+                }}
+                className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white active:scale-95 text-red-600 border border-red-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                title="Eliminar Solicitud"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            );
+          })()}
 
           <div className="h-5 w-px bg-zinc-200 mx-0.5" />
 
@@ -914,13 +972,26 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           </div>
 
           {/* =============================================================== */}
-          {/* SECCIÓN DE PRESUPUESTO OFICIAL (SIEMPRE EN MATRIZ; EN GARANTE/TALLER SOLO SI ENCARGAR AL TALLER) */}
+          {/* SECCIÓN DE PRESUPUESTO OFICIAL (EN MATRIZ SIEMPRE; EN GARANTE Y TALLER SOLO SI ENCARGAR AL TALLER) */}
           {/* =============================================================== */}
+          {viewerRole === 'garante' && formData.resolutionType === 'envio_repuesto' && !isLocked && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 space-y-1 animate-fade-in mt-3">
+              <span className="font-bold flex items-center gap-1.5 text-emerald-950">
+                <Package className="w-4 h-4 text-emerald-600" />
+                Modalidad: Envío de Repuesto Directo
+              </span>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                La marca despachará los repuestos físicos directamente a la sede sin costo alguno. No se genera presupuesto ni liquidación de taller.
+              </p>
+            </div>
+          )}
+
           {(viewerRole === 'admin' ||
-            ((viewerRole === 'garante' || viewerRole === 'taller') && formData.resolutionType === 'encargar_taller')) && (
+            ((viewerRole === 'garante' || viewerRole === 'taller') &&
+              formData.resolutionType === 'encargar_taller')) && (
             <div className="pt-3 border-t border-zinc-100 space-y-3 animate-fade-in">
-              {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA */}
-              {Boolean(formData.garanteNotes || warranty.garanteNotes) && (
+              {/* BANNER DE OBSERVACIÓN Y DICTAMEN DEL GARANTE DE MARCA (SI YA FUE EMITIDO) */}
+              {Boolean(formData.garanteNotes || warranty.garanteNotes) && isLocked && (
                 <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border-2 border-indigo-300 rounded-2xl p-3.5 shadow-xs space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shrink-0">
@@ -960,6 +1031,8 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                     <p className="text-[10px] text-zinc-500">
                       {viewerRole === 'admin' && !isLocked
                         ? 'Ingrese costos unitarios y tiempo de mano de obra'
+                        : viewerRole === 'garante' && !isLocked
+                        ? 'Revise la propuesta de Matriz: Acepte o re-presupueste'
                         : 'Desglose oficial de repuestos y mano de obra'}
                     </p>
                   </div>
@@ -989,42 +1062,82 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                     )}
                   </div>
                   {formData.partsTags.length > 0 ? (
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
                       {formData.partsTags.map((tag, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-zinc-200 text-xs"
+                          className="p-2 bg-white rounded-lg border border-zinc-200 text-xs space-y-1.5"
                         >
-                          <span className="font-semibold text-zinc-800 truncate flex-1">{tag}</span>
-                          <div className="relative w-24 shrink-0 text-right">
-                            {viewerRole === 'admin' && !isLocked ? (
-                              <>
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-[11px]">$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0.00"
-                                  value={partsBudgetMap[tag] !== undefined ? partsBudgetMap[tag] : ''}
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    const newMap = { ...partsBudgetMap, [tag]: val };
-                                    setPartsBudgetMap(newMap);
-                                    const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (newMap[t] || 0), 0);
-                                    const newTotal = newPartsTotal + (laborCost || 0);
-                                    setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
-                                  }}
-                                  className="w-full py-1 pl-5 pr-2 bg-zinc-50 border border-zinc-200 focus:border-indigo-600 focus:bg-white rounded-md text-xs font-mono font-bold text-right outline-none"
-                                />
-                              </>
-                            ) : (
-                              <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded">
-                                ${(Number(partsBudgetMap[tag]) || 0).toFixed(2)} USD
-                              </span>
-                            )}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-zinc-800 truncate flex-1">{tag}</span>
+                            <div className="relative w-24 shrink-0 text-right">
+                              {canEditParts ? (
+                                <>
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-[11px]">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={partsBudgetMap[tag] !== undefined ? partsBudgetMap[tag] : ''}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      const newMap = { ...partsBudgetMap, [tag]: val };
+                                      setPartsBudgetMap(newMap);
+                                      const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (newMap[t] || 0), 0);
+                                      const newTotal = newPartsTotal + (laborCost || 0);
+                                      setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
+                                    }}
+                                    className="w-full py-1 pl-5 pr-2 bg-zinc-50 border border-zinc-200 focus:border-indigo-600 focus:bg-white rounded-md text-xs font-mono font-bold text-right outline-none"
+                                  />
+                                </>
+                              ) : (
+                                <span className="font-mono font-bold text-xs text-zinc-900 bg-zinc-100 px-2 py-1 rounded">
+                                  ${(Number(partsBudgetMap[tag]) || 0).toFixed(2)} USD
+                                </span>
+                              )}
+                            </div>
                           </div>
+
+                          {/* Observación por repuesto si está re-presupuestando */}
+                          {viewerRole === 'garante' && !isLocked && garanteProposalDecision === 'no_acepto' ? (
+                            <div className="pt-1.5 border-t border-amber-200/60 flex flex-col gap-1">
+                              <label className="text-[9px] font-bold text-amber-900 flex items-center gap-1">
+                                <Pencil className="w-2.5 h-2.5 text-amber-600" />
+                                <span>Obs. Repuesto ({tag}):</span>
+                              </label>
+                              <input
+                                type="text"
+                                placeholder={`Justificación de ${tag}...`}
+                                value={partsObservations[tag] || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setPartsObservations((prev) => ({ ...prev, [tag]: val }));
+                                }}
+                                className="w-full py-1 px-2 bg-amber-50/50 border border-amber-300 focus:border-amber-600 focus:bg-white rounded text-[11px] text-zinc-900 outline-none"
+                              />
+                            </div>
+                          ) : partsObservations[tag] ? (
+                            <div className="pt-1 border-t border-zinc-150 text-[10px] text-amber-900 bg-amber-50/60 p-1 rounded border border-amber-200/60">
+                              <span className="font-bold">Obs:</span> {partsObservations[tag]}
+                            </div>
+                          ) : null}
                         </div>
                       ))}
+
+                      {/* Botón para guardar el re-presupuesto de repuestos por parte del Garante */}
+                      {viewerRole === 'garante' && !isLocked && garanteProposalDecision === 'no_acepto' && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={handleSaveGaranteParts}
+                            className="w-full py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-lg text-xs font-bold shadow-2xs transition flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            <span>Guardar Re-presupuesto y Observaciones</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <p className="text-[11px] text-zinc-400 italic bg-white p-2.5 rounded-lg border border-zinc-200">
@@ -1033,13 +1146,18 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   )}
                 </div>
 
-                {/* 2. Mano de Obra */}
+                {/* 2. Mano de Obra (Solo editable por taller / matriz) */}
                 <div className="space-y-2 pt-2 border-t border-zinc-200/80">
-                  <label className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider block">
-                    2. Mano de Obra
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider block">
+                      2. Mano de Obra
+                    </label>
+                    <span className="text-[9px] text-zinc-400">
+                      {canEditLabor ? 'Editable Matriz' : 'Dictaminado Taller'}
+                    </span>
+                  </div>
 
-                  {viewerRole === 'admin' && !isLocked ? (
+                  {canEditLabor ? (
                     <>
                       <div>
                         <span className="text-[10px] text-zinc-500 font-medium block mb-1">
@@ -1097,6 +1215,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                           ${Number(laborCost || 0).toFixed(2)} USD
                         </span>
                       </div>
+                      {viewerRole === 'garante' && !isLocked && (
+                        <p className="text-[10px] text-zinc-400 italic">
+                          Nota: La mano de obra es dictaminada por el taller autorizado.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1134,6 +1257,57 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                       <Check className="w-3.5 h-3.5" />
                       <span>Guardar Presupuesto</span>
                     </button>
+                  </div>
+                )}
+
+                {/* BARRA DE DECISIÓN DEBAJO DE LA PROPUESTA: ACEPTO O NO ACEPTO (GARANTE MÓVIL) */}
+                {viewerRole === 'garante' && !isLocked && (
+                  <div className="pt-3 border-t border-zinc-200/80 space-y-3 animate-fade-in">
+                    <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase text-purple-950">
+                          ¿Acepta la propuesta económica?
+                        </span>
+                        <span className="text-[9px] font-bold text-purple-700 bg-white px-1.5 py-0.5 rounded border border-purple-200">
+                          Marca
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-purple-800">
+                        {garanteProposalDecision === 'acepto'
+                          ? 'Se aceptan los repuestos de Matriz tal cual. Formalice el dictamen en la pestaña Dictamen.'
+                          : 'Modo re-presupuesto: Modifique los precios y observaciones de repuestos arriba.'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setGaranteProposalDecision('acepto')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                            garanteProposalDecision === 'acepto'
+                              ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300'
+                              : 'bg-white text-zinc-700 border border-zinc-200'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Acepto</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGaranteProposalDecision('no_acepto');
+                            setFormData((prev) => ({ ...prev, resolutionType: 'encargar_taller' }));
+                          }}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                            garanteProposalDecision === 'no_acepto'
+                              ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300'
+                              : 'bg-white text-zinc-700 border border-zinc-200'
+                          }`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>No Acepto</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1529,6 +1703,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => {
+                handleSave();
                 onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
                 setFormData({ ...formData, status: 'validada_matriz' });
                 confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });

@@ -267,8 +267,57 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
   },
 ];
 
+// --- Solicitud de Garantía Restaurada GAR-2026-9135 ---
+export const RESTORED_WARRANTY_9135: WarrantyRequest = {
+  id: 'gar-1790270366447',
+  requestNumber: 'GAR-2026-9135',
+  status: 'aceptada',
+  createdAt: '2026-09-24T19:36:36.527Z',
+  approvedAt: '2026-09-24T19:36:36.527Z',
+  clientName: 'Bayron Manuel  Bermeo Rizzo',
+  clientIdNumber: '1205409004',
+  clientPhone: '0994825101',
+  motorcycleBrand: 'HMT',
+  motorcycleModel: 'Thork 230 pro',
+  motorcyclePlate: 'KG212G',
+  motorcycleVin: 'L6UB4HA26VA000305',
+  motorcycleMileage: 0,
+  motorNumber: '163FML000143W7',
+  ramvNumber: 'HMT0800024',
+  warrantyType: 'marca',
+  issueDescription: 'Allá en motor de arranque, tablero y sensor de velocímetro, el vehículo fue ingresado a otro taller no autorizado',
+  tallerOrigin: 'StarMotos Sucursal Quevedo',
+  tallerOriginId: 'taller-quevedo',
+  partsRequired: 'Motor de arranque, Tablero, Sensor de velocímetro',
+  partsTags: ['Motor de arranque', 'Tablero', 'Sensor de velocímetro'],
+  resolutionType: 'envio_repuesto',
+  partsBudget: {
+    Tablero: 55,
+    'Motor de arranque': 25,
+    'Sensor de velocímetro': 15,
+  },
+  laborTime: '2 horas',
+  laborCost: 20,
+  totalBudget: 115,
+  estimatedCost: 115,
+  matrizNotes: 'Inspección técnica de Matriz aprobada. Aplica cobertura de fábrica.',
+  garanteNotes: 'por el tiempo esta fuera de garantía por lo que le podemos apoyar con el motor de arranque nada mas y el tema de la velocidad muy probablemente solo sea de calibrar el sensor',
+  garanteName: 'Pedro Zeas',
+  targetBrand: 'MMOTASA',
+  invoiceNumber: '024-000024',
+  diagnosticPhotos: [
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_1_1790270354929_bjjqh2.webp',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_2_1790270273169_olg6i3.webp',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_3_1790270275904_zofe2n.webp',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_4_1790270278838_u71d9c.webp',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_5_1790270359752_mpwi2u.webp',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_1_1790270295244_xxa14v.mp4',
+    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_2_1790270299550_gsqvke.mp4',
+  ],
+};
+
 // --- Solicitudes de Garantía Iniciales ---
-export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [];
+export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [RESTORED_WARRANTY_9135];
 
 // --- Alertas del Sistema ---
 export const INITIAL_ALERTS: SystemAlert[] = [];
@@ -428,21 +477,30 @@ try {
 // Garantías
 export function getStoredWarranties(): WarrantyRequest[] {
   try {
+    removeDeletedTombstone('gar-1790270366447', 'GAR-2026-9135');
     const stored = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
     if (stored) {
       const parsed: WarrantyRequest[] = JSON.parse(stored);
-      return parsed.filter(
+      const filtered = parsed.filter(
         (w) =>
           w &&
           w.id &&
           !isDeletedTombstone(w.id) &&
           (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
       );
+      if (!filtered.some((w) => w.id === 'gar-1790270366447' || w.requestNumber === 'GAR-2026-9135')) {
+        filtered.unshift(RESTORED_WARRANTY_9135);
+        safeSaveWarrantiesToLocalStorage(filtered);
+      }
+      return filtered;
+    } else {
+      safeSaveWarrantiesToLocalStorage([RESTORED_WARRANTY_9135]);
+      return [RESTORED_WARRANTY_9135];
     }
   } catch (e) {
     console.error('Error reading warranties from localStorage', e);
   }
-  return [];
+  return [RESTORED_WARRANTY_9135];
 }
 
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {
@@ -474,7 +532,64 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
   }
 }
 
-export function deleteStoredWarranty(id: string) {
+/**
+ * Evalúa si una solicitud de garantía puede ser eliminada.
+ * Regla de negocio: Las garantías que ya han sido ACEPTADAS / APROBADAS solo pueden
+ * ser eliminadas una vez transcurridos 30 días desde su resolución oficial.
+ * Las demás solicitudes (en revisión, en proceso, rechazadas) se pueden eliminar inmediatamente.
+ */
+export function canDeleteWarranty(warranty?: WarrantyRequest | null): {
+  canDelete: boolean;
+  reason?: string;
+  daysRemaining?: number;
+} {
+  if (!warranty) return { canDelete: true };
+
+  const isAccepted =
+    warranty.status === 'aceptada' ||
+    warranty.status === 'aprobada' ||
+    warranty.status === 'en_proceso_aceptacion_2';
+
+  if (!isAccepted) {
+    return { canDelete: true };
+  }
+
+  // Extraer fecha base (aprobación o creación)
+  let baseDate: Date | null = null;
+  if (warranty.approvedAt) {
+    const parsed = Date.parse(warranty.approvedAt);
+    if (!isNaN(parsed)) {
+      baseDate = new Date(parsed);
+    }
+  }
+
+  if (!baseDate && warranty.createdAt) {
+    const parsed = Date.parse(warranty.createdAt);
+    if (!isNaN(parsed)) {
+      baseDate = new Date(parsed);
+    }
+  }
+
+  if (!baseDate) {
+    baseDate = new Date();
+  }
+
+  const diffMs = Date.now() - baseDate.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffDays < 30) {
+    const daysRemaining = Math.max(1, Math.ceil(30 - diffDays));
+    return {
+      canDelete: false,
+      reason: `Las garantías aceptadas solo se pueden eliminar después de 30 días de su resolución oficial. Faltan ${daysRemaining} día(s) para habilitar su eliminación.`,
+      daysRemaining,
+    };
+  }
+
+  return { canDelete: true };
+}
+
+export function deleteStoredWarranty(id: string): boolean {
   try {
     const cleanId = id.trim();
     const stored = getStoredWarranties();
@@ -484,6 +599,14 @@ export function deleteStoredWarranty(id: string) {
         w.requestNumber === cleanId ||
         (w.requestNumber && w.requestNumber.toLowerCase() === cleanId.toLowerCase())
     );
+
+    if (target) {
+      const deleteCheck = canDeleteWarranty(target);
+      if (!deleteCheck.canDelete) {
+        alert(deleteCheck.reason || 'Las garantías aceptadas solo se pueden eliminar después de 30 días de su resolución oficial.');
+        return false;
+      }
+    }
 
     const idsToTombstone = [cleanId];
     if (target?.id && !idsToTombstone.includes(target.id)) idsToTombstone.push(target.id);
@@ -535,8 +658,10 @@ export function deleteStoredWarranty(id: string) {
 
     // 5. Eliminar en Supabase en cascada
     cloudDeleteWarranty(...idsToTombstone);
+    return true;
   } catch (e) {
     console.error('Error deleting warranty', e);
+    return false;
   }
 }
 

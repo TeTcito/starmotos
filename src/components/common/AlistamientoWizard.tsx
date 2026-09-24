@@ -1302,7 +1302,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="w-full h-full flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Input oculto para subir archivos reales de imágenes */}
       <input
         ref={fileInputRef}
@@ -1314,16 +1314,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 1. VISTA: LISTADO O APARTADO INDEPENDIENTE DE ALISTAMIENTO                 */}
-      {/* ========================================================================= */}
-      {/* ========================================================================= */}
       {/* 1. VISTA: FORMULARIO DE DETALLE DE ALISTAMIENTO PREVIO                    */}
       {/* ========================================================================= */}
       {currentViewMode === 'list' && selectedRecordForDetail && detailFormData && (
-        <form
-          onSubmit={handleSaveRecordDetail}
-          className="w-full flex flex-col gap-4 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs"
-        >
+        <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
+          <form
+            onSubmit={handleSaveRecordDetail}
+            className="w-full flex flex-col gap-4 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs mb-4"
+          >
           {/* Cabecera del Formulario de Alistamiento */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
             <div className="flex items-center gap-3">
@@ -2149,11 +2147,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
             </div>
           </div>
         </form>
+        </div>
       )}
 
       {/* 2. VISTA: LIBRO DE ALISTAMIENTOS (TABLA EXCEL) */}
       {currentViewMode === 'list' && !selectedRecordForDetail && (
-        <div className="h-full w-full flex flex-col overflow-hidden gap-2.5 animate-fade-in">
+        <div className="h-full w-full flex-1 min-h-0 flex flex-col overflow-y-auto xl:overflow-hidden gap-2.5 animate-fade-in">
           {/* Header Superior Destacado: Libro de Alistamientos & Búsqueda de Cédula */}
           <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 shrink-0">
             {/* Fila 1: Título con Icono y Badges de Métricas */}
@@ -2613,7 +2612,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
             </div>
 
             {filteredRecords.length > 0 ? (
-              <div className="flex-1 min-h-0 w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
+              <div className="flex-1 min-h-0 min-h-[260px] w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
                 <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
                 <table className="w-full table-fixed text-left text-xs border-collapse">
                   <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
@@ -2986,10 +2985,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO (3 COLUMNAS LIMPIAS, SIN SCROLL)     */}
+      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO (3 COLUMNAS)                         */}
       {/* ========================================================================= */}
       {currentViewMode === 'form' && (
-        <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
+        <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
+          <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
           {/* ALERTA DE VALIDACIÓN (SI FALTAN CAMPOS) */}
           {validationAlert && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
@@ -4755,6 +4755,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
             )}
           </div>
         </form>
+        </div>
       )}
 
 

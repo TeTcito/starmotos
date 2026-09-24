@@ -593,6 +593,17 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     };
   }, [filteredRecords]);
 
+  // Historial completo conocido (combinando recentRecords con localStorage de alistamientos)
+  const allKnownRecords = useMemo(() => {
+    const stored = getStoredFullAlistamientos();
+    const map = new Map<string, AlistamientoFullRecord>();
+    recentRecords.forEach((r) => map.set(r.id, r));
+    stored.forEach((r) => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+    return Array.from(map.values());
+  }, [recentRecords]);
+
   // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
   const clientHistoricalRecords = useMemo(() => {
     const cedula = formData.cedulaRuc.trim().toLowerCase();
@@ -601,7 +612,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
 
     if (!cedula && !chasis && !placa) return [];
 
-    return recentRecords.filter((rec) => {
+    return allKnownRecords.filter((rec) => {
       if (formData.id && rec.id === formData.id) return false;
       const matchCedula = !!cedula && rec.cedulaRuc.trim().toLowerCase() === cedula;
       const matchChasis = !!chasis && rec.chasis.trim().toLowerCase() === chasis;
@@ -613,41 +624,52 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
 
       return matchCedula || matchChasis || matchPlaca;
     });
-  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, recentRecords]);
+  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, allKnownRecords]);
 
-  // 1. Si ya se realizó alistamiento PDI previamente para este cliente/moto, opción bloqueada
-  const isPdiBlocked = useMemo(() => {
+  // 1. ¿Ya se realizó alistamiento PDI previamente para este cliente/moto?
+  const hasPdiDone = useMemo(() => {
     return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('alistamiento_pdi'));
   }, [clientHistoricalRecords]);
 
-  // 2. Si ya se realizó engrasado previamente para este cliente/moto, opción bloqueada
-  const isEngrasadoBlocked = useMemo(() => {
+  // 2. ¿Ya se realizó engrasado previamente para este cliente/moto?
+  const hasEngrasadoDone = useMemo(() => {
     return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('engrasado'));
   }, [clientHistoricalRecords]);
 
-  // Sincronizar dinámicamente qué servicios pueden estar marcados
+  // Flujo Secuencial Obligatorio:
+  // Paso 1: Alistamiento PDI (bloqueado si ya se realizó)
+  const isPdiBlocked = hasPdiDone;
+  // Paso 2: Engrasado (bloqueado si ya se realizó)
+  const isEngrasadoBlocked = hasEngrasadoDone;
+  // Paso 3: Mantenimiento (bloqueado si ya se hizo PDI pero aún NO ha realizado el Engrasado)
+  const isMantenimientoBlocked = hasPdiDone && !hasEngrasadoDone;
+
+  // Sincronizar dinámicamente qué servicios pueden estar marcados según la etapa secuencial
   useEffect(() => {
     setFormData((prev) => {
       let updated = [...prev.serviciosRealizados];
       let changed = false;
 
-      if (isPdiBlocked && updated.includes('alistamiento_pdi')) {
-        updated = updated.filter((s) => s !== 'alistamiento_pdi');
-        changed = true;
+      // Etapa B: Ya tiene PDI previo pero NO engrasado -> Paso 2 Engrasado OBLIGATORIO
+      if (hasPdiDone && !hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'engrasado') {
+          updated = ['engrasado'];
+          changed = true;
+        }
       }
-      if (isEngrasadoBlocked && updated.includes('engrasado')) {
-        updated = updated.filter((s) => s !== 'engrasado');
-        changed = true;
-      }
-
-      if (isPdiBlocked && isEngrasadoBlocked) {
-        if (!updated.includes('mantenimiento') || updated.length > 1) {
+      // Etapa C: Ya completó Engrasado previo -> Paso 3 Mantenimiento OBLIGATORIO
+      else if (hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'mantenimiento') {
           updated = ['mantenimiento'];
           changed = true;
         }
-      } else if (updated.length === 0) {
-        updated = ['mantenimiento'];
-        changed = true;
+      }
+      // Etapa A: Primera vez (sin PDI previo) -> Asegurar al menos alistamiento_pdi
+      else {
+        if (updated.length === 0) {
+          updated = ['alistamiento_pdi'];
+          changed = true;
+        }
       }
 
       if (!changed) return prev;
@@ -657,7 +679,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
         serviciosRealizados: updated,
       };
     });
-  }, [isPdiBlocked, isEngrasadoBlocked]);
+  }, [hasPdiDone, hasEngrasadoDone]);
 
   // Consultar Cédula o RUC
   const handleConsultar = (idToSearch?: string) => {
@@ -695,6 +717,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
         modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
         color: existingRec.color || prev.color,
         kilometraje: existingRec.kilometraje || prev.kilometraje,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingRec.sede || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingRec.sedeId || prev.sedeId),
       }));
       setSearchFeedback(`✓ Cliente registrado encontrado: ${existingRec.nombres} ${existingRec.apellidos}`);
       return;
@@ -748,6 +772,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
         color: existingClient.color || prev.color,
         year: existingClient.year || prev.year,
         kilometraje: existingClient.motorcycleMileage !== undefined ? existingClient.motorcycleMileage : prev.kilometraje,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingClient.workshopName || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingClient.workshopId || prev.sedeId),
       }));
       setSearchFeedback(`✓ Cliente registrado encontrado: ${existingClient.fullName}`);
       return;
@@ -826,11 +852,20 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   // Iniciar nuevo alistamiento
   const handleStartNewAlistamiento = (initialCedula?: string) => {
     const cedula = initialCedula?.trim() || '';
+
+    // Si hay una sede seleccionada en el filtro exterior (distinta de 'all'), pre-seleccionarla automáticamente
+    const preselectedWs =
+      effectiveIsMatriz && selectedWorkshopFilter !== 'all' && workshops && workshops.length > 0
+        ? workshops.find((w) => w.id === selectedWorkshopFilter)
+        : null;
+    const initialSede = preselectedWs ? preselectedWs.name : defaultSede;
+    const initialSedeId = preselectedWs ? preselectedWs.id : defaultSedeId;
+
     setFormData({
       id: '',
       atendidoPor: defaultAtendidoPor,
-      sede: defaultSede,
-      sedeId: defaultSedeId,
+      sede: initialSede,
+      sedeId: initialSedeId,
       fechaServicio: todayStr,
       horaServicio: getCurrentTimeStr(),
       nombres: '',
@@ -1052,12 +1087,19 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     });
   };
 
-  // Toggle de servicios en formulario de nuevo registro
+  // Toggle de servicios en formulario de nuevo registro (con bloqueo por flujo secuencial)
   const toggleServicio = (servicio: ServiceActionType) => {
     if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
     if (servicio === 'engrasado' && isEngrasadoBlocked) return;
+    if (servicio === 'mantenimiento' && isMantenimientoBlocked) return;
 
-    if (isPdiBlocked && isEngrasadoBlocked && servicio === 'mantenimiento') {
+    // Si PDI está completado y engrasado aún no, engrasado es obligatorio
+    if (hasPdiDone && !hasEngrasadoDone && servicio === 'engrasado') {
+      return;
+    }
+
+    // Si engrasado ya está completado, mantenimiento es obligatorio
+    if (hasEngrasadoDone && servicio === 'mantenimiento') {
       return;
     }
 
@@ -3053,59 +3095,64 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Sede / Taller</label>
-                  {effectiveIsMatriz ? (
-                    <select
-                      value={formData.sede}
-                      onChange={(e) => {
-                        const sName = e.target.value;
-                        const sObj = workshops.find((w) => w.name === sName);
-                        setFormData({
-                          ...formData,
-                          sede: sName,
-                          sedeId: sObj?.id || defaultSedeId,
-                        });
-                      }}
-                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
-                    >
-                      {workshops.map((w) => (
-                        <option key={w.id} value={w.name}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-800 truncate">
-                      {formData.sede || defaultSede}
-                    </div>
+              {/* Sede / Taller (Arriba de Origen) */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center justify-between">
+                  <span>Sede / Taller *</span>
+                  {effectiveIsMatriz && (
+                    <span className="text-[9px] text-blue-600 font-semibold normal-case">Red Matriz</span>
                   )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <label className="block text-[11px] font-bold text-zinc-700">Origen</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddOriginModal(true)}
-                      className="text-[10px] text-blue-600 font-bold"
-                    >
-                      + Nuevo
-                    </button>
-                  </div>
+                </label>
+                {effectiveIsMatriz && workshops && workshops.length > 0 ? (
                   <select
-                    value={formData.origen}
-                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                    className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                    value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
+                    onChange={(e) => {
+                      const chosenId = e.target.value;
+                      const sObj = workshops.find((w) => w.id === chosenId);
+                      setFormData({
+                        ...formData,
+                        sedeId: chosenId,
+                        sede: sObj ? sObj.name : formData.sede,
+                      });
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
                   >
-                    {origins.map((orig) => (
-                      <option key={orig} value={orig}>
-                        {orig}
+                    {workshops.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
                       </option>
                     ))}
                   </select>
+                ) : (
+                  <div className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-800 truncate">
+                    {formData.sede || defaultSede}
+                  </div>
+                )}
+              </div>
+
+              {/* Origen / Almacén (Abajo de Sede) */}
+              <div>
+                <div className="flex items-center justify-between mb-0.5">
+                  <label className="block text-[11px] font-bold text-zinc-700">Origen / Almacén *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddOriginModal(true)}
+                    className="text-[10px] text-blue-600 font-bold"
+                  >
+                    + Nuevo Almacén
+                  </button>
                 </div>
+                <select
+                  value={formData.origen}
+                  onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                >
+                  {origins.map((orig) => (
+                    <option key={orig} value={orig}>
+                      {orig}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-2 flex gap-2">
@@ -3254,9 +3301,14 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   <label className="block text-[11px] font-bold uppercase text-zinc-700">
                     ¿Qué se realizó? *
                   </label>
-                  {isPdiBlocked && isEngrasadoBlocked && (
-                    <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                      PDI & Engrasado previos
+                  {hasPdiDone && !hasEngrasadoDone && (
+                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                      Paso 2: Engrasado
+                    </span>
+                  )}
+                  {hasEngrasadoDone && (
+                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Paso 3: Mantenimiento
                     </span>
                   )}
                 </div>
@@ -3265,17 +3317,23 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     {
                       id: 'alistamiento_pdi' as ServiceActionType,
                       label: 'Alistamiento PDI',
+                      stepBadge: 'Paso 1',
                       isBlocked: isPdiBlocked,
+                      blockReason: 'Ya realizado',
                     },
                     {
                       id: 'engrasado' as ServiceActionType,
                       label: 'Engrasado',
+                      stepBadge: 'Paso 2',
                       isBlocked: isEngrasadoBlocked,
+                      blockReason: 'Ya realizado',
                     },
                     {
                       id: 'mantenimiento' as ServiceActionType,
                       label: 'Mantenimiento',
-                      isBlocked: false,
+                      stepBadge: 'Paso 3',
+                      isBlocked: isMantenimientoBlocked,
+                      blockReason: 'Req. Engrasado',
                     },
                   ].map((srv) => {
                     const isSelected = formData.serviciosRealizados.includes(srv.id);
@@ -3290,10 +3348,14 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                             <Lock className="w-3 h-3 text-zinc-400" />
                             <span className="line-through opacity-70 truncate">{srv.label}</span>
                           </div>
-                          <span className="text-[8px] font-semibold text-zinc-400">Ya realizado</span>
+                          <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
                         </div>
                       );
                     }
+
+                    const isMandatory =
+                      (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                      (hasEngrasadoDone && srv.id === 'mantenimiento');
 
                     return (
                       <button
@@ -3307,6 +3369,15 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                         }`}
                       >
                         <span className="truncate">{srv.label}</span>
+                        {isMandatory ? (
+                          <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                            {srv.stepBadge} Oblig.
+                          </span>
+                        ) : (
+                          <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                            {srv.stepBadge}
+                          </span>
+                        )}
                       </button>
                     );
                   })}

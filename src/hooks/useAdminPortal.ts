@@ -760,6 +760,8 @@ export function useAdminPortal() {
           color: record.color || updated[existingIdx].color,
           year: record.year || updated[existingIdx].year,
           lastVisit: record.fechaServicio || updated[existingIdx].lastVisit,
+          workshopId: record.sedeId || updated[existingIdx].workshopId,
+          workshopName: record.sede || updated[existingIdx].workshopName,
         };
       } else {
         updated = [newClient, ...prev];

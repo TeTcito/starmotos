@@ -82,6 +82,10 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
             setViewMode('list');
           }}
           viewerRole="taller"
+          onCreateNewRequest={() => {
+            setSelectedWarranty(null);
+            setViewMode('new');
+          }}
         />
       )}
 

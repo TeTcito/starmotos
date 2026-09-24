@@ -576,8 +576,8 @@ export function useTallerPortal() {
           color: securedRecord.color || updated[existingIdx].color,
           year: securedRecord.year || updated[existingIdx].year,
           lastVisit: securedRecord.fechaServicio || updated[existingIdx].lastVisit,
-          workshopId: wsId,
-          workshopName: wsName,
+          workshopId: targetWsId,
+          workshopName: targetWsName,
           totalVisits: updated[existingIdx].totalVisits + 1,
         };
       } else {

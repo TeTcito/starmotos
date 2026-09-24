@@ -39,6 +39,7 @@ import {
   RefreshCw,
   RotateCcw,
   Image as ImageIcon,
+  PlusCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
@@ -311,6 +312,7 @@ interface WarrantyFormViewProps {
   onRejectByGarante?: (id: string, reason: string) => void;
   onDelete?: (id: string) => void;
   onUpdateWarranty?: (updated: WarrantyRequest) => void;
+  onCreateNewRequest?: () => void;
 }
 
 export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
@@ -323,6 +325,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   onRejectByGarante,
   onDelete,
   onUpdateWarranty,
+  onCreateNewRequest,
 }) => {
   const [currentWarranty, setCurrentWarranty] = useState<WarrantyRequest>(warranty);
   const [isEditing, setIsEditing] = useState(false);
@@ -353,11 +356,18 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
   const statusInfo = getWarrantyStatusInfo(currentWarranty.status);
 
-  // Bloqueo total si la garantía ya fue aceptada, aprobada, denegada o completada
+  // Bloqueo total si la garantía ya fue aceptada, aprobada, denegada, rechazada o completada
   const isLocked = useMemo(() => {
     return (
-      ['aceptada', 'aprobada', 'completada', 'denegada'].includes(currentWarranty.status) ||
+      ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(currentWarranty.status) ||
       ['aceptada', 'denegada'].includes(statusInfo.canonical)
+    );
+  }, [currentWarranty.status, statusInfo.canonical]);
+
+  const isDenied = useMemo(() => {
+    return (
+      ['denegada', 'rechazada'].includes(currentWarranty.status) ||
+      statusInfo.canonical === 'denegada'
     );
   }, [currentWarranty.status, statusInfo.canonical]);
 
@@ -700,6 +710,17 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             >
               <Trash2 className="w-4 h-4" />
               <span>Eliminar</span>
+            </button>
+          )}
+
+          {isDenied && onCreateNewRequest && (
+            <button
+              type="button"
+              onClick={onCreateNewRequest}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Crear Nueva Solicitud</span>
             </button>
           )}
         </div>
@@ -2121,6 +2142,19 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           )}
           {currentWarranty.approvedAt && (
             <p className="text-[11px] opacity-80">Fecha: {currentWarranty.approvedAt}</p>
+          )}
+
+          {statusInfo.canonical === 'denegada' && onCreateNewRequest && (
+            <div className="pt-2 border-t border-red-200 flex justify-end">
+              <button
+                type="button"
+                onClick={onCreateNewRequest}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>+ Crear Nueva Solicitud de Garantía</span>
+              </button>
+            </div>
           )}
         </div>
       )}

@@ -700,6 +700,17 @@ export const AlistamientoWizard: React.FC<Props> = ({
   const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * RECORDS_PER_PAGE, currentPage * RECORDS_PER_PAGE);
 
+  // Historial completo conocido (combinando recentRecords con localStorage de alistamientos)
+  const allKnownRecords = useMemo(() => {
+    const stored = getStoredFullAlistamientos();
+    const map = new Map<string, AlistamientoFullRecord>();
+    recentRecords.forEach((r) => map.set(r.id, r));
+    stored.forEach((r) => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+    return Array.from(map.values());
+  }, [recentRecords]);
+
   // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
   const clientHistoricalRecords = useMemo(() => {
     const cedula = formData.cedulaRuc.trim().toLowerCase();
@@ -708,7 +719,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     if (!cedula && !chasis && !placa) return [];
 
-    return recentRecords.filter((rec) => {
+    return allKnownRecords.filter((rec) => {
       if (formData.id && rec.id === formData.id) return false;
       const matchCedula = !!cedula && rec.cedulaRuc.trim().toLowerCase() === cedula;
       const matchChasis = !!chasis && rec.chasis.trim().toLowerCase() === chasis;
@@ -720,45 +731,52 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
       return matchCedula || matchChasis || matchPlaca;
     });
-  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, recentRecords]);
+  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, allKnownRecords]);
 
-  // 1. Si ya se realizó alistamiento PDI previamente para este cliente/moto, opción bloqueada
-  const isPdiBlocked = useMemo(() => {
+  // 1. ¿Ya se realizó alistamiento PDI previamente para este cliente/moto?
+  const hasPdiDone = useMemo(() => {
     return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('alistamiento_pdi'));
   }, [clientHistoricalRecords]);
 
-  // 2. Si ya se realizó engrasado previamente para este cliente/moto, opción bloqueada
-  const isEngrasadoBlocked = useMemo(() => {
+  // 2. ¿Ya se realizó engrasado previamente para este cliente/moto?
+  const hasEngrasadoDone = useMemo(() => {
     return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('engrasado'));
   }, [clientHistoricalRecords]);
 
-  // Sincronizar dinámicamente qué servicios pueden estar marcados
+  // Flujo Secuencial Obligatorio:
+  // Paso 1: Alistamiento PDI (bloqueado si ya se realizó)
+  const isPdiBlocked = hasPdiDone;
+  // Paso 2: Engrasado (bloqueado si ya se realizó)
+  const isEngrasadoBlocked = hasEngrasadoDone;
+  // Paso 3: Mantenimiento (bloqueado si ya se hizo PDI pero aún NO ha realizado el Engrasado)
+  const isMantenimientoBlocked = hasPdiDone && !hasEngrasadoDone;
+
+  // Sincronizar dinámicamente qué servicios pueden estar marcados según la etapa secuencial
   useEffect(() => {
     setFormData((prev) => {
       let updated = [...prev.serviciosRealizados];
       let changed = false;
 
-      // Si PDI está bloqueado, no puede estar marcado
-      if (isPdiBlocked && updated.includes('alistamiento_pdi')) {
-        updated = updated.filter((s) => s !== 'alistamiento_pdi');
-        changed = true;
+      // Etapa B: Ya tiene PDI previo pero NO engrasado -> Paso 2 Engrasado OBLIGATORIO
+      if (hasPdiDone && !hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'engrasado') {
+          updated = ['engrasado'];
+          changed = true;
+        }
       }
-      // Si Engrasado está bloqueado, no puede estar marcado
-      if (isEngrasadoBlocked && updated.includes('engrasado')) {
-        updated = updated.filter((s) => s !== 'engrasado');
-        changed = true;
-      }
-
-      // Si ambos están completados/bloqueados, mantenimiento se queda marcado y lo demás desmarcado
-      if (isPdiBlocked && isEngrasadoBlocked) {
-        if (!updated.includes('mantenimiento') || updated.length > 1) {
+      // Etapa C: Ya completó Engrasado previo -> Paso 3 Mantenimiento OBLIGATORIO
+      else if (hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'mantenimiento') {
           updated = ['mantenimiento'];
           changed = true;
         }
-      } else if (updated.length === 0) {
-        // Siempre asegurar al menos una opción activa
-        updated = ['mantenimiento'];
-        changed = true;
+      }
+      // Etapa A: Primera vez (sin PDI previo) -> Asegurar al menos alistamiento_pdi
+      else {
+        if (updated.length === 0) {
+          updated = ['alistamiento_pdi'];
+          changed = true;
+        }
       }
 
       if (!changed) return prev;
@@ -768,7 +786,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
         serviciosRealizados: updated,
       };
     });
-  }, [isPdiBlocked, isEngrasadoBlocked]);
+  }, [hasPdiDone, hasEngrasadoDone]);
 
   // Consultar Cédula o RUC (busca en registros existentes o clientes guardados)
   const handleConsultar = (idToSearch?: string) => {
@@ -806,6 +824,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
         modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
         color: existingRec.color || prev.color,
         kilometraje: existingRec.kilometraje || prev.kilometraje,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingRec.sede || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingRec.sedeId || prev.sedeId),
       }));
       setSearchFeedback(`✓ Cliente registrado encontrado: ${existingRec.nombres} ${existingRec.apellidos}`);
       return;
@@ -859,6 +879,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
         color: existingClient.color || prev.color,
         year: existingClient.year || prev.year,
         kilometraje: existingClient.motorcycleMileage !== undefined ? existingClient.motorcycleMileage : prev.kilometraje,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingClient.workshopName || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingClient.workshopId || prev.sedeId),
       }));
       setSearchFeedback(`✓ Cliente registrado encontrado: ${existingClient.fullName}`);
       return;
@@ -938,11 +960,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Iniciar nuevo alistamiento con o sin cédula previa
   const handleStartNewAlistamiento = (initialCedula?: string) => {
     const cedula = initialCedula?.trim() || '';
+
+    // Si hay una sede seleccionada en el filtro exterior (distinta de 'all'), pre-seleccionarla automáticamente
+    const preselectedWs =
+      effectiveIsMatriz && selectedWorkshopFilter !== 'all' && workshops && workshops.length > 0
+        ? workshops.find((w) => w.id === selectedWorkshopFilter)
+        : null;
+    const initialSede = preselectedWs ? preselectedWs.name : defaultSede;
+    const initialSedeId = preselectedWs ? preselectedWs.id : defaultSedeId;
+
     setFormData({
       id: '',
       atendidoPor: defaultAtendidoPor,
-      sede: defaultSede,
-      sedeId: defaultSedeId,
+      sede: initialSede,
+      sedeId: initialSedeId,
       fechaServicio: todayStr,
       horaServicio: getCurrentTimeStr(),
       nombres: '',
@@ -1108,13 +1139,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setTimeout(() => setDetailSuccessToast(null), 3500);
   };
 
-  // Servicios toggle (con bloqueo si ya se realizaron previamente)
+  // Servicios toggle (con bloqueo si ya se realizaron previamente o según flujo secuencial)
   const toggleServicio = (servicio: ServiceActionType) => {
     if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
     if (servicio === 'engrasado' && isEngrasadoBlocked) return;
+    if (servicio === 'mantenimiento' && isMantenimientoBlocked) return;
 
-    // Si ambos ya están completados/bloqueados, mantenimiento se queda marcado fijo
-    if (isPdiBlocked && isEngrasadoBlocked && servicio === 'mantenimiento') {
+    // Si PDI está completado y engrasado aún no, engrasado es obligatorio (no se puede desmarcar)
+    if (hasPdiDone && !hasEngrasadoDone && servicio === 'engrasado') {
+      return;
+    }
+
+    // Si engrasado ya está completado, mantenimiento es obligatorio (no se puede desmarcar)
+    if (hasEngrasadoDone && servicio === 'mantenimiento') {
       return;
     }
 
@@ -3213,7 +3250,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   />
                 </div>
 
-                {/* Origen / Almacén */}
+                {/* Sede / Taller (Arriba de Origen / Almacén) */}
+                {effectiveIsMatriz && workshops && workshops.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                      <span>Sede de Atención / Taller *</span>
+                      <span className="text-[10px] text-blue-600 font-semibold normal-case">Red Matriz</span>
+                    </label>
+                    <select
+                      value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
+                      onChange={(e) => {
+                        const chosenId = e.target.value;
+                        const chosenWs = workshops.find((w) => w.id === chosenId);
+                        setFormData({
+                          ...formData,
+                          sedeId: chosenId,
+                          sede: chosenWs ? chosenWs.name : formData.sede,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
+                    >
+                      {workshops.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Origen / Almacén (Abajo de Sede / Taller) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold uppercase text-zinc-700">
@@ -3390,15 +3456,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </span>
                 </div>
 
-                {/* ¿Qué se realizó? (Alistamiento PDI, Engrasado, Mantenimiento con bloqueo por historial) */}
+                {/* ¿Qué se realizó? (Alistamiento PDI, Engrasado, Mantenimiento con bloqueo secuencial estricto) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold uppercase text-zinc-700">
                       ¿Qué se realizó? *
                     </label>
-                    {isPdiBlocked && isEngrasadoBlocked && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                        PDI & Engrasado previos
+                    {hasPdiDone && !hasEngrasadoDone && (
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        Paso 2 Obligatorio: Engrasado
+                      </span>
+                    )}
+                    {hasEngrasadoDone && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Paso 3 Obligatorio: Mantenimiento
                       </span>
                     )}
                   </div>
@@ -3407,17 +3478,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       {
                         id: 'alistamiento_pdi' as ServiceActionType,
                         label: 'Alistamiento PDI',
+                        stepBadge: 'Paso 1',
                         isBlocked: isPdiBlocked,
+                        blockReason: 'Ya realizado',
                       },
                       {
                         id: 'engrasado' as ServiceActionType,
                         label: 'Engrasado',
+                        stepBadge: 'Paso 2',
                         isBlocked: isEngrasadoBlocked,
+                        blockReason: 'Ya realizado',
                       },
                       {
                         id: 'mantenimiento' as ServiceActionType,
                         label: 'Mantenimiento',
-                        isBlocked: false,
+                        stepBadge: 'Paso 3',
+                        isBlocked: isMantenimientoBlocked,
+                        blockReason: 'Requiere Engrasado',
                       },
                     ].map((srv) => {
                       const isSelected = formData.serviciosRealizados.includes(srv.id);
@@ -3426,17 +3503,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         return (
                           <div
                             key={srv.id}
-                            title="Servicio ya completado previamente para este cliente / motocicleta"
+                            title={`Opción bloqueada: ${srv.blockReason}`}
                             className="px-2 py-2 rounded-xl text-[11px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
                           >
                             <div className="flex items-center gap-1">
                               <Lock className="w-3 h-3 text-zinc-400" />
                               <span className="line-through opacity-70 truncate">{srv.label}</span>
                             </div>
-                            <span className="text-[9px] font-semibold text-zinc-400">Ya realizado</span>
+                            <span className="text-[9px] font-semibold text-zinc-400">{srv.blockReason}</span>
                           </div>
                         );
                       }
+
+                      const isMandatory =
+                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                        (hasEngrasadoDone && srv.id === 'mantenimiento');
 
                       return (
                         <button
@@ -3450,8 +3531,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           }`}
                         >
                           <span className="truncate">{srv.label}</span>
-                          {isPdiBlocked && isEngrasadoBlocked && srv.id === 'mantenimiento' && (
-                            <span className="text-[9px] font-bold text-blue-200">Requerido</span>
+                          {isMandatory ? (
+                            <span className={`text-[9px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                              {srv.stepBadge} Obligatorio
+                            </span>
+                          ) : (
+                            <span className={`text-[9px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                              {srv.stepBadge}
+                            </span>
                           )}
                         </button>
                       );
@@ -4175,6 +4262,34 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </div>
                 </div>
 
+                {effectiveIsMatriz && workshops && workshops.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                      <span>Sede de Atención / Taller *</span>
+                      <span className="text-[10px] text-blue-600 font-semibold normal-case">Red Matriz</span>
+                    </label>
+                    <select
+                      value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
+                      onChange={(e) => {
+                        const chosenId = e.target.value;
+                        const chosenWs = workshops.find((w) => w.id === chosenId);
+                        setFormData({
+                          ...formData,
+                          sedeId: chosenId,
+                          sede: chosenWs ? chosenWs.name : formData.sede,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
+                    >
+                      {workshops.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                     Origen / Almacén *
@@ -4339,15 +4454,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <span className="text-[10px] font-bold text-emerald-600">3 de 3</span>
                 </div>
 
-                {/* ¿Qué se realizó? Móvil */}
+                {/* ¿Qué se realizó? Móvil (Flujo Secuencial) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-bold uppercase text-zinc-700">
                       ¿Qué se realizó? *
                     </label>
-                    {isPdiBlocked && isEngrasadoBlocked && (
-                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                        PDI & Engrasado previos
+                    {hasPdiDone && !hasEngrasadoDone && (
+                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-200">
+                        Paso 2: Engrasado
+                      </span>
+                    )}
+                    {hasEngrasadoDone && (
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
+                        Paso 3: Mantenimiento
                       </span>
                     )}
                   </div>
@@ -4356,17 +4476,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       {
                         id: 'alistamiento_pdi' as ServiceActionType,
                         label: 'Alistamiento PDI',
+                        stepBadge: 'Paso 1',
                         isBlocked: isPdiBlocked,
+                        blockReason: 'Ya realizado',
                       },
                       {
                         id: 'engrasado' as ServiceActionType,
                         label: 'Engrasado',
+                        stepBadge: 'Paso 2',
                         isBlocked: isEngrasadoBlocked,
+                        blockReason: 'Ya realizado',
                       },
                       {
                         id: 'mantenimiento' as ServiceActionType,
                         label: 'Mantenimiento',
-                        isBlocked: false,
+                        stepBadge: 'Paso 3',
+                        isBlocked: isMantenimientoBlocked,
+                        blockReason: 'Requiere Engrasado',
                       },
                     ].map((srv) => {
                       const isSelected = formData.serviciosRealizados.includes(srv.id);
@@ -4375,17 +4501,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         return (
                           <div
                             key={srv.id}
-                            title="Servicio ya completado previamente"
+                            title={`Opción bloqueada: ${srv.blockReason}`}
                             className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
                           >
                             <div className="flex items-center gap-1">
                               <Lock className="w-3 h-3 text-zinc-400" />
                               <span className="line-through opacity-70 truncate">{srv.label}</span>
                             </div>
-                            <span className="text-[8px] font-semibold text-zinc-400">Ya realizado</span>
+                            <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
                           </div>
                         );
                       }
+
+                      const isMandatory =
+                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                        (hasEngrasadoDone && srv.id === 'mantenimiento');
 
                       return (
                         <button
@@ -4399,8 +4529,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           }`}
                         >
                           <span className="truncate">{srv.label}</span>
-                          {isPdiBlocked && isEngrasadoBlocked && srv.id === 'mantenimiento' && (
-                            <span className="text-[8px] font-bold text-blue-200">Requerido</span>
+                          {isMandatory ? (
+                            <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                              {srv.stepBadge} Obligatorio
+                            </span>
+                          ) : (
+                            <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                              {srv.stepBadge}
+                            </span>
                           )}
                         </button>
                       );

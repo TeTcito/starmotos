@@ -262,8 +262,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   const handleOpenAbonoModal = (record: AlistamientoFullRecord) => {
     setAbonoModalRecord(record);
     const valServ = Number(record.valorServicio) || 0;
-    const currentAbono = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
-    const currentPend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
+    const currentAbono = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+    const currentPend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
     setAbonoFormData({
       montoAbono: currentPend > 0 ? String(currentPend) : '',
       metodoPago: record.metodoPago || 'Efectivo',
@@ -278,7 +278,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     if (!abonoModalRecord) return;
 
     const valServ = Number(abonoModalRecord.valorServicio) || 0;
-    const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+    const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
     const inputAbono = parseFloat(abonoFormData.montoAbono) || 0;
 
     // Si está en modo suma (predeterminado), se suma el nuevo abono a lo recaudado previamente
@@ -534,8 +534,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     filteredRecords.forEach((r) => {
       const isPdi = isPdiOnlyRecord(r);
       const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
-      const pagado = isPdi ? 0 : (r.abono !== undefined && r.abono !== '' ? Number(r.abono) : (Number(r.montoPagado) || 0));
-      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined && r.saldoPendiente !== '' 
+      const pagado = isPdi ? 0 : (r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined 
         ? Number(r.saldoPendiente) 
         : Math.max(0, valor - pagado));
 
@@ -2207,6 +2207,38 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Historial de Abonos / Pagos Registrados */}
+                {selectedRecordForDetail?.historialAbonos && selectedRecordForDetail.historialAbonos.length > 0 && (
+                  <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center gap-1.5 pb-1 border-b border-blue-100 text-xs font-bold text-blue-900 uppercase tracking-wider">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Historial de Abonos ({selectedRecordForDetail.historialAbonos.length})</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {selectedRecordForDetail.historialAbonos.map((ab, idx) => (
+                        <div key={ab.id || idx} className="bg-white/80 rounded-lg p-2 border border-blue-100 flex flex-col gap-0.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-blue-600 font-bold">#{idx + 1} — {ab.fecha}{ab.hora ? ` ${ab.hora}` : ''}</span>
+                            <span className="text-xs font-bold text-emerald-700">${Number(ab.monto).toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-600">
+                              <CreditCard className="w-2.5 h-2.5" />
+                              {ab.metodoPago}
+                            </span>
+                            <span className={`text-[10px] font-bold font-mono ${Number(ab.saldoRestante) > 0.01 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                              Saldo: ${Number(ab.saldoRestante).toFixed(2)}
+                            </span>
+                          </div>
+                          {ab.registradoPor && (
+                            <span className="text-[9px] text-zinc-400">Por: {ab.registradoPor}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2781,8 +2813,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       ) : (
                         (() => {
                           const val = Number(record.valorServicio) || 0;
-                          const pag = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
-                          const pend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                          const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                          const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
                           return (
                             <div className="flex flex-col items-end leading-none text-right">
                               <span className="font-mono font-black text-zinc-900 text-xs">
@@ -3934,8 +3966,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             {/* Resumen Financiero del Servicio */}
             {(() => {
               const valServ = Number(abonoModalRecord.valorServicio) || 0;
-              const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
-              const saldoActual = abonoModalRecord.saldoPendiente !== undefined && abonoModalRecord.saldoPendiente !== '' ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
+              const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+              const saldoActual = abonoModalRecord.saldoPendiente !== undefined ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
               const inputVal = parseFloat(abonoFormData.montoAbono) || 0;
               
               // Si es modo suma, el total pagado es prevPagado + inputVal; sino, es inputVal directo

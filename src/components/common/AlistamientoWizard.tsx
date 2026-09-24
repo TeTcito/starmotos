@@ -292,8 +292,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
   const handleOpenAbonoModal = (record: AlistamientoFullRecord) => {
     setAbonoModalRecord(record);
     const valServ = Number(record.valorServicio) || 0;
-    const currentAbono = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
-    const currentPend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
+    const currentAbono = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+    const currentPend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
     setAbonoFormData({
       montoAbono: currentPend > 0 ? String(currentPend) : '',
       metodoPago: record.metodoPago || 'Efectivo',
@@ -308,7 +308,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     if (!abonoModalRecord) return;
 
     const valServ = Number(abonoModalRecord.valorServicio) || 0;
-    const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+    const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
     const inputAbono = parseFloat(abonoFormData.montoAbono) || 0;
 
     // Si está en modo suma (predeterminado), se suma el nuevo abono a lo recaudado previamente
@@ -571,8 +571,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     filteredRecords.forEach((r) => {
       const isPdi = isPdiOnlyRecord(r);
       const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
-      const pagado = isPdi ? 0 : (r.abono !== undefined && r.abono !== '' ? Number(r.abono) : (Number(r.montoPagado) || 0));
-      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined && r.saldoPendiente !== '' 
+      const pagado = isPdi ? 0 : (r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined 
         ? Number(r.saldoPendiente) 
         : Math.max(0, valor - pagado));
 
@@ -1948,6 +1948,49 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
               </div>
             )}
+
+            {/* Historial de Abonos / Pagos Registrados */}
+            {selectedRecordForDetail?.historialAbonos && selectedRecordForDetail.historialAbonos.length > 0 && (
+              <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 space-y-2">
+                <h4 className="text-xs font-black uppercase text-blue-950 tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-700" />
+                  <span>Historial de Abonos ({selectedRecordForDetail.historialAbonos.length})</span>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] text-left">
+                    <thead>
+                      <tr className="border-b border-blue-200 text-blue-800 font-bold">
+                        <th className="py-1.5 px-2">#</th>
+                        <th className="py-1.5 px-2">Fecha</th>
+                        <th className="py-1.5 px-2">Monto</th>
+                        <th className="py-1.5 px-2">Método</th>
+                        <th className="py-1.5 px-2">Saldo Restante</th>
+                        <th className="py-1.5 px-2">Registrado por</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRecordForDetail.historialAbonos.map((ab, idx) => (
+                        <tr key={ab.id || idx} className="border-b border-blue-100 last:border-0 hover:bg-blue-100/50">
+                          <td className="py-1.5 px-2 font-mono text-blue-600">{idx + 1}</td>
+                          <td className="py-1.5 px-2 font-mono">{ab.fecha}{ab.hora ? ` ${ab.hora}` : ''}</td>
+                          <td className="py-1.5 px-2 font-bold text-emerald-700">${Number(ab.monto).toFixed(2)}</td>
+                          <td className="py-1.5 px-2">
+                            <span className="inline-flex items-center gap-1 bg-white/80 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-200">
+                              <CreditCard className="w-2.5 h-2.5" />
+                              {ab.metodoPago}
+                            </span>
+                          </td>
+                          <td className={`py-1.5 px-2 font-bold font-mono ${Number(ab.saldoRestante) > 0.01 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                            ${Number(ab.saldoRestante).toFixed(2)}
+                          </td>
+                          <td className="py-1.5 px-2 text-zinc-500">{ab.registradoPor || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer del Formulario */}
@@ -2548,8 +2591,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             ) : (
                               (() => {
                                 const val = Number(record.valorServicio) || 0;
-                                const pag = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
-                                const pend = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                                const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                                const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
                                 return (
                                   <div className="flex flex-col items-end leading-tight">
                                     <span className="font-bold text-zinc-900 text-xs">${val.toFixed(2)}</span>
@@ -4625,8 +4668,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
             {/* Resumen Financiero del Servicio */}
             {(() => {
               const valServ = Number(abonoModalRecord.valorServicio) || 0;
-              const prevPagado = abonoModalRecord.abono !== undefined && abonoModalRecord.abono !== '' ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
-              const saldoActual = abonoModalRecord.saldoPendiente !== undefined && abonoModalRecord.saldoPendiente !== '' ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
+              const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+              const saldoActual = abonoModalRecord.saldoPendiente !== undefined ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
               const inputVal = parseFloat(abonoFormData.montoAbono) || 0;
               
               // Si es modo suma, el total pagado es prevPagado + inputVal; sino, es inputVal directo

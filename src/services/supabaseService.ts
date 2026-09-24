@@ -41,7 +41,7 @@ if (syncBus) {
           const filtered = current.filter(
             (w) => !event.data.ids.includes(w.id) && (!w.requestNumber || !event.data.ids.includes(w.requestNumber))
           );
-          localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(filtered));
+          safeSaveWarrantiesToLocalStorage(filtered as any);
           window.dispatchEvent(new Event('starmotos_warranties_updated'));
         } catch (_) {}
       }
@@ -147,49 +147,121 @@ export function isDeletedTombstone(id?: string | null): boolean {
  * se bloquee la visualización de alistamientos en Matriz ni en ninguna sede.
  */
 export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRecord[]): boolean {
+  if (!records || !Array.isArray(records)) return false;
+
+  const sanitizeAlistamiento = (r: AlistamientoFullRecord, stripMediaCompletely = false): AlistamientoFullRecord => {
+    const copy = { ...r };
+
+    // 1. Fotos
+    if (Array.isArray(copy.fotos) && copy.fotos.length > 0) {
+      if (stripMediaCompletely) {
+        copy.fotos = [];
+      } else {
+        copy.fotos = copy.fotos.map((f, i) => {
+          if (typeof f === 'string') {
+            if (f.startsWith('http://') || f.startsWith('https://')) return f;
+            if (f.length > 2000) {
+              const idbKey = `als_foto_${r.id}_${i}`;
+              try {
+                saveMediaToIndexedDB(idbKey, f);
+              } catch (_) {}
+              return `idb:${idbKey}`;
+            }
+          }
+          return f;
+        });
+      }
+    }
+
+    // 2. Evidencia de Transferencia
+    if (typeof copy.evidenciaTransferencia === 'string') {
+      if (stripMediaCompletely) {
+        copy.evidenciaTransferencia = '';
+      } else if (!copy.evidenciaTransferencia.startsWith('http://') && !copy.evidenciaTransferencia.startsWith('https://') && copy.evidenciaTransferencia.length > 2000) {
+        const idbKey = `als_evidencia_${r.id}`;
+        try {
+          saveMediaToIndexedDB(idbKey, copy.evidenciaTransferencia);
+        } catch (_) {}
+        copy.evidenciaTransferencia = `idb:${idbKey}`;
+      }
+    }
+
+    // 3. Comprobante Pago URL
+    if (typeof copy.comprobantePagoUrl === 'string') {
+      if (stripMediaCompletely) {
+        copy.comprobantePagoUrl = '';
+      } else if (!copy.comprobantePagoUrl.startsWith('http://') && !copy.comprobantePagoUrl.startsWith('https://') && copy.comprobantePagoUrl.length > 2000) {
+        const idbKey = `als_comprobante_${r.id}`;
+        try {
+          saveMediaToIndexedDB(idbKey, copy.comprobantePagoUrl);
+        } catch (_) {}
+        copy.comprobantePagoUrl = `idb:${idbKey}`;
+      }
+    }
+
+    return copy;
+  };
+
   try {
-    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(records));
+    // Proactivamente sanitizamos para evitar saturar el LocalStorage
+    const sanitized = records.map((r) => sanitizeAlistamiento(r, false));
+    localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(sanitized));
     return true;
   } catch (quotaErr) {
-    console.warn('[Storage] LocalStorage lleno al guardar alistamientos, optimizando fotos a IndexedDB:', quotaErr);
     try {
-      // Nivel 1: Conservar registros completos pero aligerar fotos > 15KB respaldándolas en IndexedDB
-      const optimized = records.map((r) => {
-        let copy = { ...r };
-        if (r.fotos && r.fotos.length > 0) {
-          copy.fotos = r.fotos.map((f, i) => {
-            if (typeof f === 'string' && f.length > 15000) {
-              try {
-                saveMediaToIndexedDB(`als_foto_${r.id}_${i}`, f);
-              } catch (_) {}
-              return f.slice(0, 300);
-            }
-            return f;
-          });
-        }
-        if (typeof r.evidenciaTransferencia === 'string' && r.evidenciaTransferencia.length > 15000) {
-          try {
-            saveMediaToIndexedDB(`als_evidencia_${r.id}`, r.evidenciaTransferencia);
-          } catch (_) {}
-        }
-        return copy;
-      });
-      localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(optimized));
+      // Fallback Nivel 2: Limpieza completa de fotos/evidencias manteniendo datos operacionales íntegros
+      const stripped = records.map((r) => sanitizeAlistamiento(r, true));
+      localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(stripped));
       return true;
     } catch (quotaErr2) {
-      console.warn('[Storage] Quota aún excedida, guardando metadatos de alistamiento sin fotos en LocalStorage:', quotaErr2);
-      try {
-        // Nivel 2: Guardar todos los datos esenciales del alistamiento con array fotos vacío
-        const stripped = records.map((r) => ({
-          ...r,
-          fotos: [],
-        }));
-        localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(stripped));
-        return true;
-      } catch (quotaErr3) {
-        console.error('[Storage] Error crítico al persistir alistamientos en LocalStorage:', quotaErr3);
-        return false;
+      console.warn('[Storage] Advertencia al persistir alistamientos en LocalStorage:', quotaErr2);
+      return false;
+    }
+  }
+}
+
+/**
+ * Sanitiza y guarda garantías en LocalStorage de forma ultra ligera y segura.
+ */
+export function safeSaveWarrantiesToLocalStorage(warranties: WarrantyRequest[]): boolean {
+  if (!warranties || !Array.isArray(warranties)) return false;
+
+  const sanitizeWarranty = (w: WarrantyRequest, stripMediaCompletely = false): WarrantyRequest => {
+    const copy = { ...w };
+    if (Array.isArray(copy.diagnosticPhotos) && copy.diagnosticPhotos.length > 0) {
+      if (stripMediaCompletely) {
+        copy.diagnosticPhotos = [];
+      } else {
+        copy.diagnosticPhotos = copy.diagnosticPhotos.map((item: any, idx: number) => {
+          if (typeof item === 'string') {
+            if (item.startsWith('http://') || item.startsWith('https://')) return item;
+            if (item.length > 2000) {
+              const idbKey = `${w.id}_media_${idx}`;
+              try {
+                saveMediaToIndexedDB(idbKey, item);
+              } catch (_) {}
+              return `idb:${idbKey}`;
+            }
+          }
+          return item;
+        });
       }
+    }
+    return copy;
+  };
+
+  try {
+    const sanitized = warranties.map((w) => sanitizeWarranty(w, false));
+    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(sanitized));
+    return true;
+  } catch (quotaErr) {
+    try {
+      const stripped = warranties.map((w) => sanitizeWarranty(w, true));
+      localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(stripped));
+      return true;
+    } catch (err2) {
+      console.warn('[Storage] Advertencia al persistir garantías en LocalStorage:', err2);
+      return false;
     }
   }
 }
@@ -278,24 +350,7 @@ export async function syncAllFromSupabase(): Promise<{
           }
         }
 
-        try {
-          localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(mergedWarranties));
-        } catch (quotaErr) {
-          console.warn('LocalStorage lleno al sincronizar garantías desde Supabase:', quotaErr);
-          const safeMerged = mergedWarranties.map((w) => {
-            if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
-            return {
-              ...w,
-              diagnosticPhotos: w.diagnosticPhotos.map((item) =>
-                typeof item === 'string' && item.length > 30000 ? item.slice(0, 500) : item
-              ),
-            };
-          });
-          try {
-            localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(safeMerged));
-          } catch (_) {}
-        }
-
+        safeSaveWarrantiesToLocalStorage(mergedWarranties);
         window.dispatchEvent(new Event('starmotos_warranties_updated'));
         warrantiesCount = mergedWarranties.length;
       }

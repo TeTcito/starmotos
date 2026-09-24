@@ -40,6 +40,7 @@ import {
   isDeletedTombstone,
   syncBus,
   safeSaveAlistamientosToLocalStorage,
+  safeSaveWarrantiesToLocalStorage,
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -454,36 +455,8 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
         (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
     );
 
-    // Intentar guardar en localStorage con protección contra QuotaExceededError
-    try {
-      localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(cleanList));
-    } catch (quotaErr) {
-      console.warn('LocalStorage saturado al guardar garantías. Optimizando almacenamiento:', quotaErr);
-      const safeList = cleanList.map((w) => {
-        if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
-        return {
-          ...w,
-          diagnosticPhotos: w.diagnosticPhotos.map((item, idx) => {
-            if (typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://'))) {
-              return item;
-            }
-            if (typeof item === 'string' && item.length > 30000) {
-              const mediaKey = `${w.id}_media_${idx}`;
-              saveMediaToIndexedDB(mediaKey, item);
-              return item.slice(0, 500); // fragmento indicador ligero
-            }
-            return item;
-          }),
-        };
-      });
-
-      try {
-        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(safeList));
-      } catch (retryErr) {
-        console.error('Fallo crítico al escribir en localStorage:', retryErr);
-      }
-    }
-
+    // Guardar en localStorage de forma ultra ligera y protegida
+    safeSaveWarrantiesToLocalStorage(cleanList);
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
 
     // Transmisión a Supabase en paralelo SIEMPRE
@@ -525,7 +498,7 @@ export function deleteStoredWarranty(id: string) {
         w.requestNumber !== cleanId &&
         (target ? w.id !== target.id && w.requestNumber !== target.requestNumber : true)
     );
-    localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(current));
+    safeSaveWarrantiesToLocalStorage(current);
 
     // 2. Limpiar dictámenes asociados a esta garantía para que no reaparezca en el garante
     try {
@@ -1114,7 +1087,7 @@ export function deleteStoredClient(idOrCedula: string) {
             w.clientIdNumber !== clean &&
             (target?.idNumber ? w.clientIdNumber !== target.idNumber : true)
         );
-        localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(remainingW));
+        safeSaveWarrantiesToLocalStorage(remainingW);
         window.dispatchEvent(new Event('starmotos_warranties_updated'));
       }
     } catch (_) {}

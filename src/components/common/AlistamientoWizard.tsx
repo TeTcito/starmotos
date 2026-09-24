@@ -52,6 +52,7 @@ import {
 } from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
+import { getMediaFromIndexedDB } from '../../services/mediaStorage';
 
 interface Props {
   defaultAtendidoPor: string;
@@ -1046,6 +1047,39 @@ export const AlistamientoWizard: React.FC<Props> = ({
     setSelectedRecordForDetail(record);
     setDetailFormData({ ...record });
     setDetailSuccessToast(null);
+
+    // Resolver evidencias y fotos desde IndexedDB si vienen con idb:
+    const evidencia = record.evidenciaTransferencia || record.comprobantePagoUrl || '';
+    if (evidencia.startsWith('idb:')) {
+      const key = evidencia.replace('idb:', '');
+      getMediaFromIndexedDB(key).then((data) => {
+        if (data) {
+          setDetailFormData((prev) => (prev ? {
+            ...prev,
+            evidenciaTransferencia: data,
+            comprobantePagoUrl: data,
+          } : null));
+        }
+      });
+    }
+
+    if (record.fotos && record.fotos.length > 0) {
+      record.fotos.forEach((f, idx) => {
+        if (typeof f === 'string' && f.startsWith('idb:')) {
+          const key = f.replace('idb:', '');
+          getMediaFromIndexedDB(key).then((data) => {
+            if (data) {
+              setDetailFormData((prev) => {
+                if (!prev) return null;
+                const nextFotos = [...(prev.fotos || [])];
+                nextFotos[idx] = data;
+                return { ...prev, fotos: nextFotos };
+              });
+            }
+          });
+        }
+      });
+    }
   };
 
   // Guardar modificaciones del formulario de alistamiento

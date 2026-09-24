@@ -51,6 +51,7 @@ import {
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
+import { getMediaFromIndexedDB } from '../../../services/mediaStorage';
 import { matchRecordToWorkshop, getRecordTimestamp, getRecordOrderStatus } from '../../common/AlistamientoWizard';
 
 interface Props {
@@ -961,6 +962,39 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     });
     setDetailSuccessToast(null);
     setDetailActiveTab('cliente');
+
+    // Resolver evidencias y fotos desde IndexedDB si vienen con idb:
+    const evidencia = record.evidenciaTransferencia || record.comprobantePagoUrl || '';
+    if (evidencia.startsWith('idb:')) {
+      const key = evidencia.replace('idb:', '');
+      getMediaFromIndexedDB(key).then((data) => {
+        if (data) {
+          setDetailFormData((prev) => (prev ? {
+            ...prev,
+            evidenciaTransferencia: data,
+            comprobantePagoUrl: data,
+          } : null));
+        }
+      });
+    }
+
+    if (record.fotos && record.fotos.length > 0) {
+      record.fotos.forEach((f, idx) => {
+        if (typeof f === 'string' && f.startsWith('idb:')) {
+          const key = f.replace('idb:', '');
+          getMediaFromIndexedDB(key).then((data) => {
+            if (data) {
+              setDetailFormData((prev) => {
+                if (!prev) return null;
+                const nextFotos = [...(prev.fotos || [])];
+                nextFotos[idx] = data;
+                return { ...prev, fotos: nextFotos };
+              });
+            }
+          });
+        }
+      });
+    }
   };
 
   // Guardar modificaciones del formulario de alistamiento
@@ -1495,39 +1529,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Celular 2 (Opcional)</label>
-                    <input
-                      type="tel"
-                      value={detailFormData.celular2 || ''}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, celular2: e.target.value })}
-                      placeholder="Opcional"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono text-zinc-900 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Correo Electrónico</label>
-                    <input
-                      type="email"
-                      value={detailFormData.email || ''}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, email: e.target.value })}
-                      placeholder="correo@ejemplo.com"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Dirección Domiciliaria</label>
-                    <input
-                      type="text"
-                      value={detailFormData.direccion || ''}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, direccion: e.target.value })}
-                      placeholder="Calle principal, secundaria, ciudad"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs text-zinc-900 outline-none transition-all"
-                    />
-                  </div>
-
                   <div className="pt-2 border-t border-zinc-100 space-y-2.5">
                     <div>
                       <label className="block text-[11px] font-bold text-zinc-700 mb-1">Sede / Taller</label>
@@ -1632,36 +1633,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">N° de Motor</label>
-                      <input
-                        type="text"
-                        value={detailFormData.numeroMotor || ''}
-                        onChange={(e) =>
-                          setDetailFormData({ ...detailFormData, numeroMotor: e.target.value.toUpperCase() })
-                        }
-                        placeholder="Opcional"
-                        className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono text-zinc-900 uppercase outline-none transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Año / Modelo</label>
-                      <input
-                        type="number"
-                        value={detailFormData.year || ''}
-                        onFocus={selectOnFocus}
-                        onChange={(e) => {
-                          const clean = cleanNumberInput(e.target.value);
-                          setDetailFormData({ ...detailFormData, year: clean === '' ? undefined : parseInt(clean) });
-                        }}
-                        placeholder="2026"
-                        className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono text-zinc-900 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center justify-between">
                       <span>Kilometraje de Recepción (km) *</span>
@@ -1734,15 +1705,15 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   )}
                 </div>
 
-                {/* Bloque 2: Técnico & Atención */}
+                {/* Bloque 2: Técnico, Aceite & Atención (Idéntico a Desktop) */}
                 <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
                   <div className="flex items-center gap-1.5 pb-1.5 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
                     <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Técnico & Atención</span>
+                    <span>Técnico & Aceite</span>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Técnico Responsable *</label>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Técnico Responsable</label>
                     <select
                       value={detailFormData.tecnicoResponsable}
                       onChange={(e) => {
@@ -1774,122 +1745,67 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
+                      <label className="block text-[10px] font-bold text-zinc-700 mb-0.5">Tipo de Aceite</label>
+                      <select
+                        value={detailFormData.nivelAceite || 'mineral'}
+                        onChange={(e) => setDetailFormData({ ...detailFormData, nivelAceite: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                      >
+                        <option value="mineral">Mineral</option>
+                        <option value="semisintetico">Semisintético</option>
+                        <option value="sintetico">Sintético</option>
+                        <option value="full_sintetico">Full Sintético</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-700 mb-0.5">Viscosidad / Grado</label>
+                      <select
+                        value={detailFormData.tipoAceite || '10W-30'}
+                        onChange={(e) => setDetailFormData({ ...detailFormData, tipoAceite: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                      >
+                        <option value="10W-30">10W-30</option>
+                        <option value="10W-40">10W-40</option>
+                        <option value="15W-40">15W-40</option>
+                        <option value="15W-50">15W-50</option>
+                        <option value="20W-40">20W-40</option>
+                        <option value="20W-50">20W-50</option>
+                        <option value="25W-50">25W-50</option>
+                        <option value="5W-30">5W-30</option>
+                        <option value="5W-40">5W-40</option>
+                        {customOilTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                        <option value="Sin Tipo">N/A</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-blue-600" />
-                        <span>Fecha Atención</span>
+                        <span>Fecha de Servicio</span>
                       </label>
                       <input
                         type="date"
                         value={detailFormData.fechaServicio || ''}
                         onChange={(e) => setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })}
-                        className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
+                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
+                      <label className="block text-[10px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-indigo-600" />
-                        <span>Hora Atención</span>
+                        <span>Hora de Servicio</span>
                       </label>
                       <input
                         type="time"
                         value={detailFormData.horaServicio || ''}
                         onChange={(e) => setDetailFormData({ ...detailFormData, horaServicio: e.target.value })}
-                        className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
+                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
                       />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bloque 3: Control de Aceite */}
-                <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                  <div className="flex items-center gap-1.5 pb-1.5 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                    <Wrench className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Control de Aceite</span>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[11px] font-bold text-zinc-700">
-                        Control de Aceite
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowCustomOilInput(!showCustomOilInput)}
-                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Agregar Aceite</span>
-                      </button>
-                    </div>
-
-                    {showCustomOilInput && (
-                      <div className="flex gap-2 mb-2 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                        <input
-                          type="text"
-                          value={newCustomOil}
-                          onChange={(e) => setNewCustomOil(e.target.value)}
-                          placeholder="Nueva Viscosidad..."
-                          className="flex-1 px-2 py-1 text-xs border border-emerald-200 rounded outline-none focus:border-emerald-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCustomOil}
-                          className="px-2 py-1 text-xs bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700"
-                        >
-                          Añadir
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <div>
-                        <label className="block text-[9px] font-bold text-zinc-500 mb-0.5">Estado</label>
-                        <select
-                          value={detailFormData.aceite || 'con_aceite'}
-                          onChange={(e) => setDetailFormData({ ...detailFormData, aceite: e.target.value })}
-                          className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-bold text-zinc-800 outline-none focus:border-blue-600"
-                        >
-                          <option value="con_aceite">Con Aceite</option>
-                          <option value="sin_aceite">Sin Aceite</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-bold text-zinc-500 mb-0.5">Tipo de Aceite</label>
-                        <select
-                          value={detailFormData.nivelAceite || 'mineral'}
-                          onChange={(e) => setDetailFormData({ ...detailFormData, nivelAceite: e.target.value })}
-                          className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-semibold text-zinc-800 outline-none focus:border-blue-600"
-                        >
-                          <option value="mineral">Mineral</option>
-                          <option value="semisintetico">Semisintético</option>
-                          <option value="sintetico">Sintético</option>
-                          <option value="full_sintetico">Full Sintético</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[9px] font-bold text-zinc-500 mb-0.5">Viscosidad / Grado</label>
-                        <select
-                          value={detailFormData.tipoAceite || '10W-30'}
-                          onChange={(e) => setDetailFormData({ ...detailFormData, tipoAceite: e.target.value })}
-                          className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-semibold text-zinc-800 outline-none focus:border-blue-600"
-                        >
-                          <option value="10W-30">10W-30</option>
-                          <option value="10W-40">10W-40</option>
-                          <option value="15W-40">15W-40</option>
-                          <option value="15W-50">15W-50</option>
-                          <option value="20W-40">20W-40</option>
-                          <option value="20W-50">20W-50</option>
-                          <option value="25W-50">25W-50</option>
-                          <option value="5W-30">5W-30</option>
-                          <option value="5W-40">5W-40</option>
-                          {customOilTypes.map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                          <option value="Sin Tipo">N/A</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -3302,33 +3218,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   required
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">N° Motor</label>
-                  <input
-                    type="text"
-                    value={formData.numeroMotor || ''}
-                    onChange={(e) => setFormData({ ...formData, numeroMotor: e.target.value.toUpperCase() })}
-                    placeholder="Ejemplo: 167FMM-8472910"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono uppercase"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Año / Modelo</label>
-                  <input
-                    type="number"
-                    value={formData.year || ''}
-                    onFocus={selectOnFocus}
-                    onChange={(e) => {
-                      const clean = cleanNumberInput(e.target.value);
-                      setFormData({ ...formData, year: clean === '' ? undefined : parseInt(clean) });
-                    }}
-                    placeholder="Ejemplo: 2026"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono"
-                  />
-                </div>
               </div>
 
               <div className="pt-2 flex gap-2">

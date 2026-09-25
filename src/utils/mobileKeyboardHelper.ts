@@ -9,9 +9,14 @@
 function getScrollParent(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
   while (parent && parent !== document.body && parent !== document.documentElement) {
+    if (parent.dataset.noKeyboardPad) {
+      parent = parent.parentElement;
+      continue;
+    }
     const style = window.getComputedStyle(parent);
     const overflowY = style.overflowY;
-    if (overflowY === 'auto' || overflowY === 'scroll') {
+    // Solo considerar un scroll parent si es el contenedor principal de la vista (>350px de alto)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && parent.clientHeight >= 350) {
       return parent;
     }
     parent = parent.parentElement;
@@ -26,10 +31,19 @@ export function initMobileKeyboardHelper() {
   if (typeof window === 'undefined') return;
 
   const scrollToActiveElement = (target: HTMLElement) => {
+    // Si el elemento ya es visible cómodamente en la pantalla, no forzar scroll
+    const rect = target.getBoundingClientRect();
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+    // Si ya está visible por encima de donde saldría el teclado, no mover
+    if (rect.top >= 70 && rect.bottom <= viewportHeight * 0.65) {
+      return;
+    }
+
     try {
       target.scrollIntoView({
         behavior: 'smooth',
-        block: 'center',
+        block: 'nearest',
         inline: 'nearest',
       });
     } catch (_) {
@@ -59,18 +73,22 @@ export function initMobileKeyboardHelper() {
       blurTimeout = null;
     }
 
-    // Agregar padding de colchón al contenedor de scroll para permitir desplazar hasta arriba
-    const scrollParent = getScrollParent(target);
-    if (scrollParent) {
-      activeScrollParent = scrollParent;
-      scrollParent.classList.add('mobile-keyboard-pad');
+    // Solo agregar colchón si el campo está en la parte baja de la pantalla
+    const rect = target.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const isNearBottom = rect.bottom > viewportHeight * 0.6;
+
+    if (isNearBottom) {
+      const scrollParent = getScrollParent(target);
+      if (scrollParent) {
+        activeScrollParent = scrollParent;
+        scrollParent.classList.add('mobile-keyboard-pad');
+      }
     }
 
-    // Desplazamiento escalonado para sincronizar con la animación de apertura del teclado móvil
+    // Desplazamiento no agresivo solo si es necesario
     requestAnimationFrame(() => scrollToActiveElement(target));
-    setTimeout(() => scrollToActiveElement(target), 120);
-    setTimeout(() => scrollToActiveElement(target), 280);
-    setTimeout(() => scrollToActiveElement(target), 450);
+    setTimeout(() => scrollToActiveElement(target), 250);
   };
 
   const handleFocusOut = () => {

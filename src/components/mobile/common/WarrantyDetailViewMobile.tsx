@@ -1180,7 +1180,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                     )}
                   </div>
                   {formData.partsTags.length > 0 ? (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+                    <div className="space-y-2">
                       {formData.partsTags.map((tag, idx) => (
                         <div
                           key={idx}

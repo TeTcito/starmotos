@@ -74,6 +74,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
         clients={clients}
         defaultTallerOrigin="StarMotos Sede Matriz"
         defaultTallerOriginId="sede-matriz"
+        viewerRole="admin"
       />
     );
   }

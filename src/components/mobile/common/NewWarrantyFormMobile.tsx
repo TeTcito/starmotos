@@ -652,18 +652,30 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             />
           </div>
 
-          {/* Tipo de Póliza: Solo Garantía Oficial de Marca */}
+          {/* Tipo de Póliza: Solo Matriz (admin) puede seleccionar Plus o GPS; Taller fija Garantía Oficial de Marca */}
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Póliza</label>
-            <div className="w-full px-3 py-2.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-black text-blue-900">Garantía Oficial de Marca</span>
+            {viewerRole === 'admin' ? (
+              <select
+                value={formData.warrantyType || 'marca'}
+                onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
+                className="w-full px-3 py-2.5 bg-white border border-zinc-300 focus:border-blue-600 rounded-xl text-xs font-bold text-blue-900 outline-none"
+              >
+                <option value="marca">Garantía Oficial de Marca</option>
+                <option value="plus_taller">Garantía Plus StarMotos</option>
+                <option value="gps">Garantía Dispositivo GPS Satelital</option>
+              </select>
+            ) : (
+              <div className="w-full px-3 py-2.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-black text-blue-900">Garantía Oficial de Marca</span>
+                </div>
+                <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
+                  Oficial
+                </span>
               </div>
-              <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
-                Oficial
-              </span>
-            </div>
+            )}
           </div>
 
           {/* Destino del Reclamo: Matriz vs Garante de Marca */}

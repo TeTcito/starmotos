@@ -168,6 +168,80 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     return false;
   }, [warranty, laborTime, laborCost, partsBudgetMap, formData.partsTags]);
 
+  // Modo de edición activable manualmente
+  const [isEditing, setIsEditing] = useState(false);
+  const [backupFormData, setBackupFormData] = useState<typeof formData | null>(null);
+
+  const canAdminOrTallerEdit = !isLocked && (viewerRole === 'admin' || viewerRole === 'taller');
+  const isFieldEditable = canAdminOrTallerEdit && isEditing;
+
+  const isForMatriz =
+    warranty.targetBrand === 'StarMotos Matriz' ||
+    (warranty.targetBrand || '').toLowerCase().includes('matriz') ||
+    warranty.warrantyType === 'plus_taller' ||
+    warranty.warrantyType === 'gps';
+
+  const handleStartEdit = () => {
+    setBackupFormData({ ...formData });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (backupFormData) {
+      setFormData(backupFormData);
+    }
+    setIsEditing(false);
+  };
+
+  const handleSaveMobile = () => {
+    handleSave();
+    setIsEditing(false);
+  };
+
+  const handleMatrizDirectApprove = () => {
+    const updated: WarrantyRequest = {
+      ...warranty,
+      ...formData,
+      motorcycleMileage: Number(formData.motorcycleMileage) || 0,
+      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+      status: 'aceptada',
+      matrizNotes: formData.matrizNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén.',
+      approvedAt: 'Hoy, Autorización Directa Matriz',
+    };
+    if (onSave) onSave(updated);
+    try {
+      const allStored = getStoredWarranties();
+      saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+    } catch {}
+    setFormData({ ...formData, status: 'aceptada' });
+    setToastMessage('✓ Garantía aprobada exitosamente por Matriz.');
+    confetti({ particleCount: 40, spread: 55, origin: { y: 0.7 } });
+  };
+
+  const handleMatrizReject = () => {
+    const reason = window.prompt('Ingrese el motivo de denegación en Matriz Central:');
+    if (!reason || !reason.trim()) return;
+    const updated: WarrantyRequest = {
+      ...warranty,
+      ...formData,
+      motorcycleMileage: Number(formData.motorcycleMileage) || 0,
+      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+      status: 'denegada',
+      rejectionReason: reason.trim(),
+      rejectedAt: 'Hoy, Matriz Central',
+    };
+    if (onSave) onSave(updated);
+    try {
+      const allStored = getStoredWarranties();
+      saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+    } catch {}
+    if (onRejectWarranty) {
+      onRejectWarranty(warranty.id, reason.trim());
+    }
+    setFormData({ ...formData, status: 'denegada' });
+    setToastMessage('✕ Solicitud rechazada por Matriz.');
+  };
+
   // Decisión del Garante sobre la propuesta ('acepto' | 'no_acepto')
   const [garanteProposalDecision, setGaranteProposalDecision] = useState<'acepto' | 'no_acepto'>('acepto');
 
@@ -176,8 +250,8 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     return warranty.partsObservations || {};
   });
 
-  const canEditParts = !isLocked && (viewerRole === 'admin' || (viewerRole === 'garante' && garanteProposalDecision === 'no_acepto'));
-  const canEditLabor = !isLocked && viewerRole === 'admin';
+  const canEditParts = !isLocked && (viewerRole === 'admin' ? isEditing : (viewerRole === 'garante' && garanteProposalDecision === 'no_acepto'));
+  const canEditLabor = !isLocked && viewerRole === 'admin' && isEditing;
 
   const handleSaveGaranteParts = () => {
     const grandTotal = partsTotal + laborCost;
@@ -470,40 +544,63 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
           {/* Acciones Rápidas */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Imprimir */}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-black active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-              title="Imprimir / Guardar como PDF"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="w-8 h-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                  title="Cancelar Edición"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMobile}
+                  className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                  title="Guardar Cambios"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Imprimir / PDF */}
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-black active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                  title="PDF"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
 
-          {/* WhatsApp */}
-          {formData.clientPhone && (
-            <a
-              href={cleanWhatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-600 border border-emerald-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-              title="Contactar al Cliente"
-            >
-              <MessageCircle className="w-4 h-4" />
-            </a>
-          )}
+                {/* WhatsApp */}
+                {formData.clientPhone && (
+                  <a
+                    href={cleanWhatsappUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-600 border border-emerald-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                    title="Contactar al Cliente"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </a>
+                )}
 
-          {/* Guardar (Oculto si está bloqueada o denegada) */}
-          {!isLocked && (
-            <button
-              type="button"
-              onClick={() => handleSave()}
-              className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shadow-xs"
-              title="Guardar Cambios"
-            >
-              <Save className="w-4 h-4" />
-            </button>
-          )}
+                {/* Botón Edición (en lugar de guardar fijo) */}
+                {canAdminOrTallerEdit && (
+                  <button
+                    type="button"
+                    onClick={handleStartEdit}
+                    className="w-8 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                    title="Edición"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+              </>
+            )}
 
           {/* Botón rápido "+ Nueva" si la solicitud está denegada */}
           {isDenied && onCreateNewRequest && (
@@ -687,7 +784,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Cédula o RUC</label>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.clientIdNumber}
               onChange={(e) => setFormData({ ...formData, clientIdNumber: e.target.value })}
               className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
@@ -698,7 +795,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Nombre Completo</label>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.clientName}
               onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
               required
@@ -723,7 +820,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </div>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.clientPhone}
               onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
               placeholder="0990000000"
@@ -735,7 +832,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Taller de Origen</label>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.tallerOrigin}
               onChange={(e) => setFormData({ ...formData, tallerOrigin: e.target.value })}
               className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white disabled:opacity-75 disabled:cursor-not-allowed"
@@ -744,12 +841,30 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Tipo de Cobertura / Póliza</label>
-            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-black text-blue-900 uppercase flex items-center justify-between">
-              <span>Garantía Oficial de Marca</span>
-              <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
-                Oficial
-              </span>
-            </div>
+            {isFieldEditable && viewerRole === 'admin' ? (
+              <select
+                value={formData.warrantyType || 'marca'}
+                onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
+                className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 outline-none"
+              >
+                <option value="marca">Garantía Oficial de Marca</option>
+                <option value="plus_taller">Garantía Plus StarMotos</option>
+                <option value="gps">Garantía Dispositivo GPS Satelital</option>
+              </select>
+            ) : (
+              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-black text-blue-900 uppercase flex items-center justify-between">
+                <span>
+                  {formData.warrantyType === 'plus_taller'
+                    ? 'Garantía Plus StarMotos'
+                    : formData.warrantyType === 'gps'
+                    ? 'Garantía Dispositivo GPS'
+                    : 'Garantía Oficial de Marca'}
+                </span>
+                <span className="px-2 py-0.5 bg-blue-600 text-white text-[9px] font-bold rounded uppercase">
+                  Oficial
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -781,7 +896,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Marca</label>
               <input
                 type="text"
-                disabled={isLocked}
+                disabled={!isFieldEditable}
                 value={formData.motorcycleBrand}
                 onChange={(e) => setFormData({ ...formData, motorcycleBrand: e.target.value })}
                 placeholder="Marca"
@@ -792,7 +907,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Modelo</label>
               <input
                 type="text"
-                disabled={isLocked}
+                disabled={!isFieldEditable}
                 value={formData.motorcycleModel}
                 onChange={(e) => setFormData({ ...formData, motorcycleModel: e.target.value })}
                 placeholder="Modelo"
@@ -805,7 +920,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-bold text-zinc-700">Placa</label>
-                {!isLocked && (
+                {isFieldEditable && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, motorcyclePlate: 'SIN PLACA' })}
@@ -817,7 +932,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </div>
               <input
                 type="text"
-                disabled={isLocked}
+                disabled={!isFieldEditable}
                 value={formData.motorcyclePlate}
                 onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
                 placeholder="SIN PLACA"
@@ -830,7 +945,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 <input
                   type="number"
                   min="0"
-                  disabled={isLocked}
+                  disabled={!isFieldEditable}
                   value={formData.motorcycleMileage}
                   onChange={(e) => setFormData({ ...formData, motorcycleMileage: e.target.value })}
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white pr-8 disabled:opacity-75 disabled:cursor-not-allowed"
@@ -846,7 +961,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Serie o Chasis (VIN)</label>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.motorcycleVin}
               onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
               className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
@@ -858,7 +973,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Número de Motor</label>
               <input
                 type="text"
-                disabled={isLocked}
+                disabled={!isFieldEditable}
                 value={formData.motorNumber}
                 onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
                 placeholder="S/N"
@@ -869,7 +984,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <label className="block text-xs font-bold text-zinc-700 mb-1">Número de RAMV</label>
               <input
                 type="text"
-                disabled={isLocked}
+                disabled={!isFieldEditable}
                 value={formData.ramvNumber}
                 onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase() })}
                 placeholder="S/N"
@@ -882,7 +997,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">N° Factura / Ticket</label>
             <input
               type="text"
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.invoiceNumber}
               onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
               placeholder="FAC-2026-4869"
@@ -908,7 +1023,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">Falla Reportada</label>
             <textarea
               rows={3}
-              disabled={isLocked}
+              disabled={!isFieldEditable}
               value={formData.issueDescription}
               onChange={(e) => setFormData({ ...formData, issueDescription: e.target.value })}
               className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs text-zinc-900 outline-none focus:border-blue-600 focus:bg-white resize-none leading-relaxed disabled:opacity-75 disabled:cursor-not-allowed"
@@ -921,7 +1036,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             <label className="block text-xs font-bold text-zinc-700 mb-1">
               Repuestos Requeridos ({formData.partsTags.length})
             </label>
-            {!isLocked && (
+            {isFieldEditable && (
               <div className="flex gap-1.5 mb-2">
                 <input
                   type="text"
@@ -955,7 +1070,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   >
                     <Tag className="w-3 h-3 text-blue-600 shrink-0" />
                     <span>{tag}</span>
-                    {!isLocked && (
+                    {isFieldEditable && (
                       <button
                         type="button"
                         onClick={() => handleRemoveTag(idx)}
@@ -1690,106 +1805,114 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* 10. FOOTER DE ACCIONES RÁPIDAS                                            */}
       {/* ========================================================================= */}
-      <div className="pt-2 border-t border-zinc-200 flex items-center justify-between gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-          <span>Volver</span>
-        </button>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Acción para Matriz si está en_revision */}
-          {viewerRole === 'admin' && formData.status === 'en_revision' && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const updated: WarrantyRequest = {
-                    ...warranty,
-                    ...formData,
-                    motorcycleMileage: Number(formData.motorcycleMileage) || 0,
-                    estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
-                    status: 'aceptada',
-                    matrizNotes: formData.matrizNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén.',
-                    approvedAt: 'Hoy, Autorización Directa Matriz',
-                  };
-                  if (onSave) onSave(updated);
-                  try {
-                    const allStored = getStoredWarranties();
-                    saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
-                  } catch {}
-                  setFormData({ ...formData, status: 'aceptada' });
-                  confetti({ particleCount: 40, spread: 55, origin: { y: 0.7 } });
-                }}
-                className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                title="Aprobar y aceptar la garantía directamente en Matriz"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Aprobar Matriz</span>
-              </button>
-
-              {onValidateWarranty && (
+      <div className="pt-2 border-t border-zinc-200 w-full shrink-0">
+        {isEditing ? (
+          <div className="flex items-center gap-2 w-full">
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="flex-1 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <X className="w-4 h-4 text-zinc-500" />
+              <span>Cancelar</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveMobile}
+              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Save className="w-4 h-4" />
+              <span>Guardar Cambios</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 w-full">
+            {/* Acción para Matriz si está en_revision */}
+            {viewerRole === 'admin' && formData.status === 'en_revision' && (
+              <>
                 <button
                   type="button"
-                  onClick={() => {
-                    handleSave();
-                    onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
-                    setFormData({ ...formData, status: 'validada_matriz' });
-                    confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
-                  }}
-                  className="px-2.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                  title="Poner en proceso hacia Garante de Marca"
+                  onClick={handleMatrizReject}
+                  className="flex-1 py-2 px-2 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                  title="Denegar garantía"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>A Garante</span>
+                  <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                  <span>Denegar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleMatrizDirectApprove}
+                  className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                  title="Aprobar y aceptar la garantía en Matriz"
+                >
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <span>Aprobar</span>
+                </button>
+
+                {!isForMatriz && onValidateWarranty && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSave();
+                      onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
+                      setFormData({ ...formData, status: 'validada_matriz' });
+                      confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+                    }}
+                    className="flex-1 py-2 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                    title="Remitir solicitud al Garante de la Marca"
+                  >
+                    <Send className="w-3.5 h-3.5 shrink-0" />
+                    <span>A Garante</span>
+                  </button>
+                )}
+              </>
+            )}
+
+            {/* Acción para Garante si está pendiente */}
+            {viewerRole === 'garante' &&
+              formData.status !== 'aceptada' &&
+              formData.status !== 'aprobada' &&
+              formData.status !== 'denegada' &&
+              formData.status !== 'completada' && (
+                <button
+                  type="button"
+                  onClick={handleGaranteApprove}
+                  className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Aprobar Dictamen</span>
                 </button>
               )}
-            </div>
-          )}
 
-          {/* Acción para Garante si está pendiente */}
-          {viewerRole === 'garante' &&
-            formData.status !== 'aceptada' &&
-            formData.status !== 'aprobada' &&
-            formData.status !== 'denegada' &&
-            formData.status !== 'completada' && (
+            {/* Botón Nueva Solicitud si está denegada */}
+            {isDenied && onCreateNewRequest && (
               <button
                 type="button"
-                onClick={handleGaranteApprove}
-                className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                onClick={onCreateNewRequest}
+                className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Aprobar Dictamen</span>
+                <PlusCircle className="w-4 h-4" />
+                <span>+ Crear Nueva Solicitud</span>
               </button>
             )}
 
-          {/* Guardar Cambios si no está bloqueada */}
-          {!isLocked && (
-            <button
-              type="button"
-              onClick={() => handleSave()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>Guardar Cambios</span>
-            </button>
-          )}
-
-          {/* Botón Nueva Solicitud si está denegada */}
-          {isDenied && onCreateNewRequest && (
-            <button
-              type="button"
-              onClick={onCreateNewRequest}
-              className="px-3.5 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>+ Crear Nueva Solicitud</span>
-            </button>
-          )}
-        </div>
+            {/* Si es taller o admin en otro estado y puede editar */}
+            {viewerRole !== 'garante' &&
+              !(viewerRole === 'admin' && formData.status === 'en_revision') &&
+              !isDenied &&
+              canAdminOrTallerEdit && (
+                <button
+                  type="button"
+                  onClick={handleStartEdit}
+                  className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Editar Solicitud</span>
+                </button>
+              )}
+          </div>
+        )}
       </div>
       </div>
 

@@ -542,6 +542,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
   const canAdminEdit = viewerRole === 'admin' && !isLocked && !isDenied;
   const isEditingMode = canAdminEdit && isAdminEditing;
+  const isForMatriz =
+    currentWarranty.targetBrand === 'StarMotos Matriz' ||
+    (currentWarranty.targetBrand || '').toLowerCase().includes('matriz') ||
+    currentWarranty.warrantyType === 'plus_taller' ||
+    currentWarranty.warrantyType === 'gps';
 
   const handleStartAdminEdit = () => {
     setBackupWarranty(JSON.parse(JSON.stringify(currentWarranty)));
@@ -1166,7 +1171,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, warrantyType: e.target.value as any })}
                     className="w-full h-11 sm:h-12 px-3.5 bg-white border-2 border-blue-200 focus:border-blue-600 rounded-xl text-xs sm:text-sm font-bold text-blue-900 cursor-pointer outline-none"
                   >
-                    <option value="marca">Garantía Oficial de Marca ({currentWarranty.motorcycleBrand || 'Fábrica'})</option>
+                    <option value="marca">Garantía Oficial de Marca</option>
                     <option value="plus_taller">Garantía Plus StarMotos</option>
                     <option value="gps">Garantía Dispositivo GPS Satelital</option>
                   </select>
@@ -2171,21 +2176,23 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 type="button"
                 onClick={handleMatrizDirectApprove}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
-                title="Aprobar y validar la garantía directamente en Matriz (acuerdo con Almacén / marca sin cuenta en sistema)"
+                title="Aprobar y validar la garantía directamente en Matriz"
               >
                 <Check className="w-4 h-4" />
-                <span>✓ Aprobar Garantía Directa (Matriz / Almacén)</span>
+                <span>✓ Aprobar Garantía</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleMatrizApprove}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
-                title="Poner en proceso y remitir al buzón del Garante de Marca"
-              >
-                <Send className="w-4 h-4" />
-                <span>Aceptar y Enviar a Garante de Marca</span>
-              </button>
+              {!isForMatriz && (
+                <button
+                  type="button"
+                  onClick={handleMatrizApprove}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                  title="Poner en proceso y remitir al buzón del Garante de Marca"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Aceptar y Enviar a Garante de Marca</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2405,6 +2412,7 @@ interface NewWarrantyFormViewProps {
   clients?: TallerClient[];
   defaultTallerOrigin?: string;
   defaultTallerOriginId?: string;
+  viewerRole?: 'admin' | 'taller' | 'garante';
 }
 
 export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
@@ -2413,6 +2421,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   clients = [],
   defaultTallerOrigin = 'StarMotos Taller Oficial',
   defaultTallerOriginId = 'matriz-la-mana',
+  viewerRole = 'taller',
 }) => {
   const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
   const [destinationType, setDestinationType] = useState<'matriz' | 'garante'>('matriz');
@@ -2940,20 +2949,32 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               />
             </div>
 
-            {/* Tipo de Cobertura / Póliza: Solo Garantía Oficial de Marca sin opciones para elegir */}
+            {/* Tipo de Cobertura / Póliza: Solo Matriz (admin) puede seleccionar Plus o GPS; Taller fija Garantía Oficial de Marca */}
             <div>
               <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
                 Tipo de Cobertura / Póliza
               </label>
-              <div className="w-full h-11 sm:h-12 px-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-black text-blue-900">Garantía Oficial de Marca</span>
+              {viewerRole === 'admin' ? (
+                <select
+                  value={formData.warrantyType || 'marca'}
+                  onChange={(e) => setFormData({ ...formData, warrantyType: e.target.value as any })}
+                  className="w-full h-11 sm:h-12 px-3.5 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-xs sm:text-sm font-bold text-blue-900 cursor-pointer outline-none"
+                >
+                  <option value="marca">Garantía Oficial de Marca</option>
+                  <option value="plus_taller">Garantía Plus StarMotos</option>
+                  <option value="gps">Garantía Dispositivo GPS Satelital</option>
+                </select>
+              ) : (
+                <div className="w-full h-11 sm:h-12 px-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-black text-blue-900">Garantía Oficial de Marca</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    Oficial
+                  </span>
                 </div>
-                <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
-                  Oficial
-                </span>
-              </div>
+              )}
             </div>
 
             {/* Destino del Reclamo: Matriz vs Garante de Marca */}

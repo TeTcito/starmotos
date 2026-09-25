@@ -513,9 +513,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
     return count;
   }, [filterPayment, filterDateRange, sortBy]);
 
-  // Filtrado de alistamientos existentes por Sede, término de búsqueda, pagos, fechas y ordenamiento
-  const filteredRecords = useMemo(() => {
-    const base = recentRecords.filter((r) => {
+  // 1. Registros base filtrados por Sede, término de búsqueda y fechas (para las métricas de los 4 bloques superiores)
+  const baseRecords = useMemo(() => {
+    return recentRecords.filter((r) => {
       // 1. Restricción por Sede
       if (!effectiveIsMatriz && defaultSedeId) {
         const matchesSede = matchRecordToWorkshop(r, defaultSedeId, workshops);
@@ -542,23 +542,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
         if (!matchesTerm) return false;
       }
 
-      // 3. Filtro por Estado de Pago
-      if (filterPayment !== 'all') {
-        const valor = Number(r.valorServicio) || 0;
-        const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
-        const pendiente = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
-        const isPdi = isPdiOnlyRecord(r);
-
-        if (filterPayment === 'con_saldo') {
-          if (pendiente <= 0.01) return false;
-        } else if (filterPayment === 'pagados') {
-          if (isPdi || valor <= 0 || pendiente > 0.01) return false;
-        } else if (filterPayment === 'pdi') {
-          if (!isPdi) return false;
-        }
-      }
-
-      // 4. Filtro por Fechas
+      // 3. Filtro por Fechas
       if (filterDateRange !== 'all') {
         const rawDate = r.fechaServicio || r.createdAt;
         if (rawDate) {
@@ -603,9 +587,77 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
       return true;
     });
+  }, [
+    recentRecords,
+    searchTerm,
+    selectedWorkshopFilter,
+    defaultSedeId,
+    effectiveIsMatriz,
+    workshops,
+    filterDateRange,
+    customStartDate,
+    customEndDate,
+  ]);
+
+  // Métricas financieras y operativas globales del listado (para los 4 bloques superiores)
+  const statsMetrics = useMemo(() => {
+    let totalRecaudado = 0;
+    let totalPendiente = 0;
+    let totalFacturado = 0;
+    let countPdi = 0;
+    let countMantenimiento = 0;
+    let countConSaldo = 0;
+
+    baseRecords.forEach((r) => {
+      const isPdi = isPdiOnlyRecord(r);
+      const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
+      const pagado = isPdi ? 0 : (r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined 
+        ? Number(r.saldoPendiente) 
+        : Math.max(0, valor - pagado));
+
+      totalFacturado += valor;
+      totalRecaudado += pagado;
+      totalPendiente += pendiente;
+
+      if (pendiente > 0.01) countConSaldo++;
+      if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
+      if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
+    });
+
+    return {
+      totalRecaudado,
+      totalPendiente,
+      totalFacturado,
+      countPdi,
+      countMantenimiento,
+      countConSaldo,
+      totalOperaciones: baseRecords.length,
+    };
+  }, [baseRecords]);
+
+  // Filtrado final aplicando el filtro de estado de pago (controlado por clic en los 4 bloques o menú de filtros)
+  const filteredRecords = useMemo(() => {
+    const afterPayment = baseRecords.filter((r) => {
+      if (filterPayment !== 'all') {
+        const valor = Number(r.valorServicio) || 0;
+        const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
+        const pendiente = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
+        const isPdi = isPdiOnlyRecord(r);
+
+        if (filterPayment === 'con_saldo') {
+          if (pendiente <= 0.01) return false;
+        } else if (filterPayment === 'pagados') {
+          if (isPdi || valor <= 0 || pendiente > 0.01) return false;
+        } else if (filterPayment === 'pdi') {
+          if (!isPdi) return false;
+        }
+      }
+      return true;
+    });
 
     // 5. Ordenamiento
-    return [...base].sort((a, b) => {
+    return [...afterPayment].sort((a, b) => {
       if (sortBy === 'recientes') {
         const timeA = getRecordTimestamp(a);
         const timeB = getRecordTimestamp(b);
@@ -644,29 +696,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
       }
       return 0;
     });
-  }, [
-    recentRecords,
-    searchTerm,
-    selectedWorkshopFilter,
-    defaultSedeId,
-    defaultSede,
-    effectiveIsMatriz,
-    workshops,
-    filterPayment,
-    filterDateRange,
-    customStartDate,
-    customEndDate,
-    sortBy,
-  ]);
+  }, [baseRecords, filterPayment, sortBy]);
 
-  // Métricas financieras y operativas del listado (Ingresos cobrados vs Pendientes por cobrar)
-  const statsMetrics = useMemo(() => {
+  // Totales para el pie de tabla según los registros visibles
+  const tableFooterMetrics = useMemo(() => {
     let totalRecaudado = 0;
     let totalPendiente = 0;
     let totalFacturado = 0;
     let countPdi = 0;
-    let countMantenimiento = 0;
     let countConSaldo = 0;
+    let countMantenimiento = 0;
 
     filteredRecords.forEach((r) => {
       const isPdi = isPdiOnlyRecord(r);
@@ -679,21 +718,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
       totalFacturado += valor;
       totalRecaudado += pagado;
       totalPendiente += pendiente;
-
       if (pendiente > 0.01) countConSaldo++;
       if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
       if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
     });
 
-    return {
-      totalRecaudado,
-      totalPendiente,
-      totalFacturado,
-      countPdi,
-      countMantenimiento,
-      countConSaldo,
-      totalOperaciones: filteredRecords.length,
-    };
+    return { totalFacturado, totalRecaudado, totalPendiente, countPdi, countConSaldo, countMantenimiento };
   }, [filteredRecords]);
 
   // Paginación derivada
@@ -2578,13 +2608,29 @@ export const AlistamientoWizard: React.FC<Props> = ({
               </div>
             )}
 
-            {/* Fila 3: Bloques Estadísticos Reactivos (Ingresos Cobrados vs Pendientes por Cobrar) */}
+            {/* Fila 3: Bloques Estadísticos Reactivos e Interactivos (Filtros rápidos al hacer clic) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-              {/* Bloque 1: Total Cobrado / Abonos */}
-              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-emerald-50 transition-colors">
+              {/* Bloque 1: Ingresos Cobrados (Filtra solo pagados al hacer clic) */}
+              <button
+                type="button"
+                onClick={() => setFilterPayment(filterPayment === 'pagados' ? 'all' : 'pagados')}
+                className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filterPayment === 'pagados'
+                    ? 'bg-emerald-100 border-2 border-emerald-500 shadow-md ring-2 ring-emerald-300 scale-[1.01]'
+                    : 'bg-emerald-50/70 border border-emerald-200 shadow-2xs hover:bg-emerald-100/70 hover:border-emerald-300'
+                }`}
+                title="Clic para ver solo clientes con pagos cobrados (o desactivar filtro)"
+              >
                 <div className="flex items-center justify-between text-emerald-800">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Ingresos Cobrados</span>
-                  <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Ingresos Cobrados</span>
+                    {filterPayment === 'pagados' && (
+                      <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.2 rounded-full uppercase">
+                        Filtrado
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-6 h-6 rounded-lg bg-emerald-200/80 flex items-center justify-center text-emerald-800">
                     <DollarSign className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -2594,13 +2640,29 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </div>
                   <span className="text-[10px] font-semibold text-emerald-700">Abonos y cobros liquidados</span>
                 </div>
-              </div>
+              </button>
 
-              {/* Bloque 2: Pendientes por Cobrar */}
-              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-amber-50 transition-colors">
+              {/* Bloque 2: Pendientes por Cobrar (Filtra solo clientes con deuda al hacer clic) */}
+              <button
+                type="button"
+                onClick={() => setFilterPayment(filterPayment === 'con_saldo' ? 'all' : 'con_saldo')}
+                className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filterPayment === 'con_saldo'
+                    ? 'bg-amber-100 border-2 border-amber-500 shadow-md ring-2 ring-amber-300 scale-[1.01]'
+                    : 'bg-amber-50/70 border border-amber-200 shadow-2xs hover:bg-amber-100/70 hover:border-amber-300'
+                }`}
+                title="Clic para ver solo clientes con saldo pendiente por cobrar (o desactivar filtro)"
+              >
                 <div className="flex items-center justify-between text-amber-800">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Pendiente por Cobrar</span>
-                  <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Pendiente por Cobrar</span>
+                    {filterPayment === 'con_saldo' && (
+                      <span className="text-[9px] font-black bg-amber-600 text-white px-1.5 py-0.2 rounded-full uppercase">
+                        Filtrado
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-6 h-6 rounded-lg bg-amber-200/80 flex items-center justify-center text-amber-800">
                     <Clock className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -2612,10 +2674,19 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     {statsMetrics.countConSaldo > 0 ? `${statsMetrics.countConSaldo} cliente(s) con saldo` : 'Al día / Sin deudas'}
                   </span>
                 </div>
-              </div>
+              </button>
 
-              {/* Bloque 3: Total Facturado en Servicios */}
-              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-blue-50 transition-colors">
+              {/* Bloque 3: Total Facturado en Servicios (Muestra todos al hacer clic) */}
+              <button
+                type="button"
+                onClick={() => setFilterPayment('all')}
+                className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filterPayment === 'all'
+                    ? 'bg-blue-50/90 border border-blue-300 shadow-2xs hover:bg-blue-100/70'
+                    : 'bg-blue-50/50 border border-blue-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-blue-100/60'
+                }`}
+                title="Clic para ver todos los alistamientos facturados"
+              >
                 <div className="flex items-center justify-between text-blue-800">
                   <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
                   <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700">
@@ -2626,12 +2697,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <div className="text-lg sm:text-xl font-black font-mono text-blue-900 leading-tight">
                     ${statsMetrics.totalFacturado.toFixed(2)}
                   </div>
-                  <span className="text-[10px] font-semibold text-blue-700">Volumen total de servicios</span>
+                  <span className="text-[10px] font-semibold text-blue-700">Volumen total (Ver todos)</span>
                 </div>
-              </div>
+              </button>
 
-              {/* Bloque 4: Operaciones en Taller */}
-              <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:bg-purple-50 transition-colors">
+              {/* Bloque 4: Operaciones en Taller (Muestra todas al hacer clic) */}
+              <button
+                type="button"
+                onClick={() => setFilterPayment('all')}
+                className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
+                  filterPayment === 'all'
+                    ? 'bg-purple-50/90 border border-purple-300 shadow-2xs hover:bg-purple-100/70'
+                    : 'bg-purple-50/50 border border-purple-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-purple-100/60'
+                }`}
+                title="Clic para ver todas las operaciones de taller"
+              >
                 <div className="flex items-center justify-between text-purple-800">
                   <span className="text-[10px] font-black uppercase tracking-wider">Operaciones</span>
                   <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
@@ -2643,10 +2723,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     {statsMetrics.totalOperaciones} <span className="text-xs font-bold text-purple-700">motos</span>
                   </div>
                   <span className="text-[10px] font-semibold text-purple-700">
-                    {statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mantenimientos
+                    {statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mant. (Ver todas)
                   </span>
                 </div>
-              </div>
+              </button>
             </div>
 
             {/* Aviso o Sugerencia reactiva si escribe una cédula no existente */}
@@ -2947,23 +3027,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       </td>
                       <td className="px-2 py-2 text-right font-mono whitespace-nowrap">
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="text-zinc-900 font-black text-xs">${statsMetrics.totalFacturado.toFixed(2)}</span>
-                          <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${statsMetrics.totalRecaudado.toFixed(2)}</span>
-                          {statsMetrics.totalPendiente > 0.01 && (
-                            <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${statsMetrics.totalPendiente.toFixed(2)}</span>
+                          <span className="text-zinc-900 font-black text-xs">${tableFooterMetrics.totalFacturado.toFixed(2)}</span>
+                          <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${tableFooterMetrics.totalRecaudado.toFixed(2)}</span>
+                          {tableFooterMetrics.totalPendiente > 0.01 && (
+                            <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${tableFooterMetrics.totalPendiente.toFixed(2)}</span>
                           )}
                         </div>
                       </td>
                       <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5 font-bold">
-                            <span className="text-blue-700">{statsMetrics.countPdi} PDI OK</span>
+                            <span className="text-blue-700">{tableFooterMetrics.countPdi} PDI OK</span>
                             <span>•</span>
-                            <span className="text-purple-700">{statsMetrics.countMantenimiento} Mantenimientos</span>
+                            <span className="text-purple-700">{tableFooterMetrics.countMantenimiento} Mantenimientos</span>
                           </div>
-                          {statsMetrics.countConSaldo > 0 ? (
+                          {tableFooterMetrics.countConSaldo > 0 ? (
                             <span className="text-[10px] font-bold text-rose-600">
-                              ⚠️ {statsMetrics.countConSaldo} cliente(s) con saldo por cobrar
+                              ⚠️ {tableFooterMetrics.countConSaldo} cliente(s) con saldo por cobrar
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-emerald-700">

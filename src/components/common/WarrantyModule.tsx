@@ -536,7 +536,24 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     confetti({ particleCount: 50, spread: 50, origin: { y: 0.7 } });
   };
 
-  const canAdminEdit = viewerRole === 'admin' && !isDenied;
+  // Modo de edición activable manualmente por Matriz Central
+  const [isAdminEditing, setIsAdminEditing] = useState(false);
+  const [backupWarranty, setBackupWarranty] = useState<WarrantyRequest | null>(null);
+
+  const canAdminEdit = viewerRole === 'admin' && !isLocked && !isDenied;
+  const isEditingMode = canAdminEdit && isAdminEditing;
+
+  const handleStartAdminEdit = () => {
+    setBackupWarranty(JSON.parse(JSON.stringify(currentWarranty)));
+    setIsAdminEditing(true);
+  };
+
+  const handleCancelAdminEdit = () => {
+    if (backupWarranty) {
+      setCurrentWarranty(backupWarranty);
+    }
+    setIsAdminEditing(false);
+  };
 
   const handleAddPartTag = () => {
     const t = newPartInput.trim();
@@ -591,6 +608,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       estimatedCost: grandTotalBudget,
     };
     setCurrentWarranty(updated);
+    setIsAdminEditing(false);
 
     const all = getStoredWarranties();
     const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
@@ -807,54 +825,77 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           <button
             type="button"
             onClick={onBack}
-            className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Volver a Solicitudes</span>
+            <span>Volver</span>
           </button>
 
           <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
 
           <div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-base sm:text-xl font-black text-zinc-900 tracking-tight">
-                Ficha Técnica de Garantía: <span className="font-mono text-blue-600">{currentWarranty.requestNumber}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
+                Ficha: <span className="font-mono text-blue-600">{currentWarranty.requestNumber}</span>
               </h2>
               <span
-                className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 shadow-2xs ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1.5 shadow-2xs ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
               >
                 {statusInfo.icon}
                 <span>{statusInfo.label}</span>
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-              Taller Emisor: <strong className="text-zinc-800">{currentWarranty.tallerOrigin}</strong> • Fecha:{' '}
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Sede: <strong className="text-zinc-800">{currentWarranty.tallerOrigin}</strong> • Fecha:{' '}
               <strong className="text-zinc-800">{currentWarranty.createdAt}</strong>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {canAdminEdit && (
-            <button
-              type="button"
-              onClick={handleSaveAdminChanges}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
-              title="Guardar cualquier cambio realizado a los datos de la solicitud"
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Cambios</span>
-            </button>
+            isAdminEditing ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSaveAdminChanges}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  title="Guardar cambios realizados"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelAdminEdit}
+                  className="px-3 py-2 bg-zinc-200 hover:bg-zinc-300 active:scale-95 text-zinc-800 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  title="Cancelar edición"
+                >
+                  <X className="w-4 h-4" />
+                  <span>Cancelar</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartAdminEdit}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Habilitar edición de la solicitud"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>Edición</span>
+              </button>
+            )
           )}
 
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-4 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-98"
-            title="Imprimir documento oficial o guardar directamente como PDF con todas sus imágenes"
+            className="px-3.5 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+            title="Generar PDF"
           >
             <Printer className="w-4 h-4 text-amber-400" />
-            <span>Imprimir / Guardar como PDF</span>
+            <span>PDF</span>
           </button>
 
           {currentWarranty.clientPhone && (
@@ -864,10 +905,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               )},%20le%20escribimos%20de%20StarMotos%20sobre%20su%20solicitud%20de%20garantía%20${currentWarranty.requestNumber}.`}
               target="_blank"
               rel="noreferrer"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Contactar al cliente vía WhatsApp"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>WhatsApp Cliente</span>
+              <span>Contactar</span>
             </a>
           )}
 
@@ -1026,35 +1068,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         </div>
       </div>
 
-      {/* 3 COLUMNAS: CLIENTE, VEHÍCULO Y RECLAMO TÉCNICO (DIRECTAMENTE EDITABLES EN MATRIZ CENTRAL) */}
+      {/* 3 COLUMNAS: CLIENTE, VEHÍCULO Y RECLAMO TÉCNICO */}
       <div className="space-y-4">
-        {canAdminEdit && (
-          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border-2 border-blue-200 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                <Pencil className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs sm:text-sm font-black text-blue-950 block">
-                  Edición Habilitada para Matriz Central
-                </span>
-                <span className="text-[11px] text-blue-800">
-                  Puede corregir cualquier dato del cliente, motocicleta o avería directamente. Los cambios se guardan al presionar Guardar o al Aceptar la solicitud.
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSaveAdminChanges}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
-              >
-                <Save className="w-4 h-4" />
-                <span>Guardar Cambios</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* ========================================================= */}
@@ -1069,7 +1084,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                   <span>1. Datos del Cliente & Sede</span>
                 </div>
-                {canAdminEdit && (
+                {isEditingMode && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
                     Editable
                   </span>
@@ -1078,15 +1093,15 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                  Cédula o RUC {canAdminEdit && <span className="text-red-500">*</span>}
+                  Cédula o RUC {isEditingMode && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.clientIdNumber || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientIdNumber: e.target.value })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono font-bold outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
                   }`}
@@ -1096,15 +1111,15 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                  Nombre Completo {canAdminEdit && <span className="text-red-500">*</span>}
+                  Nombre Completo {isEditingMode && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.clientName || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientName: e.target.value })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-bold outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
                   }`}
@@ -1131,11 +1146,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 </div>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.clientPhone || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, clientPhone: e.target.value })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                   }`}
@@ -1145,7 +1160,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Tipo de Cobertura / Póliza</label>
-                {canAdminEdit ? (
+                {isEditingMode ? (
                   <select
                     value={currentWarranty.warrantyType || 'marca'}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, warrantyType: e.target.value as any })}
@@ -1169,7 +1184,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               {/* Marca Garantía / Garante Responsable */}
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca / Garante Responsable</label>
-                {canAdminEdit && currentWarranty.warrantyType === 'marca' ? (
+                {isEditingMode && currentWarranty.warrantyType === 'marca' ? (
                   <select
                     value={currentWarranty.motorcycleBrand || currentWarranty.targetBrand || ''}
                     onChange={(e) =>
@@ -1201,11 +1216,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Taller de Origen</label>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.tallerOrigin || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, tallerOrigin: e.target.value })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-semibold outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                   }`}
@@ -1227,7 +1242,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                   <span>2. Motocicleta Registrada</span>
                 </div>
-                {canAdminEdit && (
+                {isEditingMode && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
                     Editable
                   </span>
@@ -1239,11 +1254,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Marca</label>
                   <input
                     type="text"
-                    readOnly={!canAdminEdit}
+                    readOnly={!isEditingMode}
                     value={currentWarranty.motorcycleBrand || ''}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleBrand: e.target.value })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-bold outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
                     }`}
@@ -1253,11 +1268,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Modelo</label>
                   <input
                     type="text"
-                    readOnly={!canAdminEdit}
+                    readOnly={!isEditingMode}
                     value={currentWarranty.motorcycleModel || ''}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleModel: e.target.value })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-bold outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed'
                     }`}
@@ -1270,11 +1285,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Placa</label>
                   <input
                     type="text"
-                    readOnly={!canAdminEdit}
+                    readOnly={!isEditingMode}
                     value={currentWarranty.motorcyclePlate || ''}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcyclePlate: e.target.value.toUpperCase() })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono font-bold outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                     }`}
@@ -1284,12 +1299,12 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Kilometraje</label>
                   <input
-                    type={canAdminEdit ? 'number' : 'text'}
-                    readOnly={!canAdminEdit}
-                    value={canAdminEdit ? (currentWarranty.motorcycleMileage ?? 0) : `${currentWarranty.motorcycleMileage || 0} km`}
+                    type={isEditingMode ? 'number' : 'text'}
+                    readOnly={!isEditingMode}
+                    value={isEditingMode ? (currentWarranty.motorcycleMileage ?? 0) : `${currentWarranty.motorcycleMileage || 0} km`}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleMileage: Number(e.target.value) || 0 })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 font-bold text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                     }`}
@@ -1301,11 +1316,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Serie o Chasis (VIN)</label>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.motorcycleVin || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleVin: e.target.value.toUpperCase() })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 font-bold text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                   }`}
@@ -1317,11 +1332,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Número de Motor</label>
                   <input
                     type="text"
-                    readOnly={!canAdminEdit}
+                    readOnly={!isEditingMode}
                     value={currentWarranty.motorNumber || ''}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorNumber: e.target.value.toUpperCase() })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                     }`}
@@ -1332,11 +1347,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Número de RAMV</label>
                   <input
                     type="text"
-                    readOnly={!canAdminEdit}
+                    readOnly={!isEditingMode}
                     value={currentWarranty.ramvNumber || ''}
                     onChange={(e) => setCurrentWarranty({ ...currentWarranty, ramvNumber: e.target.value.toUpperCase() })}
                     className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
-                      canAdminEdit
+                      isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                     }`}
@@ -1349,11 +1364,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">N° Factura / Ticket</label>
                 <input
                   type="text"
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.invoiceNumber || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, invoiceNumber: e.target.value })}
                   className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
                   }`}
@@ -1375,7 +1390,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                   <span>3. Reclamo Técnico & Modalidad</span>
                 </div>
-                {canAdminEdit && (
+                {isEditingMode && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 uppercase tracking-wider">
                     Editable
                   </span>
@@ -1386,11 +1401,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">Falla Reportada</label>
                 <textarea
                   rows={3}
-                  readOnly={!canAdminEdit}
+                  readOnly={!isEditingMode}
                   value={currentWarranty.issueDescription || ''}
                   onChange={(e) => setCurrentWarranty({ ...currentWarranty, issueDescription: e.target.value })}
                   className={`w-full p-4 rounded-xl text-sm outline-none leading-relaxed transition-all ${
-                    canAdminEdit
+                    isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900 resize-y'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-900 cursor-not-allowed resize-none'
                   }`}
@@ -1404,7 +1419,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 </label>
 
                 {/* Input para agregar nuevos repuestos en Matriz */}
-                {canAdminEdit && (
+                {isEditingMode && (
                   <div className="flex gap-2 mb-2">
                     <input
                       type="text"
@@ -1439,7 +1454,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                       >
                         <Tag className="w-3 h-3 text-blue-600 shrink-0" />
                         <span>{tag}</span>
-                        {canAdminEdit && (
+                        {isEditingMode && (
                           <button
                             type="button"
                             onClick={() => handleRemovePartTag(idx)}

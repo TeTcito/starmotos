@@ -69,17 +69,19 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
           </div>
         </div>
 
-        {/* Tarjeta de Control y Folio (Sin el badge de En Revisión Matriz) */}
-        <div className="text-right space-y-0.5">
-          <span className="text-[9px] uppercase tracking-wider font-extrabold text-zinc-500 block">
-            Folio / N° Solicitud
-          </span>
-          <span className="text-base sm:text-lg font-black font-mono text-zinc-950 block">
-            {warranty.requestNumber}
-          </span>
-          <div className="flex items-center justify-end gap-1.5 text-[10px] text-zinc-600 font-medium pt-0.5">
-            <Calendar className="w-3 h-3 text-zinc-400" />
-            <span>Emitido: {warranty.createdAt}</span>
+        {/* Folio y Fecha de Emisión en una sola línea cada uno */}
+        <div className="text-right shrink-0 whitespace-nowrap space-y-1">
+          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <span className="text-[10px] uppercase tracking-wider font-extrabold text-zinc-500 whitespace-nowrap">
+              Folio / N° Solicitud:
+            </span>
+            <span className="text-sm sm:text-base font-black font-mono text-zinc-950 whitespace-nowrap">
+              {warranty.requestNumber}
+            </span>
+          </div>
+          <div className="flex items-center justify-end gap-1.5 text-[10.5px] text-zinc-600 font-medium whitespace-nowrap">
+            <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <span className="whitespace-nowrap">Emitido: {warranty.createdAt}</span>
           </div>
         </div>
       </div>
@@ -316,49 +318,8 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* 5. CUADRO DE FIRMAS Y SELLOS AUTORIZADOS                                  */}
-      {/* ========================================================================= */}
-      <div className="pt-8 border-t-2 border-zinc-900 grid grid-cols-3 gap-6 break-inside-avoid">
-        {/* Firma Cliente */}
-        <div className="text-center space-y-9">
-          <div className="h-12"></div>
-          <div className="border-t border-zinc-400 pt-1 space-y-0.5">
-            <span className="text-[10px] font-black uppercase text-zinc-950 block">
-              Firma del Propietario / Cliente
-            </span>
-            <span className="text-[9px] text-zinc-600 block">C.I.: {warranty.clientIdNumber}</span>
-            <span className="text-[8px] text-zinc-400 block font-medium">Recepción / Solicitud</span>
-          </div>
-        </div>
-
-        {/* Firma Jefe de Taller */}
-        <div className="text-center space-y-9">
-          <div className="h-12"></div>
-          <div className="border-t border-zinc-400 pt-1 space-y-0.5">
-            <span className="text-[10px] font-black uppercase text-zinc-950 block">
-              Jefe de Taller / Técnico Emisor
-            </span>
-            <span className="text-[9px] text-zinc-600 block">{warranty.tallerOrigin}</span>
-            <span className="text-[8px] text-zinc-400 block font-medium">Diagnóstico Certificado</span>
-          </div>
-        </div>
-
-        {/* Firma Matriz / Almacén */}
-        <div className="text-center space-y-9">
-          <div className="h-12"></div>
-          <div className="border-t border-zinc-400 pt-1 space-y-0.5">
-            <span className="text-[10px] font-black uppercase text-zinc-950 block">
-              Validación Matriz / Almacén Central
-            </span>
-            <span className="text-[9px] text-zinc-600 block">StarMotos Matriz</span>
-            <span className="text-[8px] text-zinc-400 block font-medium">Autorización Oficial</span>
-          </div>
-        </div>
-      </div>
-
       {/* Pie de Página */}
-      <div className="pt-3 border-t border-zinc-200 text-center text-[8px] text-zinc-400 uppercase tracking-widest font-mono">
+      <div className="pt-4 border-t border-zinc-200 text-center text-[8.5px] text-zinc-400 uppercase tracking-widest font-mono break-inside-avoid">
         Documento técnico oficial emitido por el Sistema de Garantías StarMotos • Válido para trámite
         legal y comercial ante fábrica o importador • Fecha de impresión:{' '}
         {new Date().toLocaleDateString('es-EC')}

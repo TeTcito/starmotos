@@ -51,15 +51,15 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* ========================================================================= */}
       {/* 1. ENCABEZADO INSTITUCIONAL OFICIAL                                       */}
       {/* ========================================================================= */}
-      <div className="border-b-2 border-zinc-900 pb-4 flex items-center justify-between gap-4">
-        {/* Logo Oficial de StarMotos y Membrete */}
-        <div className="flex items-center gap-3.5">
+      <div className="border-b-2 border-zinc-900 pb-3 flex items-start justify-between gap-6">
+        {/* Logo Oficial de StarMotos y Membrete debajo */}
+        <div className="space-y-2">
           <img
             src="/logoheader.webp"
             alt="Logo StarMotos"
-            className="h-10 sm:h-12 w-auto object-contain shrink-0"
+            className="h-10 sm:h-11 w-auto object-contain"
           />
-          <div className="border-l-2 border-zinc-900 pl-3">
+          <div className="space-y-0.5">
             <h1 className="text-xs sm:text-sm font-black uppercase tracking-tight text-zinc-950">
               Expediente Oficial de Reclamo de Garantía de Fábrica
             </h1>

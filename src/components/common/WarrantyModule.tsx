@@ -49,6 +49,7 @@ import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
 import { uploadWarrantyMedia } from '../../services/mediaStorage';
+import { PrintableWarrantySheet } from './PrintableWarrantySheet';
 
 // =========================================================================
 // 1. HELPERS DE ESTADO Y CANONIZACIÓN
@@ -646,6 +647,43 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     confetti({ particleCount: 60, spread: 60 });
   };
 
+  const handleMatrizDirectApprove = () => {
+    const updated: WarrantyRequest = {
+      ...currentWarranty,
+      motorcycleVin: (currentWarranty.motorcycleVin || '').toUpperCase(),
+      motorcyclePlate: (currentWarranty.motorcyclePlate || '').toUpperCase(),
+      motorNumber: currentWarranty.motorNumber?.toUpperCase(),
+      ramvNumber: currentWarranty.ramvNumber?.toUpperCase(),
+      partsRequired:
+        currentWarranty.partsTags && currentWarranty.partsTags.length > 0
+          ? currentWarranty.partsTags.join(', ')
+          : currentWarranty.partsRequired,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotalBudget,
+      estimatedCost: grandTotalBudget,
+      matrizNotes: matrizInputNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén Central.',
+      status: 'aceptada',
+      approvedAt: 'Hoy, Autorización Directa Sede Matriz / Almacén',
+    };
+    setCurrentWarranty(updated);
+
+    const all = getStoredWarranties();
+    const updatedList = all.map((w) => (w.id === updated.id ? updated : w));
+    saveStoredWarranties(updatedList);
+    try {
+      cloudSaveWarranty(updated);
+    } catch (e) {
+      console.warn('Cloud save error', e);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+    setToastMessage('✓ Garantía aprobada y aceptada oficialmente por Sede Matriz y Almacén.');
+    confetti({ particleCount: 65, spread: 65 });
+  };
+
   const handleMatrizReject = () => {
     if (!rejectReasonInput.trim()) {
       alert('Por favor ingrese el motivo del rechazo en Matriz.');
@@ -751,9 +789,10 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
   };
 
   return (
-    <div className="w-full space-y-6 animate-fade-in">
-      {/* Toast Notificación */}
-      {toastMessage && (
+    <div className="w-full animate-fade-in">
+      <div className="print:hidden space-y-6">
+        {/* Toast Notificación */}
+        {toastMessage && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-between shadow-xs animate-slide-in">
           <span>{toastMessage}</span>
           <button onClick={() => setToastMessage(null)} className="text-emerald-700 hover:text-emerald-900 text-base font-bold cursor-pointer">
@@ -811,10 +850,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-3.5 py-2 bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-2xs cursor-pointer"
+            className="px-4 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 shadow-sm cursor-pointer active:scale-98"
+            title="Imprimir documento oficial o guardar directamente como PDF con todas sus imágenes"
           >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir Ficha</span>
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Imprimir / Guardar como PDF</span>
           </button>
 
           {currentWarranty.clientPhone && (
@@ -2111,14 +2151,27 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleMatrizApprove}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Check className="w-4 h-4" />
-              <span>Aceptar y Enviar a Marca (Poner En Proceso)</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={handleMatrizDirectApprove}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                title="Aprobar y validar la garantía directamente en Matriz (acuerdo con Almacén / marca sin cuenta en sistema)"
+              >
+                <Check className="w-4 h-4" />
+                <span>✓ Aprobar Garantía Directa (Matriz / Almacén)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleMatrizApprove}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                title="Poner en proceso y remitir al buzón del Garante de Marca"
+              >
+                <Send className="w-4 h-4" />
+                <span>Aceptar y Enviar a Garante de Marca</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2315,6 +2368,14 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           )}
         </div>
       )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* FICHA TÉCNICA OFICIAL EXCLUSIVA PARA IMPRESIÓN Y PDF                      */}
+      {/* ========================================================================= */}
+      <div className="hidden print:block w-full">
+        <PrintableWarrantySheet warranty={currentWarranty} />
+      </div>
     </div>
   );
 };
@@ -2339,6 +2400,34 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   defaultTallerOriginId = 'matriz-la-mana',
 }) => {
   const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+  const [destinationType, setDestinationType] = useState<'matriz' | 'garante'>('matriz');
+
+  const ALL_POPULAR_BRANDS = useMemo(() => {
+    const defaults = [
+      'Thunder',
+      'Benelli',
+      'Bajaj',
+      'Shineray',
+      'Daytona',
+      'Honda',
+      'Yamaha',
+      'Suzuki',
+      'Loncin',
+      'Tuko',
+      'Ranger',
+      'Dukare',
+      'Motor1',
+      'Haojue',
+      'KTM',
+      'Kawasaki',
+      'TVS',
+      'Hero',
+      'Italika',
+      'Zongshen',
+    ];
+    const combined = new Set([...registeredBrands, ...defaults]);
+    return Array.from(combined).sort((a, b) => a.localeCompare(b));
+  }, [registeredBrands]);
 
   useEffect(() => {
     const handleGarantesUpdated = () => {
@@ -2669,7 +2758,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       return;
     }
 
-    if (!formData.targetBrand.trim()) {
+    if (destinationType === 'garante' && !formData.targetBrand.trim()) {
       alert('Por favor seleccione la Marca Garantía registrada.');
       return;
     }
@@ -2677,7 +2766,10 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     const loadedPhotos = photoSlots.filter(Boolean) as string[];
     const loadedVideos = videoSlots.filter(Boolean) as string[];
 
-
+    const resolvedTargetBrand =
+      destinationType === 'matriz'
+        ? 'StarMotos Matriz'
+        : formData.targetBrand.trim();
 
     const newReq: WarrantyRequest = {
       id: `gar-${Date.now()}`,
@@ -2698,14 +2790,15 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       ramvNumber: formData.ramvNumber.trim().toUpperCase(),
       motorcycleMileage: Number(formData.motorcycleMileage) || 0,
       warrantyType: 'marca',
-      targetBrand: formData.targetBrand.trim(),
-      garanteName: formData.targetBrand.trim(),
+      destinationType: destinationType,
+      targetBrand: resolvedTargetBrand,
+      garanteName: resolvedTargetBrand,
       issueDescription: formData.issueDescription.trim(),
       partsTags: partsTags.length > 0 ? partsTags : (formData.partsRequired ? [formData.partsRequired] : []),
       partsRequired: partsTags.join(', ') || formData.partsRequired.trim(),
       resolutionType: undefined,
       diagnosticPhotos: [...loadedPhotos, ...loadedVideos],
-      status: 'en_revision',
+      status: destinationType === 'matriz' ? 'enviada_matriz' : 'en_revision',
       tallerOrigin: defaultTallerOrigin,
       tallerOriginId: defaultTallerOriginId,
       estimatedCost: 0,
@@ -2848,26 +2941,73 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               </div>
             </div>
 
-            {/* Marca Garantía: Sincronizada únicamente con marcas y garantes registrados con su Razón Social */}
+            {/* Destino del Reclamo: Matriz vs Garante de Marca */}
             <div>
               <label className="block text-xs sm:text-sm font-bold text-zinc-700 mb-1.5">
-                Marca Garantía (Razón Social Registrada) <span className="text-red-500">*</span>
+                Destino del Reclamo <span className="text-red-500">*</span>
               </label>
-              <select
-                required
-                value={formData.targetBrand}
-                onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
-                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none cursor-pointer"
-              >
-                <option value="" disabled>Seleccione la Razón Social de la Marca</option>
-                {registeredBrands.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 rounded-xl mb-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDestinationType('matriz');
+                    setFormData((prev) => ({ ...prev, targetBrand: 'StarMotos Matriz' }));
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    destinationType === 'matriz'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Enviar a Matriz</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDestinationType('garante');
+                    setFormData((prev) => ({ ...prev, targetBrand: registeredBrands[0] || '' }));
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    destinationType === 'garante'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900 bg-transparent'
+                  }`}
+                >
+                  <FileCheck2 className="w-3.5 h-3.5" />
+                  <span>Marca Garante</span>
+                </button>
+              </div>
+
+              {destinationType === 'matriz' ? (
+                <div className="w-full h-11 sm:h-12 px-4 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-black text-emerald-900">StarMotos Sede Matriz</span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded uppercase">
+                    Recepción Central
+                  </span>
+                </div>
+              ) : (
+                <select
+                  required
+                  value={formData.targetBrand}
+                  onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
+                  className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none cursor-pointer"
+                >
+                  <option value="" disabled>Seleccione la Razón Social de la Marca</option>
+                  {registeredBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              )}
               <p className="text-[11px] text-zinc-500 mt-1">
-                Razón Social de marcas y garantes oficiales registrados en el sistema.
+                {destinationType === 'matriz'
+                  ? 'La solicitud se enviará directo a Matriz y Almacén (ideal para marcas no registradas en el sistema).'
+                  : 'Se asignará al buzón del garante oficial registrado en el sistema.'}
               </p>
             </div>
           </div>
@@ -2898,7 +3038,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-bold text-zinc-900 transition-all outline-none"
                 />
                 <datalist id="registered-brands-datalist">
-                  {registeredBrands.map((b) => (
+                  {ALL_POPULAR_BRANDS.map((b) => (
                     <option key={b} value={b} />
                   ))}
                 </datalist>

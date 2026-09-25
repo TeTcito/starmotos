@@ -32,6 +32,7 @@ import {
   MaintenanceRecord,
   WarrantyItem,
   Branch,
+  TallerOrder,
 } from '../../types/customer';
 
 interface Props {
@@ -53,6 +54,8 @@ interface Props {
   setIsApprovalModalOpen: (open: boolean) => void;
   isApproving: boolean;
   approveQuotation: () => void;
+  pendingRatingOrder?: TallerOrder | null;
+  onOpenRatingModal?: () => void;
 }
 
 export const CustomerViewDesktop: React.FC<Props> = ({
@@ -74,6 +77,8 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   setIsApprovalModalOpen,
   isApproving,
   approveQuotation,
+  pendingRatingOrder,
+  onOpenRatingModal,
 }) => {
   const menuItems: { id: ActiveSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -285,6 +290,8 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                 activeOrder={activeOrder}
                 motorcycle={motorcycle}
                 onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
+                pendingRatingOrder={pendingRatingOrder}
+                onOpenRatingModal={onOpenRatingModal}
               />
             )}
 

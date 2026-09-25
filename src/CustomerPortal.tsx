@@ -5,6 +5,7 @@ import { useIsDesktop } from './hooks/useIsDesktop';
 import { CustomerViewMobile } from './components/mobile/CustomerViewMobile';
 import { CustomerViewDesktop } from './components/desktop/CustomerViewDesktop';
 import { ForceChangePasswordModal } from './components/common/ForceChangePasswordModal';
+import { RatingServiceModal } from './components/common/RatingServiceModal';
 import { CheckCircle2 } from 'lucide-react';
 
 interface CustomerPortalProps {
@@ -35,6 +36,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     setIsApprovalModalOpen,
     isApproving,
     approveQuotation,
+    pendingRatingOrder,
+    isRatingModalOpen,
+    setIsRatingModalOpen,
+    submitRating,
     toastMessage,
   } = portal;
 
@@ -69,6 +74,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
           approveQuotation={approveQuotation}
+          pendingRatingOrder={pendingRatingOrder}
+          onOpenRatingModal={() => setIsRatingModalOpen(true)}
         />
       ) : (
         <CustomerViewMobile
@@ -92,8 +99,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           setIsApprovalModalOpen={setIsApprovalModalOpen}
           isApproving={isApproving}
           approveQuotation={approveQuotation}
+          pendingRatingOrder={pendingRatingOrder}
+          onOpenRatingModal={() => setIsRatingModalOpen(true)}
         />
       )}
+
+      {/* Modal Emergente de Calificar Servicio Técnico (Orden Entregada) */}
+      <RatingServiceModal
+        isOpen={isRatingModalOpen}
+        onClose={() => setIsRatingModalOpen(false)}
+        order={pendingRatingOrder}
+        onSubmitRating={submitRating}
+      />
 
       {/* Modal Obligatorio de Cambio de Contraseña en Primer Acceso */}
       {mustChangePassword && (

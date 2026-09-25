@@ -18,6 +18,8 @@ import {
   AlistamientoFullRecord,
   ServiceActionType,
   TallerOrder,
+  OrderRating,
+  SystemAlert,
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
 import {
@@ -25,7 +27,12 @@ import {
   saveStoredClients,
   getStoredFullAlistamientos,
   getStoredOrders,
+  saveStoredOrders,
   getStoredWarranties,
+  getStoredRatings,
+  saveStoredRating,
+  isOrderRated,
+  addStoredAlerts,
 } from '../data/mockMultiRoleData';
 import { cloudSaveClient } from '../services/supabaseService';
 
@@ -285,6 +292,27 @@ const INITIAL_WORK_ORDER: WorkOrder = {
   status: 'cotizacion_pendiente',
   steps: buildSteps('cotizacion_pendiente'),
   supervisorObservations: 'Desgaste pronunciado en piñón de ataque y catalina 525. Pastillas delanteras al 15% de vida útil.',
+  alistamientoId: 'als-demo-01',
+  serviciosRealizados: ['mantenimiento', 'engrasado'],
+  tecnicoResponsable: 'Carlos "Charly" Morales',
+  entryTime: '08:30',
+  tipoAceite: '10W-40',
+  nivelAceite: 'sintetico',
+  estadoAceite: 'con_aceite',
+  valorServicio: 75.0,
+  abono: 40.0,
+  saldoPendiente: 35.0,
+  metodoPago: 'Efectivo',
+  kilometrajeIngreso: 15200,
+  proximoMantenimientoKm: 18000,
+  observacionesTaller: 'Desgaste pronunciado en piñón de ataque y catalina 525. Pastillas delanteras al 15% de vida útil. Ajuste general y lubricación de cadena y frenos.',
+  numeroFactura: '001-002-0004910',
+  numeroTicket: 'TCK-2026-0841',
+  fotosIngreso: [
+    'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=900&q=80',
+  ],
+  origenIngreso: 'Recepción Taller Matriz',
   diagnosticPhotos: [
     {
       id: 'diag-1',
@@ -780,71 +808,133 @@ const getClientActiveOrder = (
   const matched = clientOrders.find((o) => o.status !== 'entregada' && o.status !== 'entregado');
 
   if (matched) {
+    const allAlistamientos = getStoredFullAlistamientos();
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    let matchedAls = matched.alistamientoId
+      ? allAlistamientos.find((a) => a.id === matched.alistamientoId)
+      : undefined;
+
+    if (!matchedAls) {
+      matchedAls = allAlistamientos.find((a) => {
+        const aId = norm(a.cedulaRuc);
+        const cId = norm(p.idNumber);
+        if (aId && cId && aId === cId) return true;
+        const aPlate = norm(a.placa).replace(/[^a-z0-9]/g, '');
+        const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+        if (aPlate && mPlate && aPlate === mPlate) return true;
+        return false;
+      });
+    }
+
     const orderBranch = ALL_BRANCHES.find((b) => b.id === matched.workshopId) || branch;
-    const steps = buildSteps(matched.status || 'en_reparacion');
+    const steps = buildSteps(matched.status || 'inicio');
     const isQuotationPending = matched.status === 'cotizacion_pendiente';
+
+    const techName = matchedAls?.tecnicoResponsable || matched.mechanicName || 'Técnico Especialista Asignado';
+    const entryDate = matchedAls?.fechaServicio || matched.entryDate || 'Reciente';
+    const entryTime = matchedAls?.horaServicio || '08:30';
+    const totalCost = matchedAls?.valorServicio !== undefined ? Number(matchedAls.valorServicio) : (matched.totalCost || 0);
+    const abono = matchedAls?.abono !== undefined ? Number(matchedAls.abono) : (matchedAls?.montoPagado !== undefined ? Number(matchedAls.montoPagado) : totalCost);
+    const saldoPendiente = matchedAls?.saldoPendiente !== undefined ? Number(matchedAls.saldoPendiente) : Math.max(0, totalCost - abono);
 
     return {
       otNumber: matched.otNumber,
-      entryDate: matched.entryDate || 'Reciente',
+      entryDate: entryDate,
+      entryTime: entryTime,
       estimatedDelivery: matched.estimatedDelivery || 'En coordinación con taller',
-      clientReason: `Servicio técnico para ${matched.motorcycleInfo || `${m.brand} ${m.model}`}.`,
+      clientReason: matchedAls?.observaciones || matched.servicesSummary || `Servicio técnico para ${matched.motorcycleInfo || `${m.brand} ${m.model}`}.`,
       branch: orderBranch,
       mechanic: {
-        id: 'mec-assigned',
-        name: matched.mechanicName || 'Técnico Especialista Asignado',
+        id: matchedAls?.tecnicoId || 'mec-assigned',
+        name: techName,
         specialty: 'Mecánico Certificado StarMotos',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
         certifications: ['Técnico Homologado StarMotos'],
       },
       advisor: matched.workshopName || orderBranch.name,
-      status: matched.status || 'en_reparacion',
+      status: matched.status || 'inicio',
       steps: steps,
-      supervisorObservations: 'Servicio en proceso según especificaciones técnicas de fábrica.',
-      diagnosticPhotos: [],
+      supervisorObservations: matchedAls?.observaciones || matched.servicesSummary || 'Servicio en proceso según especificaciones técnicas de fábrica.',
+      diagnosticPhotos: matchedAls?.fotos?.map((f, i) => ({
+        id: `foto-${i}`,
+        url: f,
+        title: `Inspección de Recepción ${i + 1}`,
+        description: 'Estado de recepción de la motocicleta en taller',
+        uploadedAt: entryTime,
+        stage: 'Recepción',
+      })) || [],
+      alistamientoId: matchedAls?.id || matched.alistamientoId,
+      serviciosRealizados: matchedAls?.serviciosRealizados || [],
+      tecnicoResponsable: techName,
+      kilometrajeIngreso: matchedAls?.kilometraje !== undefined ? Number(matchedAls.kilometraje) : (m.currentKm || 0),
+      proximoMantenimientoKm: matchedAls?.proximoMantenimientoKm || ((matchedAls?.kilometraje || m.currentKm || 0) + 3000),
+      tipoAceite: matchedAls?.tipoAceite || '20W-50',
+      nivelAceite: matchedAls?.nivelAceite || 'mineral',
+      estadoAceite: matchedAls?.aceite || 'con_aceite',
+      valorServicio: totalCost,
+      abono: abono,
+      saldoPendiente: saldoPendiente,
+      metodoPago: matchedAls?.metodoPago || 'Efectivo',
+      observacionesTaller: matchedAls?.observaciones || matched.servicesSummary || 'Servicio técnico en proceso según especificaciones técnicas de fábrica.',
+      numeroFactura: matchedAls?.numeroFactura || '',
+      numeroTicket: matchedAls?.numeroTicket || matched.otNumber || '',
+      fotosIngreso: matchedAls?.fotos || [],
+      origenIngreso: matchedAls?.origen || 'Taller StarMotos',
+      orderId: matched.id,
+      rating: matched.rating,
       quotation: {
         quotationNumber: `COT-${matched.otNumber.replace(/[^0-9]/g, '') || '01'}`,
-        createdAt: matched.entryDate || 'Reciente',
+        createdAt: entryDate,
         expiresAt: '48 horas posteriores',
         status: isQuotationPending ? 'pendiente_aprobacion' : 'aprobado',
-        parts: [
-          {
-            code: 'REP-STAR-01',
-            description: 'Insumos y repuestos certificados StarMotos',
-            brand: 'StarMotos Genuine Parts',
-            quantity: 1,
-            unitPrice: Math.round((matched.totalCost || 45) * 0.6),
-            subtotal: Math.round((matched.totalCost || 45) * 0.6),
-            warrantyMonths: 6,
-          },
-        ],
-        services: [
-          {
-            code: 'SRV-STAR-01',
-            description: 'Mano de obra técnica y calibración en elevador',
-            hours: 1.5,
-            unitCost: Math.round((matched.totalCost || 45) * 0.4),
-            subtotal: Math.round((matched.totalCost || 45) * 0.4),
-          },
-        ],
-        subtotalParts: Math.round((matched.totalCost || 45) * 0.6),
-        subtotalServices: Math.round((matched.totalCost || 45) * 0.4),
-        subtotal: matched.totalCost || 45,
+        parts: [],
+        services: [],
+        subtotalParts: 0,
+        subtotalServices: totalCost,
+        subtotal: totalCost,
         discount: 0,
         taxRate: 0.15,
-        taxAmount: Number(((matched.totalCost || 45) * 0.15).toFixed(2)),
-        total: Number(((matched.totalCost || 45) * 1.15).toFixed(2)),
+        taxAmount: 0,
+        total: totalCost,
         mechanicNotes: 'Servicio respaldado con garantía oficial de taller StarMotos.',
       },
     };
   }
 
-  // Fallback demo Fernando Vaca
-  if (p.idNumber === '1724890123') {
+  // Fallback demo Fernando Vaca: SOLO si no tiene órdenes creadas en taller
+  if (p.idNumber === '1724890123' && clientOrders.length === 0) {
     return INITIAL_WORK_ORDER;
   }
 
   return EMPTY_WORK_ORDER;
+};
+
+// Generador de orden entregada pendiente de calificar
+const getPendingRatingOrder = (p: ClientProfile, m: MotorcycleClientData): TallerOrder | null => {
+  const allOrders = getStoredOrders();
+  const clientOrders = allOrders.filter((o) => {
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const cId = norm(p.idNumber);
+    const oId = norm(o.clientIdNumber);
+    if (cId && oId) return cId === oId;
+
+    const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const oPlate = norm(o.plate).replace(/[^a-z0-9]/g, '');
+    if (mPlate && oPlate && !isPlaceholderPlate(m.plate) && !isPlaceholderPlate(o.plate) && mPlate === oPlate) return true;
+
+    return false;
+  });
+
+  // Buscar orden más reciente entregada que no haya sido calificada
+  return (
+    clientOrders.find(
+      (o) =>
+        (o.status === 'entregado' || (o.status as any) === 'entregada') &&
+        !o.rating &&
+        !isOrderRated(o.id) &&
+        !isOrderRated(o.otNumber)
+    ) || null
+  );
 };
 
 // Generador de garantías para el cliente
@@ -1088,6 +1178,23 @@ export function useCustomerPortal() {
     getClientWarranties(profile, motorcycle)
   );
 
+  // Calificación del Servicio Técnico (Orden Entregada)
+  const [pendingRatingOrder, setPendingRatingOrder] = useState<TallerOrder | null>(() =>
+    getPendingRatingOrder(profile, motorcycle)
+  );
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState<boolean>(false);
+  const hasDismissedRatingModalRef = useRef<boolean>(false);
+
+  // Auto-apertura si hay una orden entregada sin calificar
+  useEffect(() => {
+    if (pendingRatingOrder && !hasDismissedRatingModalRef.current) {
+      const timer = setTimeout(() => {
+        setIsRatingModalOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingRatingOrder]);
+
   // Sincronización reactiva en tiempo real al registrar alistamientos, órdenes o garantías
   useEffect(() => {
     const syncAll = () => {
@@ -1117,12 +1224,19 @@ export function useCustomerPortal() {
       setScheduledMaintenances(getClientScheduledMaintenances(curProfile, enrichedMoto, branch));
       setActiveOrder(getClientActiveOrder(curProfile, enrichedMoto, branch));
       setWarranties(getClientWarranties(curProfile, enrichedMoto));
+
+      const unratedOrder = getPendingRatingOrder(curProfile, enrichedMoto);
+      setPendingRatingOrder(unratedOrder);
+      if (unratedOrder && !hasDismissedRatingModalRef.current) {
+        setIsRatingModalOpen(true);
+      }
     };
 
     window.addEventListener('starmotos_alistamientos_updated', syncAll);
     window.addEventListener('starmotos_orders_updated', syncAll);
     window.addEventListener('starmotos_warranties_updated', syncAll);
     window.addEventListener('starmotos_clients_updated', syncAll);
+    window.addEventListener('starmotos_ratings_updated', syncAll);
     window.addEventListener('storage', syncAll);
 
     return () => {
@@ -1130,6 +1244,7 @@ export function useCustomerPortal() {
       window.removeEventListener('starmotos_orders_updated', syncAll);
       window.removeEventListener('starmotos_warranties_updated', syncAll);
       window.removeEventListener('starmotos_clients_updated', syncAll);
+      window.removeEventListener('starmotos_ratings_updated', syncAll);
       window.removeEventListener('storage', syncAll);
     };
   }, []);
@@ -1138,6 +1253,65 @@ export function useCustomerPortal() {
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   isApprovalModalOpenRef.current = isApprovalModalOpen;
   const [isApproving, setIsApproving] = useState(false);
+
+  // Enviar Calificación de la Orden Entregada
+  const submitRating = useCallback(
+    (data: { stars: number; comment: string; orderId: string }) => {
+      const allOrders = getStoredOrders();
+      const target = allOrders.find((o) => o.id === data.orderId || o.otNumber === data.orderId);
+      if (!target) return;
+
+      const ratingRecord: OrderRating = {
+        id: `rat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        orderId: target.id,
+        otNumber: target.otNumber,
+        clientIdNumber: target.clientIdNumber,
+        clientName: target.clientName,
+        motorcycleInfo: target.motorcycleInfo,
+        plate: target.plate,
+        technicianName: target.mechanicName || 'Técnico Taller',
+        workshopId: target.workshopId,
+        workshopName: target.workshopName,
+        serviceSummary: target.servicesSummary,
+        stars: data.stars,
+        comment: data.comment,
+        createdAt: new Date().toISOString(),
+      };
+
+      // 1. Guardar calificación en la orden
+      const updated = allOrders.map((o) => (o.id === target.id ? { ...o, rating: ratingRecord } : o));
+      saveStoredOrders(updated);
+
+      // 2. Guardar en almacenamiento de calificaciones
+      saveStoredRating(ratingRecord);
+
+      // 3. Crear alerta de sistema para taller y admin
+      const ratingAlert: SystemAlert = {
+        id: `alt-rat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: 'info',
+        targetRole: 'all',
+        targetWorkshopId: target.workshopId,
+        title: `⭐ Calificación al Técnico ${target.mechanicName} (${data.stars}/5)`,
+        message: `${target.clientName} calificó con ${data.stars} estrellas el servicio de la orden ${target.otNumber}. ${data.comment ? `Comentario: "${data.comment}"` : ''}`,
+        timestamp: 'Ahora mismo',
+        read: false,
+        relatedId: target.id,
+      };
+      addStoredAlerts(ratingAlert);
+
+      // 4. Confetti y Toast
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+      showToast('¡Muchas gracias por calificar nuestro servicio técnico!', 'success');
+
+      setIsRatingModalOpen(false);
+      setPendingRatingOrder(null);
+    },
+    [showToast]
+  );
 
   // Login: Al ingresar, recarga datos actualizados del cliente y sincroniza
   const login = useCallback(() => {
@@ -1356,6 +1530,10 @@ export function useCustomerPortal() {
     setIsApprovalModalOpen,
     isApproving,
     approveQuotation,
+    pendingRatingOrder,
+    isRatingModalOpen,
+    setIsRatingModalOpen,
+    submitRating,
     toastMessage,
     showToast,
   };

@@ -17,6 +17,7 @@ import {
   MaintenanceRecord,
   WarrantyItem,
   Branch,
+  TallerOrder,
 } from '../../types/customer';
 
 interface Props {
@@ -40,6 +41,8 @@ interface Props {
   setIsApprovalModalOpen: (open: boolean) => void;
   isApproving: boolean;
   approveQuotation: () => void;
+  pendingRatingOrder?: TallerOrder | null;
+  onOpenRatingModal?: () => void;
 }
 
 export const CustomerViewMobile: React.FC<Props> = ({
@@ -63,6 +66,8 @@ export const CustomerViewMobile: React.FC<Props> = ({
   setIsApprovalModalOpen,
   isApproving,
   approveQuotation,
+  pendingRatingOrder,
+  onOpenRatingModal,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
     perfil: 'Perfil del Cliente',
@@ -118,6 +123,8 @@ export const CustomerViewMobile: React.FC<Props> = ({
             activeOrder={activeOrder}
             motorcycle={motorcycle}
             onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
+            pendingRatingOrder={pendingRatingOrder}
+            onOpenRatingModal={onOpenRatingModal}
           />
         )}
 

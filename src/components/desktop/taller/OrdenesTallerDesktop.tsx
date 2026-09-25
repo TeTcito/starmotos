@@ -11,7 +11,8 @@ import {
   Search,
   ChevronDown,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Star,
 } from 'lucide-react';
 import { TallerOrder, WorkOrderStatus } from '../../../types/customer';
 
@@ -238,6 +239,38 @@ export const OrdenesTallerDesktop: React.FC<Props> = ({ orders, onUpdateOrderSta
                       </span>
                     </div>
                   </div>
+
+                  {/* Calificación del Cliente si ya fue entregada y calificada */}
+                  {ord.rating && (
+                    <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200/90 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-amber-900 flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                          <span>Calificación Cliente</span>
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              className={`w-2.5 h-2.5 ${
+                                s <= ord.rating!.stars
+                                  ? 'fill-amber-400 text-amber-500'
+                                  : 'text-zinc-200 fill-zinc-100'
+                              }`}
+                            />
+                          ))}
+                          <span className="text-[10px] font-mono font-bold text-amber-950 ml-1">
+                            {ord.rating.stars}/5
+                          </span>
+                        </div>
+                      </div>
+                      {ord.rating.comment && (
+                        <p className="text-[10px] text-zinc-700 italic bg-white/70 p-1.5 rounded border border-amber-100 line-clamp-2">
+                          "{ord.rating.comment}"
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer de Tarjeta: Costo y Botón Desplegable Progresivo */}

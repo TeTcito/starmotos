@@ -13,8 +13,10 @@ import {
   ShieldCheck,
   X,
   Trash2,
+  Star,
 } from 'lucide-react';
 import { Technician, Workshop } from '../../../types/customer';
+import { getStoredRatings } from '../../../data/mockMultiRoleData';
 
 interface Props {
   technicians: Technician[];
@@ -155,28 +157,48 @@ export const TecnicosDesktop: React.FC<Props> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((tech) => (
-            <div
-              key={tech.id}
-              className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs hover:border-blue-300 transition flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
-                      {tech.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-zinc-900">{tech.name}</h3>
-                      <p className="text-[11px] text-zinc-500">{tech.specialty}</p>
-                    </div>
-                  </div>
+          {filtered.map((tech) => {
+            const allRatings = getStoredRatings();
+            const techRatings = allRatings.filter(
+              (r) =>
+                (r.technicianName && tech.name && r.technicianName.toLowerCase().trim() === tech.name.toLowerCase().trim()) ||
+                (tech.id && r.technicianId === tech.id)
+            );
+            const avgScore = techRatings.length > 0
+              ? (techRatings.reduce((sum, r) => sum + r.stars, 0) / techRatings.length).toFixed(1)
+              : null;
 
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Activo
-                  </span>
-                </div>
+            return (
+              <div
+                key={tech.id}
+                className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs hover:border-blue-300 transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        {tech.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-zinc-900">{tech.name}</h3>
+                        <p className="text-[11px] text-zinc-500">{tech.specialty}</p>
+                        {avgScore ? (
+                          <div className="flex items-center gap-1 mt-1 text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/80 w-fit text-[10px] font-bold">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                            <span>{avgScore} / 5</span>
+                            <span className="text-zinc-400 font-normal">({techRatings.length} calif.)</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-zinc-400 block mt-0.5">Sin calificaciones aún</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Activo
+                    </span>
+                  </div>
 
                 <div className="mt-4 p-3 bg-zinc-50 rounded-xl border border-zinc-100 space-y-1.5 text-xs">
                   <div className="flex items-center justify-between text-zinc-700">
@@ -223,7 +245,8 @@ export const TecnicosDesktop: React.FC<Props> = ({
                 )}
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
 

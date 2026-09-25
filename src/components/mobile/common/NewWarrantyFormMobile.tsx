@@ -25,6 +25,8 @@ import {
   ShieldCheck,
   RefreshCw,
   Video,
+  Building2,
+  FileCheck2,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -65,6 +67,34 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   isMatriz = false,
 }) => {
   const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+  const [destinationType, setDestinationType] = useState<'matriz' | 'garante'>('matriz');
+
+  const ALL_POPULAR_BRANDS = useMemo(() => {
+    const defaults = [
+      'Thunder',
+      'Benelli',
+      'Bajaj',
+      'Shineray',
+      'Daytona',
+      'Honda',
+      'Yamaha',
+      'Suzuki',
+      'Loncin',
+      'Tuko',
+      'Ranger',
+      'Dukare',
+      'Motor1',
+      'Haojue',
+      'KTM',
+      'Kawasaki',
+      'TVS',
+      'Hero',
+      'Italika',
+      'Zongshen',
+    ];
+    const combined = new Set([...registeredBrands, ...defaults]);
+    return Array.from(combined).sort((a, b) => a.localeCompare(b));
+  }, [registeredBrands]);
 
   useEffect(() => {
     const handleGarantesUpdated = () => {
@@ -331,9 +361,15 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       return;
     }
 
-    if (!formData.motorcycleBrand.trim()) {
+    if (destinationType === 'garante' && !formData.targetBrand.trim()) {
       setActiveTab('cliente');
       alert('Por favor seleccione la Marca Garantía registrada.');
+      return;
+    }
+
+    if (!formData.motorcycleBrand.trim()) {
+      setActiveTab('moto');
+      alert('Por favor ingrese la marca de la motocicleta.');
       return;
     }
 
@@ -346,7 +382,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     const loadedPhotos = photoSlots.filter(Boolean) as string[];
     const loadedVideos = videoSlots.filter(Boolean) as string[];
 
-
+    const resolvedTarget =
+      destinationType === 'matriz' ? 'StarMotos Matriz' : formData.targetBrand.trim();
 
     const newReq: WarrantyRequest = {
       id: `gar-${Date.now()}`,
@@ -358,8 +395,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       tallerOrigin: formData.tallerOrigin.trim() || defaultTallerOrigin,
       tallerOriginId: defaultTallerOriginId,
       warrantyType: 'marca',
-      targetBrand: formData.targetBrand.trim(),
-      garanteName: formData.targetBrand.trim(),
+      destinationType: destinationType,
+      targetBrand: resolvedTarget,
+      garanteName: resolvedTarget,
       motorcycleBrand: formData.motorcycleBrand.trim(),
       motorcycleModel: formData.motorcycleModel.trim(),
       motorcyclePlate: formData.motorcyclePlate.trim().toUpperCase() || 'SIN PLACA',
@@ -373,7 +411,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       partsRequired: partsTags.join(', '),
       resolutionType: undefined,
       diagnosticPhotos: [...loadedPhotos, ...loadedVideos],
-      status: 'en_revision',
+      status: destinationType === 'matriz' ? 'enviada_matriz' : 'en_revision',
       estimatedCost: 0,
     };
 
@@ -628,24 +666,68 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Marca Garantía: Sincronizada únicamente con marcas y garantes registrados con su Razón Social */}
-          <div className="space-y-1">
+          {/* Destino del Reclamo: Matriz vs Garante de Marca */}
+          <div className="space-y-2">
             <label className="block text-xs font-bold text-zinc-700">
-              Marca Garantía (Razón Social Registrada) <span className="text-red-500">*</span>
+              Destino del Reclamo <span className="text-red-500">*</span>
             </label>
-            <select
-              required
-              value={formData.targetBrand}
-              onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
-            >
-              <option value="" disabled>Seleccione la Razón Social de la Marca</option>
-              {registeredBrands.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
-            </select>
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setDestinationType('matriz');
+                  setFormData((prev) => ({ ...prev, targetBrand: 'StarMotos Matriz' }));
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  destinationType === 'matriz'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-zinc-600 bg-transparent'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>A Matriz</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDestinationType('garante');
+                  setFormData((prev) => ({ ...prev, targetBrand: registeredBrands[0] || '' }));
+                }}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  destinationType === 'garante'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-zinc-600 bg-transparent'
+                }`}
+              >
+                <FileCheck2 className="w-3.5 h-3.5" />
+                <span>Garante</span>
+              </button>
+            </div>
+
+            {destinationType === 'matriz' ? (
+              <div className="w-full px-3 py-2 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between">
+                <span className="text-xs font-black text-emerald-900">StarMotos Sede Matriz</span>
+                <span className="px-1.5 py-0.5 bg-emerald-600 text-white text-[8px] font-bold rounded uppercase">
+                  Central
+                </span>
+              </div>
+            ) : (
+              <select
+                required
+                value={formData.targetBrand}
+                onChange={(e) => setFormData({ ...formData, targetBrand: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
+              >
+                <option value="" disabled>Seleccione la Marca Registrada</option>
+                {registeredBrands.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            )}
             <p className="text-[10px] text-zinc-400">
-              Razón Social oficial de marcas registradas en el sistema.
+              {destinationType === 'matriz'
+                ? 'Se enviará a Matriz/Almacén (ideal para marcas no registradas en el sistema).'
+                : 'Se enviará al buzón del garante oficial registrado.'}
             </p>
           </div>
         </div>
@@ -675,7 +757,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
               />
               <datalist id="mobile-brands-datalist">
-                {registeredBrands.map((b) => (
+                {ALL_POPULAR_BRANDS.map((b) => (
                   <option key={b} value={b} />
                 ))}
               </datalist>

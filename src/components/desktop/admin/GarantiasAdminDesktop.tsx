@@ -412,6 +412,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                   onChange={(e) => setQuickTargetStatus(e.target.value as WarrantyRequestStatus)}
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none focus:border-blue-600"
                 >
+                  <option value="aceptada">✓ Aceptada Directamente (Matriz / Almacén)</option>
                   <option value="en_proceso">⏳ En Proceso (Enviar a Garante de Marca)</option>
                   <option value="validada_matriz">✓ Validada por Matriz</option>
                   <option value="rechazada_matriz">✕ Rechazada por Matriz</option>

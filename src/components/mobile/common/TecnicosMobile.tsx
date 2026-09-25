@@ -1,7 +1,7 @@
-// src/components/mobile/common/TecnicosMobile.tsx
 import React, { useState } from 'react';
-import { Wrench, Plus, Phone, Building2, CheckCircle2, X, Trash2 } from 'lucide-react';
+import { Wrench, Plus, Phone, Building2, CheckCircle2, X, Trash2, Star } from 'lucide-react';
 import { Technician, Workshop } from '../../../types/customer';
+import { getStoredRatings } from '../../../data/mockMultiRoleData';
 
 interface Props {
   technicians: Technician[];
@@ -73,17 +73,35 @@ export const TecnicosMobile: React.FC<Props> = ({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {technicians.map((tech) => (
-            <div key={tech.id} className="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-xs space-y-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="text-xs font-bold text-zinc-900">{tech.name}</h4>
-                  <p className="text-[10px] text-zinc-500">{tech.specialty}</p>
+          {technicians.map((tech) => {
+            const allRatings = getStoredRatings();
+            const techRatings = allRatings.filter(
+              (r) =>
+                (r.technicianName && tech.name && r.technicianName.toLowerCase().trim() === tech.name.toLowerCase().trim()) ||
+                (tech.id && r.technicianId === tech.id)
+            );
+            const avgScore = techRatings.length > 0
+              ? (techRatings.reduce((sum, r) => sum + r.stars, 0) / techRatings.length).toFixed(1)
+              : null;
+
+            return (
+              <div key={tech.id} className="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-xs space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-900">{tech.name}</h4>
+                    <p className="text-[10px] text-zinc-500">{tech.specialty}</p>
+                    {avgScore ? (
+                      <div className="flex items-center gap-1 mt-1 text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/80 w-fit text-[9px] font-bold">
+                        <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-500" />
+                        <span>{avgScore} / 5</span>
+                        <span className="text-zinc-400 font-normal">({techRatings.length} op.)</span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Activo
+                  </span>
                 </div>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  Activo
-                </span>
-              </div>
 
               <div className="text-[11px] text-zinc-600 flex justify-between items-center pt-1 border-t border-zinc-100">
                 <span className="truncate max-w-[170px]">{tech.workshopName.replace('StarMotos ', '')}</span>
@@ -110,7 +128,8 @@ export const TecnicosMobile: React.FC<Props> = ({
                 </div>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
 

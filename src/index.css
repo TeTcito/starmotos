@@ -40,17 +40,37 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Print styling for proforma */
+/* Print styling for proforma and warranty sheets */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
   }
-  .no-print {
+  html, body, #root {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: #09090b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .no-print,
+  .print\:hidden,
+  nav,
+  aside,
+  header:not(.print-header),
+  footer:not(.print-footer) {
     display: none !important;
   }
-  .print-only {
+  .print-only,
+  .print\:block {
     display: block !important;
+  }
+  .break-inside-avoid,
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 

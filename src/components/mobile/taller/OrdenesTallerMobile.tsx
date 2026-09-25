@@ -1,6 +1,6 @@
 // src/components/mobile/taller/OrdenesTallerMobile.tsx
 import React from 'react';
-import { Wrench, ChevronRight, PackageCheck, Clock, User } from 'lucide-react';
+import { Wrench, ChevronRight, PackageCheck, Clock, User, Star } from 'lucide-react';
 import { TallerOrder, WorkOrderStatus } from '../../../types/customer';
 
 interface Props {
@@ -74,6 +74,26 @@ export const OrdenesTallerMobile: React.FC<Props> = ({ orders, onUpdateOrderStat
                 <Clock className="w-3 h-3" /> {ord.entryDate}
               </span>
             </div>
+
+            {/* Calificación del Cliente si existe */}
+            {ord.rating && (
+              <div className="p-2 bg-amber-50 rounded-lg border border-amber-200/80 space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-amber-900 flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                    <span>Calificación Cliente</span>
+                  </span>
+                  <span className="font-mono font-bold text-amber-900">
+                    {ord.rating.stars}/5 ⭐
+                  </span>
+                </div>
+                {ord.rating.comment && (
+                  <p className="text-[10px] text-zinc-700 italic bg-white/70 p-1 rounded border border-amber-100">
+                    "{ord.rating.comment}"
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-xs">
               <span className="text-zinc-500 font-mono">${ord.totalCost.toFixed(2)}</span>

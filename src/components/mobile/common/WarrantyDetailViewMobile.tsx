@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   ShieldCheck,
   AlertCircle,
+  Send,
   DollarSign,
   Pencil,
   X,
@@ -41,6 +42,7 @@ import {
 } from '../../../data/mockMultiRoleData';
 import { getWarrantyStatusInfo } from '../../common/WarrantyModule';
 import { isVideoUrl } from './NewWarrantyFormMobile';
+import { PrintableWarrantySheet } from '../../common/PrintableWarrantySheet';
 
 interface Props {
   warranty: WarrantyRequest;
@@ -429,53 +431,54 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   };
 
   return (
-    <div className="w-full flex flex-col min-h-0 space-y-3 -mt-1.5 animate-fade-in relative">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 1. ENCABEZADO DE LA FICHA TÉCNICA (CON ACCIONES RÁPIDAS)                   */}
-      {/* ========================================================================= */}
-      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
-            <ShieldCheck className="w-4 h-4" />
+    <div className="w-full flex flex-col min-h-0 -mt-1.5 animate-fade-in relative">
+      <div className="print:hidden space-y-3">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-black text-zinc-900 tracking-tight leading-tight truncate">
-                Ficha de garantía
-              </h2>
-              <span
-                className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border shrink-0 ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
-              >
-                {statusInfo.label.toUpperCase()}
-              </span>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 1. ENCABEZADO DE LA FICHA TÉCNICA (CON ACCIONES RÁPIDAS)                   */}
+        {/* ========================================================================= */}
+        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-zinc-200 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <ShieldCheck className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono truncate mt-0.5">
-              <span className="font-semibold text-blue-700">{warranty.requestNumber}</span>
-              <span>•</span>
-              <span className="font-semibold text-zinc-700 truncate">{formData.clientName}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-black text-zinc-900 tracking-tight leading-tight truncate">
+                  Ficha de garantía
+                </h2>
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border shrink-0 ${statusInfo.badgeBg} ${statusInfo.badgeText} ${statusInfo.badgeBorder}`}
+                >
+                  {statusInfo.label.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono truncate mt-0.5">
+                <span className="font-semibold text-blue-700">{warranty.requestNumber}</span>
+                <span>•</span>
+                <span className="font-semibold text-zinc-700 truncate">{formData.clientName}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Acciones Rápidas */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Imprimir */}
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="w-8 h-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 border border-zinc-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-            title="Imprimir Ficha"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
+          {/* Acciones Rápidas */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Imprimir */}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-black active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              title="Imprimir / Guardar como PDF"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
 
           {/* WhatsApp */}
           {formData.clientPhone && (
@@ -1699,20 +1702,52 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Acción para Matriz si está en_revision */}
-          {viewerRole === 'admin' && formData.status === 'en_revision' && onValidateWarranty && (
-            <button
-              type="button"
-              onClick={() => {
-                handleSave();
-                onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
-                setFormData({ ...formData, status: 'validada_matriz' });
-                confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
-              }}
-              className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Validar Matriz</span>
-            </button>
+          {viewerRole === 'admin' && formData.status === 'en_revision' && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated: WarrantyRequest = {
+                    ...warranty,
+                    ...formData,
+                    motorcycleMileage: Number(formData.motorcycleMileage) || 0,
+                    estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+                    status: 'aceptada',
+                    matrizNotes: formData.matrizNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén.',
+                    approvedAt: 'Hoy, Autorización Directa Matriz',
+                  };
+                  if (onSave) onSave(updated);
+                  try {
+                    const allStored = getStoredWarranties();
+                    saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+                  } catch {}
+                  setFormData({ ...formData, status: 'aceptada' });
+                  confetti({ particleCount: 40, spread: 55, origin: { y: 0.7 } });
+                }}
+                className="px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                title="Aprobar y aceptar la garantía directamente en Matriz"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Aprobar Matriz</span>
+              </button>
+
+              {onValidateWarranty && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSave();
+                    onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
+                    setFormData({ ...formData, status: 'validada_matriz' });
+                    confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
+                  }}
+                  className="px-2.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Poner en proceso hacia Garante de Marca"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>A Garante</span>
+                </button>
+              )}
+            </div>
           )}
 
           {/* Acción para Garante si está pendiente */}
@@ -1755,6 +1790,19 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </button>
           )}
         </div>
+      </div>
+      </div>
+
+      {/* FICHA OFICIAL DE RECLAMO PARA IMPRESIÓN Y PDF */}
+      <div className="hidden print:block w-full">
+        <PrintableWarrantySheet
+          warranty={{
+            ...warranty,
+            ...formData,
+            motorcycleMileage: Number(formData.motorcycleMileage) || 0,
+            estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+          }}
+        />
       </div>
     </div>
   );

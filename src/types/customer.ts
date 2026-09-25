@@ -235,9 +235,28 @@ export interface WarrantyItem {
   terms: string;
 }
 
+export interface OrderRating {
+  id: string;
+  orderId: string;
+  otNumber: string;
+  clientIdNumber: string;
+  clientName: string;
+  motorcycleInfo?: string;
+  plate?: string;
+  technicianName: string;
+  technicianId?: string;
+  workshopId?: string;
+  workshopName?: string;
+  serviceSummary?: string;
+  stars: number; // 1 - 5
+  comment: string;
+  createdAt: string;
+}
+
 export interface WorkOrder {
   otNumber: string;
   entryDate: string;
+  entryTime?: string;
   estimatedDelivery: string;
   clientReason: string;
   branch: Branch;
@@ -249,6 +268,26 @@ export interface WorkOrder {
   diagnosticPhotos: DiagnosticPhoto[];
   supervisorObservations: string;
   pickupReadyNotice?: string;
+  // Campos vinculados al Alistamiento / Servicio Real
+  alistamientoId?: string;
+  serviciosRealizados?: ServiceActionType[];
+  tecnicoResponsable?: string;
+  kilometrajeIngreso?: number;
+  proximoMantenimientoKm?: number;
+  tipoAceite?: string;
+  nivelAceite?: string;
+  estadoAceite?: string;
+  valorServicio?: number;
+  abono?: number;
+  saldoPendiente?: number;
+  metodoPago?: string;
+  observacionesTaller?: string;
+  numeroFactura?: string;
+  numeroTicket?: string;
+  fotosIngreso?: string[];
+  origenIngreso?: string;
+  orderId?: string;
+  rating?: OrderRating;
 }
 
 export interface CustomerPortalData {
@@ -366,6 +405,7 @@ export interface WarrantyRequest {
   garanteId?: string;
   targetBrand?: string;
   garanteName?: string;
+  destinationType?: 'matriz' | 'garante';
 }
 
 // --- Entidad Taller ---
@@ -617,6 +657,7 @@ export interface TallerOrder {
   alistamientoId?: string;
   servicesSummary?: string;
   createdAt?: string;
+  rating?: OrderRating;
 }
 
 // --- Perfil Garante ---

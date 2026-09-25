@@ -13,6 +13,7 @@ import {
   AdminProfile,
   WorkshopManagerAccount,
   DictamenRecord,
+  OrderRating,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -1439,8 +1440,36 @@ export function deleteStoredAlistamiento(id: string) {
 }
 
 
+// ===================== CALIFICACIONES DE SERVICIOS TALLER =====================
+export function getStoredRatings(): OrderRating[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.RATINGS);
+    if (stored) return JSON.parse(stored);
+  } catch (e) {
+    console.error('Error reading ratings from localStorage', e);
+  }
+  return [];
+}
+
+export function saveStoredRating(rating: OrderRating) {
+  try {
+    const current = getStoredRatings();
+    const updated = [rating, ...current.filter((r) => r.id !== rating.id && r.orderId !== rating.orderId)];
+    localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(updated));
+    window.dispatchEvent(new Event('starmotos_ratings_updated'));
+  } catch (e) {
+    console.error('Error saving rating to localStorage', e);
+  }
+}
+
+export function isOrderRated(orderId: string): boolean {
+  const ratings = getStoredRatings();
+  return ratings.some((r) => r.orderId === orderId || r.otNumber === orderId);
+}
+
 // Función para reiniciar todos los módulos a vacío en pruebas
 export function resetAllSystemData() {
+  localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify([]));
   saveStoredWarranties([]);
   saveStoredAlerts([]);
   saveStoredInvoices([]);

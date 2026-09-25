@@ -61,7 +61,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
           />
           <div className="space-y-0.5">
             <h1 className="text-xs sm:text-sm font-black uppercase tracking-tight text-zinc-950">
-              Expediente Oficial de Reclamo de Garantía de Fábrica
+              Expediente Oficial de Reclamo Garantía
             </h1>
             <p className="text-[10px] text-zinc-600 font-medium">
               Red Nacional de Talleres Autorizados & Sede Central StarMotos

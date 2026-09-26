@@ -89,29 +89,46 @@ export const matchRecordToWorkshop = (
   workshopsList: Workshop[] = []
 ): boolean => {
   if (!targetWsId || targetWsId === 'all') return true;
+  if (!record) return false;
+
+  const targetWs = workshopsList.find((w) => w.id === targetWsId);
+  const targetWsName = targetWs ? targetWs.name.toLowerCase().trim() : '';
+  const recSedeName = (record.sede || '').toLowerCase().trim();
+  const recSedeId = (record.sedeId || '').toLowerCase().trim();
+  const targetId = targetWsId.toLowerCase().trim();
+
+  // Si el objetivo es Matriz, pero el registro indica explícitamente otra sucursal ("StarMotos Sucursal Quevedo", etc.)
+  const isTargetMatriz = targetId === 'matriz-la-mana' || targetWsName.includes('matriz');
+  if (isTargetMatriz) {
+    if (recSedeName && !recSedeName.includes('matriz') && (recSedeName.includes('sucursal') || recSedeName.includes('quevedo') || recSedeName.includes('mocache') || recSedeName.includes('balzar') || recSedeName.includes('buena fe'))) {
+      return false;
+    }
+  }
+
   // 1. Coincidencia directa por sedeId
   if (record.sedeId && record.sedeId === targetWsId) return true;
 
-  // 2. Coincidencia por información del taller
-  const targetWs = workshopsList.find((w) => w.id === targetWsId);
   if (!targetWs) {
     return record.sede === targetWsId;
   }
 
-  // Coincidencia exacta por nombre
-  if (record.sede && record.sede.toLowerCase().trim() === targetWs.name.toLowerCase().trim()) return true;
+  // 2. Coincidencia exacta por nombre
+  if (record.sede && recSedeName === targetWsName) return true;
 
-  // Coincidencia resiliente por subcadena de ciudad o nombre
+  // 3. Coincidencia resiliente por subcadena de ciudad o nombre
   if (record.sede) {
-    const cleanSede = record.sede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-    const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
-    const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
-    if (cleanSede && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede) || (cityPart && cleanSede.includes(cityPart)))) {
+    const cleanSede = recSedeName.replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cleanWs = targetWsName.replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cityPart = targetWs.city ? targetWs.city.toLowerCase().split(',')[0].trim() : '';
+    if (cleanSede && cleanWs && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede))) {
+      return true;
+    }
+    if (cleanSede && cityPart && cleanSede.includes(cityPart)) {
       return true;
     }
   }
 
-  // Coincidencia si el sedeId contiene el nombre de la ciudad
+  // 4. Coincidencia si el sedeId contiene el nombre de la ciudad
   if (record.sedeId && targetWs.city) {
     const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
     if (cityPart && record.sedeId.toLowerCase().includes(cityPart)) {
@@ -120,6 +137,78 @@ export const matchRecordToWorkshop = (
   }
 
   return false;
+};
+
+export const matchOrderToWorkshop = (
+  order: TallerOrder,
+  targetWsId: string,
+  workshopsList: Workshop[] = []
+): boolean => {
+  if (!targetWsId || targetWsId === 'all') return true;
+  if (!order) return false;
+
+  const oWsId = (order.workshopId || (order as any).tallerId || '').trim();
+  if (oWsId && oWsId === targetWsId) return true;
+
+  const targetWs = workshopsList.find(w => w.id === targetWsId);
+  const targetWsName = targetWs ? targetWs.name.toLowerCase().trim() : '';
+  const oWsName = (order.workshopName || (order as any).taller || '').toLowerCase().trim();
+
+  if (targetWsName && oWsName && (targetWsName === oWsName || targetWsName.includes(oWsName) || oWsName.includes(targetWsName))) {
+    return true;
+  }
+
+  if (targetWs) {
+    const cityPart = targetWs.city ? targetWs.city.toLowerCase().split(',')[0].trim() : '';
+    if (cityPart && (oWsId.toLowerCase().includes(cityPart) || oWsName.includes(cityPart))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const calculateWorkshopFinances = (
+  wsAlistamientos: AlistamientoFullRecord[],
+  wsOrders: TallerOrder[]
+) => {
+  let totalFacturado = 0;
+  let totalCobrado = 0;
+  let totalPendiente = 0;
+
+  // 1. Alistamientos del taller (servicios reales registrados)
+  wsAlistamientos.forEach((a) => {
+    const isPdi = isPdiOnlyRecord(a);
+    const val = isPdi ? 0 : (Number(a.valorServicio) || 0);
+    const pag = isPdi ? 0 : (a.abono !== undefined ? Number(a.abono) : (Number(a.montoPagado) || 0));
+    const pend = isPdi ? 0 : (a.saldoPendiente !== undefined ? Number(a.saldoPendiente) : Math.max(0, val - pag));
+
+    totalFacturado += val;
+    totalCobrado += pag;
+    totalPendiente += pend;
+  });
+
+  // 2. Órdenes independientes (excluyendo aquellas creadas automáticamente por un alistamiento ya contabilizado)
+  const independentOrders = wsOrders.filter(
+    (o) => !o.alistamientoId || !wsAlistamientos.some((a) => a.id === o.alistamientoId)
+  );
+
+  independentOrders.forEach((o) => {
+    const cost = Number(o.totalCost) || 0;
+    totalFacturado += cost;
+    if (o.status === 'entregada') {
+      totalCobrado += cost;
+    } else {
+      totalPendiente += cost;
+    }
+  });
+
+  return {
+    totalFacturado,
+    totalCobrado,
+    totalPendiente,
+    independentOrdersCount: independentOrders.length,
+  };
 };
 
 export const getRecordTimestamp = (r: AlistamientoFullRecord): number => {

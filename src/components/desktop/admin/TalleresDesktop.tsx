@@ -5,7 +5,7 @@ import {
   FileText, ChevronRight, User, Search, ChevronDown, Star, MessageSquare
 } from 'lucide-react';
 import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Technician, TallerOrder, InventoryItem, AdminInvoice, OrderRating } from '../../../types/customer';
-import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp } from '../../common/AlistamientoWizard';
+import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp, matchOrderToWorkshop, calculateWorkshopFinances } from '../../common/AlistamientoWizard';
 import { saveStoredOrders, getStoredOrders, getStoredRatings } from '../../../data/mockMultiRoleData';
 
 interface Props {
@@ -151,7 +151,7 @@ export const TalleresDesktop: React.FC<Props> = ({
   };
 
   // Helpers and Memos
-  const getWorkshopOrders = (wsId: string) => orders.filter(o => (o as any).workshopId === wsId || (o as any).tallerId === wsId);
+  const getWorkshopOrders = (wsId: string) => orders.filter(o => matchOrderToWorkshop(o, wsId, workshops));
   
   const provinces = useMemo(() => {
     const provs = Array.from(new Set(workshops.map(w => w.province).filter(Boolean) as string[]));
@@ -264,12 +264,8 @@ export const TalleresDesktop: React.FC<Props> = ({
     const wsInventoryCount = wsInventory.length;
     const wsLowStockCount = wsInventory.filter(i => i.stock <= (i.minStock || 5)).length;
 
-    const alistamientosTotal = wsAlistamientos.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : Number(a.valorServicio || 0)), 0);
-    const ordersTotal = wsOrders.reduce((acc, o) => acc + Number(o.totalCost || 0), 0);
-    const totalIngresos = alistamientosTotal + ordersTotal;
-
-    const totalCobrado = wsAlistamientos.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : (a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0))), 0) + ordersTotal;
-    const totalPendiente = Math.max(0, totalIngresos - totalCobrado);
+    const { totalFacturado, totalCobrado, totalPendiente } = calculateWorkshopFinances(wsAlistamientos, wsOrders);
+    const totalIngresos = totalFacturado;
 
     const wsRatings = getWorkshopRatings(ws.id, ws.name);
     const wsRatingStats = getWorkshopRatingStats(wsRatings);
@@ -828,18 +824,14 @@ export const TalleresDesktop: React.FC<Props> = ({
         {filteredWorkshops.map(ws => {
           const isMatriz = ws.id === 'matriz-la-mana' || ws.name.toLowerCase().includes('matriz');
           
-          const wsOrders = orders.filter(o => (o as any).workshopId === ws.id || (o as any).tallerId === ws.id);
+          const wsOrders = getWorkshopOrders(ws.id);
           const wsOrdersCount = wsOrders.length || ws.activeOrders;
           const wsWarrantiesCount = warranties.filter(w => w.tallerOriginId === ws.id || w.tallerOrigin === ws.name || (w as any).tallerOrigin === ws.id).length || ws.pendingWarranties;
           const wsMechanicsCount = technicians.filter(t => t.workshopId === ws.id || t.workshopName === ws.name).length || ws.mechanics;
 
           // Financial metrics
           const wsAls = fullAlistamientos.filter(a => matchRecordToWorkshop(a, ws.id, workshops));
-          const alistamientosTotal = wsAls.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : Number(a.valorServicio || 0)), 0);
-          const ordersTotal = wsOrders.reduce((acc, o) => acc + Number(o.totalCost || 0), 0);
-          const totalFacturado = alistamientosTotal + ordersTotal;
-          const totalCobrado = wsAls.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : (a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0))), 0) + ordersTotal;
-          const totalPendiente = Math.max(0, totalFacturado - totalCobrado);
+          const { totalFacturado, totalCobrado, totalPendiente } = calculateWorkshopFinances(wsAls, wsOrders);
 
           // Ratings
           const wsRatings = getWorkshopRatings(ws.id, ws.name);

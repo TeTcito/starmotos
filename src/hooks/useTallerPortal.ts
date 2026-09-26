@@ -32,14 +32,18 @@ import {
   saveStoredFullAlistamientos,
   getStoredWorkshops,
   saveStoredWorkshops,
+  getStoredAgendamientos,
+  deleteStoredAgendamiento,
+  cleanExpiredAgendamientos,
 } from '../data/mockMultiRoleData';
 import { syncAllFromSupabase } from '../services/supabaseService';
-import { Technician, AlistamientoFullRecord, Workshop, TallerSectionMobile } from '../types/customer';
+import { Technician, AlistamientoFullRecord, Workshop, TallerSectionMobile, AgendamientoTicket } from '../types/customer';
 
 
 export const TALLER_SECTIONS: TallerSectionMobile[] = [
   'perfil_taller',
   'ordenes_taller',
+  'agendamientos',
   'alistamiento_taller',
   'solicitudes_garantia',
   'clientes_taller',
@@ -77,6 +81,7 @@ export function useTallerPortal() {
   const [origins, setOrigins] = useState<string[]>(getStoredOrigins);
   const [fullAlistamientos, setFullAlistamientos] = useState<AlistamientoFullRecord[]>(getStoredFullAlistamientos);
   const [allAlerts, setAllAlerts] = useState<SystemAlert[]>(getStoredAlerts);
+  const [agendamientos, setAgendamientos] = useState<AgendamientoTicket[]>(getStoredAgendamientos);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Instancia de la sede actual autenticada
@@ -158,6 +163,27 @@ export function useTallerPortal() {
     });
   }, [fullAlistamientos, isMatriz, selectedWorkshopFilter, workshops, activeWorkshopId, currentWorkshop]);
 
+  const filteredAgendamientos = useMemo(() => {
+    if (isMatriz && selectedWorkshopFilter === 'all') {
+      return agendamientos;
+    }
+    const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
+    const targetWs = workshops.find((w) => w.id === targetWsId) || currentWorkshop;
+
+    return agendamientos.filter((a) => {
+      if (a.workshopId) {
+        return a.workshopId === targetWsId;
+      }
+      if (a.workshopName && targetWs) {
+        const cleanName = a.workshopName.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
+        return cleanName && (cleanName.includes(cleanWs) || cleanWs.includes(cleanName) || (cityPart && cleanName.includes(cityPart)));
+      }
+      return false;
+    });
+  }, [agendamientos, isMatriz, selectedWorkshopFilter, workshops, activeWorkshopId, currentWorkshop]);
+
   const filteredClients = useMemo(() => {
     if (isMatriz && selectedWorkshopFilter === 'all') {
       return clients;
@@ -224,6 +250,7 @@ export function useTallerPortal() {
     const handleClientsUpdate = () => setClients(getStoredClients());
     const handleAlertsUpdate = () => setAllAlerts(getStoredAlerts());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
+    const handleAgendamientosUpdate = () => setAgendamientos(getStoredAgendamientos());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -235,6 +262,7 @@ export function useTallerPortal() {
         handleClientsUpdate();
         handleAlertsUpdate();
         handleWorkshopsUpdate();
+        handleAgendamientosUpdate();
       }
     };
 
@@ -246,12 +274,20 @@ export function useTallerPortal() {
     window.addEventListener('starmotos_clients_updated', handleClientsUpdate);
     window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+    window.addEventListener('starmotos_agendamientos_updated', handleAgendamientosUpdate);
     window.addEventListener('storage', handleStorageEvent);
+
+    // Limpieza periódica automática de agendamientos que pasaron 24 horas luego de la fecha agendada
+    cleanExpiredAgendamientos();
+    const cleanupInterval = setInterval(() => {
+      cleanExpiredAgendamientos();
+    }, 60000);
 
     // Sincronización proactiva de arranque para garantizar datos actualizados de la red
     syncAllFromSupabase();
 
     return () => {
+      clearInterval(cleanupInterval);
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);
       window.removeEventListener('starmotos_orders_updated', handleOrdersUpdate);
       window.removeEventListener('starmotos_technicians_updated', handleTechsUpdate);
@@ -260,6 +296,7 @@ export function useTallerPortal() {
       window.removeEventListener('starmotos_clients_updated', handleClientsUpdate);
       window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+      window.removeEventListener('starmotos_agendamientos_updated', handleAgendamientosUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
@@ -671,6 +708,11 @@ export function useTallerPortal() {
     showToast('¡Alistamiento guardado y sincronizado exitosamente!', 'success');
   }, [currentWorkshop, activeWorkshopId, showToast]);
 
+  const deleteAgendamiento = useCallback((id: string) => {
+    deleteStoredAgendamiento(id);
+    showToast('Agendamiento eliminado correctamente.', 'info');
+  }, [showToast]);
+
   return {
     activeSection,
     setActiveSection,
@@ -692,6 +734,9 @@ export function useTallerPortal() {
     origins,
     fullAlistamientos: filteredFullAlistamientos,
     rawFullAlistamientos: fullAlistamientos,
+    agendamientos: filteredAgendamientos,
+    rawAgendamientos: agendamientos,
+    deleteAgendamiento,
     addTechnician,
     deleteTechnician,
     addOrigin,

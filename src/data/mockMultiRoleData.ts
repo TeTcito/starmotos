@@ -15,6 +15,7 @@ import {
   DictamenRecord,
   OrderRating,
   AdminPendiente,
+  AgendamientoTicket,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -39,6 +40,8 @@ import {
   cloudSavePendiente,
   cloudDeletePendiente,
   cloudSaveRating,
+  cloudSaveAgendamiento,
+  cloudDeleteAgendamiento,
   getDeletedTombstones,
   addDeletedTombstone,
   removeDeletedTombstone,
@@ -1734,6 +1737,186 @@ export function deleteStoredPendiente(id: string) {
     cloudDeletePendiente(id);
   } catch (e) {
     console.error('Error al eliminar pendiente:', e);
+  }
+}
+
+// =========================================================================
+// AGENDAMIENTO DE CITAS TÉCNICAS (CLIENTES Y JEFES DE TALLER)
+// =========================================================================
+
+export const INITIAL_AGENDAMIENTOS: AgendamientoTicket[] = [
+  {
+    id: 'AGN-804192',
+    ticketNumber: 'TKT-804192',
+    clientName: 'Carlos Alberto Zambrano Morales',
+    clientCedula: '1205847392',
+    clientPhone: '0987654321',
+    clientEmail: 'carlos.zambrano@gmail.com',
+    motoPlate: 'AB-892C',
+    motoModel: 'Benelli TRK 502X',
+    motoBrand: 'Benelli',
+    motoChasis: 'LBB502X872164920',
+    motoYear: 2025,
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    scheduledDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    scheduledTime: '09:30 AM',
+    serviceId: 'alistamiento_pdi',
+    serviceTitle: 'Alistamiento PDI (Inspección y Puesta a Punto)',
+    serviceCategory: 'Alistamiento',
+    estimatedCost: 0,
+    notes: 'Revisión y torqueo previo a rodaje.',
+    status: 'confirmado',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'AGN-912403',
+    ticketNumber: 'TKT-912403',
+    clientName: 'María Elena Mendoza Castro',
+    clientCedula: '0928374651',
+    clientPhone: '0991234567',
+    clientEmail: 'maria.mendoza@hotmail.com',
+    motoPlate: 'IC-304D',
+    motoModel: 'Shineray XY 200 GY',
+    motoBrand: 'Shineray',
+    motoChasis: 'LL8XY200938172641',
+    motoYear: 2024,
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    scheduledDate: new Date(Date.now() + 172800000).toISOString().split('T')[0],
+    scheduledTime: '14:00 PM',
+    serviceId: 'engrasado',
+    serviceTitle: 'Engrasado General & Kit de Arrastre',
+    serviceCategory: 'Mantenimiento',
+    estimatedCost: 25,
+    notes: 'Ajuste de kit de transmisión y engrase de ejes.',
+    status: 'confirmado',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+/**
+ * Verifica si un agendamiento ha superado las 24 horas después de la fecha/hora agendada
+ */
+export function isAgendamientoExpired(agendamiento: AgendamientoTicket): boolean {
+  try {
+    if (!agendamiento || !agendamiento.scheduledDate) return false;
+    const parts = agendamiento.scheduledDate.split('-').map(Number);
+    if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return false;
+    const [year, month, day] = parts;
+
+    let hours = 18;
+    let minutes = 0;
+    if (agendamiento.scheduledTime) {
+      const match = agendamiento.scheduledTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (match) {
+        let h = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10);
+        const ampm = (match[3] || '').toUpperCase();
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        hours = h;
+        minutes = m;
+      }
+    }
+
+    const scheduledTimestamp = new Date(year, month - 1, day, hours, minutes, 0).getTime();
+    const now = Date.now();
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    return (now - scheduledTimestamp) >= TWENTY_FOUR_HOURS_MS;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Limpia y purga automáticamente agendamientos que ya cumplieron 24h tras la fecha programada
+ */
+export function cleanExpiredAgendamientos(): AgendamientoTicket[] {
+  try {
+    let all: AgendamientoTicket[] = [];
+    const raw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) all = parsed;
+    } else {
+      all = [...INITIAL_AGENDAMIENTOS];
+    }
+
+    const valid: AgendamientoTicket[] = [];
+    let hasDeleted = false;
+
+    for (const item of all) {
+      if (isAgendamientoExpired(item)) {
+        hasDeleted = true;
+        cloudDeleteAgendamiento(item.id);
+        syncBus?.postMessage({ type: 'AGENDAMIENTO_DELETED', id: item.id });
+      } else {
+        valid.push(item);
+      }
+    }
+
+    if (hasDeleted) {
+      localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(valid));
+      window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+    }
+    return valid;
+  } catch (e) {
+    console.error('Error al depurar agendamientos expirados:', e);
+    return getStoredAgendamientos();
+  }
+}
+
+export function getStoredAgendamientos(): AgendamientoTicket[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => !isAgendamientoExpired(item));
+      }
+    }
+  } catch (e) {
+    console.error('Error al leer agendamientos de localStorage:', e);
+  }
+  return INITIAL_AGENDAMIENTOS.filter((item) => !isAgendamientoExpired(item));
+}
+
+export function saveStoredAgendamientos(items: AgendamientoTicket[]) {
+  try {
+    const valid = items.filter((item) => !isAgendamientoExpired(item));
+    localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(valid));
+    window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+    valid.forEach((a) => cloudSaveAgendamiento(a));
+  } catch (e) {
+    console.error('Error al guardar agendamientos en localStorage:', e);
+  }
+}
+
+export function addStoredAgendamiento(item: AgendamientoTicket) {
+  try {
+    const current = getStoredAgendamientos();
+    const updated = [item, ...current.filter((a) => a.id !== item.id)];
+    localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(updated));
+    window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+    cloudSaveAgendamiento(item);
+    syncBus?.postMessage({ type: 'AGENDAMIENTO_SAVED', payload: item });
+  } catch (e) {
+    console.error('Error al agregar agendamiento:', e);
+  }
+}
+
+export function deleteStoredAgendamiento(id: string) {
+  try {
+    const current = getStoredAgendamientos();
+    const updated = current.filter((a) => a.id !== id);
+    localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(updated));
+    window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+    cloudDeleteAgendamiento(id);
+    syncBus?.postMessage({ type: 'AGENDAMIENTO_DELETED', id });
+  } catch (e) {
+    console.error('Error al eliminar agendamiento:', e);
   }
 }
 

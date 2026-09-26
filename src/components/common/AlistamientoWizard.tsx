@@ -908,6 +908,29 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   }, [hasPdiDone, hasEngrasadoDone]);
 
+  // Al crear un nuevo alistamiento para un cliente que ya tiene historial previo,
+  // mantener y precargar el número de factura y ticket que había antes (manteniendo la capacidad de edición)
+  useEffect(() => {
+    if (!formData.id && clientHistoricalRecords.length > 0) {
+      const prevDoc = clientHistoricalRecords.find((r) => r.numeroFactura || r.numeroTicket) || clientHistoricalRecords[0];
+      if (prevDoc) {
+        setFormData((prev) => {
+          let updated = false;
+          const next = { ...prev };
+          if (!prev.numeroFactura && prevDoc.numeroFactura) {
+            next.numeroFactura = prevDoc.numeroFactura;
+            updated = true;
+          }
+          if (!prev.numeroTicket && prevDoc.numeroTicket) {
+            next.numeroTicket = prevDoc.numeroTicket;
+            updated = true;
+          }
+          return updated ? next : prev;
+        });
+      }
+    }
+  }, [formData.id, clientHistoricalRecords]);
+
   // Consultar Cédula o RUC (busca en registros existentes o clientes guardados)
   const handleConsultar = (idToSearch?: string) => {
     const cleanId = (idToSearch || formData.cedulaRuc).trim();
@@ -944,6 +967,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
         modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
         color: existingRec.color || prev.color,
         kilometraje: existingRec.kilometraje || prev.kilometraje,
+        numeroFactura: existingRec.numeroFactura || prev.numeroFactura,
+        numeroTicket: existingRec.numeroTicket || prev.numeroTicket,
         sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingRec.sede || prev.sede),
         sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingRec.sedeId || prev.sedeId),
       }));
@@ -1183,8 +1208,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
       aceite: record.aceite || 'con_aceite',
       nivelAceite: record.nivelAceite || 'mineral',
       tipoAceite: record.tipoAceite || '10W-30',
-      numeroFactura: '',
-      numeroTicket: '',
+      numeroFactura: record.numeroFactura || '',
+      numeroTicket: record.numeroTicket || '',
       valorServicio: '',
       montoPagado: '',
       abono: '',
@@ -4194,9 +4219,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 {/* Factura y Ticket (2 datos seguidos en una fila) */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                      N° Factura
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase text-zinc-700">
+                        N° Factura
+                      </label>
+                      {clientHistoricalRecords.length > 0 && formData.numeroFactura && (
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                          Previo / Editable
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={formData.numeroFactura}
@@ -4206,9 +4238,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                      N° Ticket Físico
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase text-zinc-700">
+                        N° Ticket Físico
+                      </label>
+                      {clientHistoricalRecords.length > 0 && formData.numeroTicket && (
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                          Previo / Editable
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={formData.numeroTicket}

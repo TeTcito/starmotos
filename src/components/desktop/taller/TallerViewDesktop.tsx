@@ -25,7 +25,9 @@ import {
   AlistamientoFullRecord,
   Workshop,
   SystemAlert,
+  AgendamientoTicket,
 } from '../../../types/customer';
+import { CalendarClock } from 'lucide-react';
 import { OrdenesTallerDesktop } from './OrdenesTallerDesktop';
 import { SolicitudesGarantiaTallerDesktop } from './SolicitudesGarantiaTallerDesktop';
 import { ClientesTallerDesktop } from './ClientesTallerDesktop';
@@ -35,6 +37,7 @@ import { ClientesModule } from '../../common/ClientesModule';
 import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { AlertasDesktop } from '../admin/AlertasDesktop';
 import { PerfilTallerDesktop } from './PerfilTallerDesktop';
+import { AgendamientosTallerDesktop } from './AgendamientosTallerDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
@@ -43,6 +46,8 @@ interface Props {
   onLogout: () => void;
   orders: TallerOrder[];
   onUpdateOrderStatus: (orderId: string, nextStatus: WorkOrderStatus) => void;
+  agendamientos?: AgendamientoTicket[];
+  onDeleteAgendamiento?: (id: string) => void;
   warranties: WarrantyRequest[];
   clients: TallerClient[];
   inventory: InventoryItem[];
@@ -76,6 +81,8 @@ export const TallerViewDesktop: React.FC<Props> = ({
   onLogout,
   orders,
   onUpdateOrderStatus,
+  agendamientos = [],
+  onDeleteAgendamiento = () => {},
   warranties,
   clients,
   inventory,
@@ -123,6 +130,12 @@ export const TallerViewDesktop: React.FC<Props> = ({
       icon: <Building2 className="w-4 h-4" />,
     },
     {
+      id: 'agendamientos',
+      label: 'Agendamientos',
+      icon: <CalendarClock className="w-4 h-4" />,
+      badge: agendamientos.length > 0 ? `${agendamientos.length}` : undefined,
+    },
+    {
       id: 'ordenes_taller',
       label: 'Órdenes en Taller',
       icon: <Wrench className="w-4 h-4" />,
@@ -166,6 +179,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
 
   const sectionTitles: Record<TallerSection, string> = {
     perfil_taller: 'Perfil y Datos de la Sede Oficial',
+    agendamientos: 'Agendamientos y Citas Técnicas de Clientes',
     ordenes_taller: 'Bahías y Órdenes de Trabajo Activas',
     alistamiento_taller: 'Alistamiento PDI, Registro de Clientes y Motocicletas',
     solicitudes_garantia: 'Solicitudes de Garantía Técnicas hacia Matriz',
@@ -383,6 +397,17 @@ export const TallerViewDesktop: React.FC<Props> = ({
               <PerfilTallerDesktop
                 workshop={currentWs}
                 onUpdateWorkshop={onUpdateWorkshop || (() => {})}
+              />
+            )}
+            {activeSection === 'agendamientos' && (
+              <AgendamientosTallerDesktop
+                agendamientos={agendamientos}
+                onDeleteAgendamiento={onDeleteAgendamiento}
+                currentWorkshop={currentWs}
+                workshops={workshops}
+                isMatriz={isMatriz}
+                selectedWorkshopFilter={selectedWorkshopFilter}
+                onSelectWorkshopFilter={onSelectWorkshopFilter}
               />
             )}
             {activeSection === 'ordenes_taller' && (

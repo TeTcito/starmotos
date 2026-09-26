@@ -321,6 +321,7 @@ export type AdminSectionMobile = AdminSection | 'perfil_admin';
 export type TallerSection =
   | 'perfil_taller'
   | 'ordenes_taller'
+  | 'agendamientos'
   | 'alistamiento_taller'
   | 'solicitudes_garantia'
   | 'clientes_taller'
@@ -764,4 +765,31 @@ export interface AdminPendiente {
   completedAt?: string;
   createdAt: string;
   createdBy?: string;
+}
+
+// --- Tickets de Agendamiento Técnico de Clientes (Red de Talleres) ---
+export interface AgendamientoTicket {
+  id: string; // ID único ej: "AGN-182940"
+  ticketNumber: string; // ej: "TKT-891024"
+  clientId?: string;
+  clientName: string;
+  clientCedula: string;
+  clientPhone: string;
+  clientEmail?: string;
+  motoPlate: string;
+  motoModel: string;
+  motoBrand?: string;
+  motoChasis?: string;
+  motoYear?: number | string;
+  workshopId: string;
+  workshopName: string;
+  scheduledDate: string; // YYYY-MM-DD
+  scheduledTime: string; // e.g. "09:30 AM"
+  serviceId: ServiceActionType | 'alistamiento_pdi' | 'engrasado' | 'mantenimiento' | string;
+  serviceTitle: string;
+  serviceCategory?: string;
+  estimatedCost?: number;
+  notes?: string;
+  status: 'confirmado' | 'atendido' | 'cancelado';
+  createdAt: string; // ISO string
 }

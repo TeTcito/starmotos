@@ -25,7 +25,9 @@ import {
   AlistamientoFullRecord,
   Workshop,
   SystemAlert,
+  AgendamientoTicket,
 } from '../../../types/customer';
+import { CalendarClock } from 'lucide-react';
 import { OrdenesTallerMobile } from './OrdenesTallerMobile';
 import { SolicitudesGarantiaTallerMobile } from './SolicitudesGarantiaTallerMobile';
 import { ClientesTallerMobile } from './ClientesTallerMobile';
@@ -35,6 +37,7 @@ import { ClientesModuleMobile } from '../common/ClientesModuleMobile';
 import { TecnicosMobile } from '../common/TecnicosMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
 import { PerfilTallerMobile } from './PerfilTallerMobile';
+import { AgendamientosTallerMobile } from './AgendamientosTallerMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 
 interface Props {
@@ -43,6 +46,8 @@ interface Props {
   onLogout: () => void;
   orders: TallerOrder[];
   onUpdateOrderStatus: (orderId: string, nextStatus: WorkOrderStatus) => void;
+  agendamientos?: AgendamientoTicket[];
+  onDeleteAgendamiento?: (id: string) => void;
   warranties: WarrantyRequest[];
   clients: TallerClient[];
   inventory: InventoryItem[];
@@ -76,6 +81,8 @@ export const TallerViewMobile: React.FC<Props> = ({
   onLogout,
   orders,
   onUpdateOrderStatus,
+  agendamientos = [],
+  onDeleteAgendamiento = () => {},
   warranties,
   clients,
   inventory,
@@ -115,6 +122,12 @@ export const TallerViewMobile: React.FC<Props> = ({
 
   const menuItems: { id: TallerSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'perfil_taller', label: 'Mi Perfil de Sede', icon: <User className="w-4 h-4" /> },
+    {
+      id: 'agendamientos',
+      label: 'Agendamientos',
+      icon: <CalendarClock className="w-4 h-4" />,
+      badge: agendamientos.length > 0 ? `${agendamientos.length}` : undefined,
+    },
     { id: 'ordenes_taller', label: 'Órdenes en Taller', icon: <Wrench className="w-4 h-4" />, badge: `${orders.length}` },
     { id: 'alistamiento_taller', label: 'Alistamiento PDI', icon: <UserCheck className="w-4 h-4" />, badge: 'Nuevo' },
     { id: 'solicitudes_garantia', label: 'Solicitudes Garantía', icon: <ShieldAlert className="w-4 h-4" /> },
@@ -130,6 +143,7 @@ export const TallerViewMobile: React.FC<Props> = ({
   ];
 
   const sectionTitles: Record<TallerSectionMobile, string> = {
+    agendamientos: 'Agendamientos',
     ordenes_taller: 'Órdenes en Taller',
     alistamiento_taller: 'Alistamiento PDI',
     solicitudes_garantia: 'Solicitudes Garantía',
@@ -288,6 +302,17 @@ export const TallerViewMobile: React.FC<Props> = ({
       )}
 
       <main className="max-w-md mx-auto px-4 py-4">
+        {activeSection === 'agendamientos' && (
+          <AgendamientosTallerMobile
+            agendamientos={agendamientos}
+            onDeleteAgendamiento={onDeleteAgendamiento}
+            currentWorkshop={currentWs}
+            workshops={workshops}
+            isMatriz={isMatriz}
+            selectedWorkshopFilter={selectedWorkshopFilter}
+            onSelectWorkshopFilter={onSelectWorkshopFilter}
+          />
+        )}
         {activeSection === 'ordenes_taller' && (
           <OrdenesTallerMobile orders={orders} onUpdateOrderStatus={onUpdateOrderStatus} />
         )}

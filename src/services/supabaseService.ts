@@ -13,6 +13,7 @@ import {
   DictamenRecord,
   AdminPendiente,
   OrderRating,
+  AgendamientoTicket,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { uploadWarrantyMedia, saveMediaToIndexedDB } from './mediaStorage';
@@ -47,6 +48,26 @@ if (syncBus) {
           window.dispatchEvent(new Event('starmotos_warranties_updated'));
         } catch (_) {}
       }
+    } else if (event.data?.type === 'AGENDAMIENTO_SAVED' && event.data.payload) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+        let current: AgendamientoTicket[] = raw ? JSON.parse(raw) : [];
+        if (!current.some((a) => a.id === event.data.payload.id)) {
+          current = [event.data.payload, ...current];
+          localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+        }
+      } catch (_) {}
+    } else if (event.data?.type === 'AGENDAMIENTO_DELETED' && event.data.id) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+        if (raw) {
+          let current: AgendamientoTicket[] = JSON.parse(raw);
+          const filtered = current.filter((a) => a.id !== event.data.id);
+          localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(filtered));
+          window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+        }
+      } catch (_) {}
     }
   };
 }
@@ -694,6 +715,13 @@ export async function syncAllFromSupabase(): Promise<{
       console.warn('Error sincronizando calificaciones:', e);
     }
 
+    // 10. Agendamientos Técnicos de Clientes
+    try {
+      await syncAgendamientosFromSupabase();
+    } catch (e) {
+      console.warn('Error sincronizando agendamientos:', e);
+    }
+
     return {
       warrantiesCount,
       alistamientosCount,
@@ -1218,6 +1246,124 @@ export async function cloudSaveRating(r: OrderRating) {
   }
 }
 
+export async function cloudSaveAgendamiento(item: AgendamientoTicket) {
+  try {
+    const payload = {
+      id: item.id,
+      ticket_number: item.ticketNumber,
+      client_name: item.clientName,
+      client_cedula: item.clientCedula,
+      client_phone: item.clientPhone,
+      client_email: item.clientEmail || null,
+      moto_plate: item.motoPlate,
+      moto_model: item.motoModel,
+      workshop_id: item.workshopId,
+      workshop_name: item.workshopName,
+      scheduled_date: item.scheduledDate,
+      scheduled_time: item.scheduledTime,
+      service_id: item.serviceId,
+      service_title: item.serviceTitle,
+      status: item.status,
+      data: item,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('agendamientos').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando agendamiento:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando agendamiento:', err);
+  }
+}
+
+export async function cloudDeleteAgendamiento(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('agendamientos').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando agendamiento:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando agendamiento:', err);
+  }
+}
+
+export async function syncAgendamientosFromSupabase(): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('agendamientos')
+      .select('*')
+      .order('scheduled_date', { ascending: true });
+
+    if (error || !data) return 0;
+
+    const cloudItems: AgendamientoTicket[] = data
+      .map((row: any) => {
+        if (row.data && row.data.id) return row.data as AgendamientoTicket;
+        return {
+          id: row.id,
+          ticketNumber: row.ticket_number || `TKT-${row.id.slice(-6)}`,
+          clientName: row.client_name || 'Cliente StarMotos',
+          clientCedula: row.client_cedula || '',
+          clientPhone: row.client_phone || '',
+          clientEmail: row.client_email || '',
+          motoPlate: row.moto_plate || 'S/P',
+          motoModel: row.moto_model || 'Motocicleta',
+          workshopId: row.workshop_id || 'matriz-la-mana',
+          workshopName: row.workshop_name || 'StarMotos Matriz La Maná',
+          scheduledDate: row.scheduled_date || new Date().toISOString().split('T')[0],
+          scheduledTime: row.scheduled_time || '09:30 AM',
+          serviceId: row.service_id || 'alistamiento_pdi',
+          serviceTitle: row.service_title || 'Alistamiento PDI',
+          status: row.status || 'confirmado',
+          createdAt: row.created_at || new Date().toISOString(),
+        } as AgendamientoTicket;
+      })
+      .filter(Boolean);
+
+    // Regla de expiración: Si pasaron 24 horas luego de la fecha y hora agendada, se borra automáticamente
+    const now = Date.now();
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+    const validItems: AgendamientoTicket[] = [];
+
+    for (const item of cloudItems) {
+      let isExpired = false;
+      if (item.scheduledDate) {
+        try {
+          const [y, m, d] = item.scheduledDate.split('-').map(Number);
+          let hours = 18;
+          let minutes = 0;
+          if (item.scheduledTime) {
+            const match = item.scheduledTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+            if (match) {
+              let h = parseInt(match[1], 10);
+              const min = parseInt(match[2], 10);
+              const ampm = (match[3] || '').toUpperCase();
+              if (ampm === 'PM' && h < 12) h += 12;
+              if (ampm === 'AM' && h === 12) h = 0;
+              hours = h;
+              minutes = min;
+            }
+          }
+          const scheduledTimestamp = new Date(y, m - 1, d, hours, minutes, 0).getTime();
+          if (now - scheduledTimestamp >= TWENTY_FOUR_HOURS_MS) {
+            isExpired = true;
+          }
+        } catch (_) {}
+      }
+
+      if (isExpired) {
+        cloudDeleteAgendamiento(item.id);
+      } else {
+        validItems.push(item);
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(validItems));
+    window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+    return validItems.length;
+  } catch (e) {
+    console.warn('Error sincronizando agendamientos de Supabase:', e);
+    return 0;
+  }
+}
+
 export async function cloudPurgeQuevedoWarranties() {
   // No-op intencional: las garantías anteriores ya fueron depuradas. No purgar nuevas solicitudes de Quevedo.
 }
@@ -1699,6 +1845,60 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_ratings_updated'));
         } catch (e) {
           console.error('Error procesando realtime ratings:', e);
+        }
+      }
+    )
+    // Agendamientos Técnicos de Clientes
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'agendamientos' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+          let current: AgendamientoTicket[] = raw ? JSON.parse(raw) : [];
+
+          const extractAgendamientoDoc = (row: any): AgendamientoTicket | null => {
+            if (!row) return null;
+            if (row.data && row.data.id) return row.data as AgendamientoTicket;
+            return {
+              id: row.id,
+              ticketNumber: row.ticket_number || `TKT-${row.id.slice(-6)}`,
+              clientName: row.client_name || 'Cliente StarMotos',
+              clientCedula: row.client_cedula || '',
+              clientPhone: row.client_phone || '',
+              clientEmail: row.client_email || '',
+              motoPlate: row.moto_plate || 'S/P',
+              motoModel: row.moto_model || 'Motocicleta',
+              workshopId: row.workshop_id || 'matriz-la-mana',
+              workshopName: row.workshop_name || 'StarMotos Matriz La Maná',
+              scheduledDate: row.scheduled_date || new Date().toISOString().split('T')[0],
+              scheduledTime: row.scheduled_time || '09:30 AM',
+              serviceId: row.service_id || 'alistamiento_pdi',
+              serviceTitle: row.service_title || 'Alistamiento PDI',
+              status: row.status || 'confirmado',
+              createdAt: row.created_at || new Date().toISOString(),
+            } as AgendamientoTicket;
+          };
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = extractAgendamientoDoc(payload.new);
+            if (newDoc && !current.some((a) => a.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = extractAgendamientoDoc(payload.new);
+            if (updatedDoc) {
+              current = current.map((a) => (a.id === updatedDoc.id ? updatedDoc : a));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            current = current.filter((a) => a.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime agendamientos:', e);
         }
       }
     )

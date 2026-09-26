@@ -1,29 +1,32 @@
 // src/components/desktop/ScheduleAppointmentDesktop.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import confetti from 'canvas-confetti';
 import {
   CalendarPlus,
   Calendar,
   Clock,
-  MapPin,
-  Wrench,
-  CheckCircle2,
+  Building2,
   Bike,
-  Sparkles,
-  Phone,
-  AlertCircle,
-  FileCheck,
-  ChevronRight,
-  Send,
-  CalendarCheck,
+  CheckCircle2,
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Wrench,
+  Sparkles,
+  ShieldCheck,
+  FileText,
+  User,
+  ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
-import { WhatsAppIcon } from '../WhatsAppIcon';
 import {
   ScheduledMaintenance,
   MotorcycleClientData,
   ClientProfile,
   Branch,
+  AgendamientoTicket,
 } from '../../types/customer';
+import { addStoredAgendamiento, getStoredAgendamientos } from '../../data/mockMultiRoleData';
 
 interface Props {
   motorcycle: MotorcycleClientData;
@@ -34,77 +37,70 @@ interface Props {
   onBack?: () => void;
 }
 
-interface ServiceOption {
+interface AlistamientoServiceOption {
   id: string;
   title: string;
-  duration: string;
-  estimatedPrice: number;
+  category: string;
+  badge: string;
   description: string;
-  tasks: string[];
-  popular?: boolean;
+  estimatedTime: string;
+  features: string[];
 }
 
-const AVAILABLE_SERVICES: ServiceOption[] = [
+const ALISTAMIENTO_SERVICES: AlistamientoServiceOption[] = [
   {
-    id: 'preventivo',
+    id: 'alistamiento_pdi',
+    title: 'Alistamiento PDI (Inspección y Puesta a Punto)',
+    category: 'Alistamiento',
+    badge: 'Paso 1 Obligatorio',
+    description: 'Inspección técnica integral pre-entrega con chequeo estricto de 30 puntos de seguridad según manual de fabricante.',
+    estimatedTime: '1 - 2 horas',
+    features: [
+      'Ajuste y torque de pernos de chasis y motor',
+      'Verificación y calibración de sistema eléctrico',
+      'Revisión de niveles de lubricantes y fluidos',
+      'Prueba funcional y encendido en frío',
+    ],
+  },
+  {
+    id: 'engrasado',
+    title: 'Engrasado General & Kit de Arrastre',
+    category: 'Alistamiento / Intermedio',
+    badge: 'Paso 2 Mantenimiento',
+    description: 'Servicio de lubricación y engrase de ejes basculantes, rodamientos de dirección y calibración de transmisión.',
+    estimatedTime: '2 horas',
+    features: [
+      'Desarme y lubricación de rodamientos de dirección',
+      'Engrase de eje de basculante y bujes',
+      'Limpieza ultrasónica y tensión de cadena',
+      'Lubricación con grasa sintética de alta temperatura',
+    ],
+  },
+  {
+    id: 'mantenimiento',
     title: 'Mantenimiento Preventivo Periódico',
-    duration: '2 - 3 horas',
-    estimatedPrice: 65.0,
-    popular: true,
-    description: 'Servicio según manual de fabricante con cambio de fluidos y chequeo 30 puntos.',
-    tasks: ['Aceite Sintético Motul 7100', 'Filtro Aceite OEM Benelli', 'Tensión de Cadena', 'Chequeo de Frenos'],
-  },
-  {
-    id: 'aceite_express',
-    title: 'Cambio de Aceite y Filtro Express',
-    duration: '45 minutos',
-    estimatedPrice: 38.0,
-    description: 'Servicio rápido de lubricación con insumos de alta gama sin desmontajes complejos.',
-    tasks: ['Aceite Motul 7100 o 5100', 'Filtro de Aceite OEM', 'Revisión nivel de refrigerante'],
-  },
-  {
-    id: 'frenos',
-    title: 'Mantenimiento de Frenos y Cambio de Pastillas',
-    duration: '1.5 horas',
-    estimatedPrice: 48.0,
-    description: 'Inspección de discos, mordazas, líquido de frenos DOT 5.1 y pastillas sinterizadas.',
-    tasks: ['Limpieza de cálipers', 'Purga y cambio de líquido DOT 5.1', 'Ajuste de manetas'],
-  },
-  {
-    id: 'transmision',
-    title: 'Kit de Arrastre y Transmisión',
-    duration: '1.5 horas',
-    estimatedPrice: 52.0,
-    description: 'Cambio de catalina, piñón, cadena O-ring o limpieza ultrasónica con lubricación.',
-    tasks: ['Alineación con láser', 'Tensión de cadena', 'Engrase de eje de basculante'],
-  },
-  {
-    id: 'efi_valvulas',
-    title: 'Sincronización EFI y Calibración de Válvulas',
-    duration: '3 - 4 horas',
-    estimatedPrice: 75.0,
-    description: 'Calibración con galgas, limpieza por ultrasonido de inyectores y escáner OBD.',
-    tasks: ['Calibración en frío', 'Sincronización de cuerpos de aceleración', 'Diagnóstico OBD'],
-  },
-  {
-    id: 'pre_viaje',
-    title: 'Revisión General Pre-Viaje / RTV',
-    duration: '2 horas',
-    estimatedPrice: 40.0,
-    description: 'Inspección completa de seguridad para viajes largos o pase de inspección técnica RTV.',
-    tasks: ['Luces y sistema eléctrico', 'Presión y desgaste de neumáticos', 'Suspensión y rodamientos'],
+    category: 'Mantenimiento Mayor',
+    badge: 'Paso 3 Periódico',
+    description: 'Mantenimiento técnico por kilometraje con cambio de lubricante, filtros, bujía y diagnóstico general computarizado.',
+    estimatedTime: '2 - 3 horas',
+    features: [
+      'Cambio de aceite de motor y filtro de aceite',
+      'Limpieza o sustitución de filtro de aire y bujía',
+      'Calibración y purga de frenos delantero y trasero',
+      'Chequeo de compresión y sincronización',
+    ],
   },
 ];
 
-const TIME_SLOTS = [
-  '08:30 AM',
-  '09:30 AM',
-  '10:30 AM',
-  '11:30 AM',
-  '14:00 PM',
-  '15:00 PM',
-  '16:00 PM',
-  '17:00 PM',
+const DAILY_TIME_SLOTS = [
+  { time: '08:30 AM', shift: 'mañana' },
+  { time: '09:30 AM', shift: 'mañana' },
+  { time: '10:30 AM', shift: 'mañana' },
+  { time: '11:30 AM', shift: 'mañana' },
+  { time: '14:00 PM', shift: 'tarde' },
+  { time: '15:00 PM', shift: 'tarde' },
+  { time: '16:00 PM', shift: 'tarde' },
+  { time: '17:00 PM', shift: 'tarde' },
 ];
 
 export const ScheduleAppointmentDesktop: React.FC<Props> = ({
@@ -115,517 +111,612 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
   onScheduleNewMaintenance,
   onBack,
 }) => {
-  const [selectedService, setSelectedService] = useState<ServiceOption>(AVAILABLE_SERVICES[0]);
+  // Sede seleccionada
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-la-mana');
-  const [appointmentDate, setAppointmentDate] = useState<string>(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  });
-  const [appointmentTime, setAppointmentTime] = useState<string>('09:30 AM');
-  const [notes, setNotes] = useState<string>('');
-  const [partsPreference, setPartsPreference] = useState<'oem' | 'alternativo'>('oem');
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [successBookingId, setSuccessBookingId] = useState<string>('');
 
-  const currentBranch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+  // Navegación de semanas (baseDate inicia hoy)
+  const [currentWeekOffset, setCurrentWeekOffset] = useState<number>(0);
 
-  const handleConfirmAppointment = (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
+  // Fecha seleccionada (YYYY-MM-DD)
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const today = new Date();
+    // Si hoy es domingo, pasar al lunes
+    if (today.getDay() === 0) {
+      today.setDate(today.getDate() + 1);
     }
+    return today.toISOString().split('T')[0];
+  });
 
-    const bookingId = `CITA-${Date.now().toString().slice(-6)}`;
-    const newAppointment: ScheduledMaintenance = {
-      id: bookingId,
+  // Turno seleccionado
+  const [selectedTime, setSelectedTime] = useState<string>('');
+
+  // Servicio de alistamiento seleccionado
+  const [selectedService, setSelectedService] = useState<AlistamientoServiceOption | null>(null);
+
+  // Observaciones
+  const [notes, setNotes] = useState<string>('');
+
+  // Modal de confirmación exitosa con ticket generado
+  const [confirmedTicket, setConfirmedTicket] = useState<AgendamientoTicket | null>(null);
+
+  const currentBranch = useMemo(() => {
+    return branches.find((b) => b.id === selectedBranchId) || branches[0];
+  }, [branches, selectedBranchId]);
+
+  // Generar los 7 días de la semana según el offset
+  const weekDays = useMemo(() => {
+    const base = new Date();
+    base.setDate(base.getDate() + currentWeekOffset * 7);
+
+    // Calcular el Lunes de esa semana
+    const day = base.getDay();
+    const diff = base.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(base.setDate(diff));
+
+    const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const result = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const isPast = dateStr < todayStr;
+      const isSunday = i === 6;
+      const isToday = dateStr === todayStr;
+
+      result.push({
+        dateStr,
+        dayName: dayNames[i],
+        dayNumber: d.getDate(),
+        monthName: d.toLocaleString('es-EC', { month: 'short' }),
+        isPast,
+        isSunday,
+        isToday,
+      });
+    }
+    return result;
+  }, [currentWeekOffset]);
+
+  // Consultar turnos ya reservados para la sede y fecha seleccionada
+  const bookedSlots = useMemo(() => {
+    if (!selectedDate) return new Set<string>();
+    const all = getStoredAgendamientos();
+    const booked = new Set<string>();
+    for (const item of all) {
+      if (item.scheduledDate === selectedDate && item.workshopId === currentBranch.id) {
+        if (item.scheduledTime) booked.add(item.scheduledTime.trim().toUpperCase());
+      }
+    }
+    return booked;
+  }, [selectedDate, currentBranch.id]);
+
+  const handleSelectDay = (dateStr: string, isPast: boolean) => {
+    if (isPast) return;
+    setSelectedDate(dateStr);
+    setSelectedTime(''); // Reiniciar turno al cambiar día
+  };
+
+  const handleSelectTurno = (time: string) => {
+    setSelectedTime(time);
+    if (!selectedService) {
+      // Pre-seleccionar el primer servicio de alistamiento
+      setSelectedService(ALISTAMIENTO_SERVICES[0]);
+    }
+  };
+
+  const handleConfirmAppointment = () => {
+    if (!selectedDate || !selectedTime || !selectedService) return;
+
+    const ticketNumber = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+    const ticketId = `AGN-${Date.now().toString().slice(-6)}`;
+
+    const newTicket: AgendamientoTicket = {
+      id: ticketId,
+      ticketNumber,
+      clientId: profile.idNumber,
+      clientName: profile.fullName,
+      clientCedula: profile.idNumber,
+      clientPhone: profile.phone,
+      clientEmail: profile.email,
+      motoPlate: motorcycle.plate || 'S/P',
+      motoModel: motorcycle.model,
+      motoBrand: motorcycle.brand,
+      motoChasis: motorcycle.vin || '',
+      motoYear: motorcycle.year || 2025,
+      workshopId: currentBranch.id,
+      workshopName: currentBranch.name,
+      scheduledDate: selectedDate,
+      scheduledTime: selectedTime,
+      serviceId: selectedService.id,
+      serviceTitle: selectedService.title,
+      serviceCategory: selectedService.category,
+      estimatedCost: selectedService.id === 'alistamiento_pdi' ? 0 : 35,
+      notes: notes.trim(),
+      status: 'confirmado',
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Guardar y sincronizar agendamiento en la red de talleres (Supabase + LocalStorage + Realtime)
+    addStoredAgendamiento(newTicket);
+
+    // 2. Sincronizar en el portal del cliente
+    const newScheduledMaintenance: ScheduledMaintenance = {
+      id: ticketId,
       serviceTitle: selectedService.title,
       recommendedKm: motorcycle.currentKm,
-      recommendedDate: appointmentDate,
-      scheduledDate: appointmentDate,
-      scheduledTime: appointmentTime,
+      recommendedDate: selectedDate,
+      scheduledDate: selectedDate,
+      scheduledTime: selectedTime,
       branchName: currentBranch.name,
       branchId: currentBranch.id,
       status: 'confirmada',
-      estimatedCost: selectedService.estimatedPrice,
-      tasks: selectedService.tasks,
-      notes: notes
-        ? `${notes} (Preferencia de repuestos: ${partsPreference === 'oem' ? 'Originales OEM' : 'Alternativos'})`
-        : `Preferencia de repuestos: ${partsPreference === 'oem' ? 'Originales OEM' : 'Alternativos'}`,
+      estimatedCost: selectedService.id === 'alistamiento_pdi' ? 0 : 35,
+      tasks: selectedService.features,
+      notes: notes ? `${notes} (Ticket: ${ticketNumber})` : `Ticket: ${ticketNumber}`,
     };
 
-    onScheduleNewMaintenance(newAppointment);
-    setSuccessBookingId(bookingId);
-    setIsSuccess(true);
-    setNotes('');
+    onScheduleNewMaintenance(newScheduledMaintenance);
 
-    // Una vez terminado, regresar automáticamente al módulo anterior
-    setTimeout(() => {
-      setIsSuccess(false);
-      if (onBack) {
-        onBack();
-      } else {
-        window.history.back();
-      }
-    }, 1300);
+    confetti({
+      particleCount: 70,
+      spread: 60,
+      origin: { y: 0.6 },
+      colors: ['#1d4ed8', '#10b981', '#ffffff'],
+    });
+
+    setConfirmedTicket(newTicket);
   };
 
-  const subtotal = selectedService.estimatedPrice;
-  const iva = Number((subtotal * 0.15).toFixed(2));
-  const total = Number((subtotal + iva).toFixed(2));
-
   return (
-    <div className="w-full space-y-5 animate-fade-in pb-16">
-      {/* 1. Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
-        <div>
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="py-1.5 px-3 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-zinc-700 hover:text-zinc-900 transition flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-xs"
-                title="Regresar"
-              >
-                <ArrowLeft className="w-4 h-4 text-zinc-600" />
-                <span>Volver</span>
-              </button>
-            )}
+    <div className="w-full space-y-6 animate-fade-in pb-16 font-sans">
+      {/* 1. Encabezado Limpio y Resumen del Vehículo */}
+      <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-2 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-zinc-700 transition cursor-pointer"
+              title="Regresar"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
 
-            <div className="p-2 rounded-md bg-blue-50 border border-blue-200 text-blue-600">
-              <CalendarPlus className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
-                Agendar Cita en Taller StarMotos
-              </h2>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Reserva tu turno de servicio técnico garantizado para tu {motorcycle.brand} {motorcycle.model} ({motorcycle.plate})
-              </p>
-            </div>
+          <div className="w-11 h-11 rounded-2xl bg-blue-600/10 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+            <CalendarPlus className="w-6 h-6 text-blue-600" />
+          </div>
+
+          <div>
+            <h2 className="text-xl font-black text-zinc-900 tracking-tight">
+              Agendar Cita en Taller
+            </h2>
+            <p className="text-xs text-zinc-500">
+              Elija el día de la semana, su turno y el servicio de alistamiento requerido.
+            </p>
           </div>
         </div>
 
-        {/* Mensaje de Confirmación Rápida */}
-        {isSuccess && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-300 rounded-md text-emerald-800 text-xs font-bold animate-fade-in shadow-xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>¡Cita {successBookingId} agendada con éxito! Redirigiendo...</span>
+        {/* Datos de la moto y selector de sede */}
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 border border-zinc-200 font-bold text-zinc-800">
+            <Bike className="w-3.5 h-3.5 text-blue-600" />
+            <span>{motorcycle.brand} {motorcycle.model}</span>
+            <span className="px-1.5 py-0.5 rounded bg-zinc-200 font-mono text-[10px] text-zinc-700">
+              {motorcycle.plate || 'S/P'}
+            </span>
           </div>
-        )}
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 font-bold">
+            <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="bg-transparent font-bold text-xs text-blue-900 outline-none cursor-pointer"
+            >
+              {branches.map((b) => (
+                <option key={b.id} value={b.id} className="text-zinc-900">
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Grid Principal: Formulario a la Izquierda y Resumen Fijo a la Derecha */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full">
-        {/* COLUMNA IZQUIERDA: FORMULARIO INTERACTIVO (8 cols) */}
-        <div className="xl:col-span-8 space-y-5">
-          <form onSubmit={handleConfirmAppointment} className="space-y-5">
-            {/* Paso 1: Selección de Servicio con Fondo Azul al Marcar */}
-            <div className="bg-white border border-zinc-200 rounded-lg p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
-                    1
-                  </span>
-                  <h3 className="text-sm font-bold text-zinc-900">Selecciona el Servicio Requerido</h3>
-                </div>
-                <span className="text-[11px] text-zinc-400">Precios referenciales con mano de obra</span>
-              </div>
+      {/* 2. Cuadro de Horario de la Semana */}
+      <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wider">
+              1. Seleccione el Día de la Semana
+            </h3>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {AVAILABLE_SERVICES.map((srv) => {
-                  const isSelected = selectedService.id === srv.id;
+          {/* Navegación semanal */}
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <button
+              type="button"
+              disabled={currentWeekOffset <= 0}
+              onClick={() => setCurrentWeekOffset((prev) => Math.max(0, prev - 1))}
+              className={`p-1.5 rounded-xl border flex items-center gap-1 transition ${
+                currentWeekOffset <= 0
+                  ? 'border-zinc-200 text-zinc-300 cursor-not-allowed'
+                  : 'border-zinc-200 hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+              }`}
+              title="Semana anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px]">Semana Anterior</span>
+            </button>
+
+            <span className="px-2.5 py-1 rounded-xl bg-zinc-100 text-zinc-700 text-[11px] font-bold">
+              {currentWeekOffset === 0 ? 'Esta Semana' : `+${currentWeekOffset} Semanas`}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setCurrentWeekOffset((prev) => prev + 1)}
+              className="p-1.5 rounded-xl border border-zinc-200 hover:bg-zinc-100 text-zinc-700 flex items-center gap-1 transition cursor-pointer"
+              title="Semana siguiente"
+            >
+              <span className="hidden sm:inline text-[11px]">Semana Siguiente</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Grilla Semanal */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+          {weekDays.map((day) => {
+            const isSelected = selectedDate === day.dateStr;
+            const isBlocked = day.isPast || day.isSunday;
+
+            return (
+              <button
+                key={day.dateStr}
+                type="button"
+                disabled={isBlocked}
+                onClick={() => handleSelectDay(day.dateStr, day.isPast)}
+                className={`p-3.5 rounded-2xl text-center border transition-all flex flex-col items-center justify-between gap-1.5 select-none relative ${
+                  isSelected
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500/30'
+                    : isBlocked
+                    ? 'bg-zinc-100/60 border-zinc-200 text-zinc-400 cursor-not-allowed opacity-60'
+                    : 'bg-zinc-50 hover:bg-white border-zinc-200 text-zinc-800 hover:border-blue-400 hover:shadow-xs cursor-pointer'
+                }`}
+              >
+                {day.isToday && (
+                  <span
+                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
+                      isSelected ? 'bg-white text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    Hoy
+                  </span>
+                )}
+
+                <span
+                  className={`text-[11px] font-black uppercase tracking-wider ${
+                    isSelected ? 'text-blue-100' : 'text-zinc-500'
+                  }`}
+                >
+                  {day.dayName}
+                </span>
+
+                <span className="text-xl font-black">{day.dayNumber}</span>
+
+                <span
+                  className={`text-[10px] font-bold capitalize ${
+                    isSelected ? 'text-blue-200' : 'text-zinc-400'
+                  }`}
+                >
+                  {day.monthName}
+                </span>
+
+                <span
+                  className={`text-[9px] font-semibold mt-1 px-1.5 py-0.5 rounded ${
+                    isSelected
+                      ? 'bg-blue-700 text-white'
+                      : day.isSunday
+                      ? 'text-zinc-400'
+                      : day.isPast
+                      ? 'text-zinc-400'
+                      : 'text-emerald-700 bg-emerald-50'
+                  }`}
+                >
+                  {day.isSunday ? 'Cerrado' : day.isPast ? 'Pasado' : 'Disponible'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Turnos Diarios (Aparecen al seleccionar el día) */}
+      {selectedDate && (
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-xs space-y-4 animate-slide-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wider">
+                2. Seleccione su Turno Diario ({selectedDate})
+              </h3>
+            </div>
+            {selectedTime && (
+              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                Turno: {selectedTime}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {/* Turnos de Mañana */}
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1.5">
+                ☀️ Turnos de la Mañana
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {DAILY_TIME_SLOTS.filter((s) => s.shift === 'mañana').map((slot) => {
+                  const isSelected = selectedTime === slot.time;
+                  const isBooked = bookedSlots.has(slot.time.toUpperCase());
+
                   return (
-                    <div
-                      key={srv.id}
-                      onClick={() => setSelectedService(srv)}
-                      className={`relative p-3.5 rounded-md border transition-all cursor-pointer flex flex-col justify-between ${
+                    <button
+                      key={slot.time}
+                      type="button"
+                      disabled={isBooked}
+                      onClick={() => handleSelectTurno(slot.time)}
+                      className={`py-3 px-4 rounded-xl text-xs font-black border text-center transition-all select-none flex items-center justify-between ${
                         isSelected
-                          ? 'border-blue-700 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/30'
-                          : 'border-zinc-200 hover:border-zinc-300 bg-white text-zinc-900'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : isBooked
+                          ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed line-through'
+                          : 'bg-zinc-50 hover:bg-white text-zinc-800 border-zinc-200 hover:border-blue-400 cursor-pointer shadow-2xs'
                       }`}
                     >
-                      {srv.popular && (
-                        <span
-                          className={`absolute -top-2 right-2.5 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-xs ${
-                            isSelected ? 'bg-white text-blue-700 font-black' : 'bg-red-600 text-white'
-                          }`}
-                        >
-                          Recomendado
-                        </span>
-                      )}
-
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-zinc-900'}`}>
-                            {srv.title}
-                          </h4>
-                          <span
-                            className={`text-xs font-extrabold font-mono shrink-0 ${
-                              isSelected ? 'text-white' : 'text-blue-700'
-                            }`}
-                          >
-                            ${srv.estimatedPrice.toFixed(2)}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-[11px] mt-1 leading-relaxed ${
-                            isSelected ? 'text-blue-100' : 'text-zinc-500'
-                          }`}
-                        >
-                          {srv.description}
-                        </p>
-                      </div>
-
-                      <div
-                        className={`mt-3 pt-2 border-t flex items-center justify-between text-[10px] ${
-                          isSelected ? 'border-blue-500/60 text-blue-100' : 'border-zinc-100 text-zinc-400'
+                      <span>{slot.time}</span>
+                      <span
+                        className={`text-[9px] font-bold ${
+                          isSelected
+                            ? 'text-blue-200'
+                            : isBooked
+                            ? 'text-zinc-400'
+                            : 'text-emerald-600'
                         }`}
                       >
-                        <span className="flex items-center gap-1">
-                          <Clock className={`w-3 h-3 ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`} />
-                          {srv.duration}
-                        </span>
-                        <span className={`font-bold ${isSelected ? 'text-white' : 'text-zinc-400'}`}>
-                          {isSelected ? '✓ Seleccionado' : 'Seleccionar'}
-                        </span>
-                      </div>
-                    </div>
+                        {isBooked ? 'Ocupado' : 'Libre'}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Paso 2: Selección de Sucursal */}
-            <div className="bg-white border border-zinc-200 rounded-lg p-5 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
-                <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
-                  2
-                </span>
-                <h3 className="text-sm font-bold text-zinc-900">Selecciona la Sucursal de Atención</h3>
-              </div>
+            {/* Turnos de Tarde */}
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block mb-1.5">
+                ⛅ Turnos de la Tarde
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {DAILY_TIME_SLOTS.filter((s) => s.shift === 'tarde').map((slot) => {
+                  const isSelected = selectedTime === slot.time;
+                  const isBooked = bookedSlots.has(slot.time.toUpperCase());
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {branches.map((b) => {
-                  const isSelected = selectedBranchId === b.id;
                   return (
-                    <div
-                      key={b.id}
-                      onClick={() => setSelectedBranchId(b.id)}
-                      className={`p-3.5 rounded-md border transition-all cursor-pointer ${
+                    <button
+                      key={slot.time}
+                      type="button"
+                      disabled={isBooked}
+                      onClick={() => handleSelectTurno(slot.time)}
+                      className={`py-3 px-4 rounded-xl text-xs font-black border text-center transition-all select-none flex items-center justify-between ${
                         isSelected
-                          ? 'border-blue-600 bg-blue-50/50 shadow-xs ring-1 ring-blue-600/30'
-                          : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : isBooked
+                          ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed line-through'
+                          : 'bg-zinc-50 hover:bg-white text-zinc-800 border-zinc-200 hover:border-blue-400 cursor-pointer shadow-2xs'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <MapPin className={`w-4 h-4 ${isSelected ? 'text-blue-600' : 'text-zinc-400'}`} />
-                        <h4 className="text-xs font-bold text-zinc-900">{b.name}</h4>
-                      </div>
-                      <p className="text-[11px] text-zinc-500 mt-1">{b.address}</p>
-                      <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{b.schedule}</p>
-                    </div>
+                      <span>{slot.time}</span>
+                      <span
+                        className={`text-[9px] font-bold ${
+                          isSelected
+                            ? 'text-blue-200'
+                            : isBooked
+                            ? 'text-zinc-400'
+                            : 'text-emerald-600'
+                        }`}
+                      >
+                        {isBooked ? 'Ocupado' : 'Libre'}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
             </div>
-
-            {/* Paso 3: Fecha y Horario */}
-            <div className="bg-white border border-zinc-200 rounded-lg p-5 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
-                <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
-                  3
-                </span>
-                <h3 className="text-sm font-bold text-zinc-900">Fecha y Turno de Recepción</h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                    Fecha de Ingreso de la Motocicleta
-                  </label>
-                  <div className="relative">
-                    <Calendar className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
-                    <input
-                      type="date"
-                      value={appointmentDate}
-                      onChange={(e) => setAppointmentDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                      required
-                      className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-md pl-9 pr-3 py-2 text-xs font-medium transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                    Turno / Hora de Recepción
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {TIME_SLOTS.map((slot) => {
-                      const isSelected = appointmentTime === slot;
-                      return (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => setAppointmentTime(slot)}
-                          className={`py-2 px-1 text-center rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                            isSelected
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700'
-                          }`}
-                        >
-                          {slot.replace(':00', '').replace(':30', ':30')}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Paso 4: Preferencias y Síntomas */}
-            <div className="bg-white border border-zinc-200 rounded-lg p-5 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 border-b border-zinc-100 pb-3">
-                <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
-                  4
-                </span>
-                <h3 className="text-sm font-bold text-zinc-900">Detalles para los Mecánicos</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                    Preferencia de Repuestos
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPartsPreference('oem')}
-                      className={`p-3 rounded-md border text-left cursor-pointer transition ${
-                        partsPreference === 'oem'
-                          ? 'border-blue-600 bg-blue-50/50 text-blue-950 font-bold ring-1 ring-blue-600/30'
-                          : 'border-zinc-200 bg-white text-zinc-700'
-                      }`}
-                    >
-                      <span className="block text-xs font-bold">100% Repuestos Originales OEM</span>
-                      <span className="text-[10px] text-zinc-500 font-normal">Garantía oficial directa de fábrica</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPartsPreference('alternativo')}
-                      className={`p-3 rounded-md border text-left cursor-pointer transition ${
-                        partsPreference === 'alternativo'
-                          ? 'border-blue-600 bg-blue-50/50 text-blue-950 font-bold ring-1 ring-blue-600/30'
-                          : 'border-zinc-200 bg-white text-zinc-700'
-                      }`}
-                    >
-                      <span className="block text-xs font-bold">Alternativos Premium Homologados</span>
-                      <span className="text-[10px] text-zinc-500 font-normal">Excelente calidad y precio conveniente</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
-                    Síntomas, ruidos o detalles que notas en tu moto (Opcional)
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Ej. Siento un pequeño chirrido en el freno trasero al frenar en frío..."
-                    className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-md p-3 text-xs placeholder:text-zinc-400 transition"
-                  />
-                </div>
-              </div>
-            </div>
-          </form>
-
-        </div>
-
-        {/* COLUMNA DERECHA: RESUMEN DE TURNO FIJO (STICKY TOP-0) Y CITAS AGENDADAS */}
-        <div className="xl:col-span-4">
-          <div className="sticky top-0 z-20 space-y-3.5">
-            {/* Bloque de Resumen de Turno (Solo contenedor externo apastelado) */}
-            <div className="bg-[#eaf2fb] border border-[#bcd7ef] rounded-lg p-5 shadow-sm space-y-3.5 text-zinc-900">
-              {/* Encabezado sin 'En vivo' */}
-              <div className="flex items-center gap-2 border-b border-[#bcd7ef]/80 pb-2.5">
-                <CalendarCheck className="w-4 h-4 text-blue-700" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-950">
-                  Resumen de tu Turno
-                </h3>
-              </div>
-
-              {/* Vehículo - Directo en el contenedor sin cajas internas */}
-              <div className="space-y-0.5 text-xs">
-                <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                  Vehículo Registrado
-                </span>
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-zinc-900 text-xs">
-                    {motorcycle.brand} {motorcycle.model}
-                  </p>
-                  <span className="font-mono text-[10px] font-bold text-blue-800 bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200/70">
-                    {motorcycle.plate}
-                  </span>
-                </div>
-                <p className="text-[10px] text-zinc-500 font-mono">
-                  {motorcycle.currentKm.toLocaleString()} km
-                </p>
-              </div>
-
-              {/* Servicio Seleccionado - Directo sin cajas internas */}
-              <div className="pt-2 border-t border-[#bcd7ef]/70 space-y-0.5 text-xs">
-                <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                  Servicio Seleccionado
-                </span>
-                <p className="font-bold text-xs text-zinc-900">{selectedService.title}</p>
-                <div className="flex items-center justify-between text-[11px] text-zinc-600">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-zinc-400" />
-                    {selectedService.duration}
-                  </span>
-                  <span className="font-mono font-bold text-blue-800">
-                    ${selectedService.estimatedPrice.toFixed(2)} USD
-                  </span>
-                </div>
-              </div>
-
-              {/* Sucursal y Repuestos - Directo sin cajas internas */}
-              <div className="pt-2 border-t border-[#bcd7ef]/70 space-y-1 text-xs">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                      Sucursal
-                    </span>
-                    <p className="font-semibold text-zinc-900 text-[11px] truncate">
-                      {currentBranch.name}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                      Repuestos
-                    </span>
-                    <p className="font-semibold text-blue-900 text-[11px]">
-                      {partsPreference === 'oem' ? 'Originales OEM' : 'Alternativos'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fecha y Hora - Directo sin cajas internas */}
-              <div className="pt-2 border-t border-[#bcd7ef]/70 flex justify-between text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                    Fecha de Ingreso:
-                  </span>
-                  <p className="font-semibold text-zinc-900 flex items-center gap-1 mt-0.5">
-                    <Calendar className="w-3 h-3 text-blue-700" />
-                    {appointmentDate}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider block">
-                    Hora / Turno:
-                  </span>
-                  <p className="font-bold font-mono text-blue-800 flex items-center gap-1 mt-0.5 justify-end">
-                    <Clock className="w-3 h-3 text-blue-700" />
-                    {appointmentTime}
-                  </p>
-                </div>
-              </div>
-
-              {/* Desglose de Costo - Directo sin cajas internas */}
-              <div className="pt-2.5 border-t border-[#bcd7ef] space-y-1 text-xs">
-                <div className="flex justify-between text-zinc-600 text-[11px]">
-                  <span>Subtotal Servicio:</span>
-                  <span className="font-mono">${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-zinc-600 text-[11px]">
-                  <span>IVA SRI (15%):</span>
-                  <span className="font-mono">${iva.toFixed(2)}</span>
-                </div>
-                <div className="pt-1.5 border-t border-[#bcd7ef] flex items-baseline justify-between">
-                  <span className="font-bold text-blue-950 text-xs">Total Proyectado:</span>
-                  <span className="text-xl font-mono font-black text-blue-800">
-                    ${total.toFixed(2)} <span className="text-[10px] font-normal text-zinc-600">USD</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Botón de Confirmación Principal */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleConfirmAppointment()}
-                  className="w-full py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                >
-                  <CalendarPlus className="w-4 h-4" />
-                  <span>Confirmar Turno</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Bloque de Citas Agendadas debajo del Resumen */}
-            {scheduledMaintenances.length > 0 && (
-              <div className="bg-white border border-zinc-200 rounded-lg p-4 shadow-xs space-y-2.5">
-                <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-800">
-                    Tus Citas Programadas ({scheduledMaintenances.length})
-                  </h3>
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                </div>
-
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                  {scheduledMaintenances.map((appt) => (
-                    <div
-                      key={appt.id}
-                      className="p-2.5 rounded-md bg-zinc-50 border border-zinc-200/80 space-y-1 text-xs"
-                    >
-                      <div className="flex items-start justify-between gap-1.5">
-                        <div className="min-w-0">
-                          <span className="font-mono text-[9px] font-bold text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-200">
-                            {appt.id}
-                          </span>
-                          <h4 className="font-bold text-zinc-900 text-[11px] mt-0.5 truncate">{appt.serviceTitle}</h4>
-                        </div>
-                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                          {appt.status}
-                        </span>
-                      </div>
-
-                      <div className="text-[10px] text-zinc-600 space-y-0.5">
-                        <p className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-zinc-400 shrink-0" />
-                          {appt.scheduledDate || appt.recommendedDate} {appt.scheduledTime ? `• ${appt.scheduledTime}` : ''}
-                        </p>
-                        <p className="flex items-center gap-1 truncate">
-                          <MapPin className="w-3 h-3 text-zinc-400 shrink-0" />
-                          {appt.branchName}
-                        </p>
-                      </div>
-
-                      <div className="pt-1 border-t border-zinc-200/70 flex items-center justify-between text-[10px]">
-                        <span className="font-mono font-bold text-zinc-800">${appt.estimatedCost.toFixed(2)} USD</span>
-                        <a
-                          href={`https://wa.me/${branches[0]?.whatsapp || '593939316698'}?text=${encodeURIComponent(`Hola StarMotos, deseo consultar sobre mi cita ${appt.id} de mi moto ${motorcycle.plate}.`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[10px]"
-                        >
-                          <WhatsAppIcon className="w-3 h-3 text-emerald-600" />
-                          Consultar
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
+      )}
+
+      {/* 4. Servicios Manejados en Alistamiento (Aparecen al elegir turno) */}
+      {selectedTime && (
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-xs space-y-4 animate-slide-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-black text-zinc-900 uppercase tracking-wider">
+                3. Seleccione el Servicio Técnico de Alistamiento
+              </h3>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {ALISTAMIENTO_SERVICES.map((srv) => {
+              const isSelected = selectedService?.id === srv.id;
+
+              return (
+                <div
+                  key={srv.id}
+                  onClick={() => setSelectedService(srv)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between select-none ${
+                    isSelected
+                      ? 'border-blue-600 bg-blue-50/40 shadow-md ring-2 ring-blue-500/20'
+                      : 'border-zinc-200 bg-zinc-50 hover:bg-white hover:border-zinc-300'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-zinc-200 text-zinc-700'
+                        }`}
+                      >
+                        {srv.badge}
+                      </span>
+                      <span className="text-[10px] font-bold text-zinc-500">
+                        ⏱️ {srv.estimatedTime}
+                      </span>
+                    </div>
+
+                    <h4 className="text-sm font-black text-zinc-900 leading-snug">
+                      {srv.title}
+                    </h4>
+
+                    <p className="text-xs text-zinc-600 leading-relaxed">
+                      {srv.description}
+                    </p>
+
+                    <div className="pt-2 border-t border-zinc-200/80 space-y-1">
+                      {srv.features.map((feat, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="truncate">{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 mt-3 border-t border-zinc-200 flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-500">
+                      {srv.id === 'alistamiento_pdi' ? 'PDI Oficial' : 'Costo Estimado'}
+                    </span>
+                    <span className="text-sm font-black text-blue-900">
+                      {srv.id === 'alistamiento_pdi' ? 'Incluido' : '$35.00 USD'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Observaciones adicionales */}
+          <div className="pt-2">
+            <label className="block text-xs font-bold text-zinc-700 mb-1.5">
+              Observaciones o detalles para el técnico (opcional)
+            </label>
+            <textarea
+              rows={2}
+              placeholder="Ej: Revisar tensión de embrague, ruido en freno delantero, etc."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-3 py-2 text-xs text-zinc-800 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:bg-white focus:border-blue-600 transition"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 5. Barra de Confirmación Final */}
+      {selectedDate && selectedTime && selectedService && (
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-2xl p-5 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-slide-in">
+          <div className="space-y-1 text-center md:text-left">
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-200 block">
+              Resumen de la Cita Técnica
+            </span>
+            <h4 className="text-base font-black text-white">
+              {selectedService.title}
+            </h4>
+            <p className="text-xs text-blue-100 flex items-center justify-center md:justify-start gap-2 flex-wrap">
+              <span>📅 {selectedDate}</span>
+              <span>•</span>
+              <span>⏰ {selectedTime}</span>
+              <span>•</span>
+              <span>🏢 {currentBranch.name}</span>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleConfirmAppointment}
+            className="w-full md:w-auto px-7 py-3.5 rounded-xl bg-white text-blue-800 hover:bg-blue-50 font-black text-xs uppercase tracking-wider shadow-md hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Confirmar Agendamiento</span>
+          </button>
+        </div>
+      )}
+
+      {/* Modal de Confirmación Exitosa con Ticket */}
+      {confirmedTicket && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-zinc-200 space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                ¡Cita Agendada Exitosamente!
+              </span>
+              <h3 className="text-xl font-black text-zinc-900 mt-1">
+                Ticket {confirmedTicket.ticketNumber}
+              </h3>
+              <p className="text-xs text-zinc-500">
+                Su turno técnico ha sido registrado y sincronizado en la bandeja del Jefe de Taller.
+              </p>
+            </div>
+
+            <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-200/80 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                <span className="text-zinc-500">Sede Oficial:</span>
+                <span className="font-bold text-zinc-900">{confirmedTicket.workshopName}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                <span className="text-zinc-500">Fecha y Turno:</span>
+                <span className="font-bold text-blue-700">
+                  {confirmedTicket.scheduledDate} a las {confirmedTicket.scheduledTime}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                <span className="text-zinc-500">Motocicleta:</span>
+                <span className="font-bold text-zinc-900">
+                  {confirmedTicket.motoBrand} {confirmedTicket.motoModel} ({confirmedTicket.motoPlate})
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-500">Servicio Solicitado:</span>
+                <span className="font-black text-zinc-900">{confirmedTicket.serviceTitle}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmedTicket(null);
+                  if (onBack) onBack();
+                }}
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md"
+              >
+                Entendido y Finalizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

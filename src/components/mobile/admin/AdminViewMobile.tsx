@@ -14,6 +14,7 @@ import {
   Wrench,
   Users,
   User,
+  CalendarClock,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -32,6 +33,7 @@ import {
   TallerOrder,
   InventoryItem,
   AdminProfile,
+  AdminPendiente,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
@@ -42,6 +44,7 @@ import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
 import { PerfilAdminMobile } from './PerfilAdminMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
+import { PendientesModule } from '../../common/PendientesModule';
 
 interface Props {
   activeSection: AdminSectionMobile;
@@ -64,6 +67,10 @@ interface Props {
   clients: TallerClient[];
   orders: TallerOrder[];
   inventory: InventoryItem[];
+  pendientes: AdminPendiente[];
+  onSavePendiente: (p: AdminPendiente) => void;
+  onToggleCompletePendiente: (id: string) => void;
+  onDeletePendiente: (id: string) => void;
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
@@ -107,6 +114,10 @@ export const AdminViewMobile: React.FC<Props> = ({
   clients,
   orders,
   inventory,
+  pendientes,
+  onSavePendiente,
+  onToggleCompletePendiente,
+  onDeletePendiente,
   onAddTechnician,
   onDeleteTechnician,
   onAddOrigin,
@@ -129,9 +140,16 @@ export const AdminViewMobile: React.FC<Props> = ({
   onSubmitAlistamiento,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'talleres', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
+    {
+      id: 'pendientes',
+      label: 'Registrar pendientes',
+      icon: <CalendarClock className="w-4 h-4" />,
+      badge: uncompletedPendientesCount > 0 ? `${uncompletedPendientesCount}` : undefined,
+    },
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
     { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
@@ -143,6 +161,7 @@ export const AdminViewMobile: React.FC<Props> = ({
 
   const sectionTitles: Record<AdminSectionMobile, string> = {
     talleres: 'Control de Talleres',
+    pendientes: 'Registrar Pendientes',
     alistamiento: 'Alistamiento & PDI',
     clientes_admin: 'Clientes & Flota',
     tecnicos: 'Equipo Técnico',
@@ -264,6 +283,16 @@ export const AdminViewMobile: React.FC<Props> = ({
             orders={orders}
             inventory={inventory}
             invoices={invoices}
+          />
+        )}
+        {activeSection === 'pendientes' && (
+          <PendientesModule
+            pendientes={pendientes}
+            onSavePendiente={onSavePendiente}
+            onToggleComplete={onToggleCompletePendiente}
+            onDeletePendiente={onDeletePendiente}
+            workshops={workshops}
+            isMobile={true}
           />
         )}
         {activeSection === 'alistamiento' && (

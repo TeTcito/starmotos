@@ -4,6 +4,7 @@ import { useAdminPortal } from './hooks/useAdminPortal';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { AdminViewDesktop } from './components/desktop/admin/AdminViewDesktop';
 import { AdminViewMobile } from './components/mobile/admin/AdminViewMobile';
+import { PendientesAlertModal } from './components/common/PendientesAlertModal';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
 export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
   const portal = useAdminPortal();
   const isDesktop = useIsDesktop(1024);
+  const [showEntranceAlert, setShowEntranceAlert] = React.useState(false);
+  const hasCheckedEntranceRef = React.useRef(false);
 
   const {
     activeSection,
@@ -30,6 +33,10 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     adminProfile,
     updateAdminProfile,
     toastMessage,
+    pendientes,
+    savePendiente,
+    toggleCompletePendiente,
+    deletePendiente,
     validateWarrantyByMatriz,
     rejectWarrantyByMatriz,
     sendWarrantyToGarante,
@@ -58,6 +65,39 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     searchSri,
     submitAlistamiento,
   } = portal;
+
+  // Alerta de ingreso al sistema: "Tienes X pendientes por hacer"
+  React.useEffect(() => {
+    if (hasCheckedEntranceRef.current) return;
+    hasCheckedEntranceRef.current = true;
+
+    try {
+      const alreadySeen = sessionStorage.getItem('starmotos_admin_seen_pendientes_alert_v1');
+      const uncompletedCount = pendientes.filter((p) => !p.completed).length;
+
+      if (!alreadySeen && uncompletedCount > 0) {
+        const timer = setTimeout(() => {
+          setShowEntranceAlert(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } catch (_) {}
+  }, [pendientes]);
+
+  const handleCloseAlert = () => {
+    try {
+      sessionStorage.setItem('starmotos_admin_seen_pendientes_alert_v1', 'true');
+    } catch (_) {}
+    setShowEntranceAlert(false);
+  };
+
+  const handleGoToPendientes = () => {
+    try {
+      sessionStorage.setItem('starmotos_admin_seen_pendientes_alert_v1', 'true');
+    } catch (_) {}
+    setShowEntranceAlert(false);
+    setActiveSection('pendientes' as any);
+  };
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -88,6 +128,10 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           clients={clients}
           orders={orders}
           inventory={inventory}
+          pendientes={pendientes}
+          onSavePendiente={savePendiente}
+          onToggleCompletePendiente={toggleCompletePendiente}
+          onDeletePendiente={deletePendiente}
           onAddTechnician={addTechnician}
           onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}
@@ -131,6 +175,10 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           clients={clients}
           orders={orders}
           inventory={inventory}
+          pendientes={pendientes}
+          onSavePendiente={savePendiente}
+          onToggleCompletePendiente={toggleCompletePendiente}
+          onDeletePendiente={deletePendiente}
           onAddTechnician={addTechnician}
           onDeleteTechnician={deleteTechnician}
           onAddOrigin={addOrigin}
@@ -148,6 +196,14 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           onSubmitAlistamiento={submitAlistamiento}
         />
       )}
+
+      {/* Modal de Alerta de Ingreso para Pendientes Agendados */}
+      <PendientesAlertModal
+        isOpen={showEntranceAlert}
+        onClose={handleCloseAlert}
+        onGoToPendientes={handleGoToPendientes}
+        pendientes={pendientes}
+      />
 
       {/* Global Toast */}
       {toastMessage && (

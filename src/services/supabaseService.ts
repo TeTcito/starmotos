@@ -11,6 +11,7 @@ import {
   GaranteProfile,
   WorkshopManagerAccount,
   DictamenRecord,
+  AdminPendiente,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { uploadWarrantyMedia, saveMediaToIndexedDB } from './mediaStorage';
@@ -618,6 +619,26 @@ export async function syncAllFromSupabase(): Promise<{
       console.warn('Error sincronizando dictamenes:', e);
     }
 
+    // -----------------------------------------------------------------------
+    // 11. REGISTRO DE PENDIENTES & AGENDAMIENTO
+    // -----------------------------------------------------------------------
+    try {
+      const { data: pendData, error: pendErr } = await supabase
+        .from('pendientes')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!pendErr && pendData && pendData.length > 0) {
+        const items: AdminPendiente[] = pendData.map((row) => row.data as AdminPendiente).filter(Boolean);
+        if (items.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.PENDIENTES, JSON.stringify(items));
+          window.dispatchEvent(new Event('starmotos_pendientes_updated'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error sincronizando pendientes:', e);
+    }
+
     return {
       warrantiesCount,
       alistamientosCount,
@@ -1084,6 +1105,42 @@ export async function cloudDeleteDictamen(id: string) {
   }
 }
 
+export async function cloudSavePendiente(p: AdminPendiente) {
+  try {
+    const payload = {
+      id: p.id,
+      title: p.title,
+      category: p.category || 'repuesto',
+      priority: p.priority || 'media',
+      due_date: p.dueDate || null,
+      estimated_cost: p.estimatedCost || 0,
+      workshop_id: p.workshopId || null,
+      workshop_name: p.workshopName || null,
+      completed: !!p.completed,
+      completed_at: p.completedAt || null,
+      created_by: p.createdBy || null,
+      data: p,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('pendientes').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.error('[Supabase] Error guardando pendiente:', error);
+    }
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando pendiente:', err);
+  }
+}
+
+export async function cloudDeletePendiente(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('pendientes').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando pendiente:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando pendiente:', err);
+  }
+}
+
 export async function cloudPurgeQuevedoWarranties() {
   // No-op intencional: las garantías anteriores ya fueron depuradas. No purgar nuevas solicitudes de Quevedo.
 }
@@ -1485,6 +1542,37 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
         } catch (e) {
           console.error('Error procesando realtime dictamenes:', e);
+        }
+      }
+    )
+    // Registro de Pendientes & Agendamiento
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'pendientes' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.PENDIENTES);
+          let current: AdminPendiente[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as AdminPendiente;
+            if (newDoc && !current.some((p) => p.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as AdminPendiente;
+            if (updatedDoc) {
+              current = current.map((p) => (p.id === updatedDoc.id ? updatedDoc : p));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            current = current.filter((p) => p.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.PENDIENTES, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_pendientes_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime pendientes:', e);
         }
       }
     )

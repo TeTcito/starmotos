@@ -308,6 +308,7 @@ export type UserRole = 'cliente' | 'admin' | 'taller' | 'garante';
 // --- Secciones por rol ---
 export type AdminSection =
   | 'talleres'
+  | 'pendientes'
   | 'alistamiento'
   | 'clientes_admin'
   | 'garantias_admin'
@@ -743,3 +744,24 @@ export interface DictamenRecord {
   updatedAt?: string;
 }
 
+// --- Módulo de Agendamiento y Registro de Pendientes (Administración) ---
+export type PendienteCategory = 'repuesto' | 'compra' | 'revision' | 'llamada' | 'gestion' | 'otro';
+export type PendientePriority = 'alta' | 'media' | 'baja';
+
+export interface AdminPendiente {
+  id: string;
+  title: string;
+  description?: string;
+  category: PendienteCategory;
+  priority: PendientePriority;
+  dueDate?: string; // YYYY-MM-DD
+  dueTime?: string; // HH:mm
+  estimatedCost?: number;
+  workshopId?: string;
+  workshopName?: string;
+  relatedClientOrBike?: string;
+  completed: boolean;
+  completedAt?: string;
+  createdAt: string;
+  createdBy?: string;
+}

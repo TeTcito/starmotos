@@ -15,4 +15,5 @@ export const STORAGE_KEYS = {
   WORKSHOP_MANAGERS: 'starmotos_shared_workshop_managers_v5',
   DICTAMENES: 'starmotos_shared_dictamenes_v5',
   RATINGS: 'starmotos_shared_ratings_v1',
+  PENDIENTES: 'starmotos_shared_pendientes_v1',
 } as const;

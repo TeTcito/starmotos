@@ -18,6 +18,7 @@ import {
   TallerOrder,
   InventoryItem,
   AdminProfile,
+  AdminPendiente,
 } from '../types/customer';
 import {
   getStoredWarranties,
@@ -49,11 +50,15 @@ import {
   getStoredInventory,
   getStoredAdminProfile,
   saveStoredAdminProfile,
+  getStoredPendientes,
+  saveStoredPendientes,
+  deleteStoredPendiente,
 } from '../data/mockMultiRoleData';
 import { cloudSaveWarranty, syncAllFromSupabase } from '../services/supabaseService';
 
 export const ADMIN_SECTIONS: AdminSectionMobile[] = [
   'talleres',
+  'pendientes',
   'alistamiento',
   'clientes_admin',
   'garantias_admin',
@@ -90,6 +95,7 @@ export function useAdminPortal() {
   const [orders, setOrders] = useState<TallerOrder[]>(getStoredOrders);
   const [inventory, setInventory] = useState<InventoryItem[]>(getStoredInventory);
   const [adminProfile, setAdminProfile] = useState<AdminProfile>(getStoredAdminProfile);
+  const [pendientes, setPendientes] = useState<AdminPendiente[]>(getStoredPendientes);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
@@ -105,6 +111,7 @@ export function useAdminPortal() {
     const handleInventoryUpdate = () => setInventory(getStoredInventory());
     const handleInvoicesUpdate = () => setInvoices(getStoredInvoices());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
+    const handlePendientesUpdate = () => setPendientes(getStoredPendientes());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -119,6 +126,7 @@ export function useAdminPortal() {
         handleInventoryUpdate();
         handleInvoicesUpdate();
         handleWorkshopsUpdate();
+        handlePendientesUpdate();
       }
     };
 
@@ -133,6 +141,7 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_inventory_updated', handleInventoryUpdate);
     window.addEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+    window.addEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
     window.addEventListener('storage', handleStorageEvent);
 
     // Sincronización proactiva de arranque para asegurar que Matriz reciba toda la red
@@ -150,6 +159,7 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_inventory_updated', handleInventoryUpdate);
       window.removeEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
+      window.removeEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
@@ -874,6 +884,59 @@ export function useAdminPortal() {
     showToast('Cliente y cuenta de usuario eliminados correctamente del sistema.', 'info');
   }, [showToast]);
 
+  // --- GESTIÓN DE PENDIENTES & AGENDAMIENTO ---
+  const savePendiente = useCallback(
+    (pendiente: AdminPendiente) => {
+      setPendientes((prev) => {
+        const exists = prev.some((p) => p.id === pendiente.id);
+        const updated = exists
+          ? prev.map((p) => (p.id === pendiente.id ? pendiente : p))
+          : [pendiente, ...prev];
+        saveStoredPendientes(updated);
+        return updated;
+      });
+      showToast('Pendiente guardado correctamente.', 'success');
+    },
+    [showToast]
+  );
+
+  const toggleCompletePendiente = useCallback(
+    (id: string) => {
+      setPendientes((prev) => {
+        let isNowCompleted = false;
+        const updated = prev.map((p) => {
+          if (p.id === id) {
+            const nextCompleted = !p.completed;
+            isNowCompleted = nextCompleted;
+            return {
+              ...p,
+              completed: nextCompleted,
+              completedAt: nextCompleted ? new Date().toISOString() : undefined,
+            };
+          }
+          return p;
+        });
+        saveStoredPendientes(updated);
+        if (isNowCompleted) {
+          showToast('¡Pendiente marcado como completado!', 'success');
+        } else {
+          showToast('Marcado como pendiente por hacer.', 'info');
+        }
+        return updated;
+      });
+    },
+    [showToast]
+  );
+
+  const deletePendiente = useCallback(
+    (id: string) => {
+      deleteStoredPendiente(id);
+      setPendientes((prev) => prev.filter((p) => p.id !== id));
+      showToast('Pendiente eliminado del sistema.', 'info');
+    },
+    [showToast]
+  );
+
   return {
     activeSection,
     setActiveSection,
@@ -893,6 +956,11 @@ export function useAdminPortal() {
     updateAdminProfile,
     toastMessage,
     showToast,
+    // Pendientes & Agendamiento
+    pendientes,
+    savePendiente,
+    toggleCompletePendiente,
+    deletePendiente,
     // Garantías
     createWarrantyRequest,
     updateWarranty,

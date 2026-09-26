@@ -13,6 +13,7 @@ import {
   Wrench,
   ArrowLeft,
   Users,
+  CalendarClock,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -29,6 +30,7 @@ import {
   WarrantyRequestStatus,
   TallerOrder,
   InventoryItem,
+  AdminPendiente,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -38,6 +40,7 @@ import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
 import { AlertasDesktop } from './AlertasDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
+import { PendientesModule } from '../../common/PendientesModule';
 
 interface Props {
   activeSection: AdminSection;
@@ -46,7 +49,7 @@ interface Props {
   workshops: Workshop[];
   warranties: WarrantyRequest[];
   onValidateWarranty: (id: string, notes: string) => void;
-  onRejectWarranty?: (id: string, reason: string) => void;
+  onRejectWarranty: (id: string, reason: string) => void;
   onSendToGarante: (id: string, notes?: string) => void;
   onCompleteRepair: (id: string, invoiceNumber?: string) => void;
   alerts: SystemAlert[];
@@ -59,6 +62,10 @@ interface Props {
   clients: TallerClient[];
   orders: TallerOrder[];
   inventory: InventoryItem[];
+  pendientes: AdminPendiente[];
+  onSavePendiente: (p: AdminPendiente) => void;
+  onToggleCompletePendiente: (id: string) => void;
+  onDeletePendiente: (id: string) => void;
   onAddTechnician: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onDeleteTechnician?: (id: string) => void;
   onAddOrigin: (origin: string) => void;
@@ -102,6 +109,10 @@ export const AdminViewDesktop: React.FC<Props> = ({
   clients,
   orders,
   inventory,
+  pendientes,
+  onSavePendiente,
+  onToggleCompletePendiente,
+  onDeletePendiente,
   onAddTechnician,
   onDeleteTechnician,
   onAddOrigin,
@@ -125,12 +136,20 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onSubmitAlistamiento,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
+  const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
+
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: 'talleres',
       label: 'Control de Talleres',
       icon: <Building2 className="w-4 h-4" />,
       badge: `${workshops.length}`,
+    },
+    {
+      id: 'pendientes',
+      label: 'Registrar pendientes',
+      icon: <CalendarClock className="w-4 h-4" />,
+      badge: uncompletedPendientesCount > 0 ? `${uncompletedPendientesCount}` : undefined,
     },
     {
       id: 'alistamiento',
@@ -170,6 +189,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
 
   const sectionTitles: Record<AdminSection, string> = {
     talleres: 'Control Operativo de Talleres & Sucursales',
+    pendientes: 'Registrar Pendientes & Agendamiento de Tareas',
     alistamiento: 'Alistamiento de Clientes y Motocicletas',
     clientes_admin: 'Fichero Nacional de Clientes & Flota StarMotos',
     tecnicos: 'Gestión y Despacho del Equipo Técnico',
@@ -208,6 +228,21 @@ export const AdminViewDesktop: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-3.5 shrink-0">
+            {uncompletedPendientesCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveSection('pendientes')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                title="Ver pendientes por hacer"
+              >
+                <CalendarClock className="w-4 h-4" />
+                <span>
+                  {uncompletedPendientesCount}{' '}
+                  {uncompletedPendientesCount === 1 ? 'Pendiente' : 'Pendientes'}
+                </span>
+              </button>
+            )}
+
             {activeSection === 'alistamiento' && alistamientoViewMode === 'form' && (
               <button
                 type="button"
@@ -348,6 +383,15 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 orders={orders}
                 inventory={inventory}
                 invoices={invoices}
+              />
+            )}
+            {activeSection === 'pendientes' && (
+              <PendientesModule
+                pendientes={pendientes}
+                onSavePendiente={onSavePendiente}
+                onToggleComplete={onToggleCompletePendiente}
+                onDeletePendiente={onDeletePendiente}
+                workshops={workshops}
               />
             )}
             {activeSection === 'alistamiento' && (

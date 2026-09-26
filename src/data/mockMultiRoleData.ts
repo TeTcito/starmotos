@@ -14,6 +14,7 @@ import {
   WorkshopManagerAccount,
   DictamenRecord,
   OrderRating,
+  AdminPendiente,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -35,6 +36,8 @@ import {
   cloudDeleteClient,
   cloudDeleteAlert,
   cloudDeleteAlerts,
+  cloudSavePendiente,
+  cloudDeletePendiente,
   getDeletedTombstones,
   addDeletedTombstone,
   removeDeletedTombstone,
@@ -1607,4 +1610,95 @@ export function resetAllSystemData() {
     supabase.from('invoices').delete().neq('id', '___').then(() => {});
   } catch (_) {}
 }
+
+// =========================================================================
+// GESTIÓN DE PENDIENTES & AGENDAMIENTO (MATRIZ / ADMINISTRACIÓN)
+// =========================================================================
+
+export const INITIAL_PENDIENTES: AdminPendiente[] = [
+  {
+    id: 'pend-1',
+    title: 'Comprar kit de cilindro y pistón Shineray XY250',
+    description: 'Repuesto solicitado para moto en taller. Cotizar urgente con distribuidor de Guayaquil.',
+    category: 'repuesto',
+    priority: 'alta',
+    dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    dueTime: '10:00',
+    estimatedCost: 85.0,
+    workshopName: 'StarMotos Matriz La Maná',
+    workshopId: 'matriz-la-mana',
+    relatedClientOrBike: 'Shineray XY250 - Placa LAB-1204',
+    completed: false,
+    createdAt: new Date().toISOString(),
+    createdBy: 'Administrador Matriz',
+  },
+  {
+    id: 'pend-2',
+    title: 'Pedir juego de neumáticos doble propósito 110/90-17',
+    description: 'Stock bajo en bodega central para despacho a sucursales.',
+    category: 'compra',
+    priority: 'media',
+    dueDate: new Date(Date.now() + 172800000).toISOString().split('T')[0],
+    dueTime: '15:30',
+    estimatedCost: 110.0,
+    workshopName: 'StarMotos Matriz La Maná',
+    workshopId: 'matriz-la-mana',
+    relatedClientOrBike: 'Bodega Central Matriz',
+    completed: false,
+    createdAt: new Date().toISOString(),
+    createdBy: 'Administrador Matriz',
+  },
+  {
+    id: 'pend-3',
+    title: 'Confirmar retiro de Benelli TRK 502 alistada',
+    description: 'Llamar al cliente para coordinar entrega formal y entrega de kit de herramientas.',
+    category: 'llamada',
+    priority: 'baja',
+    dueDate: new Date().toISOString().split('T')[0],
+    dueTime: '17:00',
+    estimatedCost: 0,
+    workshopName: 'StarMotos Matriz La Maná',
+    workshopId: 'matriz-la-mana',
+    relatedClientOrBike: 'Benelli TRK 502X - Juan Pérez',
+    completed: false,
+    createdAt: new Date().toISOString(),
+    createdBy: 'Administrador Matriz',
+  },
+];
+
+export function getStoredPendientes(): AdminPendiente[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PENDIENTES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error al leer pendientes de localStorage:', e);
+  }
+  return INITIAL_PENDIENTES;
+}
+
+export function saveStoredPendientes(pendientes: AdminPendiente[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PENDIENTES, JSON.stringify(pendientes));
+    window.dispatchEvent(new Event('starmotos_pendientes_updated'));
+    pendientes.forEach((p) => cloudSavePendiente(p));
+  } catch (e) {
+    console.error('Error al guardar pendientes en localStorage:', e);
+  }
+}
+
+export function deleteStoredPendiente(id: string) {
+  try {
+    const current = getStoredPendientes();
+    const updated = current.filter((p) => p.id !== id);
+    localStorage.setItem(STORAGE_KEYS.PENDIENTES, JSON.stringify(updated));
+    window.dispatchEvent(new Event('starmotos_pendientes_updated'));
+    cloudDeletePendiente(id);
+  } catch (e) {
+    console.error('Error al eliminar pendiente:', e);
+  }
+}
+
 

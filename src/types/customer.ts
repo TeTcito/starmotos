@@ -864,6 +864,7 @@ export interface GpsRecord {
   saldoPendiente?: number;
   metodoPago?: 'Efectivo' | 'Transferencia' | string;
   evidenciaTransferencia?: string; // Comprobante de transferencia bancaria
+  fotos?: string[]; // Fotografías o evidencias de la instalación GPS
   observaciones?: string;
   // Estado y Credenciales asignadas por el perfil "GPS servicios"
   estado: 'pendiente' | 'activa' | 'rechazada' | 'cancelada';

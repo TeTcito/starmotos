@@ -122,6 +122,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
     montoPagado: 180.0,
     metodoPago: 'Efectivo' as 'Efectivo' | 'Transferencia',
     evidenciaTransferencia: '',
+    fotos: [] as string[],
     observaciones: '',
     // Estado y credenciales
     estado: 'pendiente' as 'pendiente' | 'activa',
@@ -130,6 +131,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
   };
 
   const [formData, setFormData] = useState(initialFormData);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSearchingSri, setIsSearchingSri] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{ title: string; fields: string[] } | null>(null);
@@ -347,6 +349,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       montoPagado: Number(record.montoPagado) || 0,
       metodoPago: ((record.metodoPago === 'Transferencia' || (record.metodoPago as string)?.toLowerCase?.().includes('transferencia')) ? 'Transferencia' : 'Efectivo') as 'Efectivo' | 'Transferencia',
       evidenciaTransferencia: record.evidenciaTransferencia || '',
+      fotos: record.fotos || [],
       observaciones: record.observaciones || '',
       estado: record.estado as any,
       gpsUser: record.gpsUser || '',
@@ -410,6 +413,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
         saldoPendiente: saldo,
         metodoPago: formData.metodoPago,
         evidenciaTransferencia: formData.metodoPago === 'Transferencia' ? (formData.evidenciaTransferencia || undefined) : undefined,
+        fotos: formData.fotos && formData.fotos.length > 0 ? formData.fotos : undefined,
         observaciones: formData.observaciones.trim() || undefined,
         updatedAt: new Date().toISOString(),
       };
@@ -457,6 +461,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       saldoPendiente: saldo,
       metodoPago: formData.metodoPago,
       evidenciaTransferencia: formData.metodoPago === 'Transferencia' ? (formData.evidenciaTransferencia || undefined) : undefined,
+      fotos: formData.fotos && formData.fotos.length > 0 ? formData.fotos : undefined,
       observaciones: formData.observaciones.trim() || undefined,
       estado: 'pendiente',
       createdAt: new Date().toISOString(),
@@ -1838,6 +1843,84 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     </div>
                   )}
 
+                  {/* FOTOGRAFÍAS / EVIDENCIAS DE LA INSTALACIÓN GPS */}
+                  <div className="space-y-1.5 pt-1 border-t border-zinc-200/80">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-black uppercase text-zinc-700 flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                        <span>Fotografías / Evidencias de la Instalación</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
+                        {formData.fotos.length} foto{formData.fotos.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+
+                    {/* Galería de miniaturas */}
+                    {formData.fotos.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2 pb-1">
+                        {formData.fotos.map((foto, index) => (
+                          <div
+                            key={index}
+                            className="relative group rounded-xl overflow-hidden border border-zinc-200 bg-zinc-100 aspect-square shadow-2xs"
+                          >
+                            <img
+                              src={foto}
+                              alt={`Foto ${index + 1}`}
+                              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition"
+                              onClick={() => setPreviewImage(foto)}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  fotos: prev.fotos.filter((_, i) => i !== index),
+                                }));
+                              }}
+                              className="absolute top-1 right-1 p-1 rounded-full bg-red-600/90 text-white opacity-0 group-hover:opacity-100 transition cursor-pointer shadow-xs hover:bg-red-700"
+                              title="Eliminar foto"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                            <span className="absolute bottom-1 left-1 text-[9px] font-bold bg-black/60 text-white px-1 rounded">
+                              #{index + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Botón para subir fotos */}
+                    <label className="flex items-center justify-center gap-2 p-2.5 border-2 border-dashed border-cyan-300 hover:border-cyan-500 bg-cyan-50/20 hover:bg-cyan-50/50 rounded-xl cursor-pointer transition-all">
+                      <Upload className="w-4 h-4 text-cyan-600" />
+                      <span className="text-xs font-bold text-cyan-900">
+                        {formData.fotos.length > 0 ? '+ Agregar más fotos' : 'Subir fotos del vehículo / GPS instalado'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = e.target.files;
+                          if (files && files.length > 0) {
+                            const newFotos: string[] = [];
+                            for (let i = 0; i < files.length; i++) {
+                              const compressed = await compressImageBase64(files[i], 1000, 0.7);
+                              if (compressed) newFotos.push(compressed);
+                            }
+                            setFormData((prev) => ({
+                              ...prev,
+                              fotos: [...prev.fotos, ...newFotos],
+                            }));
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   {/* Observaciones */}
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
@@ -1870,6 +1953,33 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Modal visor de foto en tamaño completo */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-3 right-3 p-1.5 rounded-full bg-black/70 text-white hover:bg-black transition cursor-pointer z-10"
+              title="Cerrar vista previa"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImage}
+              alt="Evidencia en tamaño completo"
+              className="max-h-[82vh] w-auto max-w-full rounded-xl object-contain mx-auto"
+            />
+          </div>
         </div>
       )}
 

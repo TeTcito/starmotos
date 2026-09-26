@@ -15,8 +15,13 @@ export const GpsPortal: React.FC<Props> = ({ onLogout }) => {
   const isDesktop = useIsDesktop(1024);
 
   const {
+    activeSection,
+    setActiveSection,
     records,
+    pendingRequests,
+    activeRequests,
     profile,
+    updateProfile,
     assignCredentials,
     toastMessage,
     showToast,
@@ -26,16 +31,26 @@ export const GpsPortal: React.FC<Props> = ({ onLogout }) => {
     <div className="min-h-screen bg-zinc-100 text-zinc-900 font-sans antialiased selection:bg-cyan-600 selection:text-white">
       {isDesktop ? (
         <GpsViewDesktop
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
           records={records}
+          pendingRequests={pendingRequests}
+          activeRequests={activeRequests}
           profile={profile}
+          onUpdateProfile={updateProfile}
           onLogout={onLogout}
           onAssignCredentials={assignCredentials}
           showToast={showToast}
         />
       ) : (
         <GpsViewMobile
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
           records={records}
+          pendingRequests={pendingRequests}
+          activeRequests={activeRequests}
           profile={profile}
+          onUpdateProfile={updateProfile}
           onLogout={onLogout}
           onAssignCredentials={assignCredentials}
           showToast={showToast}

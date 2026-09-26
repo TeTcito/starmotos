@@ -321,11 +321,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
   // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
   const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento'>('all');
-  const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'custom'>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'this_year' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<
-    'recientes' | 'antiguos' | 'cliente_asc' | 'cliente_desc' | 'modelo_asc' | 'modelo_desc' | 'mayor_valor' | 'mayor_saldo'
+    'recientes' | 'antiguos' | 'hoy' | 'por_semana' | 'por_mes' | 'por_ano' | 'cliente_asc' | 'cliente_desc' | 'modelo_asc' | 'modelo_desc' | 'mayor_valor' | 'mayor_saldo'
   >('recientes');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
@@ -394,7 +394,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Helper para extraer de forma robusta la fecha de cualquier registro sin desfase horario
   const getRecordLocalDate = (raw?: string): { year: number; month: number; day: number } | null => {
     if (!raw) return null;
-    const ymdMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    const str = String(raw).trim();
+    if (!str) return null;
+
+    // 1. Si es formato ISO con timestamp o indicador horario (ej: 2026-09-26T02:00:00Z)
+    // Se debe interpretar con la zona horaria local del navegador
+    if (str.includes('T') || str.includes('Z')) {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return {
+          year: d.getFullYear(),
+          month: d.getMonth() + 1,
+          day: d.getDate(),
+        };
+      }
+    }
+
+    // 2. YYYY-MM-DD (fecha plana seleccionada en calendario sin hora)
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
     if (ymdMatch) {
       return {
         year: parseInt(ymdMatch[1], 10),
@@ -402,7 +419,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
         day: parseInt(ymdMatch[3], 10),
       };
     }
-    const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+
+    // 3. DD/MM/YYYY o DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
     if (dmyMatch) {
       return {
         year: parseInt(dmyMatch[3], 10),
@@ -410,7 +429,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
         day: parseInt(dmyMatch[1], 10),
       };
     }
-    const d = new Date(raw);
+
+    // 4. Fallback Date parse
+    const d = new Date(str);
     if (!isNaN(d.getTime())) {
       return {
         year: d.getFullYear(),
@@ -776,45 +797,53 @@ export const AlistamientoWizard: React.FC<Props> = ({
       // 3. Filtro por Fechas
       if (filterDateRange !== 'all') {
         const recDateObj = getRecordLocalDate(r.fechaServicio) || getRecordLocalDate(r.createdAt);
-        if (recDateObj) {
-          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day);
-          const now = new Date();
+        if (!recDateObj) return false;
 
-          if (filterDateRange === 'today') {
-            if (
-              recDateObj.year !== now.getFullYear() ||
-              recDateObj.month !== now.getMonth() + 1 ||
-              recDateObj.day !== now.getDate()
-            ) {
-              return false;
+        const now = new Date();
+        const todayYear = now.getFullYear();
+        const todayMonth = now.getMonth() + 1;
+        const todayDay = now.getDate();
+
+        if (filterDateRange === 'today') {
+          if (
+            recDateObj.year !== todayYear ||
+            recDateObj.month !== todayMonth ||
+            recDateObj.day !== todayDay
+          ) {
+            return false;
+          }
+        } else if (filterDateRange === 'this_week') {
+          const dayOfWeek = now.getDay();
+          const diffToMonday = (dayOfWeek + 6) % 7;
+          const monday = new Date(todayYear, todayMonth - 1, todayDay - diffToMonday, 0, 0, 0, 0);
+          const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day, 12, 0, 0, 0);
+          if (recDate < monday || recDate > sunday) return false;
+        } else if (filterDateRange === 'this_month') {
+          if (
+            recDateObj.year !== todayYear ||
+            recDateObj.month !== todayMonth
+          ) {
+            return false;
+          }
+        } else if (filterDateRange === 'this_year') {
+          if (recDateObj.year !== todayYear) {
+            return false;
+          }
+        } else if (filterDateRange === 'custom') {
+          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day, 12, 0, 0, 0);
+          if (customStartDate) {
+            const cStartObj = getRecordLocalDate(customStartDate);
+            if (cStartObj) {
+              const cStart = new Date(cStartObj.year, cStartObj.month - 1, cStartObj.day, 0, 0, 0, 0);
+              if (recDate < cStart) return false;
             }
-          } else if (filterDateRange === 'this_week') {
-            const dayOfWeek = now.getDay();
-            const diffToMonday = (dayOfWeek + 6) % 7;
-            const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
-            const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
-            if (recDate < monday || recDate > sunday) return false;
-          } else if (filterDateRange === 'this_month') {
-            if (
-              recDateObj.year !== now.getFullYear() ||
-              recDateObj.month !== now.getMonth() + 1
-            ) {
-              return false;
-            }
-          } else if (filterDateRange === 'custom') {
-            if (customStartDate) {
-              const cStartObj = getRecordLocalDate(customStartDate);
-              if (cStartObj) {
-                const cStart = new Date(cStartObj.year, cStartObj.month - 1, cStartObj.day);
-                if (recDate < cStart) return false;
-              }
-            }
-            if (customEndDate) {
-              const cEndObj = getRecordLocalDate(customEndDate);
-              if (cEndObj) {
-                const cEnd = new Date(cEndObj.year, cEndObj.month - 1, cEndObj.day, 23, 59, 59, 999);
-                if (recDate > cEnd) return false;
-              }
+          }
+          if (customEndDate) {
+            const cEndObj = getRecordLocalDate(customEndDate);
+            if (cEndObj) {
+              const cEnd = new Date(cEndObj.year, cEndObj.month - 1, cEndObj.day, 23, 59, 59, 999);
+              if (recDate > cEnd) return false;
             }
           }
         }
@@ -885,7 +914,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
         } else if (filterPayment === 'pagados') {
           if (isPdi || valor <= 0 || pendiente > 0.01) return false;
         } else if (filterPayment === 'pdi') {
-          if (!isPdi) return false;
+          const hasPdi =
+            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('pdi') || s.toLowerCase().includes('alistamiento')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('pdi') ||
+            (r as any).tipoServicio?.toLowerCase().includes('alistamiento') ||
+            isPdiOnlyRecord(r);
+          if (!hasPdi) return false;
         } else if (filterPayment === 'engrasado') {
           const hasEngrasado =
             r.serviciosRealizados?.some((s) => s.toLowerCase().includes('engrasad')) ||
@@ -905,7 +939,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     // 5. Ordenamiento
     return [...afterPayment].sort((a, b) => {
-      if (sortBy === 'recientes') {
+      if (sortBy === 'recientes' || sortBy === 'hoy' || sortBy === 'por_semana' || sortBy === 'por_mes' || sortBy === 'por_ano') {
         const timeA = getRecordTimestamp(a);
         const timeB = getRecordTimestamp(b);
         if (timeA !== timeB) return timeB - timeA;
@@ -2742,18 +2776,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* 1. Estado de Pago */}
+                  {/* 1. Servicios Realizados */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
-                      Estado de Pago
+                      Servicios
                     </label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
                         { id: 'all', label: 'Todos' },
-                        { id: 'con_saldo', label: 'Pendiente (Con Saldo)' },
-                        { id: 'pagados', label: 'Pagados (Al Día)' },
-                        { id: 'pdi', label: 'PDI (Sin Costo)' },
-                        { id: 'engrasado', label: 'Engrasada' },
+                        { id: 'pdi', label: 'Alistamiento PDI' },
+                        { id: 'engrasado', label: 'Engrasado' },
                         { id: 'mantenimiento', label: 'Mantenimiento' },
                       ].map((item) => (
                         <button
@@ -2781,14 +2813,21 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       {[
                         { id: 'all', label: 'Todas' },
                         { id: 'today', label: 'Hoy' },
-                        { id: 'this_week', label: 'Esta Semana' },
-                        { id: 'this_month', label: 'Este Mes' },
+                        { id: 'this_week', label: 'Por semana' },
+                        { id: 'this_month', label: 'Por mes' },
+                        { id: 'this_year', label: 'Por año' },
                         { id: 'custom', label: 'Rango Manual' },
                       ].map((item) => (
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => setFilterDateRange(item.id as any)}
+                          onClick={() => {
+                            setFilterDateRange(item.id as any);
+                            if (item.id === 'today') setSortBy('hoy');
+                            else if (item.id === 'this_week') setSortBy('por_semana');
+                            else if (item.id === 'this_month') setSortBy('por_mes');
+                            else if (item.id === 'this_year') setSortBy('por_ano');
+                          }}
                           className={`px-2 py-1.5 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer truncate ${
                             filterDateRange === item.id
                               ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
@@ -2831,11 +2870,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <div className="relative">
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
+                        onChange={(e) => {
+                          const val = e.target.value as any;
+                          setSortBy(val);
+                          if (val === 'hoy') setFilterDateRange('today');
+                          else if (val === 'por_semana') setFilterDateRange('this_week');
+                          else if (val === 'por_mes') setFilterDateRange('this_month');
+                          else if (val === 'por_ano') setFilterDateRange('this_year');
+                        }}
                         className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none cursor-pointer focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                       >
                         <option value="recientes">📅 Más recientes primero</option>
                         <option value="antiguos">📅 Más antiguos primero</option>
+                        <option value="hoy">📅 Hoy</option>
+                        <option value="por_semana">📅 Por semana</option>
+                        <option value="por_mes">📅 Por mes</option>
+                        <option value="por_ano">📅 Por año</option>
                         <option value="cliente_asc">👤 Cliente (A - Z)</option>
                         <option value="cliente_desc">👤 Cliente (Z - A)</option>
                         <option value="modelo_asc">🏍️ Modelo / Marca (A - Z)</option>
@@ -2856,15 +2906,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 {filterPayment !== 'all' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
                     <span>
-                      Filtro:{' '}
+                      Servicio:{' '}
                       {filterPayment === 'con_saldo'
                         ? 'Con Saldo'
                         : filterPayment === 'pagados'
                         ? 'Pagados'
                         : filterPayment === 'pdi'
-                        ? 'PDI'
+                        ? 'Alistamiento PDI'
                         : filterPayment === 'engrasado'
-                        ? 'Engrasada'
+                        ? 'Engrasado'
                         : 'Mantenimiento'}
                     </span>
                     <button
@@ -2883,9 +2933,11 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       {filterDateRange === 'today'
                         ? 'Hoy'
                         : filterDateRange === 'this_week'
-                        ? 'Esta semana'
+                        ? 'Por semana'
                         : filterDateRange === 'this_month'
-                        ? 'Este mes'
+                        ? 'Por mes'
+                        : filterDateRange === 'this_year'
+                        ? 'Por año'
                         : `${customStartDate || '...'} a ${customEndDate || '...'}`}
                     </span>
                     <button
@@ -2907,6 +2959,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       Orden:{' '}
                       {sortBy === 'antiguos'
                         ? 'Antiguos'
+                        : sortBy === 'hoy'
+                        ? 'Hoy'
+                        : sortBy === 'por_semana'
+                        ? 'Por semana'
+                        : sortBy === 'por_mes'
+                        ? 'Por mes'
+                        : sortBy === 'por_ano'
+                        ? 'Por año'
                         : sortBy === 'cliente_asc'
                         ? 'Cliente (A-Z)'
                         : sortBy === 'cliente_desc'

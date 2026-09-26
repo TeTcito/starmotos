@@ -635,7 +635,42 @@ const formatServiceSummary = (actions: ServiceActionType[] = [], defaultObs?: st
 // Generador de historial específico para el cliente según alistamientos/servicios realizados
 const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): MaintenanceRecord[] => {
   const allAlistamientos = getStoredFullAlistamientos();
-  const matched = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+  const allOrders = getStoredOrders();
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+
+  // Órdenes del cliente
+  const clientOrders = allOrders.filter((o) => {
+    const cId = norm(p.idNumber);
+    const oId = norm(o.clientIdNumber);
+    if (cId && oId) return cId === oId;
+
+    const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const oPlate = norm(o.plate).replace(/[^a-z0-9]/g, '');
+    if (mPlate && oPlate && !isPlaceholderPlate(m.plate) && !isPlaceholderPlate(o.plate) && mPlate === oPlate) return true;
+
+    return false;
+  });
+
+  // Alistamientos que corresponden a este cliente
+  const clientAlistamientos = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+
+  // IDs y tickets de órdenes que están actualmente ACTIVAS (no entregadas)
+  const activeAlistamientoIds = new Set<string>();
+  const activeOtNumbers = new Set<string>();
+  clientOrders.forEach((o) => {
+    if (o.status !== 'entregado' && o.status !== 'entregada') {
+      if (o.alistamientoId) activeAlistamientoIds.add(o.alistamientoId);
+      if (o.id) activeAlistamientoIds.add(o.id);
+      if (o.otNumber) activeOtNumbers.add(o.otNumber);
+    }
+  });
+
+  // Alistamientos entregados (excluye los que están activos en taller)
+  const matched = clientAlistamientos.filter((a) => {
+    if (activeAlistamientoIds.has(a.id)) return false;
+    if (a.numeroTicket && activeOtNumbers.has(a.numeroTicket)) return false;
+    return true;
+  });
 
   matched.sort(
     (a, b) =>
@@ -676,7 +711,6 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
   }
 
   // Also include delivered orders (entregado/entregada) that don't already have an alistamiento record
-  const allOrders = getStoredOrders();
   const deliveredOrders = allOrders.filter((o) => {
     if (o.status !== 'entregado' && o.status !== 'entregada') return false;
     const norm = (s?: string) => (s || '').trim().toLowerCase();
@@ -794,18 +828,124 @@ const getClientScheduledMaintenances = (
   return result;
 };
 
-// Generador de OT activa para el cliente
-const getClientActiveOrder = (
+// Conversor de una orden de taller a WorkOrder completa para el cliente
+export const buildWorkOrderFromTallerOrder = (
+  matched: TallerOrder,
+  p: ClientProfile,
+  m: MotorcycleClientData,
+  branch: Branch,
+  allAlistamientos: AlistamientoFullRecord[]
+): WorkOrder => {
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+  let matchedAls = matched.alistamientoId
+    ? allAlistamientos.find((a) => a.id === matched.alistamientoId)
+    : undefined;
+
+  if (!matchedAls) {
+    const candidates = allAlistamientos.filter((a) => {
+      const aId = norm(a.cedulaRuc);
+      const cId = norm(p.idNumber);
+      if (aId && cId && aId === cId) return true;
+      const aPlate = norm(a.placa).replace(/[^a-z0-9]/g, '');
+      const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
+      if (aPlate && mPlate && aPlate === mPlate) return true;
+      return false;
+    });
+    matchedAls =
+      candidates.find((a) => a.numeroTicket === matched.otNumber || a.id === matched.id) ||
+      candidates.find((a) => a.fotos && a.fotos.length > 0) ||
+      candidates[candidates.length - 1];
+  }
+
+  const orderBranch = ALL_BRANCHES.find((b) => b.id === matched.workshopId) || branch;
+  const steps = buildSteps(matched.status || 'inicio');
+  const isQuotationPending = matched.status === 'cotizacion_pendiente';
+
+  const techName = matchedAls?.tecnicoResponsable || matched.mechanicName || 'Técnico Especialista Asignado';
+  const entryDate = matchedAls?.fechaServicio || matched.entryDate || 'Reciente';
+  const entryTime = matchedAls?.horaServicio || '08:30';
+  const totalCost = matchedAls?.valorServicio !== undefined ? Number(matchedAls.valorServicio) : (matched.totalCost || 0);
+  const abono = matchedAls?.abono !== undefined ? Number(matchedAls.abono) : (matchedAls?.montoPagado !== undefined ? Number(matchedAls.montoPagado) : totalCost);
+  const saldoPendiente = matchedAls?.saldoPendiente !== undefined ? Number(matchedAls.saldoPendiente) : Math.max(0, totalCost - abono);
+
+  return {
+    otNumber: matched.otNumber,
+    entryDate: entryDate,
+    entryTime: entryTime,
+    estimatedDelivery: matched.estimatedDelivery || 'En coordinación con taller',
+    clientReason: matchedAls?.observaciones || matched.servicesSummary || `Servicio técnico para ${matched.motorcycleInfo || `${m.brand} ${m.model}`}.`,
+    branch: orderBranch,
+    mechanic: {
+      id: matchedAls?.tecnicoId || 'mec-assigned',
+      name: techName,
+      specialty: 'Mecánico Certificado StarMotos',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      certifications: ['Técnico Homologado StarMotos'],
+    },
+    advisor: matched.workshopName || orderBranch.name,
+    status: matched.status || 'inicio',
+    steps: steps,
+    supervisorObservations: matchedAls?.observaciones || matched.servicesSummary || 'Servicio en proceso según especificaciones técnicas de fábrica.',
+    diagnosticPhotos: (matchedAls?.fotos || []).filter(isValidMediaUrl).map((f, i) => ({
+      id: `foto-${i}`,
+      url: f,
+      title: `Inspección de Recepción ${i + 1}`,
+      description: 'Estado de recepción de la motocicleta en taller',
+      uploadedAt: entryTime,
+      stage: 'Recepción',
+    })),
+    alistamientoId: matchedAls?.id || matched.alistamientoId,
+    serviciosRealizados: matchedAls?.serviciosRealizados || [],
+    tecnicoResponsable: techName,
+    kilometrajeIngreso: matchedAls?.kilometraje !== undefined ? Number(matchedAls.kilometraje) : (m.currentKm || 0),
+    proximoMantenimientoKm: matchedAls?.proximoMantenimientoKm || ((matchedAls?.kilometraje || m.currentKm || 0) + 3000),
+    tipoAceite: matchedAls?.tipoAceite || '20W-50',
+    nivelAceite: matchedAls?.nivelAceite || 'mineral',
+    estadoAceite: matchedAls?.aceite || 'con_aceite',
+    valorServicio: totalCost,
+    abono: abono,
+    saldoPendiente: saldoPendiente,
+    metodoPago: matchedAls?.metodoPago || 'Efectivo',
+    observacionesTaller: matchedAls?.observaciones || matched.servicesSummary || 'Servicio técnico en proceso según especificaciones técnicas de fábrica.',
+    numeroFactura: matchedAls?.numeroFactura || '',
+    numeroTicket: matchedAls?.numeroTicket || matched.otNumber || '',
+    fotosIngreso: (matchedAls?.fotos || []).filter(isValidMediaUrl),
+    origenIngreso: matchedAls?.origen || 'Taller StarMotos',
+    orderId: matched.id,
+    rating: matched.rating,
+    quotation: {
+      quotationNumber: `COT-${matched.otNumber.replace(/[^0-9]/g, '') || '01'}`,
+      createdAt: entryDate,
+      expiresAt: '48 horas posteriores',
+      status: isQuotationPending ? 'pendiente_aprobacion' : 'aprobado',
+      parts: [],
+      services: [],
+      subtotalParts: 0,
+      subtotalServices: totalCost,
+      subtotal: totalCost,
+      discount: 0,
+      taxRate: 0.15,
+      taxAmount: 0,
+      total: totalCost,
+      mechanicNotes: 'Servicio respaldado con garantía oficial de taller StarMotos.',
+    },
+  };
+};
+
+// Generador de todas las órdenes activas en curso para el cliente
+export const getClientActiveOrders = (
   p: ClientProfile,
   m: MotorcycleClientData,
   branch: Branch
-): WorkOrder => {
+): WorkOrder[] => {
   const allOrders = getStoredOrders();
+  const allAlistamientos = getStoredFullAlistamientos();
+  const norm = (s?: string) => (s || '').trim().toLowerCase();
+
+  // 1. Filtrar órdenes que corresponden al cliente
   const clientOrders = allOrders.filter((o) => {
-    const norm = (s?: string) => (s || '').trim().toLowerCase();
     const cId = norm(p.idNumber);
     const oId = norm(o.clientIdNumber);
-    // Cedula-first: if both have cedula, they MUST match
     if (cId && oId) return cId === oId;
 
     const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
@@ -814,113 +954,82 @@ const getClientActiveOrder = (
 
     return false;
   });
-  // Find the most recent non-delivered order
-  const matched = clientOrders.find((o) => o.status !== 'entregada' && o.status !== 'entregado');
 
-  if (matched) {
-    const allAlistamientos = getStoredFullAlistamientos();
-    const norm = (s?: string) => (s || '').trim().toLowerCase();
-    let matchedAls = matched.alistamientoId
-      ? allAlistamientos.find((a) => a.id === matched.alistamientoId)
-      : undefined;
+  // 2. Órdenes con estado activo (NO entregadas)
+  const activeTallerOrders = clientOrders.filter(
+    (o) => o.status !== 'entregada' && o.status !== 'entregado'
+  );
 
-    if (!matchedAls) {
-      const candidates = allAlistamientos.filter((a) => {
-        const aId = norm(a.cedulaRuc);
-        const cId = norm(p.idNumber);
-        if (aId && cId && aId === cId) return true;
-        const aPlate = norm(a.placa).replace(/[^a-z0-9]/g, '');
-        const mPlate = norm(m.plate).replace(/[^a-z0-9]/g, '');
-        if (aPlate && mPlate && aPlate === mPlate) return true;
-        return false;
-      });
-      matchedAls =
-        candidates.find((a) => a.numeroTicket === matched.otNumber || a.id === matched.id) ||
-        candidates.find((a) => a.fotos && a.fotos.length > 0) ||
-        candidates[candidates.length - 1];
+  // 3. Revisar si hay alistamientos del cliente que no tengan aún TallerOrder registrado
+  const clientAlistamientos = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
+  const missingAlistamientos = clientAlistamientos.filter((a) => {
+    // Si ya existe una orden para este alistamiento, ya fue evaluada en clientOrders
+    const matchingOrder = clientOrders.find(
+      (o) =>
+        (o.alistamientoId && o.alistamientoId === a.id) ||
+        o.id === a.id ||
+        (o.otNumber && a.numeroTicket && o.otNumber === a.numeroTicket)
+    );
+    if (matchingOrder) {
+      return false;
     }
+    // Si no tiene orden, se considera un nuevo alistamiento activo en taller
+    return true;
+  });
 
-    const orderBranch = ALL_BRANCHES.find((b) => b.id === matched.workshopId) || branch;
-    const steps = buildSteps(matched.status || 'inicio');
-    const isQuotationPending = matched.status === 'cotizacion_pendiente';
-
-    const techName = matchedAls?.tecnicoResponsable || matched.mechanicName || 'Técnico Especialista Asignado';
-    const entryDate = matchedAls?.fechaServicio || matched.entryDate || 'Reciente';
-    const entryTime = matchedAls?.horaServicio || '08:30';
-    const totalCost = matchedAls?.valorServicio !== undefined ? Number(matchedAls.valorServicio) : (matched.totalCost || 0);
-    const abono = matchedAls?.abono !== undefined ? Number(matchedAls.abono) : (matchedAls?.montoPagado !== undefined ? Number(matchedAls.montoPagado) : totalCost);
-    const saldoPendiente = matchedAls?.saldoPendiente !== undefined ? Number(matchedAls.saldoPendiente) : Math.max(0, totalCost - abono);
-
+  // Convertir alistamientos faltantes en TallerOrders sintéticas activas
+  const synthesizedOrders: TallerOrder[] = missingAlistamientos.map((a) => {
+    const otNumber = a.numeroTicket || `OT-${a.id.slice(-6).toUpperCase()}`;
     return {
-      otNumber: matched.otNumber,
-      entryDate: entryDate,
-      entryTime: entryTime,
-      estimatedDelivery: matched.estimatedDelivery || 'En coordinación con taller',
-      clientReason: matchedAls?.observaciones || matched.servicesSummary || `Servicio técnico para ${matched.motorcycleInfo || `${m.brand} ${m.model}`}.`,
-      branch: orderBranch,
-      mechanic: {
-        id: matchedAls?.tecnicoId || 'mec-assigned',
-        name: techName,
-        specialty: 'Mecánico Certificado StarMotos',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-        certifications: ['Técnico Homologado StarMotos'],
-      },
-      advisor: matched.workshopName || orderBranch.name,
-      status: matched.status || 'inicio',
-      steps: steps,
-      supervisorObservations: matchedAls?.observaciones || matched.servicesSummary || 'Servicio en proceso según especificaciones técnicas de fábrica.',
-      diagnosticPhotos: (matchedAls?.fotos || []).filter(isValidMediaUrl).map((f, i) => ({
-        id: `foto-${i}`,
-        url: f,
-        title: `Inspección de Recepción ${i + 1}`,
-        description: 'Estado de recepción de la motocicleta en taller',
-        uploadedAt: entryTime,
-        stage: 'Recepción',
-      })),
-      alistamientoId: matchedAls?.id || matched.alistamientoId,
-      serviciosRealizados: matchedAls?.serviciosRealizados || [],
-      tecnicoResponsable: techName,
-      kilometrajeIngreso: matchedAls?.kilometraje !== undefined ? Number(matchedAls.kilometraje) : (m.currentKm || 0),
-      proximoMantenimientoKm: matchedAls?.proximoMantenimientoKm || ((matchedAls?.kilometraje || m.currentKm || 0) + 3000),
-      tipoAceite: matchedAls?.tipoAceite || '20W-50',
-      nivelAceite: matchedAls?.nivelAceite || 'mineral',
-      estadoAceite: matchedAls?.aceite || 'con_aceite',
-      valorServicio: totalCost,
-      abono: abono,
-      saldoPendiente: saldoPendiente,
-      metodoPago: matchedAls?.metodoPago || 'Efectivo',
-      observacionesTaller: matchedAls?.observaciones || matched.servicesSummary || 'Servicio técnico en proceso según especificaciones técnicas de fábrica.',
-      numeroFactura: matchedAls?.numeroFactura || '',
-      numeroTicket: matchedAls?.numeroTicket || matched.otNumber || '',
-      fotosIngreso: (matchedAls?.fotos || []).filter(isValidMediaUrl),
-      origenIngreso: matchedAls?.origen || 'Taller StarMotos',
-      orderId: matched.id,
-      rating: matched.rating,
-      quotation: {
-        quotationNumber: `COT-${matched.otNumber.replace(/[^0-9]/g, '') || '01'}`,
-        createdAt: entryDate,
-        expiresAt: '48 horas posteriores',
-        status: isQuotationPending ? 'pendiente_aprobacion' : 'aprobado',
-        parts: [],
-        services: [],
-        subtotalParts: 0,
-        subtotalServices: totalCost,
-        subtotal: totalCost,
-        discount: 0,
-        taxRate: 0.15,
-        taxAmount: 0,
-        total: totalCost,
-        mechanicNotes: 'Servicio respaldado con garantía oficial de taller StarMotos.',
-      },
+      id: a.id,
+      otNumber,
+      clientName: `${a.nombres} ${a.apellidos}`.trim(),
+      clientIdNumber: a.cedulaRuc,
+      motorcycleInfo: a.modeloMarca,
+      plate: a.placa,
+      entryDate: a.fechaServicio || new Date().toISOString().split('T')[0],
+      status: 'inicio',
+      mechanicName: a.tecnicoResponsable || 'Sin asignar',
+      estimatedDelivery: '',
+      totalCost: a.valorServicio || 0,
+      workshopId: a.sedeId || branch.id,
+      workshopName: a.sede || branch.name,
+      alistamientoId: a.id,
+      servicesSummary: (a.serviciosRealizados || []).join(', ') || 'Alistamiento / Mantenimiento',
     };
+  });
+
+  const combinedOrders = [...activeTallerOrders, ...synthesizedOrders];
+
+  // Ordenar por fecha más reciente
+  combinedOrders.sort((a, b) => {
+    const dateA = new Date(a.entryDate || 0).getTime();
+    const dateB = new Date(b.entryDate || 0).getTime();
+    return dateB - dateA;
+  });
+
+  if (combinedOrders.length > 0) {
+    return combinedOrders.map((o) =>
+      buildWorkOrderFromTallerOrder(o, p, m, branch, allAlistamientos)
+    );
   }
 
   // Fallback demo Fernando Vaca: SOLO si no tiene órdenes creadas en taller
-  if (p.idNumber === '1724890123' && clientOrders.length === 0) {
-    return INITIAL_WORK_ORDER;
+  if (p.idNumber === '1724890123' && clientOrders.length === 0 && clientAlistamientos.length === 0) {
+    return [INITIAL_WORK_ORDER];
   }
 
-  return EMPTY_WORK_ORDER;
+  return [];
+};
+
+// Generador de OT activa para el cliente (compatibilidad hacia atrás)
+export const getClientActiveOrder = (
+  p: ClientProfile,
+  m: MotorcycleClientData,
+  branch: Branch
+): WorkOrder => {
+  const list = getClientActiveOrders(p, m, branch);
+  return list[0] || EMPTY_WORK_ORDER;
 };
 
 // Generador de orden entregada pendiente de calificar
@@ -1182,9 +1291,17 @@ export function useCustomerPortal() {
   );
 
   // Orden de Trabajo, Historial y Garantías vinculadas en tiempo real
-  const [activeOrder, setActiveOrder] = useState<WorkOrder>(() =>
-    getClientActiveOrder(profile, motorcycle, activeBranch)
+  const [activeOrders, setActiveOrders] = useState<WorkOrder[]>(() =>
+    getClientActiveOrders(profile, motorcycle, activeBranch)
   );
+  const [selectedActiveOrderIndex, setSelectedActiveOrderIndex] = useState<number>(0);
+
+  const activeOrder = useMemo(() => {
+    if (activeOrders.length === 0) return EMPTY_WORK_ORDER;
+    const safeIdx = Math.min(Math.max(0, selectedActiveOrderIndex), activeOrders.length - 1);
+    return activeOrders[safeIdx] || EMPTY_WORK_ORDER;
+  }, [activeOrders, selectedActiveOrderIndex]);
+
   const [history, setHistory] = useState<MaintenanceRecord[]>(() =>
     getClientHistory(profile, motorcycle)
   );
@@ -1236,7 +1353,9 @@ export function useCustomerPortal() {
       const branch = ALL_BRANCHES.find((b) => b.id === enrichedMoto.preferredBranchId) || BRANCH_MATRIZ;
       setHistory(getClientHistory(curProfile, enrichedMoto));
       setScheduledMaintenances(getClientScheduledMaintenances(curProfile, enrichedMoto, branch));
-      setActiveOrder(getClientActiveOrder(curProfile, enrichedMoto, branch));
+      const ordersList = getClientActiveOrders(curProfile, enrichedMoto, branch);
+      setActiveOrders(ordersList);
+      setSelectedActiveOrderIndex((prev) => (prev < ordersList.length ? prev : 0));
       setWarranties(getClientWarranties(curProfile, enrichedMoto));
 
       const unratedOrder = getPendingRatingOrder(curProfile, enrichedMoto);
@@ -1352,7 +1471,9 @@ export function useCustomerPortal() {
     const branch = ALL_BRANCHES.find((b) => b.id === enrichedMoto.preferredBranchId) || BRANCH_MATRIZ;
     setHistory(getClientHistory(curProfile, enrichedMoto));
     setScheduledMaintenances(getClientScheduledMaintenances(curProfile, enrichedMoto, branch));
-    setActiveOrder(getClientActiveOrder(curProfile, enrichedMoto, branch));
+    const ordersList = getClientActiveOrders(curProfile, enrichedMoto, branch);
+    setActiveOrders(ordersList);
+    setSelectedActiveOrderIndex(0);
     setWarranties(getClientWarranties(curProfile, enrichedMoto));
 
     const target = getSectionFromHash();
@@ -1495,17 +1616,24 @@ export function useCustomerPortal() {
   const approveQuotation = useCallback(() => {
     setIsApproving(true);
     setTimeout(() => {
-      setActiveOrder((prev) => ({
-        ...prev,
-        status: 'en_reparacion',
-        steps: buildSteps('en_reparacion'),
-        quotation: {
-          ...prev.quotation,
-          status: 'aprobado',
-          approvedAt: 'Hoy (Portal Web Cliente)',
-          approvedBy: profile.fullName,
-        },
-      }));
+      setActiveOrders((prev) => {
+        const safeIdx = Math.min(Math.max(0, selectedActiveOrderIndex), prev.length - 1);
+        return prev.map((ord, i) =>
+          i === safeIdx
+            ? {
+                ...ord,
+                status: 'en_reparacion',
+                steps: buildSteps('en_reparacion'),
+                quotation: {
+                  ...ord.quotation,
+                  status: 'aprobado',
+                  approvedAt: 'Hoy (Portal Web Cliente)',
+                  approvedBy: profile.fullName,
+                },
+              }
+            : ord
+        );
+      });
 
       setIsApproving(false);
       setIsApprovalModalOpen(false);
@@ -1671,6 +1799,9 @@ export function useCustomerPortal() {
     scheduledMaintenances,
     addScheduledMaintenance,
     activeOrder,
+    activeOrders,
+    selectedActiveOrderIndex,
+    setSelectedActiveOrderIndex,
     history,
     warranties,
     branches: ALL_BRANCHES,

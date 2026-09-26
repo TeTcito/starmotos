@@ -818,7 +818,50 @@ export function useAdminPortal() {
       return updated;
     });
 
-    // 4. Crear Alerta para Admin
+    // 4. Crear / actualizar Orden de Trabajo correspondiente en taller (status: inicio)
+    const serviceLabels: Record<string, string> = {
+      alistamiento_pdi: 'Alistamiento PDI',
+      engrasado: 'Engrasado',
+      mantenimiento: 'Mantenimiento',
+    };
+    const servicesSummary = (record.serviciosRealizados || [])
+      .map((s) => serviceLabels[s] || s)
+      .join(', ') || 'Servicio General';
+
+    const otNumber = record.numeroTicket || `OT-${Date.now().toString(36).toUpperCase()}`;
+    const newOrder: TallerOrder = {
+      id: `ord-${Date.now()}`,
+      otNumber,
+      clientName: `${record.nombres} ${record.apellidos}`.trim(),
+      clientIdNumber: record.cedulaRuc,
+      motorcycleInfo: record.modeloMarca,
+      plate: record.placa,
+      entryDate: record.fechaServicio || new Date().toISOString().split('T')[0],
+      status: 'inicio',
+      mechanicName: record.tecnicoResponsable || 'Sin asignar',
+      estimatedDelivery: '',
+      totalCost: record.valorServicio || 0,
+      workshopId: record.sedeId || 'matriz-la-mana',
+      workshopName: record.sede || 'StarMotos Matriz La Maná',
+      alistamientoId: record.id,
+      servicesSummary,
+    };
+
+    setOrders((prev) => {
+      const alreadyExists = prev.some((o) => o.alistamientoId === record.id || o.id === record.id);
+      if (alreadyExists) {
+        const updated = prev.map((o) =>
+          o.alistamientoId === record.id || o.id === record.id ? { ...o, ...newOrder, id: o.id, otNumber: o.otNumber } : o
+        );
+        saveStoredOrders(updated);
+        return updated;
+      }
+      const updated = [newOrder, ...prev];
+      saveStoredOrders(updated);
+      return updated;
+    });
+
+    // 5. Crear Alerta para Admin
     const newAlert: SystemAlert = {
       id: `alt-adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'orden_creada',

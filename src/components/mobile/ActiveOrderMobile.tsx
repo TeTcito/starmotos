@@ -27,6 +27,9 @@ import { isValidMediaUrl } from '../../services/mediaStorage';
 interface Props {
   activeOrder: WorkOrder;
   motorcycle: MotorcycleClientData;
+  activeOrders?: WorkOrder[];
+  selectedOrderIndex?: number;
+  onSelectOrder?: (index: number) => void;
   onOpenApprovalModal?: () => void;
   pendingRatingOrder?: TallerOrder | null;
   onOpenRatingModal?: () => void;
@@ -52,6 +55,9 @@ const SERVICE_LABELS: Record<string, { label: string; desc: string }> = {
 export const ActiveOrderMobile: React.FC<Props> = ({
   activeOrder,
   motorcycle,
+  activeOrders,
+  selectedOrderIndex,
+  onSelectOrder,
   pendingRatingOrder,
   onOpenRatingModal,
   isHistoryView = false,
@@ -186,6 +192,70 @@ export const ActiveOrderMobile: React.FC<Props> = ({
           </span>
         )}
       </div>
+
+      {/* Selector de Órdenes Activas si hay más de 1 en curso */}
+      {!isHistoryView && activeOrders && activeOrders.length > 1 && (
+        <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-indigo-50/70 border border-blue-200/90 rounded-2xl p-3 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+              </span>
+              <span className="text-[11px] font-black text-blue-950 uppercase tracking-wider">
+                Órdenes en Taller ({activeOrders.length})
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-medium">Toca para alternar</span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {activeOrders.map((ord, idx) => {
+              const isSelected = (selectedOrderIndex !== undefined ? selectedOrderIndex : 0) === idx;
+              const total = ord.valorServicio || ord.quotation?.total || 0;
+              const statusMap: Record<string, { label: string; color: string }> = {
+                inicio: { label: 'Inicio', color: 'bg-zinc-100 text-zinc-700' },
+                en_proceso: { label: 'En Proceso', color: 'bg-blue-100 text-blue-800' },
+                trabajando: { label: 'Trabajando', color: 'bg-amber-100 text-amber-800' },
+                listo_para_entregar: { label: 'Listo Retiro', color: 'bg-emerald-100 text-emerald-800' },
+              };
+              const statusInfo = statusMap[ord.status] || { label: ord.status, color: 'bg-blue-50 text-blue-700' };
+
+              return (
+                <button
+                  key={ord.otNumber || idx}
+                  type="button"
+                  onClick={() => onSelectOrder && onSelectOrder(idx)}
+                  className={`px-3 py-2 rounded-xl border text-left transition shrink-0 cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/25 ring-1 ring-white/30'
+                      : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-800 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono text-xs font-black ${isSelected ? 'text-white' : 'text-blue-600'}`}>
+                      {ord.otNumber || `OT-${idx + 1}`}
+                    </span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                      isSelected ? 'bg-white/20 text-white' : statusInfo.color
+                    }`}>
+                      {statusInfo.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 mt-1">
+                    <span className={`text-[10px] truncate max-w-[110px] ${isSelected ? 'text-blue-100' : 'text-zinc-500'}`}>
+                      {ord.clientReason || 'Servicio'}
+                    </span>
+                    <span className={`text-[10px] font-mono font-bold ${isSelected ? 'text-white' : 'text-zinc-800'}`}>
+                      ${Number(total).toFixed(2)}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Resumen OT */}
       <div className="bg-zinc-50 rounded-xl p-3.5 border border-zinc-200 shadow-xs space-y-1.5">

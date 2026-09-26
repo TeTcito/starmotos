@@ -28,6 +28,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     scheduledMaintenances,
     addScheduledMaintenance,
     activeOrder,
+    activeOrders,
+    selectedActiveOrderIndex,
+    setSelectedActiveOrderIndex,
     history,
     warranties,
     branches,
@@ -64,6 +67,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           scheduledMaintenances={scheduledMaintenances}
           addScheduledMaintenance={addScheduledMaintenance}
           activeOrder={activeOrder}
+          activeOrders={activeOrders}
+          selectedActiveOrderIndex={selectedActiveOrderIndex}
+          onSelectActiveOrder={setSelectedActiveOrderIndex}
           history={history}
           warranties={warranties}
           branches={branches}
@@ -88,6 +94,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           scheduledMaintenances={scheduledMaintenances}
           addScheduledMaintenance={addScheduledMaintenance}
           activeOrder={activeOrder}
+          activeOrders={activeOrders}
+          selectedActiveOrderIndex={selectedActiveOrderIndex}
+          onSelectActiveOrder={setSelectedActiveOrderIndex}
           history={history}
           warranties={warranties}
           branches={branches}

@@ -43,6 +43,9 @@ interface Props {
   scheduledMaintenances: ScheduledMaintenance[];
   addScheduledMaintenance: (maintenance: ScheduledMaintenance) => void;
   activeOrder: WorkOrder;
+  activeOrders?: WorkOrder[];
+  selectedActiveOrderIndex?: number;
+  onSelectActiveOrder?: (index: number) => void;
   history: MaintenanceRecord[];
   warranties: WarrantyItem[];
   branches: Branch[];
@@ -74,6 +77,9 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   scheduledMaintenances,
   addScheduledMaintenance,
   activeOrder,
+  activeOrders,
+  selectedActiveOrderIndex,
+  onSelectActiveOrder,
   history,
   warranties,
   branches,
@@ -298,6 +304,9 @@ export const CustomerViewDesktop: React.FC<Props> = ({
               <ActiveOrderDesktop
                 activeOrder={activeOrder}
                 motorcycle={motorcycle}
+                activeOrders={activeOrders}
+                selectedOrderIndex={selectedActiveOrderIndex}
+                onSelectOrder={onSelectActiveOrder}
                 onOpenApprovalModal={() => setIsApprovalModalOpen(true)}
                 pendingRatingOrder={pendingRatingOrder}
                 onOpenRatingModal={onOpenRatingModal}

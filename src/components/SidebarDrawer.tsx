@@ -77,9 +77,9 @@ export const SidebarDrawer: React.FC<Props> = ({
     },
     {
       id: 'eventos',
-      label: 'Evento de Facturas',
+      label: 'Eventos y Facturas',
       icon: <Receipt className="w-4 h-4" />,
-      badge: 'SRI',
+      badge: 'Facturas',
     },
     {
       id: 'historial',

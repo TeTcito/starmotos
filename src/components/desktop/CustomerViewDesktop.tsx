@@ -56,6 +56,14 @@ interface Props {
   approveQuotation: () => void;
   pendingRatingOrder?: TallerOrder | null;
   onOpenRatingModal?: () => void;
+  onSubmitAbono?: (data: {
+    alistamientoId?: string;
+    monto: number;
+    comprobanteUrl: string;
+    bancoOrigen?: string;
+    numeroComprobante?: string;
+    notas?: string;
+  }) => Promise<boolean>;
 }
 
 export const CustomerViewDesktop: React.FC<Props> = ({
@@ -79,6 +87,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   approveQuotation,
   pendingRatingOrder,
   onOpenRatingModal,
+  onSubmitAbono,
 }) => {
   const menuItems: { id: ActiveSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -115,7 +124,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
     perfil: 'Perfil del Cliente',
     orden_activa: 'Orden de Trabajo Activa',
     agendar_cita: 'Agendar Cita Técnica en Taller',
-    eventos: 'Evento de Facturas, Mantenimientos y SRI',
+    eventos: 'Eventos y Facturas',
     historial: 'Historial de Servicios y Garantía de Pólizas',
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita Técnica',
@@ -317,6 +326,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                 history={history}
                 motorcycle={motorcycle}
                 profile={profile}
+                onSubmitAbono={onSubmitAbono}
               />
             )}
 

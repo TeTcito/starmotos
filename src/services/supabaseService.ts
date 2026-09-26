@@ -835,6 +835,19 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
       } catch (_) {}
     }
 
+    // 3. Subir comprobante de solicitud de abono del cliente si viene en base64/blob
+    if (cleanRec.solicitudAbonoPendiente?.comprobanteUrl) {
+      const solEv = cleanRec.solicitudAbonoPendiente.comprobanteUrl;
+      if (typeof solEv === 'string' && (solEv.startsWith('data:') || solEv.startsWith('blob:') || solEv.length > 2000)) {
+        try {
+          const cloudUrl = await uploadWarrantyMedia(solEv, `als_${cleanRec.id}_solicitud_abono`);
+          if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+            cleanRec.solicitudAbonoPendiente.comprobanteUrl = cloudUrl;
+          }
+        } catch (_) {}
+      }
+    }
+
     const payload = {
       id: cleanRec.id,
       cedula_ruc: cleanRec.cedulaRuc || null,

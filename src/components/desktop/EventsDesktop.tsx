@@ -1,5 +1,4 @@
-// src/components/desktop/EventsDesktop.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Receipt,
   Wrench,
@@ -16,28 +15,58 @@ import {
   Sparkles,
   ExternalLink,
   Filter,
+  Clock,
+  AlertCircle,
+  Upload,
 } from 'lucide-react';
 import { MaintenanceRecord, MotorcycleClientData, ClientProfile } from '../../types/customer';
 import { ModalPortal } from '../common/ModalPortal';
+import { AbonoTransferenciaModal } from '../common/AbonoTransferenciaModal';
 
 interface Props {
   history: MaintenanceRecord[];
   motorcycle: MotorcycleClientData;
   profile: ClientProfile;
+  onSubmitAbono?: (data: {
+    alistamientoId?: string;
+    monto: number;
+    comprobanteUrl: string;
+    bancoOrigen?: string;
+    numeroComprobante?: string;
+    notas?: string;
+  }) => Promise<boolean>;
 }
 
-export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile }) => {
+export const EventsDesktop: React.FC<Props> = ({
+  history,
+  motorcycle,
+  profile,
+  onSubmitAbono,
+}) => {
   const [selectedInvoice, setSelectedInvoice] = useState<MaintenanceRecord | null>(null);
-  const [filterType, setFilterType] = useState<'all' | 'maintenances' | 'invoices'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'maintenances' | 'pendientes'>('all');
+  const [isAbonoModalOpen, setIsAbonoModalOpen] = useState(false);
 
   // Cálculo de totales
   const totalInvested = history.reduce((sum, item) => sum + item.totalPaid, 0);
+  const totalPending = history.reduce((sum, item) => sum + (item.saldoPendiente || 0), 0);
+  const pendingCount = history.filter((item) => (item.saldoPendiente || 0) > 0.01).length;
   const completedMaintenances = history.length;
-  const totalInvoices = history.filter((item) => Boolean(item.invoiceNumber)).length;
+  const hasPendingAbonoReview = history.some(
+    (item) => item.solicitudAbonoPendiente?.estado === 'pendiente'
+  );
+
   const nextServiceKm = history.length > 0 && history[0].mileage > 0
     ? history[0].mileage + (motorcycle.oilChangeIntervalKm || 3000)
     : (motorcycle.currentKm + (motorcycle.oilChangeIntervalKm || 3000));
   const kmToNextService = Math.max(0, nextServiceKm - motorcycle.currentKm);
+
+  const displayedRecords = useMemo(() => {
+    if (filterType === 'pendientes') {
+      return history.filter((item) => (item.saldoPendiente || 0) > 0.01);
+    }
+    return history;
+  }, [history, filterType]);
 
   return (
     <div className="w-full space-y-6 animate-fade-in pb-16">
@@ -50,7 +79,7 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
             </div>
             <div>
               <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
-                Eventos, Mantenimientos y Facturas SRI
+                Eventos y Facturas
               </h2>
               <p className="text-xs text-zinc-500 mt-0.5">
                 Historial técnico certificado, kilometraje oficial y comprobantes electrónicos emitidos
@@ -81,16 +110,18 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
           >
             Mantenimientos ({completedMaintenances})
           </button>
-          <button
-            onClick={() => setFilterType('invoices')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-              filterType === 'invoices'
-                ? 'bg-white text-blue-700 shadow-xs'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Facturas SRI ({totalInvoices})
-          </button>
+          {pendingCount > 0 && (
+            <button
+              onClick={() => setFilterType('pendientes')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                filterType === 'pendientes'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-purple-700 hover:text-purple-900'
+              }`}
+            >
+              Pendientes ({pendingCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -110,6 +141,41 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
           </div>
         </div>
 
+        {/* Pendientes (Al lado de Total Invertido con botón/icono de Abono) */}
+        <div className="bg-gradient-to-br from-purple-50/90 to-white p-4 rounded-2xl border border-purple-200/80 shadow-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-purple-600/20">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Pendientes</p>
+                {hasPendingAbonoReview && (
+                  <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.2 rounded-full border border-purple-300 animate-pulse">
+                    En revisión
+                  </span>
+                )}
+              </div>
+              <h3 className="text-xl font-extrabold text-purple-900 font-mono">
+                ${totalPending.toFixed(2)} <span className="text-xs text-zinc-500 font-normal">USD</span>
+              </h3>
+              <p className="text-[10px] text-zinc-500 truncate">
+                {totalPending > 0.01 ? 'Por liquidar' : 'Sin saldos pendientes'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsAbonoModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+            title="Abonar por transferencia bancaria con evidencia"
+          >
+            <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Abonar</span>
+          </button>
+        </div>
+
         {/* Mantenimientos Completados */}
         <div className="bg-gradient-to-br from-emerald-50/80 to-white p-4 rounded-2xl border border-emerald-200/80 shadow-xs flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-600/20">
@@ -122,21 +188,6 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
               <span className="text-xs text-zinc-500 font-normal">completados</span>
             </h3>
             <p className="text-[10px] text-emerald-700 font-medium">Certificados por StarMotos</p>
-          </div>
-        </div>
-
-        {/* Facturas Autorizadas SRI */}
-        <div className="bg-gradient-to-br from-cyan-50/80 to-white p-4 rounded-2xl border border-cyan-200/80 shadow-xs flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-cyan-600/20">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Facturas SRI</p>
-            <h3 className="text-xl font-extrabold text-zinc-900 font-mono">
-              {totalInvoices}{' '}
-              <span className="text-xs text-zinc-500 font-normal">emitidas</span>
-            </h3>
-            <p className="text-[10px] text-cyan-800 font-medium">Autorizadas SRI Ecuador</p>
           </div>
         </div>
 
@@ -157,32 +208,35 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
         </div>
       </div>
 
-      {/* 3. Contenedor Principal de Eventos Simétrico */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full">
-        {/* COLUMNA IZQUIERDA: RESUMEN DE MANTENIMIENTOS */}
-        {(filterType === 'all' || filterType === 'maintenances') && (
-          <div className={`space-y-4 ${filterType === 'maintenances' ? 'xl:col-span-2' : ''}`}>
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">
-                  Mantenimientos Realizados ({history.length})
-                </h3>
-              </div>
-              <span className="text-[11px] text-zinc-500">Historial técnico verificado</span>
-            </div>
+      {/* 3. Contenedor Principal de Eventos y Mantenimientos */}
+      <div className="space-y-4 w-full">
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+          <div className="flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">
+              {filterType === 'pendientes'
+                ? `Servicios con Saldo Pendiente (${displayedRecords.length})`
+                : `Mantenimientos Realizados (${displayedRecords.length})`}
+            </h3>
+          </div>
+          <span className="text-[11px] text-zinc-500">Historial técnico verificado</span>
+        </div>
 
-            {history.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
-                <Wrench className="w-8 h-8 text-zinc-400 mx-auto" />
-                <h4 className="text-sm font-bold text-zinc-900">Sin mantenimientos registrados</h4>
-                <p className="text-xs text-zinc-500">
-                  Aún no registras servicios técnicos o mantenimientos preventivos realizados en la red oficial de talleres StarMotos.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {history.map((record) => (
+        {displayedRecords.length === 0 ? (
+          <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
+            <Wrench className="w-8 h-8 text-zinc-400 mx-auto" />
+            <h4 className="text-sm font-bold text-zinc-900">
+              {filterType === 'pendientes' ? 'Sin saldos pendientes' : 'Sin mantenimientos registrados'}
+            </h4>
+            <p className="text-xs text-zinc-500">
+              {filterType === 'pendientes'
+                ? '¡Excelente! Estás al día con todos tus pagos y servicios técnicos.'
+                : 'Aún no registras servicios técnicos o mantenimientos preventivos realizados en la red oficial de talleres StarMotos.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {displayedRecords.map((record) => (
                   <div
                     key={record.id}
                     className="bg-white border border-zinc-200 hover:border-blue-400 rounded-2xl p-5 sm:p-6 transition-all shadow-xs hover:shadow-md group space-y-4"
@@ -207,11 +261,55 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
                         <span className="text-sm font-extrabold text-zinc-900 font-mono">
                           ${record.totalPaid.toFixed(2)}
                         </span>
-                        <span className="block text-[10px] text-emerald-700 font-bold">
-                          Pagado
-                        </span>
+                        {(record.saldoPendiente || 0) > 0.01 ? (
+                          <div className="flex flex-col items-end mt-0.5">
+                            <span className="block text-[10px] text-rose-600 font-black">
+                              Debe: ${(record.saldoPendiente || 0).toFixed(2)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsAbonoModalOpen(true)}
+                              className="mt-1 px-2 py-0.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer transition"
+                            >
+                              <DollarSign className="w-2.5 h-2.5" />
+                              <span>Abonar</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="block text-[10px] text-emerald-700 font-bold">
+                            Pagado
+                          </span>
+                        )}
                       </div>
                     </div>
+
+                    {/* Banner de Estado de Abono Solicitado */}
+                    {record.solicitudAbonoPendiente?.estado === 'pendiente' && (
+                      <div className="px-3 py-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 flex items-center justify-between text-xs font-medium">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <Clock className="w-3.5 h-3.5 text-purple-600 animate-spin" />
+                          <span>Abono de ${Number(record.solicitudAbonoPendiente.monto).toFixed(2)} USD enviado por transferencia</span>
+                        </div>
+                        <span className="text-[10px] font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-md">
+                          En revisión por taller
+                        </span>
+                      </div>
+                    )}
+                    {record.solicitudAbonoPendiente?.estado === 'rechazado' && (
+                      <div className="px-3 py-2 bg-rose-50 rounded-xl border border-rose-200 text-rose-900 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Abono rechazado: {record.solicitudAbonoPendiente.motivoRechazo || 'Revisar comprobante'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsAbonoModalOpen(true)}
+                          className="text-[10px] font-bold bg-rose-200 hover:bg-rose-300 text-rose-800 px-2 py-0.5 rounded-md cursor-pointer"
+                        >
+                          Reenviar comprobante
+                        </button>
+                      </div>
+                    )}
 
                     {/* Detalles del servicio compactados con espacio interior */}
                     <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-zinc-50/80 rounded-xl border border-zinc-200/60 text-xs text-zinc-600">
@@ -270,114 +368,6 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* COLUMNA DERECHA: FACTURAS SRI PRESENTADAS */}
-        {(filterType === 'all' || filterType === 'invoices') && (
-          <div className={`space-y-4 ${filterType === 'invoices' ? 'xl:col-span-2' : ''}`}>
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider">
-                  Facturas Electrónicas SRI ({totalInvoices})
-                </h3>
-              </div>
-              <span className="text-[11px] text-zinc-500">Comprobantes válidos SRI Ecuador</span>
-            </div>
-
-            {history.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-dashed border-zinc-300 text-center space-y-2">
-                <FileText className="w-8 h-8 text-zinc-400 mx-auto" />
-                <h4 className="text-sm font-bold text-zinc-900">Sin facturas emitidas</h4>
-                <p className="text-xs text-zinc-500">
-                  No registras comprobantes electrónicos autorizados por el SRI por el momento.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {history.map((record) => {
-                  const subtotal = record.totalPaid / 1.15;
-                  const iva = record.totalPaid - subtotal;
-
-                  return (
-                    <div
-                      key={`inv-${record.id}`}
-                      className="bg-white border border-zinc-200 hover:border-emerald-400 rounded-2xl p-5 sm:p-6 transition-all shadow-xs hover:shadow-md space-y-4"
-                    >
-                      {/* Cabecera de la Tarjeta con separación interna */}
-                      <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-100 px-1">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                              {record.invoiceNumber}
-                            </span>
-                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" />
-                              SRI Autorizada
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-500 mt-1.5">
-                            Emitida el {record.date} • Razón Social: <strong>StarMotos S.A.</strong>
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="text-base font-extrabold text-emerald-700 font-mono">
-                            ${record.totalPaid.toFixed(2)}
-                          </span>
-                          <span className="block text-[10px] text-zinc-400">Total con IVA</span>
-                        </div>
-                      </div>
-
-                      {/* Desglose Fiscal con padding amplio y espacio interior (no topa los bordes) */}
-                      <div className="bg-slate-50/90 rounded-2xl px-5 py-4 border border-zinc-200/80 space-y-2 text-xs">
-                        <div className="flex items-center justify-between text-zinc-600">
-                          <span className="text-zinc-500">Cliente Adquiriente:</span>
-                          <strong className="text-zinc-900 font-semibold">{profile.fullName}</strong>
-                        </div>
-                        <div className="flex items-center justify-between text-zinc-600">
-                          <span className="text-zinc-500">Cédula / RUC:</span>
-                          <span className="font-mono text-zinc-800">{profile.idNumber}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-zinc-600">
-                          <span className="text-zinc-500">Orden de Trabajo Vinculada:</span>
-                          <span className="font-mono text-blue-700 font-bold">{record.otNumber}</span>
-                        </div>
-                        <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between text-zinc-600">
-                          <span className="text-zinc-500">Subtotal (Tarifa 15%):</span>
-                          <span className="font-mono text-zinc-800">${subtotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-zinc-600">
-                          <span className="text-zinc-500">IVA (15%):</span>
-                          <span className="font-mono text-zinc-800">${iva.toFixed(2)}</span>
-                        </div>
-                        <div className="pt-2 border-t border-zinc-200 flex items-center justify-between font-bold text-zinc-900 text-sm">
-                          <span>Total Comprobante:</span>
-                          <span className="font-mono text-emerald-700 font-extrabold">${record.totalPaid.toFixed(2)} USD</span>
-                        </div>
-                      </div>
-
-                      {/* Botones de acción */}
-                      <div className="flex items-center justify-between px-1 pt-1">
-                        <span className="text-[11px] text-zinc-500 truncate max-w-[200px]">
-                          Sucursal: <strong>{record.branchName}</strong>
-                        </span>
-                        <button
-                          onClick={() => setSelectedInvoice(record)}
-                          className="px-3.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Ver RIDE Electrónico
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -509,6 +499,16 @@ export const EventsDesktop: React.FC<Props> = ({ history, motorcycle, profile })
           </>
         )}
       </ModalPortal>
+
+      {/* 5. MODAL ABONO POR TRANSFERENCIA BANCARIA CON EVIDENCIA */}
+      <AbonoTransferenciaModal
+        isOpen={isAbonoModalOpen}
+        onClose={() => setIsAbonoModalOpen(false)}
+        history={history}
+        profile={profile}
+        motorcycle={motorcycle}
+        onSubmitAbono={onSubmitAbono}
+      />
     </div>
   );
 };

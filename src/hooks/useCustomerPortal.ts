@@ -20,12 +20,14 @@ import {
   TallerOrder,
   OrderRating,
   SystemAlert,
+  SolicitudAbonoCliente,
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
 import {
   getStoredClients,
   saveStoredClients,
   getStoredFullAlistamientos,
+  saveStoredFullAlistamientos,
   getStoredOrders,
   saveStoredOrders,
   getStoredWarranties,
@@ -34,7 +36,7 @@ import {
   isOrderRated,
   addStoredAlerts,
 } from '../data/mockMultiRoleData';
-import { cloudSaveClient } from '../services/supabaseService';
+import { cloudSaveClient, cloudSaveAlistamiento } from '../services/supabaseService';
 
 // Sucursales Oficiales StarMotos
 export const BRANCH_MATRIZ: Branch = {
@@ -661,6 +663,11 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
           partsReplaced: parts,
           totalPaid: Number(a.montoPagado ?? a.valorServicio ?? 0),
           technicianName: a.tecnicoResponsable || 'Técnico Certificado StarMotos',
+          totalCost: Number(a.valorServicio || 0),
+          saldoPendiente: a.saldoPendiente !== undefined ? Number(a.saldoPendiente) : Math.max(0, Number(a.valorServicio || 0) - Number(a.abono ?? a.montoPagado ?? 0)),
+          abono: a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0),
+          alistamientoId: a.id,
+          solicitudAbonoPendiente: a.solicitudAbonoPendiente,
         };
       })
     );
@@ -1507,6 +1514,141 @@ export function useCustomerPortal() {
     }, 1000);
   }, [profile.fullName, showToast]);
 
+  // Enviar comprobante de abono mediante transferencia bancaria
+  const submitClientAbono = useCallback(
+    async (data: {
+      alistamientoId?: string;
+      monto: number;
+      comprobanteUrl: string;
+      bancoOrigen?: string;
+      numeroComprobante?: string;
+      notas?: string;
+    }): Promise<boolean> => {
+      try {
+        const allAls = getStoredFullAlistamientos();
+        let targetIndex = -1;
+
+        if (data.alistamientoId) {
+          targetIndex = allAls.findIndex((a) => a.id === data.alistamientoId);
+        }
+
+        if (targetIndex === -1) {
+          // Buscar primero el que tenga saldo pendiente
+          targetIndex = allAls.findIndex((a) => {
+            if (!isMatchingClientAlistamiento(a, profile, motorcycle)) return false;
+            const val = Number(a.valorServicio) || 0;
+            const abn = a.abono !== undefined ? Number(a.abono) : (Number(a.montoPagado) || 0);
+            const pend = a.saldoPendiente !== undefined ? Number(a.saldoPendiente) : Math.max(0, val - abn);
+            return pend > 0;
+          });
+        }
+
+        if (targetIndex === -1) {
+          // Fallback a cualquier alistamiento del cliente
+          targetIndex = allAls.findIndex((a) => isMatchingClientAlistamiento(a, profile, motorcycle));
+        }
+
+        let target: AlistamientoFullRecord;
+
+        if (targetIndex === -1) {
+          // Si no existe ninguno, creamos un registro inicial para asociar el abono y notificar al taller
+          target = {
+            id: `als-abono-${Date.now()}`,
+            atendidoPor: 'Recepción Taller',
+            sede: activeBranch.name,
+            sedeId: activeBranch.id,
+            fechaServicio: new Date().toISOString().split('T')[0],
+            horaServicio: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+            nombres: profile.fullName.split(' ')[0] || 'Cliente',
+            apellidos: profile.fullName.split(' ').slice(1).join(' ') || 'StarMotos',
+            cedulaRuc: profile.idNumber,
+            celular1: profile.phone,
+            email: profile.email || 'cliente@starmotos.ec',
+            direccion: profile.address || 'Ecuador',
+            origen: 'Portal de Clientes',
+            chasis: motorcycle.vin || 'VIN-PORTAL',
+            placa: motorcycle.plate,
+            modeloMarca: `${motorcycle.brand} ${motorcycle.model}`,
+            tecnicoResponsable: 'Técnico Asignado',
+            tecnicoId: 'tech-default',
+            kilometraje: motorcycle.currentKm || 0,
+            aceite: 'con_aceite',
+            numeroFactura: `FAC-${Date.now().toString().slice(-6)}`,
+            numeroTicket: `OT-${Date.now().toString().slice(-6)}`,
+            valorServicio: Number(data.monto),
+            montoPagado: 0,
+            abono: 0,
+            saldoPendiente: Number(data.monto),
+            serviciosRealizados: ['mantenimiento'],
+            metodoPago: 'Transferencia',
+            proximoMantenimientoKm: (motorcycle.currentKm || 0) + 3000,
+            fotos: [],
+            observaciones: 'Registro generado automáticamente para abono por transferencia del cliente.',
+            createdAt: new Date().toISOString(),
+          };
+          allAls.unshift(target);
+          targetIndex = 0;
+        } else {
+          target = allAls[targetIndex];
+        }
+
+        const nuevaSolicitud: SolicitudAbonoCliente = {
+          id: `sol-abn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          fechaSolicitud: new Date().toISOString(),
+          monto: Number(data.monto),
+          comprobanteUrl: data.comprobanteUrl,
+          bancoOrigen: data.bancoOrigen,
+          numeroComprobante: data.numeroComprobante,
+          estado: 'pendiente',
+          observacionesCliente: data.notas,
+          clienteNombre: profile.fullName,
+          clienteCedula: profile.idNumber,
+          clienteTelefono: profile.phone,
+        };
+
+        const updatedRecord: AlistamientoFullRecord = {
+          ...target,
+          solicitudAbonoPendiente: nuevaSolicitud,
+        };
+
+        allAls[targetIndex] = updatedRecord;
+        saveStoredFullAlistamientos(allAls);
+        cloudSaveAlistamiento(updatedRecord);
+
+        // Crear alerta de sistema para taller y matriz
+        const abonoAlert: SystemAlert = {
+          id: `alt-abn-${Date.now()}`,
+          type: 'info',
+          targetRole: 'all',
+          targetWorkshopId: target.sedeId || activeBranch.id,
+          title: `💰 Abono por Transferencia ($${data.monto.toFixed(2)}) - ${profile.fullName}`,
+          message: `${profile.fullName} envió comprobante de transferencia por $${data.monto.toFixed(2)} (${data.bancoOrigen || 'Banco'}). Requiere revisión y validación.`,
+          timestamp: 'Ahora mismo',
+          read: false,
+          relatedId: target.id,
+        };
+        addStoredAlerts(abonoAlert);
+
+        window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+
+        confetti({
+          particleCount: 90,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#a855f7', '#8b5cf6', '#10b981', '#3b82f6'],
+        });
+
+        showToast('¡Comprobante de abono enviado con éxito! El taller lo revisará enseguida.', 'success');
+        return true;
+      } catch (err) {
+        console.error('Error al registrar abono del cliente:', err);
+        showToast('Error al enviar el comprobante de transferencia.', 'info');
+        return false;
+      }
+    },
+    [profile, motorcycle, activeBranch, showToast]
+  );
+
   return {
     isAuthenticated,
     login,
@@ -1534,6 +1676,7 @@ export function useCustomerPortal() {
     isRatingModalOpen,
     setIsRatingModalOpen,
     submitRating,
+    submitClientAbono,
     toastMessage,
     showToast,
   };

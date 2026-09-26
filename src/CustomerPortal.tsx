@@ -40,6 +40,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     isRatingModalOpen,
     setIsRatingModalOpen,
     submitRating,
+    submitClientAbono,
     toastMessage,
   } = portal;
 
@@ -76,6 +77,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           approveQuotation={approveQuotation}
           pendingRatingOrder={pendingRatingOrder}
           onOpenRatingModal={() => setIsRatingModalOpen(true)}
+          onSubmitAbono={submitClientAbono}
         />
       ) : (
         <CustomerViewMobile
@@ -101,6 +103,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           approveQuotation={approveQuotation}
           pendingRatingOrder={pendingRatingOrder}
           onOpenRatingModal={() => setIsRatingModalOpen(true)}
+          onSubmitAbono={submitClientAbono}
         />
       )}
 

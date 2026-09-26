@@ -43,6 +43,14 @@ interface Props {
   approveQuotation: () => void;
   pendingRatingOrder?: TallerOrder | null;
   onOpenRatingModal?: () => void;
+  onSubmitAbono?: (data: {
+    alistamientoId?: string;
+    monto: number;
+    comprobanteUrl: string;
+    bancoOrigen?: string;
+    numeroComprobante?: string;
+    notas?: string;
+  }) => Promise<boolean>;
 }
 
 export const CustomerViewMobile: React.FC<Props> = ({
@@ -68,12 +76,13 @@ export const CustomerViewMobile: React.FC<Props> = ({
   approveQuotation,
   pendingRatingOrder,
   onOpenRatingModal,
+  onSubmitAbono,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
     perfil: 'Perfil del Cliente',
     orden_activa: 'Orden de Trabajo Activa',
     agendar_cita: 'Agendar Cita',
-    eventos: 'Evento de Facturas',
+    eventos: 'Eventos y Facturas',
     historial: 'Historial y Garantías',
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita',
@@ -150,6 +159,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
             history={history}
             motorcycle={motorcycle}
             profile={profile}
+            onSubmitAbono={onSubmitAbono}
           />
         )}
 

@@ -54,6 +54,7 @@ import {
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
 import { getMediaFromIndexedDB, uploadWarrantyMedia } from '../../services/mediaStorage';
+import { cloudSaveAlistamiento } from '../../services/supabaseService';
 
 interface Props {
   defaultAtendidoPor: string;
@@ -477,8 +478,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
     esSuma: true,
   });
 
+  const [rejectingAbono, setRejectingAbono] = useState<boolean>(false);
+  const [motivoRechazoAbono, setMotivoRechazoAbono] = useState<string>('');
+
   const handleOpenAbonoModal = (record: AlistamientoFullRecord) => {
     setAbonoModalRecord(record);
+    setRejectingAbono(false);
+    setMotivoRechazoAbono('');
     const valServ = Number(record.valorServicio) || 0;
     const currentAbono = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
     const currentPend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
@@ -557,6 +563,103 @@ export const AlistamientoWizard: React.FC<Props> = ({
       setDetailFormData(updatedRecord);
     }
 
+    setAbonoModalRecord(null);
+  };
+
+  const handleAceptarAbonoCliente = () => {
+    if (!abonoModalRecord || !abonoModalRecord.solicitudAbonoPendiente) return;
+    const sol = abonoModalRecord.solicitudAbonoPendiente;
+    const valServ = Number(abonoModalRecord.valorServicio) || 0;
+    const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+    const montoAbonado = Number(sol.monto) || 0;
+    const nuevoTotalPagado = Math.min(valServ, prevPagado + montoAbonado);
+    const nuevoSaldo = Math.max(0, valServ - nuevoTotalPagado);
+    const isPaidInFull = nuevoSaldo <= 0.01;
+
+    const fechaAbono = new Date().toLocaleDateString('es-EC');
+    const horaAbono = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+
+    const nuevoItemAbono = {
+      id: `abn-cli-${Date.now()}`,
+      fecha: fechaAbono,
+      hora: horaAbono,
+      monto: montoAbonado,
+      metodoPago: 'Transferencia',
+      evidenciaTransferencia: sol.comprobanteUrl,
+      numeroFactura: abonoModalRecord.numeroFactura,
+      saldoRestante: nuevoSaldo,
+      registradoPor: `Cliente (Validado por ${defaultAtendidoPor || 'Taller'})`,
+    };
+
+    const updatedRecord: AlistamientoFullRecord = {
+      ...abonoModalRecord,
+      abono: nuevoTotalPagado,
+      montoPagado: nuevoTotalPagado,
+      saldoPendiente: nuevoSaldo,
+      metodoPago: 'Transferencia',
+      evidenciaTransferencia: sol.comprobanteUrl || abonoModalRecord.evidenciaTransferencia,
+      comprobantePagoUrl: sol.comprobanteUrl || abonoModalRecord.comprobantePagoUrl,
+      historialAbonos: [...(abonoModalRecord.historialAbonos || []), nuevoItemAbono],
+      solicitudAbonoPendiente: {
+        ...sol,
+        estado: 'aprobado',
+        fechaRevision: new Date().toISOString(),
+      },
+      observaciones: (
+        (abonoModalRecord.observaciones || '').trim() +
+        `\n[Abono Aprobado ${fechaAbono} ${horaAbono}: +$${montoAbonado.toFixed(2)} por Transferencia. Ref: ${sol.numeroComprobante || 'S/N'}]`
+      ).trim(),
+    };
+
+    onSaveRecord(updatedRecord);
+    cloudSaveAlistamiento(updatedRecord);
+    window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#10b981', '#059669', '#34d399', '#8b5cf6'],
+    });
+
+    if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
+      setSelectedRecordForDetail(updatedRecord);
+      setDetailFormData(updatedRecord);
+    }
+
+    setAbonoModalRecord(null);
+  };
+
+  const handleNegarAbonoCliente = () => {
+    if (!abonoModalRecord || !abonoModalRecord.solicitudAbonoPendiente) return;
+    const sol = abonoModalRecord.solicitudAbonoPendiente;
+    const razon = motivoRechazoAbono.trim() || 'Comprobante no válido o valor no acreditado en cuenta bancaria';
+
+    const updatedRecord: AlistamientoFullRecord = {
+      ...abonoModalRecord,
+      solicitudAbonoPendiente: {
+        ...sol,
+        estado: 'rechazado',
+        motivoRechazo: razon,
+        fechaRevision: new Date().toISOString(),
+      },
+      observaciones: (
+        (abonoModalRecord.observaciones || '').trim() +
+        `\n[Abono Negado ${new Date().toLocaleDateString('es-EC')}: Monto $${Number(sol.monto).toFixed(2)}. Motivo: ${razon}]`
+      ).trim(),
+    };
+
+    onSaveRecord(updatedRecord);
+    cloudSaveAlistamiento(updatedRecord);
+    window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
+
+    if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
+      setSelectedRecordForDetail(updatedRecord);
+      setDetailFormData(updatedRecord);
+    }
+
+    setRejectingAbono(false);
+    setMotivoRechazoAbono('');
     setAbonoModalRecord(null);
   };
 
@@ -3100,13 +3203,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           {/* 11. Acciones */}
                           <td className="px-1.5 py-2 text-center whitespace-nowrap">
                             <div className="inline-flex items-center justify-center gap-1">
-                              {/* Botón de Dinero / Abono (Verde si está pagado, Rojo si falta abonar) */}
+                              {/* Botón de Dinero / Abono (Morado = Abono por validar / Verde = Pagado o Aprobado / Rojo = Falta abonar) */}
                               {(() => {
                                 const val = Number(record.valorServicio) || 0;
                                 const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
                                 const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
                                 const isPdi = isPdiOnlyRecord(record);
                                 const isPaid = isPdi || val <= 0 || pend <= 0.01;
+                                const hasPendingAbono = record.solicitudAbonoPendiente?.estado === 'pendiente';
+                                const isApprovedAbono = record.solicitudAbonoPendiente?.estado === 'aprobado';
 
                                 return (
                                   <button
@@ -3116,14 +3221,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
                                       handleOpenAbonoModal(record);
                                     }}
                                     className={`p-1 rounded-lg border transition-all cursor-pointer shadow-2xs ${
-                                      isPaid
-                                        ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
-                                        : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-300 animate-pulse'
+                                      hasPendingAbono
+                                        ? 'text-purple-700 bg-purple-100 hover:bg-purple-200 border-purple-400 ring-2 ring-purple-300 ring-offset-1 animate-pulse'
+                                        : (isApprovedAbono || isPaid)
+                                          ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
+                                          : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-300 animate-pulse'
                                     }`}
                                     title={
-                                      isPaid
-                                        ? `Todo abonado ($${pag.toFixed(2)}). Clic para gestionar pagos o evidencias.`
-                                        : `Falta abonar: $${pend.toFixed(2)} pendientes. Clic para registrar abono.`
+                                      hasPendingAbono
+                                        ? `¡Abono por transferencia de $${Number(record.solicitudAbonoPendiente?.monto).toFixed(2)} pendiente de validación! Clic para revisar.`
+                                        : (isApprovedAbono || isPaid)
+                                          ? `Todo abonado / aprobado ($${pag.toFixed(2)}). Clic para gestionar pagos o evidencias.`
+                                          : `Falta abonar: $${pend.toFixed(2)} pendientes. Clic para registrar abono.`
                                     }
                                   >
                                     <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -5352,6 +5461,142 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Si el cliente envió una solicitud de abono por transferencia */}
+            {abonoModalRecord.solicitudAbonoPendiente?.estado === 'pendiente' && (
+              <div className="p-4 bg-gradient-to-br from-purple-50 via-indigo-50/40 to-white rounded-2xl border-2 border-purple-300 shadow-md space-y-3">
+                <div className="flex items-center justify-between border-b border-purple-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold">
+                      <Clock className="w-4 h-4 animate-spin" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-purple-950 uppercase tracking-wide">
+                        Abono Enviado por el Cliente
+                      </h4>
+                      <p className="text-[10px] text-purple-700 font-medium">
+                        Transferencia bancaria con comprobante
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] bg-purple-200 text-purple-900 font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+                    Pendiente
+                  </span>
+                </div>
+
+                {/* Datos del abono */}
+                <div className="grid grid-cols-2 gap-2 text-[11px] bg-white/95 p-3 rounded-xl border border-purple-200/80">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Monto Transferido:</span>
+                    <span className="font-mono text-base font-black text-purple-900">
+                      ${Number(abonoModalRecord.solicitudAbonoPendiente.monto).toFixed(2)} <span className="text-xs font-normal text-zinc-500">USD</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Fecha / Hora:</span>
+                    <span className="text-zinc-800 font-medium">
+                      {abonoModalRecord.solicitudAbonoPendiente.fechaSolicitud
+                        ? new Date(abonoModalRecord.solicitudAbonoPendiente.fechaSolicitud).toLocaleString('es-EC')
+                        : (abonoModalRecord.solicitudAbonoPendiente.fecha || 'Reciente')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Banco Origen:</span>
+                    <span className="text-zinc-800 font-medium">
+                      {abonoModalRecord.solicitudAbonoPendiente.bancoOrigen || 'No especificado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Nº Comprobante / Ref:</span>
+                    <span className="font-mono text-zinc-800 font-semibold">
+                      {abonoModalRecord.solicitudAbonoPendiente.numeroComprobante || 'S/N'}
+                    </span>
+                  </div>
+                  {abonoModalRecord.solicitudAbonoPendiente.observacionesCliente && (
+                    <div className="col-span-2 pt-1 border-t border-purple-100">
+                      <span className="text-[10px] text-zinc-500 block uppercase font-bold">Nota del Cliente:</span>
+                      <span className="text-zinc-700 italic">"{abonoModalRecord.solicitudAbonoPendiente.observacionesCliente}"</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Evidencia Fotográfica / Captura */}
+                {abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-zinc-600 block">Comprobante de Transferencia:</span>
+                    <a
+                      href={abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block relative rounded-xl overflow-hidden border border-purple-200 group max-h-48 bg-zinc-950 flex items-center justify-center cursor-pointer"
+                    >
+                      <img
+                        src={abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl}
+                        alt="Comprobante Transferencia"
+                        className="w-full max-h-48 object-contain group-hover:scale-105 transition"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                        <Eye className="w-4 h-4" />
+                        <span>Clic para ver comprobante completo</span>
+                      </div>
+                    </a>
+                  </div>
+                )}
+
+                {/* Sección de Rechazo o Botones de Acción */}
+                {rejectingAbono ? (
+                  <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] font-bold text-rose-900 block">
+                      Indica la razón del rechazo del abono (se mostrará al cliente):
+                    </label>
+                    <input
+                      type="text"
+                      value={motivoRechazoAbono}
+                      onChange={(e) => setMotivoRechazoAbono(e.target.value)}
+                      placeholder="Ej. Valor no se refleja en la cuenta de StarMotos, imagen no legible..."
+                      className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      autoFocus
+                    />
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleNegarAbonoCliente}
+                        className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                      >
+                        Confirmar Negación
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRejectingAbono(false)}
+                        className="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-semibold text-xs rounded-lg transition cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAceptarAbonoCliente}
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Aceptar Abono (${Number(abonoModalRecord.solicitudAbonoPendiente.monto).toFixed(2)})</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRejectingAbono(true)}
+                      className="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Negar Abono</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Resumen Financiero del Servicio */}
             {(() => {

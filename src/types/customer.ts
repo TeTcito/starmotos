@@ -217,6 +217,11 @@ export interface MaintenanceRecord {
   partsReplaced: string[];
   totalPaid: number;
   technicianName: string;
+  totalCost?: number;
+  saldoPendiente?: number;
+  abono?: number;
+  alistamientoId?: string;
+  solicitudAbonoPendiente?: SolicitudAbonoCliente;
 }
 
 export type WarrantyStatus = 'vigente' | 'por_vencer' | 'vencida';
@@ -489,7 +494,30 @@ export interface AlistamientoFullRecord {
   evidenciaTransferencia?: string;
   comprobantePagoUrl?: string;
   historialAbonos?: AbonoRecord[];
+  solicitudAbonoPendiente?: SolicitudAbonoCliente;
   createdAt: string;
+}
+
+export interface SolicitudAbonoCliente {
+  id: string;
+  monto: number;
+  fecha?: string;
+  hora?: string;
+  fechaSolicitud?: string;
+  metodoPago?: 'Transferencia' | string;
+  evidenciaTransferencia?: string; // Base64 o URL del comprobante
+  comprobanteUrl?: string; // Base64 o URL de la imagen de transferencia
+  bancoOrigen?: string;
+  numeroComprobante?: string;
+  referenciaBancaria?: string;
+  observacionesCliente?: string;
+  estado: 'pendiente' | 'aprobado' | 'rechazado';
+  motivoRechazo?: string;
+  clienteNombre?: string;
+  clienteCedula?: string;
+  clienteTelefono?: string;
+  revisadoPor?: string;
+  fechaRevision?: string;
 }
 
 export interface AbonoRecord {

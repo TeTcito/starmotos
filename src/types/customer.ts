@@ -851,6 +851,7 @@ export interface GpsRecord {
   kilometraje?: number;
   serieGps: string; // Serie / IMEI del GPS
   serieChip: string; // Serie / SIM del Chip
+  tecnicoResponsable?: string; // Técnico Encargado
   // Paso 3: Servicio, Vigencia & Contabilidad Matriz
   fechaInicio: string; // YYYY-MM-DD
   fechaVencimiento: string; // YYYY-MM-DD
@@ -859,7 +860,8 @@ export interface GpsRecord {
   montoPagado: number;
   abono?: number;
   saldoPendiente?: number;
-  metodoPago?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Crédito' | 'Mixto' | string;
+  metodoPago?: 'Efectivo' | 'Transferencia' | string;
+  evidenciaTransferencia?: string; // Comprobante de transferencia bancaria
   observaciones?: string;
   // Estado y Credenciales asignadas por el perfil "GPS servicios"
   estado: 'pendiente' | 'activa' | 'rechazada' | 'cancelada';

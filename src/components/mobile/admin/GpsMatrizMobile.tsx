@@ -24,8 +24,12 @@ import {
   UserCheck,
   ChevronRight,
   Eye,
+  Camera,
+  Upload,
+  Wrench,
+  CreditCard,
 } from 'lucide-react';
-import { GpsRecord, SystemAlert } from '../../../types/customer';
+import { GpsRecord, SystemAlert, Technician } from '../../../types/customer';
 import {
   getStoredClients,
   getStoredFullAlistamientos,
@@ -33,7 +37,11 @@ import {
   saveStoredGpsRecord,
   deleteStoredGpsRecord,
   addStoredAlerts,
+  getStoredTechnicians,
 } from '../../../data/mockMultiRoleData';
+import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
+import { compressImageBase64 } from '../../../utils/imageCompressor';
+import { isValidMediaUrl } from '../../../services/mediaStorage';
 import { GpsCredentialDetailModal } from '../../common/GpsCredentialDetailModal';
 
 interface Props {
@@ -87,12 +95,14 @@ export const GpsMatrizMobile: React.FC<Props> = ({
     kilometraje: 0,
     serieGps: '',
     serieChip: '',
-    // Módulo 3: Vigencia & Contabilidad Matriz
+    // Módulo 3: Vigencia, Técnico & Contabilidad Matriz
+    tecnicoResponsable: '',
     fechaInicio: todayStr,
     fechaVencimiento: nextYearStr,
     valorServicio: 180.0,
     montoPagado: 180.0,
-    metodoPago: 'Efectivo',
+    metodoPago: 'Efectivo' as 'Efectivo' | 'Transferencia',
+    evidenciaTransferencia: '',
     observaciones: '',
     // Estado y credenciales
     estado: 'pendiente' as 'pendiente' | 'activa',
@@ -104,6 +114,9 @@ export const GpsMatrizMobile: React.FC<Props> = ({
   const [isSearchingSri, setIsSearchingSri] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{ title: string; fields: string[] } | null>(null);
+
+  // Lista de Técnicos disponibles
+  const techniciansList = useMemo(() => getStoredTechnicians(), []);
 
   // Base de datos local para autocompletado rápido
   const existingClients = useMemo(() => {
@@ -242,11 +255,13 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       kilometraje: record.kilometraje || 0,
       serieGps: record.serieGps,
       serieChip: record.serieChip,
+      tecnicoResponsable: record.tecnicoResponsable || '',
       fechaInicio: record.fechaInicio,
       fechaVencimiento: record.fechaVencimiento,
       valorServicio: Number(record.valorServicio) || 0,
       montoPagado: Number(record.montoPagado) || 0,
-      metodoPago: record.metodoPago || 'Efectivo',
+      metodoPago: ((record.metodoPago === 'Transferencia' || (record.metodoPago as string)?.toLowerCase?.().includes('transferencia')) ? 'Transferencia' : 'Efectivo') as 'Efectivo' | 'Transferencia',
+      evidenciaTransferencia: record.evidenciaTransferencia || '',
       observaciones: record.observaciones || '',
       estado: record.estado as any,
       gpsUser: record.gpsUser || '',
@@ -299,12 +314,14 @@ export const GpsMatrizMobile: React.FC<Props> = ({
         kilometraje: Number(formData.kilometraje) || 0,
         serieGps: formData.serieGps.trim(),
         serieChip: formData.serieChip.trim(),
+        tecnicoResponsable: formData.tecnicoResponsable.trim() || undefined,
         fechaInicio: formData.fechaInicio,
         fechaVencimiento: formData.fechaVencimiento,
         valorServicio: Number(formData.valorServicio) || 0,
         montoPagado: Number(formData.montoPagado) || 0,
         saldoPendiente: saldo,
         metodoPago: formData.metodoPago,
+        evidenciaTransferencia: formData.metodoPago === 'Transferencia' ? (formData.evidenciaTransferencia || undefined) : undefined,
         observaciones: formData.observaciones.trim() || undefined,
         updatedAt: new Date().toISOString(),
       };
@@ -342,12 +359,14 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       kilometraje: Number(formData.kilometraje) || 0,
       serieGps: formData.serieGps.trim(),
       serieChip: formData.serieChip.trim(),
+      tecnicoResponsable: formData.tecnicoResponsable.trim() || undefined,
       fechaInicio: formData.fechaInicio,
       fechaVencimiento: formData.fechaVencimiento,
       valorServicio: Number(formData.valorServicio) || 0,
       montoPagado: Number(formData.montoPagado) || 0,
       saldoPendiente: saldo,
       metodoPago: formData.metodoPago,
+      evidenciaTransferencia: formData.metodoPago === 'Transferencia' ? (formData.evidenciaTransferencia || undefined) : undefined,
       observaciones: formData.observaciones.trim() || undefined,
       estado: 'pendiente',
       createdAt: new Date().toISOString(),
@@ -825,6 +844,11 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                       <div className="text-[11px]">
                         <span className="text-zinc-400 block text-[9px] uppercase font-bold">Vigencia</span>
                         <strong className="text-emerald-700 font-mono text-[11px]">{r.fechaVencimiento}</strong>
+                        {r.tecnicoResponsable && (
+                          <span className="text-[10px] text-zinc-600 font-medium block mt-0.5">
+                            🔧 {r.tecnicoResponsable}
+                          </span>
+                        )}
                       </div>
 
                       <div className="text-right">
@@ -835,6 +859,21 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                             <span className="text-red-600 font-black ml-1.5 bg-red-50 px-1 rounded border border-red-200">
                               Saldo: ${Number(r.saldoPendiente || 0).toFixed(2)}
                             </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-end gap-1 mt-0.5 text-[10px] font-bold text-zinc-500">
+                          <span>{r.metodoPago || 'Efectivo'}</span>
+                          {r.evidenciaTransferencia && isValidMediaUrl(r.evidenciaTransferencia) && (
+                            <a
+                              href={r.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-0.5"
+                              title="Ver comprobante de transferencia"
+                            >
+                              <Camera className="w-3 h-3" />
+                            </a>
                           )}
                         </div>
                       </div>
@@ -1051,29 +1090,28 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* BLOQUE ESPECIAL: 3 NÚMEROS DE CELULAR */}
-              <div className="p-3 bg-cyan-50/70 border border-cyan-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-cyan-900 font-black text-[11px] uppercase tracking-wider">
-                  <Smartphone className="w-3.5 h-3.5 text-cyan-600" />
-                  <span>3 Celulares de Contacto Requeridos</span>
-                </div>
+              {/* Celular 1 (Principal WhatsApp) sin contenedor externo */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                  <span>Celular 1 (Principal WhatsApp) *</span>
+                  <span className="text-[9px] text-cyan-700 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                    Principal
+                  </span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.celular1}
+                  onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                  placeholder="0998765432"
+                  className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-xl focus:border-cyan-600 outline-none"
+                  required
+                />
+              </div>
 
+              {/* Celulares 2 y 3 al lado */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] font-bold text-cyan-900 block mb-0.5">
-                    Celular 1 (Principal WhatsApp) *
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.celular1}
-                    onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                    placeholder="0998765432"
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border border-cyan-300 rounded-lg focus:border-cyan-600 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
                     Celular 2 (Secundario)
                   </label>
                   <input
@@ -1081,12 +1119,11 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                     value={formData.celular2}
                     onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
                     placeholder="0987654321"
-                    className="w-full px-3 py-1.5 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:border-cyan-600 outline-none"
+                    className="w-full px-3 py-1.5 text-xs font-mono bg-white border border-zinc-300 rounded-xl focus:border-cyan-600 outline-none"
                   />
                 </div>
-
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
                     Celular 3 (Adicional)
                   </label>
                   <input
@@ -1094,7 +1131,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                     value={formData.celular3}
                     onChange={(e) => setFormData({ ...formData, celular3: e.target.value })}
                     placeholder="0976543210"
-                    className="w-full px-3 py-1.5 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:border-cyan-600 outline-none"
+                    className="w-full px-3 py-1.5 text-xs font-mono bg-white border border-zinc-300 rounded-xl focus:border-cyan-600 outline-none"
                   />
                 </div>
               </div>
@@ -1242,37 +1279,31 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* BLOQUE ESPECIAL: SERIES DE HARDWARE SATELITAL */}
-              <div className="p-3 bg-cyan-50 border border-cyan-300 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-cyan-900 font-black text-[11px] uppercase tracking-wider">
-                  <Radio className="w-3.5 h-3.5 text-cyan-700" />
-                  <span>Series de Hardware Satelital</span>
-                </div>
-
+              {/* Series de Hardware GPS & SIM (sin contenedor externo) */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] font-bold text-cyan-900 block mb-0.5">
-                    Serie de GPS (IMEI / Serial) *
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
+                    Serie GPS (IMEI) *
                   </label>
                   <input
                     type="text"
                     value={formData.serieGps}
                     onChange={(e) => setFormData({ ...formData, serieGps: e.target.value.trim() })}
                     placeholder="869402058491823"
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border border-cyan-400 rounded-lg focus:border-cyan-600 outline-none"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-xl focus:border-blue-600 outline-none"
                     required
                   />
                 </div>
-
                 <div>
-                  <label className="text-[10px] font-bold text-cyan-900 block mb-0.5">
-                    Serie de Chip (SIM Card) *
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
+                    Serie Chip (SIM) *
                   </label>
                   <input
                     type="text"
                     value={formData.serieChip}
                     onChange={(e) => setFormData({ ...formData, serieChip: e.target.value.trim() })}
                     placeholder="8959302194820194820"
-                    className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white border border-cyan-400 rounded-lg focus:border-cyan-600 outline-none"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-xl focus:border-blue-600 outline-none"
                     required
                   />
                 </div>
@@ -1289,11 +1320,11 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                     3
                   </div>
                   <h4 className="text-xs font-black text-zinc-900 uppercase tracking-wider">
-                    Vigencia & Contabilidad Matriz
+                    Vigencia, Técnico & Cobro
                   </h4>
                 </div>
                 <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Tarifas
+                  Módulo 3
                 </span>
               </div>
 
@@ -1325,89 +1356,199 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* CONTABILIDAD MATRIZ (PRIVADA) */}
-              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-emerald-950 tracking-wider">
-                    Contabilidad Matriz (Privado)
-                  </span>
-                  <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded">
-                    Exclusivo Matriz
-                  </span>
-                </div>
+              {/* TÉCNICO ENCARGADO */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Técnico Encargado</span>
+                </label>
+                <select
+                  value={formData.tecnicoResponsable}
+                  onChange={(e) => setFormData({ ...formData, tecnicoResponsable: e.target.value })}
+                  className="w-full px-2.5 py-1.5 text-xs font-semibold text-zinc-800 bg-white border border-zinc-300 rounded-xl outline-none focus:border-emerald-600 cursor-pointer"
+                >
+                  <option value="">Seleccione Técnico Encargado...</option>
+                  {techniciansList.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.specialty ? `(${t.specialty})` : ''}
+                    </option>
+                  ))}
+                  {formData.tecnicoResponsable && !techniciansList.some((t) => t.name === formData.tecnicoResponsable) && (
+                    <option value={formData.tecnicoResponsable}>{formData.tecnicoResponsable}</option>
+                  )}
+                </select>
+              </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
-                      Valor GPS ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.valorServicio}
-                      onChange={(e) => setFormData({ ...formData, valorServicio: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-lg focus:border-emerald-600 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
+              {/* CONTABILIDAD MATRIZ: SIN BLOQUE EXTERNO, MÉTODO DE PAGO ALADO */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-zinc-700 block mb-1">
+                    Valor GPS ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.valorServicio}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const val = cleanNumberInput(e.target.value);
+                      setFormData({ ...formData, valorServicio: val === '' ? 0 : Number(val) });
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-xl focus:border-emerald-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-bold uppercase text-zinc-700">
                       Abono ($)
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.montoPagado}
-                      onChange={(e) => setFormData({ ...formData, montoPagado: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-lg focus:border-emerald-600 outline-none"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          montoPagado: prev.valorServicio,
+                        }));
+                      }}
+                      className="text-[9px] text-emerald-700 hover:text-emerald-800 font-bold underline cursor-pointer"
+                    >
+                      Total
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.montoPagado}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const ab = cleanNumberInput(e.target.value);
+                      setFormData({ ...formData, montoPagado: ab === '' ? 0 : Number(ab) });
+                    }}
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-zinc-300 rounded-xl focus:border-emerald-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Saldo Pendiente y Método de Pago ALADO */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
+                    Saldo Pendiente ($)
+                  </label>
+                  <div
+                    className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center justify-between ${
+                      formData.valorServicio - formData.montoPagado > 0.01
+                        ? 'bg-amber-50 border-amber-300 text-amber-900'
+                        : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                    }`}
+                  >
+                    <span>
+                      ${Math.max(0, formData.valorServicio - formData.montoPagado).toFixed(2)}
+                    </span>
+                    <span className={`text-[9px] font-sans font-bold px-1 py-0.5 rounded ${
+                      formData.valorServicio - formData.montoPagado > 0.01
+                        ? 'bg-amber-200 text-amber-900'
+                        : 'bg-emerald-200 text-emerald-900'
+                    }`}>
+                      {formData.valorServicio - formData.montoPagado > 0.01 ? 'Pend.' : 'OK'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Saldo calculado en vivo */}
-                <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-zinc-200">
-                  <span className="text-[11px] font-bold text-zinc-700">Saldo Pendiente:</span>
-                  <strong
-                    className={`font-mono text-sm ${
-                      formData.valorServicio - formData.montoPagado > 0 ? 'text-red-600' : 'text-emerald-700'
-                    }`}
-                  >
-                    ${Math.max(0, formData.valorServicio - formData.montoPagado).toFixed(2)}
-                  </strong>
-                </div>
-
-                {/* Método de pago */}
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
-                    Forma de Pago
+                  <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1">
+                    Método de Pago *
                   </label>
                   <select
                     value={formData.metodoPago}
-                    onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value })}
-                    className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-zinc-300 rounded-lg focus:border-emerald-600 outline-none"
+                    onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value as 'Efectivo' | 'Transferencia' })}
+                    className="w-full px-2.5 py-1.5 text-xs font-bold bg-white border border-zinc-300 rounded-xl focus:border-emerald-600 outline-none cursor-pointer"
                   >
                     <option value="Efectivo">Efectivo</option>
-                    <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-                    <option value="Depósito">Depósito</option>
-                    <option value="Tarjeta de Crédito / Débito">Tarjeta de Crédito / Débito</option>
-                    <option value="Saldo a Favor">Saldo a Favor</option>
+                    <option value="Transferencia">Transferencia</option>
                   </select>
                 </div>
+              </div>
 
-                {/* Observaciones */}
-                <div>
-                  <label className="text-[10px] font-bold text-zinc-600 block mb-0.5">
-                    Observaciones
+              {/* Subida de Imagen si es Transferencia */}
+              {formData.metodoPago === 'Transferencia' && (
+                <div className="space-y-1.5 pt-1 border-t border-zinc-200">
+                  <label className="block text-[10px] font-black uppercase text-emerald-900 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                      Comprobante de Transferencia
+                    </span>
+                    {formData.evidenciaTransferencia && (
+                      <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+                        ✓ Cargado
+                      </span>
+                    )}
                   </label>
-                  <textarea
-                    rows={2}
-                    value={formData.observaciones}
-                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                    placeholder="Detalles sobre instalación, cobro o cliente..."
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-300 rounded-lg focus:border-emerald-600 outline-none resize-none"
-                  />
+
+                  {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
+                    <div className="relative rounded-xl border border-emerald-300 bg-emerald-50/40 p-2 flex items-center gap-2.5">
+                      <a
+                        href={formData.evidenciaTransferencia}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-12 h-12 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block"
+                        title="Ver comprobante en tamaño completo"
+                      >
+                        <img
+                          src={formData.evidenciaTransferencia}
+                          alt="Comprobante"
+                          className="w-full h-full object-cover"
+                        />
+                      </a>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-zinc-900 truncate">Comprobante registrado</p>
+                        <p className="text-[9px] text-zinc-500">Toca la foto para ver completa</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 rounded-lg active:scale-95 cursor-pointer"
+                        title="Eliminar comprobante"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/20 rounded-xl cursor-pointer">
+                      <Camera className="w-5 h-5 text-emerald-600 mb-1" />
+                      <span className="text-xs font-bold text-emerald-900">Subir foto o captura del comprobante</span>
+                      <span className="text-[9px] text-zinc-500">JPG, PNG o captura</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const compressed = await compressImageBase64(file, 1000, 0.7);
+                            setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
+              )}
+
+              {/* Observaciones */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-zinc-700 block mb-1">
+                  Observaciones
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.observaciones}
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                  placeholder="Detalles sobre instalación, cobro o cliente..."
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-300 rounded-xl focus:border-emerald-600 outline-none resize-none"
+                />
               </div>
             </div>
 

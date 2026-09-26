@@ -35,6 +35,7 @@ import {
 } from '../../../data/mockMultiRoleData';
 import { WarrantyDetailViewMobile } from '../common/WarrantyDetailViewMobile';
 import { NewWarrantyFormMobile } from '../common/NewWarrantyFormMobile';
+import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -258,6 +259,13 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
 
   return (
     <div className="w-full flex flex-col min-h-0 space-y-3">
+      {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
+      <AutoPendingWarrantiesAlert
+        warranties={localWarranties}
+        onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
+        role="taller"
+      />
+
       {/* ========================================================================= */}
       {/* 1. DETALLE DE FICHA TÉCNICA DE GARANTÍA (IDÉNTICO A VISTA DE ESCRITORIO)  */}
       {/* ========================================================================= */}

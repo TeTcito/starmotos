@@ -31,6 +31,7 @@ import { TalleresGaranteMobile } from './TalleresGaranteMobile';
 import { AlertasMobile } from '../admin/AlertasMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { WarrantyDetailViewMobile } from '../common/WarrantyDetailViewMobile';
+import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
 
 interface Props {
   activeSection: GaranteSection;
@@ -224,6 +225,13 @@ export const GaranteViewMobile: React.FC<Props> = ({
       )}
 
       <main className="max-w-md mx-auto px-4 py-4">
+        {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
+        <AutoPendingWarrantiesAlert
+          warranties={pendingRequests}
+          onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
+          role="garante"
+        />
+
         {selectedWarrantyForDetail ? (
           <WarrantyDetailViewMobile
             warranty={selectedWarrantyForDetail}

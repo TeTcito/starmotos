@@ -126,7 +126,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                 <td className="py-1 font-bold text-zinc-950">{warranty.tallerOrigin || 'StarMotos Taller Oficial'}</td>
               </tr>
               <tr className="border-b border-zinc-200">
-                <td className="py-1 text-zinc-500 font-semibold">Marca / Garante:</td>
+                <td className="py-1 text-zinc-500 font-semibold">Garantía de Marca:</td>
                 <td className="py-1 font-bold text-zinc-950">
                   {warranty.targetBrand || warranty.garanteName || warranty.motorcycleBrand || 'StarMotos Matriz'}
                 </td>
@@ -255,7 +255,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
               {warranty.garanteNotes && (
                 <div>
                   <span className="text-[9.5px] uppercase font-bold text-purple-700 block">
-                    Observaciones de Garante de Marca:
+                    Observaciones de Garantía de Marca:
                   </span>
                   <p className="text-[10.5px] text-zinc-900 font-medium pt-0.5">
                     {warranty.garanteNotes}
@@ -270,8 +270,8 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* ========================================================================= */}
       {/* 4. REGISTRO FOTOGRÁFICO DE INSPECCIÓN TÉCNICA (IMÁGENES)                  */}
       {/* ========================================================================= */}
-      <div className="space-y-2 pt-2 break-inside-avoid">
-        <div className="flex items-center justify-between pb-1 border-b-2 border-zinc-900">
+      <div className="space-y-2 pt-2">
+        <div className="flex items-center justify-between pb-1 border-b-2 border-zinc-900 break-inside-avoid">
           <div className="flex items-center gap-2 font-black text-zinc-900 text-xs uppercase tracking-wide">
             <Camera className="w-4 h-4 text-zinc-900" />
             <span>
@@ -292,13 +292,14 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
             {photoImages.map((photoUrl, idx) => (
               <div
                 key={idx}
-                className="border border-zinc-300 rounded p-1.5 space-y-1 break-inside-avoid"
+                className="border border-zinc-300 rounded p-1.5 space-y-1 break-inside-avoid printable-photo-card"
+                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
                 <div className="flex items-center justify-between text-[9px] font-bold text-zinc-700">
                   <span>{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
                   <span className="font-mono text-zinc-400">#{idx + 1}</span>
                 </div>
-                <div className="w-full h-48 bg-zinc-50 overflow-hidden flex items-center justify-center">
+                <div className="w-full h-44 sm:h-48 bg-zinc-50 overflow-hidden flex items-center justify-center rounded">
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}

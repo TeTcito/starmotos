@@ -14,6 +14,7 @@ import {
   NewWarrantyFormView,
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
+import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -59,6 +60,16 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
+      <AutoPendingWarrantiesAlert
+        warranties={warranties}
+        onSelectWarranty={(w) => {
+          setSelectedWarranty(w);
+          setViewMode('detail');
+        }}
+        role="taller"
+      />
+
       {/* 1. MODO: CREAR NUEVA SOLICITUD EN FORMATO FORMULARIO */}
       {viewMode === 'new' && (
         <NewWarrantyFormView

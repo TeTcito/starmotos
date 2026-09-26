@@ -327,7 +327,7 @@ export function useGarantePortal() {
               status: newStatus,
               resolutionType: finalResolution,
               garanteNotes: finalNotes,
-              approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+              approvedAt: 'Hoy, Autorización Digital Garantía de Marca',
             }
           : w
       );

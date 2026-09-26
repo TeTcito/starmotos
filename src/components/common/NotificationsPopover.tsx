@@ -169,7 +169,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
         let variant: StatusBadgeVariant = 'amber';
 
         if (w.status === 'en_proceso' || w.status === 'enviada_garante') {
-          statusBadgeText = 'Enviada Garante';
+          statusBadgeText = 'Enviada Garantía Marca';
           variant = 'blue';
         } else if (w.status === 'aceptada' || w.status === 'aprobada') {
           statusBadgeText = 'Aprobada';
@@ -204,7 +204,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
         let variant: StatusBadgeVariant = 'amber';
 
         if (w.status === 'en_proceso') {
-          statusBadgeText = 'Revisión Garante';
+          statusBadgeText = 'Revisión Garantía Marca';
           variant = 'blue';
         } else if (w.status === 'aceptada' || w.status === 'aprobada') {
           statusBadgeText = 'Garantía Aprobada';

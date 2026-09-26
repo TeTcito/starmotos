@@ -12,6 +12,7 @@ import {
   WarrantyFormView,
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
+import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
 
 interface Props {
   pendingRequests: WarrantyRequest[];
@@ -46,6 +47,13 @@ export const SolicitudesGaranteDesktop: React.FC<Props> = ({
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
+      <AutoPendingWarrantiesAlert
+        warranties={pendingRequests}
+        onSelectWarranty={(w) => setSelectedWarranty(w)}
+        role="garante"
+      />
+
       {/* 1. MODO: FICHA EN FORMATO FORMULARIO PARA DICTAMEN OFICIAL */}
       {selectedWarranty ? (
         <WarrantyFormView

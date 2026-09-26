@@ -235,7 +235,7 @@ export function useAdminPortal() {
       type: 'estado_cambiado',
       targetRole: 'admin',
       title: 'Garantía Aceptada en Matriz (En Proceso)',
-      message: `La solicitud ${targetW?.requestNumber || id} fue aceptada en revisión interna y pasa a En Proceso hacia el Garante de Marca.`,
+      message: `La solicitud ${targetW?.requestNumber || id} fue aceptada en revisión interna y pasa a En Proceso hacia la Garantía de Marca.`,
       timestamp: 'Ahora mismo',
       read: false,
       relatedId: id,
@@ -249,7 +249,7 @@ export function useAdminPortal() {
         targetRole: 'taller',
         targetWorkshopId: targetW.tallerOriginId,
         title: 'Garantía Aprobada por Matriz',
-        message: `Tu solicitud #${targetW.requestNumber} para ${targetW.clientName} fue aprobada por Matriz y está en proceso de revisión con el Garante.`,
+        message: `Tu solicitud #${targetW.requestNumber} para ${targetW.clientName} fue aprobada por Matriz y está en proceso de revisión con la Garantía de Marca.`,
         timestamp: 'Ahora mismo',
         read: false,
         relatedId: id,
@@ -257,7 +257,7 @@ export function useAdminPortal() {
     }
 
     addStoredAlerts(alertsToPush);
-    showToast('Solicitud aceptada por Matriz. Puesta EN PROCESO para el Garante de Marca.', 'success');
+    showToast('Solicitud aceptada por Matriz. Puesta EN PROCESO para la Garantía de Marca.', 'success');
   }, [warranties, showToast]);
 
   // Matriz deniega la solicitud

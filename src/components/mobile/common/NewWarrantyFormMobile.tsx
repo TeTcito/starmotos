@@ -418,6 +418,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       id: `gar-${Date.now()}`,
       requestNumber: `GAR-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       createdAt: 'Hoy, Solicitud Emitida',
+      createdTimestamp: Date.now(),
       clientName: formData.clientName.trim(),
       clientIdNumber: formData.clientIdNumber.trim(),
       clientPhone: formData.clientPhone.trim(),
@@ -741,7 +742,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 }`}
               >
                 <FileCheck2 className="w-3.5 h-3.5" />
-                <span>Garante</span>
+                <span>Garantía de Marca</span>
               </button>
             </div>
 

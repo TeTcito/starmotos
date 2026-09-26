@@ -403,7 +403,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       status: 'aceptada',
       garanteNotes: finalNotes,
       resolutionType: finalResolution,
-      approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      approvedAt: 'Hoy, Autorización Digital Garantía de Marca',
       partsBudget: partsBudgetMap,
       partsObservations,
       laborTime: laborTime,
@@ -1118,7 +1118,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-indigo-950">
-                        Dictamen & Observación Oficial del Garante de Marca
+                        Dictamen & Observación Oficial de la Garantía de Marca
                       </h4>
                       <p className="text-[10px] text-indigo-700 font-medium">
                         Instrucción técnica emitida para la liquidación de la garantía
@@ -1524,7 +1524,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   </div>
                   <div>
                     <h4 className="text-xs sm:text-sm font-black text-indigo-950">
-                      Dictamen & Observación Oficial del Garante de Marca
+                      Dictamen & Observación Oficial de la Garantía de Marca
                     </h4>
                     <p className="text-[10px] text-indigo-700 font-medium">
                       Instrucción técnica emitida para la liquidación de la garantía
@@ -1559,7 +1559,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   "{formData.garanteNotes || warranty.garanteNotes || 'Dictamen oficial favorable emitido por la Gerencia de Garantías de la Marca.'}"
                 </p>
                 <p className="text-[10px] text-zinc-400 font-mono mt-1 text-right">
-                  {warranty.approvedAt || 'Hoy, Autorización Digital Garante de Marca'}
+                  {warranty.approvedAt || 'Hoy, Autorización Digital Garantía de Marca'}
                 </p>
               </div>
 

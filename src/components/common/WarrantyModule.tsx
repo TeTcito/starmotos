@@ -84,7 +84,7 @@ export function getWarrantyStatusInfo(status: WarrantyRequestStatus): StatusInfo
     case 'enviada_garante':
       return {
         canonical: 'en_proceso',
-        label: 'En Proceso (Garante Marca)',
+        label: 'En Proceso (Garantía de Marca)',
         badgeBg: 'bg-blue-50',
         badgeText: 'text-blue-800',
         badgeBorder: 'border-blue-300',
@@ -666,7 +666,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     if (onValidateByMatriz) {
       onValidateByMatriz(currentWarranty.id, matrizInputNotes);
     }
-    setToastMessage('✓ Solicitud aceptada por Matriz. Puesta EN PROCESO hacia el Garante de Marca.');
+    setToastMessage('✓ Solicitud aceptada por Matriz. Puesta EN PROCESO hacia la Garantía de Marca.');
     confetti({ particleCount: 60, spread: 60 });
   };
 
@@ -748,7 +748,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       status: 'aceptada',
       resolutionType: 'encargar_taller',
       garanteNotes: garanteInputNotes,
-      approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      approvedAt: 'Hoy, Autorización Digital Garantía de Marca',
       partsBudget: partsBudgetMap,
       partsObservations,
       laborTime,
@@ -780,7 +780,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       status: 'aceptada',
       resolutionType: 'envio_repuesto',
       garanteNotes: garanteInputNotes,
-      approvedAt: 'Hoy, Autorización Digital Garante de Marca',
+      approvedAt: 'Hoy, Autorización Digital Garantía de Marca',
       partsObservations,
       totalBudget: 0,
       estimatedCost: 0,
@@ -1058,7 +1058,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               3
             </div>
             <div className="text-xs sm:text-sm">
-              <span className="font-bold block text-zinc-900">3. Dictamen Garante Marca</span>
+              <span className="font-bold block text-zinc-900">3. Dictamen Garantía de Marca</span>
               <p className="text-xs text-zinc-600 mt-0.5">
                 {statusInfo.canonical === 'aceptada'
                   ? '✓ Garantía Aceptada y Liquidada.'
@@ -1606,7 +1606,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs sm:text-sm font-black text-indigo-950">
-                      Dictamen & Observación Oficial del Garante de Marca
+                      Dictamen & Observación Oficial de la Garantía de Marca
                     </h4>
                     <p className="text-[11px] text-indigo-700 font-medium">
                       Instrucción técnica emitida para la liquidación de la garantía
@@ -2187,10 +2187,10 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   type="button"
                   onClick={handleMatrizApprove}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
-                  title="Poner en proceso y remitir al buzón del Garante de Marca"
+                  title="Poner en proceso y remitir al buzón de Garantía de Marca"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Aceptar y Enviar a Garante de Marca</span>
+                  <span>Aceptar y Enviar a Garantía de Marca</span>
                 </button>
               )}
             </div>
@@ -2203,7 +2203,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
         <div className="bg-purple-50/50 border-2 border-purple-300 rounded-2xl p-5 space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 text-xs font-black uppercase text-purple-950 tracking-wider">
             <Building2 className="w-4 h-4 text-purple-700" />
-            <span>Resolución Oficial del Garante de Marca</span>
+            <span>Resolución Oficial de Garantía de Marca</span>
           </div>
 
           <p className="text-xs text-zinc-600">
@@ -2249,7 +2249,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
           <div>
             <label className="block text-[11px] font-bold text-zinc-700 mb-1">
-              Observaciones / Dictamen Técnico del Garante de Marca <span className="text-red-500">*</span>
+              Observaciones / Dictamen Técnico de Garantía de Marca <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={2}
@@ -2858,6 +2858,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         month: 'short',
         year: 'numeric',
       }),
+      createdTimestamp: Date.now(),
       clientName: formData.clientName.trim(),
       clientIdNumber: formData.clientIdNumber.trim(),
       clientPhone: formData.clientPhone.trim(),
@@ -3066,7 +3067,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   }`}
                 >
                   <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>Marca Garante</span>
+                  <span>Garantía de Marca</span>
                 </button>
               </div>
 

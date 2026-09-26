@@ -23,6 +23,7 @@ import {
   NewWarrantyFormView,
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
+import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -120,6 +121,13 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
 
   return (
     <div className="space-y-5 animate-fade-in relative">
+      {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
+      <AutoPendingWarrantiesAlert
+        warranties={warranties}
+        onSelectWarranty={(w) => setSelectedWarranty(w)}
+        role="admin"
+      />
+
       {/* 1. VISTA DE DETALLE: FICHA EN FORMATO FORMULARIO */}
       {selectedWarranty ? (
         <WarrantyFormView
@@ -158,7 +166,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                     Gestión Centralizada de Garantías (Matriz Central)
                   </h2>
                   <p className="text-xs text-zinc-500 font-medium">
-                    Flujo de Control: Taller emite $\rightarrow$ Matriz revisa y pone En Proceso $\rightarrow$ Garante de Marca dictamina Aceptación o Denegación.
+                    Flujo de Control: Taller emite $\rightarrow$ Matriz revisa y pone En Proceso $\rightarrow$ Garantía de Marca dictamina Aceptación o Denegación.
                   </p>
                 </div>
               </div>
@@ -414,7 +422,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none focus:border-blue-600"
                 >
                   <option value="aceptada">✓ Aceptada Directamente (Matriz / Almacén)</option>
-                  <option value="en_proceso">⏳ En Proceso (Enviar a Garante de Marca)</option>
+                  <option value="en_proceso">⏳ En Proceso (Enviar a Garantía de Marca)</option>
                   <option value="validada_matriz">✓ Validada por Matriz</option>
                   <option value="rechazada_matriz">✕ Rechazada por Matriz</option>
                   <option value="reparacion_completada">🛠 Reparación Completada</option>

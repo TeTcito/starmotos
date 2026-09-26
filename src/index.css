@@ -54,6 +54,23 @@
     color: #09090b !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* Desactivar restricciones de contenedores móviles en modo impresión para ver tamaño escritorio A4 */
+  main,
+  #root > div,
+  div:has(> .printable-warranty-sheet),
+  div:has(> * > .printable-warranty-sheet) {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    position: static !important;
+    display: block !important;
   }
   .no-print,
   .print\:hidden,
@@ -68,9 +85,31 @@
     display: block !important;
   }
   .break-inside-avoid,
-  .print-avoid-break {
+  .print-avoid-break,
+  .printable-photo-card {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    -webkit-column-break-inside: avoid !important;
+  }
+  /* Estructura oficial tipo escritorio A4 para ficha de garantías sin cortes */
+  .printable-warranty-sheet {
+    display: block !important;
+    width: 100% !important;
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    padding: 4mm 0 !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    box-sizing: border-box !important;
+  }
+  .printable-warranty-sheet .grid-cols-2 {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+  .printable-warranty-sheet img {
+    max-height: 180px !important;
+    object-fit: contain !important;
   }
 }
 

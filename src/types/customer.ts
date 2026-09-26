@@ -377,6 +377,7 @@ export interface WarrantyRequest {
   id: string;
   requestNumber: string;
   createdAt: string;
+  createdTimestamp?: number;
   clientName: string;
   clientIdNumber: string;
   clientPhone?: string;

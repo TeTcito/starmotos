@@ -16,6 +16,8 @@ import {
   OrderRating,
   AdminPendiente,
   AgendamientoTicket,
+  GpsRecord,
+  GpsProfile,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -774,7 +776,7 @@ export function addStoredAlerts(newAlerts: SystemAlert | SystemAlert[]) {
 export function filterAlertsForRole(
   alerts: SystemAlert[],
   options: {
-    role: 'admin' | 'taller' | 'garante' | 'cliente';
+    role: 'admin' | 'taller' | 'garante' | 'gps' | 'cliente';
     workshopId?: string;
     brand?: string;
     brandsRepresented?: string[];
@@ -1958,6 +1960,166 @@ export function deleteStoredAgendamiento(id: string) {
     syncBus?.postMessage({ type: 'AGENDAMIENTO_DELETED', id });
   } catch (e) {
     console.error('Error al eliminar agendamiento:', e);
+  }
+}
+
+// ==============================================================
+// --- MÓDULO GPS (MATRIZ & GPS SERVICIOS) ---
+// ==============================================================
+
+export const INITIAL_GPS_PROFILE: GpsProfile = {
+  id: 'gps-operator-1',
+  fullName: 'Ing. David Salazar',
+  email: 'gps@starmotos.ec',
+  phone: '+593 98 765 4321',
+  roleTitle: 'Operador Técnico GPS Servicios',
+  companyName: 'StarMotos GPS Servicios',
+};
+
+export const INITIAL_GPS_RECORDS: GpsRecord[] = [
+  {
+    id: 'gps-001',
+    ticketNumber: 'GPS-2026-001',
+    fechaSolicitud: '2026-09-01',
+    horaSolicitud: '10:30',
+    nombres: 'Carlos Andrés',
+    apellidos: 'Mendoza Loor',
+    cedulaRuc: '1205849302',
+    celular1: '0987654321',
+    celular2: '0991234567',
+    celular3: '0956781234',
+    email: 'carlos.mendoza@gmail.com',
+    direccion: 'Av. 10 de Agosto y Colombia, La Maná',
+    modeloMarca: 'Shineray XY200GY',
+    placa: 'IB849X',
+    chasis: 'L8E2024XY90123',
+    numeroMotor: '163FML202488',
+    color: 'Rojo / Blanco',
+    year: 2024,
+    kilometraje: 4200,
+    serieGps: '864920048192837',
+    serieChip: '8959300182947192830',
+    fechaInicio: '2026-09-01',
+    fechaVencimiento: '2027-09-01',
+    valorServicio: 120.0,
+    montoPagado: 120.0,
+    abono: 120.0,
+    saldoPendiente: 0.0,
+    metodoPago: 'Efectivo',
+    observaciones: 'Instalación oculta en chasis bajo el tanque. Prueba de corte de corriente satisfactoria.',
+    estado: 'activa',
+    gpsUser: 'carlos.mendoza',
+    gpsPassword: 'MotoGps2026*',
+    fechaAprobacion: '2026-09-02',
+    aprobadoPor: 'Operador GPS Central',
+    createdAt: '2026-09-01T10:30:00Z',
+    updatedAt: '2026-09-02T11:15:00Z',
+  },
+  {
+    id: 'gps-002',
+    ticketNumber: 'GPS-2026-002',
+    fechaSolicitud: '2026-09-25',
+    horaSolicitud: '14:20',
+    nombres: 'Jessica Paola',
+    apellidos: 'Guerrero Cárdenas',
+    cedulaRuc: '1723849102',
+    celular1: '0998472910',
+    celular2: '0983726194',
+    celular3: '0972615483',
+    email: 'jessica.guerrero@outlook.com',
+    direccion: 'Calle Guayaquil y Cotopaxi, La Maná',
+    modeloMarca: 'Honda Tornado XR 250',
+    placa: 'HQ502P',
+    chasis: '9C2MD3804829102',
+    numeroMotor: 'MD38E109283',
+    color: 'Negro con detalles rojos',
+    year: 2025,
+    kilometraje: 1500,
+    serieGps: '867104928193021',
+    serieChip: '8959300482910294820',
+    fechaInicio: '2026-09-25',
+    fechaVencimiento: '2027-09-25',
+    valorServicio: 135.0,
+    montoPagado: 50.0,
+    abono: 50.0,
+    saldoPendiente: 85.0,
+    metodoPago: 'Transferencia',
+    observaciones: 'Cliente solicita sensor de movimiento y geocerca configurada en La Maná.',
+    estado: 'pendiente',
+    createdAt: '2026-09-25T14:20:00Z',
+    updatedAt: '2026-09-25T14:20:00Z',
+  },
+];
+
+export function getStoredGpsRecords(): GpsRecord[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GPS_RECORDS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error al leer registros GPS de localStorage:', e);
+  }
+  return INITIAL_GPS_RECORDS;
+}
+
+export function saveStoredGpsRecords(records: GpsRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(records));
+    window.dispatchEvent(new Event('starmotos_gps_updated'));
+    syncBus?.postMessage({ type: 'GPS_UPDATED', payload: records });
+  } catch (e) {
+    console.error('Error al guardar registros GPS en localStorage:', e);
+  }
+}
+
+export function saveStoredGpsRecord(record: GpsRecord) {
+  try {
+    const current = getStoredGpsRecords();
+    const idx = current.findIndex((r) => r.id === record.id);
+    let updated: GpsRecord[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...record, updatedAt: new Date().toISOString() };
+    } else {
+      updated = [{ ...record, createdAt: record.createdAt || new Date().toISOString() }, ...current];
+    }
+    saveStoredGpsRecords(updated);
+  } catch (e) {
+    console.error('Error al guardar registro GPS individual:', e);
+  }
+}
+
+export function deleteStoredGpsRecord(id: string) {
+  try {
+    const current = getStoredGpsRecords();
+    const updated = current.filter((r) => r.id !== id);
+    saveStoredGpsRecords(updated);
+  } catch (e) {
+    console.error('Error al eliminar registro GPS:', e);
+  }
+}
+
+export function getStoredGpsProfile(): GpsProfile {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GPS_PROFILE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return { ...INITIAL_GPS_PROFILE, ...parsed };
+    }
+  } catch (e) {
+    console.error('Error al leer perfil GPS:', e);
+  }
+  return INITIAL_GPS_PROFILE;
+}
+
+export function saveStoredGpsProfile(profile: GpsProfile) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GPS_PROFILE, JSON.stringify(profile));
+    window.dispatchEvent(new Event('starmotos_gps_profile_updated'));
+  } catch (e) {
+    console.error('Error al guardar perfil GPS:', e);
   }
 }
 

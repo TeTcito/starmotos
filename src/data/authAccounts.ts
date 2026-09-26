@@ -130,4 +130,18 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     passwords: ['TallerElEmpalme@2026', 'StarMotos@2026'],
     name: 'StarMotos Sucursal El Empalme',
   },
+
+  // 4. GPS Servicios Oficial
+  'gps@starmotos.com': {
+    email: 'gps@starmotos.com',
+    role: 'gps',
+    passwords: ['StarMotos@Gps2026', 'StarMotos@2026', 'gps123'],
+    name: 'Operador GPS Central',
+  },
+  'gps@starmotos.ec': {
+    email: 'gps@starmotos.ec',
+    role: 'gps',
+    passwords: ['StarMotos@Gps2026', 'StarMotos@2026', 'gps123'],
+    name: 'GPS Servicios StarMotos Track',
+  },
 };

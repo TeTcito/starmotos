@@ -309,13 +309,14 @@ export interface CustomerPortalData {
 
 // ===================== SISTEMA MULTI-ROL =====================
 
-export type UserRole = 'cliente' | 'admin' | 'taller' | 'garante';
+export type UserRole = 'cliente' | 'admin' | 'taller' | 'garante' | 'gps';
 
 // --- Secciones por rol ---
 export type AdminSection =
   | 'talleres'
   | 'pendientes'
   | 'alistamiento'
+  | 'gps'
   | 'clientes_admin'
   | 'garantias_admin'
   | 'tecnicos'
@@ -588,7 +589,7 @@ export interface AlistamientoService {
 }
 
 // --- Alertas del Sistema ---
-export type AlertRole = 'admin' | 'taller' | 'garante' | 'cliente' | 'all';
+export type AlertRole = 'admin' | 'taller' | 'garante' | 'gps' | 'cliente' | 'all';
 
 export type AlertType =
   | 'orden_creada'
@@ -613,7 +614,7 @@ export interface SystemAlert {
   read: boolean;
   relatedId?: string;
   targetRole?: AlertRole;
-  targetRoles?: ('admin' | 'taller' | 'garante' | 'cliente')[];
+  targetRoles?: AlertRole[];
   targetWorkshopId?: string;
   targetBrand?: string;
   targetClientId?: string;
@@ -822,4 +823,62 @@ export interface AgendamientoTicket {
   notes?: string;
   status: 'confirmado' | 'atendido' | 'cancelado';
   createdAt: string; // ISO string
+}
+
+// --- Registro Oficial de Servicio GPS (Matriz & GPS Servicios) ---
+export interface GpsRecord {
+  id: string; // ID único ej: "gps-179048392"
+  ticketNumber: string; // ej: "GPS-84920"
+  fechaSolicitud: string; // YYYY-MM-DD
+  horaSolicitud?: string; // HH:mm
+  // Paso 1: Datos del Cliente
+  clienteId?: string;
+  nombres: string;
+  apellidos: string;
+  cedulaRuc: string;
+  celular1: string; // Celular principal
+  celular2?: string; // Celular secundario
+  celular3?: string; // Celular adicional
+  email?: string;
+  direccion?: string;
+  // Paso 2: Datos de la Moto y Dispositivo GPS
+  placa: string;
+  chasis: string; // VIN
+  numeroMotor?: string;
+  modeloMarca: string;
+  color?: string;
+  year?: number;
+  kilometraje?: number;
+  serieGps: string; // Serie / IMEI del GPS
+  serieChip: string; // Serie / SIM del Chip
+  // Paso 3: Servicio, Vigencia & Contabilidad Matriz
+  fechaInicio: string; // YYYY-MM-DD
+  fechaVencimiento: string; // YYYY-MM-DD
+  // Exclusivo de Contabilidad Matriz (oculto para perfil GPS Servicios)
+  valorServicio: number;
+  montoPagado: number;
+  abono?: number;
+  saldoPendiente?: number;
+  metodoPago?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Crédito' | 'Mixto' | string;
+  observaciones?: string;
+  // Estado y Credenciales asignadas por el perfil "GPS servicios"
+  estado: 'pendiente' | 'activa' | 'rechazada' | 'cancelada';
+  gpsUser?: string; // Usuario generado/asignado
+  gpsPassword?: string; // Contraseña asignada
+  fechaAprobacion?: string;
+  aprobadoPor?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type GpsSection = 'solicitudes_gps' | 'historial_gps' | 'perfil_gps';
+export type GpsSectionMobile = GpsSection;
+
+export interface GpsProfile {
+  id?: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  roleTitle?: string;
+  companyName?: string;
 }

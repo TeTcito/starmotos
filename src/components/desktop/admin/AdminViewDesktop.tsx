@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Users,
   CalendarClock,
+  Radio,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -31,6 +32,7 @@ import {
   TallerOrder,
   InventoryItem,
   AdminPendiente,
+  GpsRecord,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -39,6 +41,7 @@ import { TecnicosDesktop } from '../common/TecnicosDesktop';
 import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
 import { AlertasDesktop } from './AlertasDesktop';
+import { GpsMatrizDesktop } from './GpsMatrizDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
 
@@ -87,6 +90,9 @@ interface Props {
   isSearchingSri: boolean;
   onSearchSri: (idNumber: string) => void;
   onSubmitAlistamiento: () => boolean;
+  gpsRecords?: GpsRecord[];
+  onSaveGpsRecord?: (record: GpsRecord) => void;
+  onDeleteGpsRecord?: (id: string) => void;
 }
 
 export const AdminViewDesktop: React.FC<Props> = ({
@@ -134,6 +140,9 @@ export const AdminViewDesktop: React.FC<Props> = ({
   isSearchingSri,
   onSearchSri,
   onSubmitAlistamiento,
+  gpsRecords = [],
+  onSaveGpsRecord,
+  onDeleteGpsRecord,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
@@ -156,6 +165,12 @@ export const AdminViewDesktop: React.FC<Props> = ({
       label: 'Alistamiento & PDI',
       icon: <UserCheck className="w-4 h-4" />,
       badge: 'Nuevo',
+    },
+    {
+      id: 'gps',
+      label: 'Módulo GPS Matriz',
+      icon: <Radio className="w-4 h-4" />,
+      badge: 'GPS',
     },
     {
       id: 'clientes_admin',
@@ -191,6 +206,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
     talleres: 'Control Operativo de Talleres & Sucursales',
     pendientes: 'Registrar Pendientes & Agendamiento de Tareas',
     alistamiento: 'Alistamiento de Clientes y Motocicletas',
+    gps: 'Módulo GPS Matriz • Compras & Solicitudes de Rastreo',
     clientes_admin: 'Fichero Nacional de Clientes & Flota StarMotos',
     tecnicos: 'Gestión y Despacho del Equipo Técnico',
     garantias_admin: 'Gestión y Auditoría de Garantías',
@@ -411,6 +427,13 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 onViewModeChange={setAlistamientoViewMode}
                 isMatriz={true}
                 orders={orders}
+              />
+            )}
+            {activeSection === 'gps' && (
+              <GpsMatrizDesktop
+                records={gpsRecords}
+                onSaveRecord={onSaveGpsRecord}
+                onDeleteRecord={onDeleteGpsRecord}
               />
             )}
             {activeSection === 'clientes_admin' && (

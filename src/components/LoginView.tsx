@@ -5,6 +5,7 @@ import { AdminLoginView } from './login/AdminLoginView';
 import { CustomerLoginView } from './login/CustomerLoginView';
 import { TallerLoginView } from './login/TallerLoginView';
 import { GaranteLoginView } from './login/GaranteLoginView';
+import { GpsLoginView } from './login/GpsLoginView';
 import { OFFICIAL_CORPORATE_ACCOUNTS, CorporateAccount } from '../data/authAccounts';
 import { updateWebManifestForRole } from './PWAInstallPrompt';
 
@@ -27,23 +28,26 @@ function detectRoleFromUrl(): UserRole {
   if (path.includes('/admin')) return 'admin';
   if (path.includes('/taller')) return 'taller';
   if (path.includes('/marca') || path.includes('/garante') || path.includes('/garantia')) return 'garante';
+  if (path.includes('/gps')) return 'gps';
   if (path.includes('/cliente')) return 'cliente';
 
   // 2. Detección por Hash (#/admin, #admin, etc.)
   if (hash.includes('admin')) return 'admin';
   if (hash.includes('taller')) return 'taller';
   if (hash.includes('marca') || hash.includes('garante') || hash.includes('garantia')) return 'garante';
+  if (hash.includes('gps')) return 'gps';
   if (hash.includes('cliente')) return 'cliente';
 
   // 3. Detección por Query Params (?portal=admin o ?role=admin)
   if (search.includes('portal=admin') || search.includes('role=admin')) return 'admin';
   if (search.includes('portal=taller') || search.includes('role=taller')) return 'taller';
   if (search.includes('portal=marca') || search.includes('portal=garante') || search.includes('portal=garantia') || search.includes('role=garante')) return 'garante';
+  if (search.includes('portal=gps') || search.includes('role=gps')) return 'gps';
   if (search.includes('portal=cliente') || search.includes('role=cliente')) return 'cliente';
 
   // 4. Último rol recordado si está en la raíz
   const savedRole = localStorage.getItem('starmotos_preferred_login_role') as UserRole;
-  if (savedRole && ['admin', 'cliente', 'taller', 'garante'].includes(savedRole)) {
+  if (savedRole && ['admin', 'cliente', 'taller', 'garante', 'gps'].includes(savedRole)) {
     return savedRole;
   }
 
@@ -79,6 +83,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
       admin: '/?portal=admin',
       taller: '/?portal=taller',
       garante: '/?portal=garantia',
+      gps: '/?portal=gps',
       cliente: '/?portal=cliente',
     };
     try {
@@ -112,6 +117,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
               {activeRole === 'cliente' && '🏍️ Portal del Propietario'}
               {activeRole === 'taller' && '🔧 Red Oficial de Sedes & Talleres'}
               {activeRole === 'garante' && '🏷️ Garantías Oficiales de Fábrica'}
+              {activeRole === 'gps' && '📡 Portal Técnico GPS Servicios'}
             </span>
           </div>
 
@@ -123,6 +129,7 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
             {activeRole === 'cliente' && 'Seguimiento vehicular en vivo, historial de servicios técnicos y citas agendadas.'}
             {activeRole === 'taller' && 'Gestión de órdenes de trabajo, alistamiento PDI, mecánicos e inventario.'}
             {activeRole === 'garante' && 'Auditoría, validación técnica y despacho de repuestos oficiales para marcas asociadas.'}
+            {activeRole === 'gps' && 'Auditoría, validación técnica de rastreadores satelitales y emisión de credenciales de acceso.'}
           </p>
         </div>
       </div>
@@ -185,6 +192,17 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
           </button>
           <button
             type="button"
+            onClick={() => switchRole('gps')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+              activeRole === 'gps'
+                ? 'bg-white text-cyan-700 shadow-xs font-black'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            GPS
+          </button>
+          <button
+            type="button"
             onClick={() => switchRole('admin')}
             className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
               activeRole === 'admin'
@@ -212,6 +230,10 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
 
           {activeRole === 'garante' && (
             <GaranteLoginView onLoginSuccess={onLoginSuccess} />
+          )}
+
+          {activeRole === 'gps' && (
+            <GpsLoginView onLoginSuccess={onLoginSuccess} />
           )}
         </div>
       </div>

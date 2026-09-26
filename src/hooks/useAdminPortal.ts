@@ -19,6 +19,7 @@ import {
   InventoryItem,
   AdminProfile,
   AdminPendiente,
+  GpsRecord,
 } from '../types/customer';
 import {
   getStoredWarranties,
@@ -53,6 +54,9 @@ import {
   getStoredPendientes,
   saveStoredPendientes,
   deleteStoredPendiente,
+  getStoredGpsRecords,
+  saveStoredGpsRecord,
+  deleteStoredGpsRecord,
 } from '../data/mockMultiRoleData';
 import { cloudSaveWarranty, syncAllFromSupabase } from '../services/supabaseService';
 
@@ -60,6 +64,7 @@ export const ADMIN_SECTIONS: AdminSectionMobile[] = [
   'talleres',
   'pendientes',
   'alistamiento',
+  'gps',
   'clientes_admin',
   'garantias_admin',
   'tecnicos',
@@ -96,6 +101,7 @@ export function useAdminPortal() {
   const [inventory, setInventory] = useState<InventoryItem[]>(getStoredInventory);
   const [adminProfile, setAdminProfile] = useState<AdminProfile>(getStoredAdminProfile);
   const [pendientes, setPendientes] = useState<AdminPendiente[]>(getStoredPendientes);
+  const [gpsRecords, setGpsRecords] = useState<GpsRecord[]>(getStoredGpsRecords);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
@@ -112,6 +118,7 @@ export function useAdminPortal() {
     const handleInvoicesUpdate = () => setInvoices(getStoredInvoices());
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
     const handlePendientesUpdate = () => setPendientes(getStoredPendientes());
+    const handleGpsUpdate = () => setGpsRecords(getStoredGpsRecords());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -127,6 +134,7 @@ export function useAdminPortal() {
         handleInvoicesUpdate();
         handleWorkshopsUpdate();
         handlePendientesUpdate();
+        handleGpsUpdate();
       }
     };
 
@@ -142,6 +150,7 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
+    window.addEventListener('starmotos_gps_updated', handleGpsUpdate);
     window.addEventListener('storage', handleStorageEvent);
 
     // Sincronización proactiva de arranque para asegurar que Matriz reciba toda la red
@@ -160,6 +169,7 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_invoices_updated', handleInvoicesUpdate);
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
       window.removeEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
+      window.removeEventListener('starmotos_gps_updated', handleGpsUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
@@ -980,6 +990,32 @@ export function useAdminPortal() {
     [showToast]
   );
 
+  const saveGpsRecord = useCallback(
+    (record: GpsRecord) => {
+      saveStoredGpsRecord(record);
+      setGpsRecords((prev) => {
+        const idx = prev.findIndex((r) => r.id === record.id);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = record;
+          return updated;
+        }
+        return [record, ...prev];
+      });
+      showToast('Registro GPS guardado exitosamente.', 'success');
+    },
+    [showToast]
+  );
+
+  const deleteGpsRecord = useCallback(
+    (id: string) => {
+      deleteStoredGpsRecord(id);
+      setGpsRecords((prev) => prev.filter((r) => r.id !== id));
+      showToast('Registro GPS eliminado.', 'info');
+    },
+    [showToast]
+  );
+
   return {
     activeSection,
     setActiveSection,
@@ -999,6 +1035,10 @@ export function useAdminPortal() {
     updateAdminProfile,
     toastMessage,
     showToast,
+    // GPS Matriz
+    gpsRecords,
+    saveGpsRecord,
+    deleteGpsRecord,
     // Pendientes & Agendamiento
     pendientes,
     savePendiente,

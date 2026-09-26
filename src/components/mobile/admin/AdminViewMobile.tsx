@@ -15,6 +15,7 @@ import {
   Users,
   User,
   CalendarClock,
+  Radio,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -34,6 +35,7 @@ import {
   InventoryItem,
   AdminProfile,
   AdminPendiente,
+  GpsRecord,
 } from '../../../types/customer';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
@@ -43,6 +45,7 @@ import { GarantiasAdminMobile } from './GarantiasAdminMobile';
 import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
 import { PerfilAdminMobile } from './PerfilAdminMobile';
+import { GpsMatrizMobile } from './GpsMatrizMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
 
@@ -91,6 +94,9 @@ interface Props {
   isSearchingSri: boolean;
   onSearchSri: (idNumber: string) => void;
   onSubmitAlistamiento: () => boolean;
+  gpsRecords?: GpsRecord[];
+  onSaveGpsRecord?: (record: GpsRecord) => void;
+  onDeleteGpsRecord?: (id: string) => void;
 }
 
 export const AdminViewMobile: React.FC<Props> = ({
@@ -138,6 +144,9 @@ export const AdminViewMobile: React.FC<Props> = ({
   isSearchingSri,
   onSearchSri,
   onSubmitAlistamiento,
+  gpsRecords = [],
+  onSaveGpsRecord,
+  onDeleteGpsRecord,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
@@ -151,6 +160,7 @@ export const AdminViewMobile: React.FC<Props> = ({
       badge: uncompletedPendientesCount > 0 ? `${uncompletedPendientesCount}` : undefined,
     },
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
+    { id: 'gps', label: 'GPS Matriz', icon: <Radio className="w-4 h-4" />, badge: 'GPS' },
     { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
     { id: 'garantias_admin', label: 'Garantías', icon: <ShieldCheck className="w-4 h-4" />, badge: `${warranties.filter((w) => w.status === 'en_revision' || w.status === 'enviada_matriz').length || ''}` },
@@ -163,6 +173,7 @@ export const AdminViewMobile: React.FC<Props> = ({
     talleres: 'Control de Talleres',
     pendientes: 'Registrar Pendientes',
     alistamiento: 'Alistamiento & PDI',
+    gps: 'Módulo GPS Matriz',
     clientes_admin: 'Clientes & Flota',
     tecnicos: 'Equipo Técnico',
     garantias_admin: 'Garantías & Pólizas',
@@ -310,6 +321,13 @@ export const AdminViewMobile: React.FC<Props> = ({
             recentRecords={fullAlistamientos}
             isMatriz={true}
             orders={orders}
+          />
+        )}
+        {activeSection === 'gps' && (
+          <GpsMatrizMobile
+            records={gpsRecords}
+            onSaveRecord={onSaveGpsRecord}
+            onDeleteRecord={onDeleteGpsRecord}
           />
         )}
         {activeSection === 'clientes_admin' && (

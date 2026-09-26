@@ -37,6 +37,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     savePendiente,
     toggleCompletePendiente,
     deletePendiente,
+    gpsRecords,
+    saveGpsRecord,
+    deleteGpsRecord,
     validateWarrantyByMatriz,
     rejectWarrantyByMatriz,
     sendWarrantyToGarante,
@@ -147,6 +150,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           isSearchingSri={isSearchingSri}
           onSearchSri={searchSri}
           onSubmitAlistamiento={submitAlistamiento}
+          gpsRecords={gpsRecords}
+          onSaveGpsRecord={saveGpsRecord}
+          onDeleteGpsRecord={deleteGpsRecord}
         />
       ) : (
         <AdminViewMobile
@@ -194,6 +200,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           isSearchingSri={isSearchingSri}
           onSearchSri={searchSri}
           onSubmitAlistamiento={submitAlistamiento}
+          gpsRecords={gpsRecords}
+          onSaveGpsRecord={saveGpsRecord}
+          onDeleteGpsRecord={deleteGpsRecord}
         />
       )}
 

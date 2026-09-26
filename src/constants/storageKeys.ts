@@ -17,4 +17,6 @@ export const STORAGE_KEYS = {
   RATINGS: 'starmotos_shared_ratings_v1',
   PENDIENTES: 'starmotos_shared_pendientes_v1',
   AGENDAMIENTOS: 'starmotos_shared_agendamientos_v1',
+  GPS_RECORDS: 'starmotos_shared_gps_records_v1',
+  GPS_PROFILE: 'starmotos_shared_gps_profile_v1',
 } as const;

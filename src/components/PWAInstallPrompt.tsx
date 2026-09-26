@@ -9,6 +9,7 @@ import {
   Wrench,
   Award,
   Bike,
+  Radio,
 } from 'lucide-react';
 import { UserRole } from '../types/customer';
 
@@ -121,6 +122,7 @@ export function updateWebManifestForRole(role: UserRole) {
     admin: '/manifest-admin.json',
     taller: '/manifest-taller.json',
     garante: '/manifest-garante.json',
+    gps: '/manifest-admin.json',
     cliente: '/manifest-cliente.json',
   };
 
@@ -135,6 +137,7 @@ export function updateWebManifestForRole(role: UserRole) {
     admin: 'StarMotos Admin',
     taller: 'StarMotos Taller',
     garante: 'StarMotos Garantías',
+    gps: 'StarMotos GPS Servicios',
     cliente: 'StarMotos Clientes',
   };
   if (appleTitleMeta) {
@@ -146,7 +149,7 @@ export function updateWebManifestForRole(role: UserRole) {
  * Detecta el rol activo a partir de las props, la URL (pathname, hash, search) o el almacenamiento local.
  */
 export function detectActiveRole(propRole?: UserRole): UserRole {
-  if (propRole && ['admin', 'taller', 'garante', 'cliente'].includes(propRole)) {
+  if (propRole && ['admin', 'taller', 'garante', 'cliente', 'gps'].includes(propRole)) {
     return propRole;
   }
   if (typeof window === 'undefined') return 'cliente';
@@ -252,6 +255,18 @@ const ROLE_PWA_CONFIGS: Record<UserRole, RoleConfig> = {
     buttonText: 'Instalar App Clientes',
     themeColor: '#2563eb',
     icon: <Bike className="w-3.5 h-3.5" />,
+  },
+  gps: {
+    title: 'Instalar StarMotos GPS Servicios',
+    subtitle: 'Portal de Monitoreo y Credenciales',
+    badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    mobileDesc:
+      'Instala la app en tu celular para auditar dispositivos GPS y emitir credenciales de acceso satelital.',
+    desktopDesc:
+      'Instala la app en tu computadora para acceso rápido a las solicitudes satelitales de la red.',
+    buttonText: 'Instalar Portal GPS',
+    themeColor: '#0891b2',
+    icon: <Radio className="w-3.5 h-3.5" />,
   },
 };
 

@@ -6,6 +6,7 @@ import { CustomerPortal } from './CustomerPortal';
 import { AdminPortal } from './AdminPortal';
 import { TallerPortal } from './TallerPortal';
 import { GarantePortal } from './GarantePortal';
+import { GpsPortal } from './GpsPortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { initSupabaseRealtime, syncAllFromSupabase } from './services/supabaseService';
 import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
@@ -30,12 +31,13 @@ function detectInitialRole(): UserRole {
   ) {
     return 'garante';
   }
+  if (search.includes('portal=gps') || search.includes('role=gps') || hash.includes('gps') || path.includes('/gps')) return 'gps';
   if (search.includes('portal=cliente') || search.includes('role=cliente') || hash.includes('cliente') || path.includes('/cliente')) return 'cliente';
 
   const savedRole = localStorage.getItem('starmotos_role') as UserRole;
-  if (savedRole && ['admin', 'taller', 'garante', 'cliente'].includes(savedRole)) return savedRole;
+  if (savedRole && ['admin', 'taller', 'garante', 'cliente', 'gps'].includes(savedRole)) return savedRole;
   const prefRole = localStorage.getItem('starmotos_preferred_login_role') as UserRole;
-  if (prefRole && ['admin', 'taller', 'garante', 'cliente'].includes(prefRole)) return prefRole;
+  if (prefRole && ['admin', 'taller', 'garante', 'cliente', 'gps'].includes(prefRole)) return prefRole;
   return 'cliente';
 }
 
@@ -77,6 +79,8 @@ function App() {
       window.location.hash = '#perfil_taller';
     } else if (selectedRole === 'garante') {
       window.location.hash = '#solicitudes_garante';
+    } else if (selectedRole === 'gps') {
+      window.location.hash = '#solicitudes_gps';
     } else {
       window.location.hash = '#eventos';
     }
@@ -109,6 +113,7 @@ function App() {
           {role === 'admin' && <AdminPortal onLogout={handleLogout} />}
           {role === 'taller' && <TallerPortal onLogout={handleLogout} />}
           {role === 'garante' && <GarantePortal onLogout={handleLogout} />}
+          {role === 'gps' && <GpsPortal onLogout={handleLogout} />}
           {role === 'cliente' && <CustomerPortal onLogout={handleLogout} />}
         </>
       )}

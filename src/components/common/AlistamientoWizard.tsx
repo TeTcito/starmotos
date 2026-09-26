@@ -760,8 +760,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filterPayment !== 'all') count++;
-    if (filterDateRange !== 'all') count++;
-    if (sortBy !== 'recientes') count++;
+    if (filterDateRange !== 'all' || sortBy !== 'recientes') count++;
     return count;
   }, [filterPayment, filterDateRange, sortBy]);
 
@@ -915,22 +914,20 @@ export const AlistamientoWizard: React.FC<Props> = ({
           if (isPdi || valor <= 0 || pendiente > 0.01) return false;
         } else if (filterPayment === 'pdi') {
           const hasPdi =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('pdi') || s.toLowerCase().includes('alistamiento')) ||
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'alistamiento_pdi' || s.toLowerCase().includes('pdi')) ||
             (r as any).tipoServicio?.toLowerCase().includes('pdi') ||
             (r as any).tipoServicio?.toLowerCase().includes('alistamiento') ||
             isPdiOnlyRecord(r);
           if (!hasPdi) return false;
         } else if (filterPayment === 'engrasado') {
           const hasEngrasado =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('engrasad')) ||
-            (r as any).tipoServicio?.toLowerCase().includes('engrasad') ||
-            r.observaciones?.toLowerCase().includes('engrasad');
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'engrasado' || s.toLowerCase().includes('engrasad')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('engrasad');
           if (!hasEngrasado) return false;
         } else if (filterPayment === 'mantenimiento') {
           const hasMantenimiento =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('mantenimiento')) ||
-            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento') ||
-            r.observaciones?.toLowerCase().includes('mantenimiento');
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'mantenimiento') ||
+            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento');
           if (!hasMantenimiento) return false;
         }
       }
@@ -2775,7 +2772,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* 1. Servicios Realizados */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
@@ -2804,65 +2801,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* 2. Rango de Fechas */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
-                      Fecha del Servicio
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'all', label: 'Todas' },
-                        { id: 'today', label: 'Hoy' },
-                        { id: 'this_week', label: 'Por semana' },
-                        { id: 'this_month', label: 'Por mes' },
-                        { id: 'this_year', label: 'Por año' },
-                        { id: 'custom', label: 'Rango Manual' },
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setFilterDateRange(item.id as any);
-                            if (item.id === 'today') setSortBy('hoy');
-                            else if (item.id === 'this_week') setSortBy('por_semana');
-                            else if (item.id === 'this_month') setSortBy('por_mes');
-                            else if (item.id === 'this_year') setSortBy('por_ano');
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer truncate ${
-                            filterDateRange === item.id
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                    {filterDateRange === 'custom' && (
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                          <label className="block text-[10px] text-zinc-500 font-bold">Desde</label>
-                          <input
-                            type="date"
-                            value={customStartDate}
-                            onChange={(e) => setCustomStartDate(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-800"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-zinc-500 font-bold">Hasta</label>
-                          <input
-                            type="date"
-                            value={customEndDate}
-                            onChange={(e) => setCustomEndDate(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-800"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. Ordenamiento */}
+                  {/* 2. Ordenar Resultados y Período */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
                       Ordenar Resultados
@@ -2877,6 +2816,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           else if (val === 'por_semana') setFilterDateRange('this_week');
                           else if (val === 'por_mes') setFilterDateRange('this_month');
                           else if (val === 'por_ano') setFilterDateRange('this_year');
+                          else setFilterDateRange('all');
                         }}
                         className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none cursor-pointer focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                       >
@@ -2926,37 +2866,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </button>
                   </span>
                 )}
-                {filterDateRange !== 'all' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
-                    <span>
-                      Fecha:{' '}
-                      {filterDateRange === 'today'
-                        ? 'Hoy'
-                        : filterDateRange === 'this_week'
-                        ? 'Por semana'
-                        : filterDateRange === 'this_month'
-                        ? 'Por mes'
-                        : filterDateRange === 'this_year'
-                        ? 'Por año'
-                        : `${customStartDate || '...'} a ${customEndDate || '...'}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFilterDateRange('all');
-                        setCustomStartDate('');
-                        setCustomEndDate('');
-                      }}
-                      className="hover:text-blue-950 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
                 {sortBy !== 'recientes' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
                     <span>
-                      Orden:{' '}
                       {sortBy === 'antiguos'
                         ? 'Antiguos'
                         : sortBy === 'hoy'
@@ -2981,7 +2893,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </span>
                     <button
                       type="button"
-                      onClick={() => setSortBy('recientes')}
+                      onClick={() => {
+                        setSortBy('recientes');
+                        setFilterDateRange('all');
+                      }}
                       className="hover:text-blue-950 cursor-pointer"
                     >
                       <X className="w-3 h-3" />

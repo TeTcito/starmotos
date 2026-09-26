@@ -177,8 +177,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filterPayment !== 'all') count++;
-    if (filterDateRange !== 'all') count++;
-    if (sortBy !== 'recientes') count++;
+    if (filterDateRange !== 'all' || sortBy !== 'recientes') count++;
     return count;
   }, [filterPayment, filterDateRange, sortBy]);
 
@@ -732,22 +731,20 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
           if (isPdi || valor <= 0 || pendiente > 0.01) return false;
         } else if (filterPayment === 'pdi') {
           const hasPdi =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('pdi') || s.toLowerCase().includes('alistamiento')) ||
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'alistamiento_pdi' || s.toLowerCase().includes('pdi')) ||
             (r as any).tipoServicio?.toLowerCase().includes('pdi') ||
             (r as any).tipoServicio?.toLowerCase().includes('alistamiento') ||
             isPdiOnlyRecord(r);
           if (!hasPdi) return false;
         } else if (filterPayment === 'engrasado') {
           const hasEngrasado =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('engrasad')) ||
-            (r as any).tipoServicio?.toLowerCase().includes('engrasad') ||
-            r.observaciones?.toLowerCase().includes('engrasad');
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'engrasado' || s.toLowerCase().includes('engrasad')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('engrasad');
           if (!hasEngrasado) return false;
         } else if (filterPayment === 'mantenimiento') {
           const hasMantenimiento =
-            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('mantenimiento')) ||
-            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento') ||
-            r.observaciones?.toLowerCase().includes('mantenimiento');
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'mantenimiento') ||
+            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento');
           if (!hasMantenimiento) return false;
         }
       }
@@ -2776,63 +2773,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* 2. Rango de Fechas */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Fecha</span>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { id: 'all', label: 'Todas' },
-                    { id: 'today', label: 'Hoy' },
-                    { id: 'this_week', label: 'Semana' },
-                    { id: 'this_month', label: 'Mes' },
-                    { id: 'this_year', label: 'Año' },
-                    { id: 'custom', label: 'Rango' },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setFilterDateRange(item.id as any);
-                        if (item.id === 'today') setSortBy('hoy');
-                        else if (item.id === 'this_week') setSortBy('por_semana');
-                        else if (item.id === 'this_month') setSortBy('por_mes');
-                        else if (item.id === 'this_year') setSortBy('por_ano');
-                      }}
-                      className={`px-1.5 py-1 rounded-lg text-[11px] font-bold border text-center transition-all truncate cursor-pointer ${
-                        filterDateRange === item.id
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-white text-zinc-700 border-zinc-200'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-                {filterDateRange === 'custom' && (
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
-                    <div>
-                      <label className="block text-[9px] text-zinc-500 font-bold">Desde</label>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="w-full px-1.5 py-1 bg-white border border-zinc-300 rounded text-[11px] font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500 font-bold">Hasta</label>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="w-full px-1.5 py-1 bg-white border border-zinc-300 rounded text-[11px] font-semibold"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Ordenamiento */}
+              {/* 2. Ordenamiento */}
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Ordenar por</span>
                 <select
@@ -2844,6 +2785,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     else if (val === 'por_semana') setFilterDateRange('this_week');
                     else if (val === 'por_mes') setFilterDateRange('this_month');
                     else if (val === 'por_ano') setFilterDateRange('this_year');
+                    else setFilterDateRange('all');
                   }}
                   className="w-full px-2 py-1.5 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-800 outline-none"
                 >
@@ -2886,32 +2828,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   </button>
                 </span>
               )}
-              {filterDateRange !== 'all' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
-                  <span>
-                    {filterDateRange === 'today'
-                      ? 'Hoy'
-                      : filterDateRange === 'this_week'
-                      ? 'Semana'
-                      : filterDateRange === 'this_month'
-                      ? 'Mes'
-                      : filterDateRange === 'this_year'
-                      ? 'Año'
-                      : 'Rango'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilterDateRange('all');
-                      setCustomStartDate('');
-                      setCustomEndDate('');
-                    }}
-                    className="hover:text-blue-950"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              )}
               {sortBy !== 'recientes' && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
                   <span>
@@ -2937,7 +2853,14 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       ? 'Mayor valor'
                       : 'Mayor saldo'}
                   </span>
-                  <button type="button" onClick={() => setSortBy('recientes')} className="hover:text-blue-950">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('recientes');
+                      setFilterDateRange('all');
+                    }}
+                    className="hover:text-blue-950"
+                  >
                     <X className="w-2.5 h-2.5" />
                   </button>
                 </span>

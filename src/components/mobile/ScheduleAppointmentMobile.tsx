@@ -51,10 +51,10 @@ const ALISTAMIENTO_SERVICES: AlistamientoServiceOption[] = [
   },
   {
     id: 'engrasado',
-    title: 'Engrasado General & Kit de Arrastre',
+    title: 'Engrasado General',
     category: 'Intermedio',
     badge: 'Paso 2 Engrasado',
-    description: 'Desarme y lubricación de rodamientos de dirección, basculante y kit de arrastre.',
+    description: 'Desarme y lubricación de rodamientos de dirección, basculante y transmisión.',
     estimatedTime: '2h',
   },
   {
@@ -67,16 +67,47 @@ const ALISTAMIENTO_SERVICES: AlistamientoServiceOption[] = [
   },
 ];
 
-const DAILY_TIME_SLOTS = [
-  { time: '08:30 AM', shift: 'mañana' },
-  { time: '09:30 AM', shift: 'mañana' },
-  { time: '10:30 AM', shift: 'mañana' },
-  { time: '11:30 AM', shift: 'mañana' },
-  { time: '14:00 PM', shift: 'tarde' },
-  { time: '15:00 PM', shift: 'tarde' },
-  { time: '16:00 PM', shift: 'tarde' },
-  { time: '17:00 PM', shift: 'tarde' },
+interface DailyTimeSlot {
+  time: string;
+  shift: 'mañana' | 'tarde';
+  hour24: number;
+  minute: number;
+}
+
+const DAILY_TIME_SLOTS: DailyTimeSlot[] = [
+  { time: '08:30 AM', shift: 'mañana', hour24: 8, minute: 30 },
+  { time: '09:30 AM', shift: 'mañana', hour24: 9, minute: 30 },
+  { time: '10:30 AM', shift: 'mañana', hour24: 10, minute: 30 },
+  { time: '11:30 AM', shift: 'mañana', hour24: 11, minute: 30 },
+  { time: '14:00 PM', shift: 'tarde', hour24: 14, minute: 0 },
+  { time: '15:00 PM', shift: 'tarde', hour24: 15, minute: 0 },
+  { time: '16:00 PM', shift: 'tarde', hour24: 16, minute: 0 },
+  { time: '17:00 PM', shift: 'tarde', hour24: 17, minute: 0 },
 ];
+
+const formatLocalDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getInitialScheduleDate = (): string => {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const lastSlotMinutes = 17 * 60; // 17:00 PM
+
+  const target = new Date(now);
+  if (target.getDay() === 0) {
+    target.setDate(target.getDate() + 1); // Domingo pasa a Lunes
+  } else if (currentMinutes >= lastSlotMinutes) {
+    target.setDate(target.getDate() + 1); // Mañana
+    if (target.getDay() === 0) {
+      target.setDate(target.getDate() + 1); // Si mañana es Domingo pasa a Lunes
+    }
+  }
+  return formatLocalDate(target);
+};
 
 export const ScheduleAppointmentMobile: React.FC<Props> = ({
   motorcycle,
@@ -89,11 +120,7 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-la-mana');
   const [currentWeekOffset, setCurrentWeekOffset] = useState<number>(0);
 
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const today = new Date();
-    if (today.getDay() === 0) today.setDate(today.getDate() + 1);
-    return today.toISOString().split('T')[0];
-  });
+  const [selectedDate, setSelectedDate] = useState<string>(getInitialScheduleDate);
 
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedService, setSelectedService] = useState<AlistamientoServiceOption | null>(null);
@@ -110,20 +137,23 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
     base.setDate(base.getDate() + currentWeekOffset * 7);
 
     const day = base.getDay();
-    const diff = base.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(base.setDate(diff));
+    const diff = base.getDate() - (day === 0 ? 6 : day - 1);
+    const monday = new Date(base.getFullYear(), base.getMonth(), diff);
 
     const dayNamesShort = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const result = [];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayStr = formatLocalDate(now);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(d);
       const isPast = dateStr < todayStr;
       const isSunday = i === 6;
       const isToday = dateStr === todayStr;
+      const hasSlotsToday = !isToday || DAILY_TIME_SLOTS.some((s) => s.hour24 * 60 + s.minute > currentMinutes);
 
       result.push({
         dateStr,
@@ -133,10 +163,32 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
         isPast,
         isSunday,
         isToday,
+        hasSlotsToday,
       });
     }
     return result;
   }, [currentWeekOffset]);
+
+  // Filtrar los turnos disponibles según la hora actual si es el día de hoy
+  const availableTimeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const now = new Date();
+    const todayStr = formatLocalDate(now);
+
+    if (selectedDate < todayStr) {
+      return [];
+    }
+
+    if (selectedDate === todayStr) {
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      return DAILY_TIME_SLOTS.filter((slot) => {
+        const slotMinutes = slot.hour24 * 60 + slot.minute;
+        return slotMinutes > currentMinutes;
+      });
+    }
+
+    return DAILY_TIME_SLOTS;
+  }, [selectedDate]);
 
   // Turnos ya reservados
   const bookedSlots = useMemo(() => {
@@ -151,8 +203,8 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
     return booked;
   }, [selectedDate, currentBranch.id]);
 
-  const handleSelectDay = (dateStr: string, isPast: boolean) => {
-    if (isPast) return;
+  const handleSelectDay = (dateStr: string, isBlocked: boolean) => {
+    if (isBlocked) return;
     setSelectedDate(dateStr);
     setSelectedTime('');
   };
@@ -323,14 +375,14 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
         <div className="grid grid-cols-7 gap-1">
           {weekDays.map((day) => {
             const isSelected = selectedDate === day.dateStr;
-            const isBlocked = day.isPast || day.isSunday;
+            const isBlocked = day.isPast || day.isSunday || (day.isToday && !day.hasSlotsToday);
 
             return (
               <button
                 key={day.dateStr}
                 type="button"
                 disabled={isBlocked}
-                onClick={() => handleSelectDay(day.dateStr, day.isPast)}
+                onClick={() => handleSelectDay(day.dateStr, isBlocked)}
                 className={`py-2 px-1 rounded-xl text-center border transition flex flex-col items-center justify-center gap-0.5 select-none ${
                   isSelected
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
@@ -341,7 +393,9 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
               >
                 <span className="text-[9px] font-bold uppercase">{day.dayName}</span>
                 <span className="text-sm font-black">{day.dayNumber}</span>
-                <span className="text-[8px] opacity-80">{day.monthName}</span>
+                <span className="text-[8px] opacity-80">
+                  {day.isSunday ? 'Cerrado' : day.isPast ? 'Pasado' : day.isToday && !day.hasSlotsToday ? 'Sin cupo' : day.monthName}
+                </span>
               </button>
             );
           })}
@@ -365,30 +419,42 @@ export const ScheduleAppointmentMobile: React.FC<Props> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5">
-            {DAILY_TIME_SLOTS.map((slot) => {
-              const isSelected = selectedTime === slot.time;
-              const isBooked = bookedSlots.has(slot.time.toUpperCase());
+          {availableTimeSlots.length === 0 ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center space-y-1">
+              <Clock className="w-4 h-4 text-amber-600 mx-auto" />
+              <p className="text-xs font-bold text-amber-900">
+                Sin turnos disponibles para hoy
+              </p>
+              <p className="text-[10px] text-amber-700">
+                Por favor seleccione el día de mañana u otra fecha en el calendario superior.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-1.5">
+              {availableTimeSlots.map((slot) => {
+                const isSelected = selectedTime === slot.time;
+                const isBooked = bookedSlots.has(slot.time.toUpperCase());
 
-              return (
-                <button
-                  key={slot.time}
-                  type="button"
-                  disabled={isBooked}
-                  onClick={() => handleSelectTurno(slot.time)}
-                  className={`py-2 px-1 rounded-xl text-[11px] font-black border text-center transition ${
-                    isSelected
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                      : isBooked
-                      ? 'bg-zinc-100 text-zinc-300 border-zinc-200 line-through'
-                      : 'bg-zinc-50 text-zinc-800 border-zinc-200'
-                  }`}
-                >
-                  {slot.time}
-                </button>
-              );
-            })}
-          </div>
+                return (
+                  <button
+                    key={slot.time}
+                    type="button"
+                    disabled={isBooked}
+                    onClick={() => handleSelectTurno(slot.time)}
+                    className={`py-2 px-1 rounded-xl text-[11px] font-black border text-center transition ${
+                      isSelected
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : isBooked
+                        ? 'bg-zinc-100 text-zinc-300 border-zinc-200 line-through'
+                        : 'bg-zinc-50 text-zinc-800 border-zinc-200'
+                    }`}
+                  >
+                    {slot.time}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

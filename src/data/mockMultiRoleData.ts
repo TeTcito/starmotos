@@ -1786,7 +1786,7 @@ export const INITIAL_AGENDAMIENTOS: AgendamientoTicket[] = [
     scheduledDate: new Date(Date.now() + 172800000).toISOString().split('T')[0],
     scheduledTime: '14:00 PM',
     serviceId: 'engrasado',
-    serviceTitle: 'Engrasado General & Kit de Arrastre',
+    serviceTitle: 'Engrasado General',
     serviceCategory: 'Mantenimiento',
     estimatedCost: 25,
     notes: 'Ajuste de kit de transmisión y engrase de ejes.',

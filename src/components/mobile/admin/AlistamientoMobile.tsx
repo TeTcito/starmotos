@@ -266,7 +266,7 @@ export const AlistamientoMobile: React.FC<Props> = ({
                 className="w-full px-3 py-2 text-xs font-bold bg-zinc-50 border border-zinc-300 rounded-lg"
               >
                 <option value="preventivo">Preventivo</option>
-                <option value="engrasado">Engrasado & Kit</option>
+                <option value="engrasado">Engrasado General</option>
                 <option value="mantenimiento_completo">Mantenimiento Completo</option>
               </select>
             </div>

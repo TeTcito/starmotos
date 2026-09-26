@@ -417,7 +417,7 @@ export const AlistamientoDesktop: React.FC<Props> = ({
                   className="w-full px-3.5 py-2.5 text-xs font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-blue-600 focus:bg-white outline-none cursor-pointer"
                 >
                   <option value="preventivo">Mantenimiento Preventivo (Aceite + Filtro + Puntos Clave)</option>
-                  <option value="engrasado">Engrasado General & Ajuste de Kit de Arrastre</option>
+                  <option value="engrasado">Engrasado General</option>
                   <option value="mantenimiento_completo">
                     Mantenimiento Completo Mayor (Válvulas + Escáner Delphi + Suspensión)
                   </option>

@@ -74,14 +74,121 @@ export async function getMediaFromIndexedDB(id: string): Promise<string | null> 
  */
 export function isValidDataUrl(dataUrl: string): boolean {
   if (!dataUrl || typeof dataUrl !== 'string') return false;
-  if (!dataUrl.startsWith('data:')) return false;
+  if (!dataUrl.startsWith('data:image/')) return false;
   const commaIdx = dataUrl.indexOf(',');
   if (commaIdx === -1) return false;
-  const dataPart = dataUrl.slice(commaIdx + 1).trim();
-  if (dataPart.length < 20) return false;
-  if (dataPart.includes('…') || dataPart.includes('...')) return false;
-  return true;
+
+  let b64Data = dataUrl.slice(commaIdx + 1).trim().replace(/\s+/g, '');
+  // Cualquier imagen fotográfica real WebP/PNG/JPG comprimida mide > 800 caracteres.
+  // Las imágenes truncadas que dan ERR_INVALID_URL miden 300 o 500 caracteres y son incompletas.
+  if (b64Data.length < 800) return false;
+  if (b64Data.includes('…') || b64Data.includes('...')) return false;
+
+  // Si b64Data.length % 4 === 1, es matemáticamente inválido en base64
+  if (b64Data.length % 4 === 1) return false;
+
+  b64Data = b64Data.replace(/-/g, '+').replace(/_/g, '/');
+  const padLen = (4 - (b64Data.length % 4)) % 4;
+  if (padLen > 0) {
+    b64Data += '='.repeat(padLen);
+  }
+
+  if (!/^[A-Za-z0-9+/=]+$/.test(b64Data)) {
+    return false;
+  }
+
+  try {
+    const decoded = atob(b64Data);
+    if (dataUrl.includes('image/webp')) {
+      if (!decoded.startsWith('RIFF') || !decoded.includes('WEBP')) {
+        return false;
+      }
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
+
+/**
+ * Valida si una URL de medio es segura y válida para renderizar en etiquetas <img> sin provocar ERR_INVALID_URL
+ */
+export function isValidMediaUrl(url: unknown): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) {
+    return true;
+  }
+  if (trimmed.startsWith('data:image/')) {
+    return isValidDataUrl(trimmed);
+  }
+  return false;
+}
+
+/**
+ * Limpia y purga proactivamente de localStorage cualquier DataURL corrupto o incompleto
+ * (generado previamente por errores de cuota o slicing) para evitar net::ERR_INVALID_URL.
+ */
+export function cleanCorruptedMediaFromLocalStorage(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      const raw = localStorage.getItem(key);
+      if (!raw || (!raw.includes('data:image/') && !raw.includes('idb:'))) continue;
+
+      try {
+        let changed = false;
+        const cleanValue = (val: any): any => {
+          if (typeof val === 'string') {
+            if (val.startsWith('data:image/')) {
+              if (!isValidDataUrl(val)) {
+                changed = true;
+                return '';
+              }
+            } else if (val.startsWith('idb:')) {
+              changed = true;
+              return '';
+            }
+            return val;
+          }
+          if (Array.isArray(val)) {
+            const nextArr = val
+              .map(cleanValue)
+              .filter((item) => item !== '' && item !== null && item !== undefined);
+            if (nextArr.length !== val.length) {
+              changed = true;
+            }
+            return nextArr;
+          }
+          if (val && typeof val === 'object') {
+            const nextObj: Record<string, any> = {};
+            for (const [k, v] of Object.entries(val)) {
+              nextObj[k] = cleanValue(v);
+            }
+            return nextObj;
+          }
+          return val;
+        };
+
+        const parsed = JSON.parse(raw);
+        const cleaned = cleanValue(parsed);
+        if (changed) {
+          localStorage.setItem(key, JSON.stringify(cleaned));
+          console.info(`[Storage Sanitizer] Se limpiaron medios corruptos de ${key}`);
+        }
+      } catch (_) {
+        // Ignorar claves no JSON
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage Sanitizer] Error al sanitizar localStorage:', err);
+  }
+}
+
 
 /**
  * Convierte un DataURL (Base64) a Blob binario para subida eficiente
@@ -100,12 +207,8 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
     const mimeMatch = header.match(/^data:([^;]+)/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/webp';
 
-    // Limpieza estricta de b64Data (espacios, saltos de línea, caracteres corruptos)
+    // Limpieza estricta de b64Data
     b64Data = b64Data.trim().replace(/\s+/g, '');
-
-    if (b64Data.includes('…') || b64Data.includes('...')) {
-      return null;
-    }
 
     // Decodificar si viene con encoding URL
     if (b64Data.includes('%')) {
@@ -123,11 +226,6 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
       b64Data += '='.repeat(padLen);
     }
 
-    // Validar que solo contenga caracteres válidos en Base64
-    if (!/^[A-Za-z0-9+/=]+$/.test(b64Data)) {
-      return null;
-    }
-
     const byteCharacters = atob(b64Data);
     const byteNumbers = new Uint8Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
@@ -137,7 +235,6 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
     const blob = new Blob([byteNumbers], { type: mimeType });
     return { blob, mimeType };
   } catch (_) {
-    // Si la cadena está corrupta o incompleta, retornar null silenciosamente sin alertar con errores rojos
     return null;
   }
 }

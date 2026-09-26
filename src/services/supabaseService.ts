@@ -16,9 +16,12 @@ import {
   AgendamientoTicket,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { uploadWarrantyMedia, saveMediaToIndexedDB, isValidDataUrl } from './mediaStorage';
+import { uploadWarrantyMedia, saveMediaToIndexedDB, isValidDataUrl, isValidMediaUrl, cleanCorruptedMediaFromLocalStorage } from './mediaStorage';
 
-export { isValidDataUrl };
+export { isValidDataUrl, isValidMediaUrl, cleanCorruptedMediaFromLocalStorage };
+
+// Purgar inmediatamente cualquier dato base64 corrupto en localStorage al importar este servicio
+cleanCorruptedMediaFromLocalStorage();
 
 let isRealtimeInitialized = false;
 let isSyncing = false;
@@ -180,54 +183,30 @@ export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRec
     // 1. Fotos
     if (Array.isArray(copy.fotos) && copy.fotos.length > 0) {
       if (stripMediaCompletely) {
-        copy.fotos = [];
+        copy.fotos = copy.fotos.filter((f) => typeof f === 'string' && (f.startsWith('http://') || f.startsWith('https://')));
       } else {
-        copy.fotos = copy.fotos
-          .filter((f) => {
-            if (typeof f === 'string' && f.startsWith('data:')) {
-              return isValidDataUrl(f);
-            }
-            return Boolean(f);
-          })
-          .map((f, i) => {
-            if (typeof f === 'string') {
-              if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('idb:')) return f;
-              if (f.length > 2000) {
-                const idbKey = `als_foto_${r.id}_${i}`;
-                try {
-                  saveMediaToIndexedDB(idbKey, f);
-                } catch (_) {}
-                return `idb:${idbKey}`;
-              }
-            }
-            return f;
-          });
+        copy.fotos = copy.fotos.filter((f) => {
+          if (typeof f === 'string') {
+            if (f.startsWith('http://') || f.startsWith('https://')) return true;
+            if (f.startsWith('data:image/')) return isValidDataUrl(f);
+            return false;
+          }
+          return false;
+        });
       }
     }
 
     // 2. Evidencia de Transferencia
     if (typeof copy.evidenciaTransferencia === 'string') {
-      if (stripMediaCompletely || (copy.evidenciaTransferencia.startsWith('data:') && !isValidDataUrl(copy.evidenciaTransferencia))) {
-        copy.evidenciaTransferencia = '';
-      } else if (!copy.evidenciaTransferencia.startsWith('http://') && !copy.evidenciaTransferencia.startsWith('https://') && !copy.evidenciaTransferencia.startsWith('idb:') && copy.evidenciaTransferencia.length > 2000) {
-        const idbKey = `als_evidencia_${r.id}`;
-        try {
-          saveMediaToIndexedDB(idbKey, copy.evidenciaTransferencia);
-        } catch (_) {}
-        copy.evidenciaTransferencia = `idb:${idbKey}`;
+      if (stripMediaCompletely || copy.evidenciaTransferencia.startsWith('idb:') || (copy.evidenciaTransferencia.startsWith('data:') && !isValidDataUrl(copy.evidenciaTransferencia))) {
+        copy.evidenciaTransferencia = copy.evidenciaTransferencia.startsWith('http') ? copy.evidenciaTransferencia : '';
       }
     }
 
     // 3. Comprobante Pago URL
     if (typeof copy.comprobantePagoUrl === 'string') {
-      if (stripMediaCompletely || (copy.comprobantePagoUrl.startsWith('data:') && !isValidDataUrl(copy.comprobantePagoUrl))) {
-        copy.comprobantePagoUrl = '';
-      } else if (!copy.comprobantePagoUrl.startsWith('http://') && !copy.comprobantePagoUrl.startsWith('https://') && !copy.comprobantePagoUrl.startsWith('idb:') && copy.comprobantePagoUrl.length > 2000) {
-        const idbKey = `als_comprobante_${r.id}`;
-        try {
-          saveMediaToIndexedDB(idbKey, copy.comprobantePagoUrl);
-        } catch (_) {}
-        copy.comprobantePagoUrl = `idb:${idbKey}`;
+      if (stripMediaCompletely || copy.comprobantePagoUrl.startsWith('idb:') || (copy.comprobantePagoUrl.startsWith('data:') && !isValidDataUrl(copy.comprobantePagoUrl))) {
+        copy.comprobantePagoUrl = copy.comprobantePagoUrl.startsWith('http') ? copy.comprobantePagoUrl : '';
       }
     }
 
@@ -235,13 +214,12 @@ export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRec
   };
 
   try {
-    // Proactivamente sanitizamos para evitar saturar el LocalStorage
     const sanitized = records.map((r) => sanitizeAlistamiento(r, false));
     localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(sanitized));
     return true;
   } catch (quotaErr) {
     try {
-      // Fallback Nivel 2: Limpieza completa de fotos/evidencias manteniendo datos operacionales íntegros
+      // Fallback: Retener solo enlaces ligeros de nube sin Base64 pesados
       const stripped = records.map((r) => sanitizeAlistamiento(r, true));
       localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(stripped));
       return true;
@@ -262,20 +240,15 @@ export function safeSaveWarrantiesToLocalStorage(warranties: WarrantyRequest[]):
     const copy = { ...w };
     if (Array.isArray(copy.diagnosticPhotos) && copy.diagnosticPhotos.length > 0) {
       if (stripMediaCompletely) {
-        copy.diagnosticPhotos = [];
+        copy.diagnosticPhotos = copy.diagnosticPhotos.filter((item: any) => typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://')));
       } else {
-        copy.diagnosticPhotos = copy.diagnosticPhotos.map((item: any, idx: number) => {
+        copy.diagnosticPhotos = copy.diagnosticPhotos.filter((item: any) => {
           if (typeof item === 'string') {
-            if (item.startsWith('http://') || item.startsWith('https://')) return item;
-            if (item.length > 2000) {
-              const idbKey = `${w.id}_media_${idx}`;
-              try {
-                saveMediaToIndexedDB(idbKey, item);
-              } catch (_) {}
-              return `idb:${idbKey}`;
-            }
+            if (item.startsWith('http://') || item.startsWith('https://')) return true;
+            if (item.startsWith('data:image/')) return isValidDataUrl(item);
+            return false;
           }
-          return item;
+          return false;
         });
       }
     }
@@ -350,7 +323,13 @@ export async function syncAllFromSupabase(): Promise<{
           if (isDeleted) {
             cloudDeleteWarranty(w.id, w.requestNumber);
           } else {
-            cloudWarranties.push(w);
+            const cleanW = { ...w };
+            if (Array.isArray(cleanW.diagnosticPhotos)) {
+              cleanW.diagnosticPhotos = cleanW.diagnosticPhotos.filter(
+                (p: any) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://') || (p.startsWith('data:') && isValidDataUrl(p)))
+              );
+            }
+            cloudWarranties.push(cleanW);
           }
         }
 
@@ -377,8 +356,14 @@ export async function syncAllFromSupabase(): Promise<{
           }
 
           if (!cloudIds.has(loc.id)) {
-            mergedWarranties.push(loc);
-            cloudSaveWarranty(loc);
+            const cleanLoc = { ...loc };
+            if (Array.isArray(cleanLoc.diagnosticPhotos)) {
+              cleanLoc.diagnosticPhotos = cleanLoc.diagnosticPhotos.filter(
+                (p: any) => typeof p === 'string' && (p.startsWith('http://') || p.startsWith('https://') || (p.startsWith('data:') && isValidDataUrl(p)))
+              );
+            }
+            mergedWarranties.push(cleanLoc);
+            cloudSaveWarranty(cleanLoc);
           }
         }
 
@@ -416,7 +401,19 @@ export async function syncAllFromSupabase(): Promise<{
           if (isDeleted) {
             cloudDeleteAlistamiento(a.id);
           } else {
-            cloudAlistamientos.push(a);
+            const cleanA = { ...a };
+            if (Array.isArray(cleanA.fotos)) {
+              cleanA.fotos = cleanA.fotos.filter(
+                (f: any) => typeof f === 'string' && (f.startsWith('http://') || f.startsWith('https://') || (f.startsWith('data:') && isValidDataUrl(f)))
+              );
+            }
+            if (typeof cleanA.evidenciaTransferencia === 'string' && cleanA.evidenciaTransferencia.startsWith('data:') && !isValidDataUrl(cleanA.evidenciaTransferencia)) {
+              cleanA.evidenciaTransferencia = '';
+            }
+            if (typeof cleanA.comprobantePagoUrl === 'string' && cleanA.comprobantePagoUrl.startsWith('data:') && !isValidDataUrl(cleanA.comprobantePagoUrl)) {
+              cleanA.comprobantePagoUrl = '';
+            }
+            cloudAlistamientos.push(cleanA);
           }
         }
 
@@ -442,8 +439,20 @@ export async function syncAllFromSupabase(): Promise<{
           }
 
           if (!cloudIds.has(loc.id)) {
-            mergedAlistamientos.push(loc);
-            cloudSaveAlistamiento(loc);
+            const cleanLoc = { ...loc };
+            if (Array.isArray(cleanLoc.fotos)) {
+              cleanLoc.fotos = cleanLoc.fotos.filter(
+                (f: any) => typeof f === 'string' && (f.startsWith('http://') || f.startsWith('https://') || (f.startsWith('data:') && isValidDataUrl(f)))
+              );
+            }
+            if (typeof cleanLoc.evidenciaTransferencia === 'string' && cleanLoc.evidenciaTransferencia.startsWith('data:') && !isValidDataUrl(cleanLoc.evidenciaTransferencia)) {
+              cleanLoc.evidenciaTransferencia = '';
+            }
+            if (typeof cleanLoc.comprobantePagoUrl === 'string' && cleanLoc.comprobantePagoUrl.startsWith('data:') && !isValidDataUrl(cleanLoc.comprobantePagoUrl)) {
+              cleanLoc.comprobantePagoUrl = '';
+            }
+            mergedAlistamientos.push(cleanLoc);
+            cloudSaveAlistamiento(cleanLoc);
           }
         }
 
@@ -762,23 +771,33 @@ export async function cloudSaveWarranty(w: WarrantyRequest) {
     let cleanW = { ...w };
     if (w.diagnosticPhotos && w.diagnosticPhotos.length > 0) {
       const hasBase64 = w.diagnosticPhotos.some(
-        (p) => typeof p === 'string' && (p.startsWith('data:') || p.startsWith('blob:'))
+        (p) => typeof p === 'string' && (p.startsWith('data:') || p.startsWith('blob:') || p.length > 2000)
       );
       if (hasBase64) {
         const uploaded = await Promise.all(
           w.diagnosticPhotos.map(async (item, idx) => {
-            if (typeof item === 'string' && (item.startsWith('data:') || item.startsWith('blob:'))) {
-              try {
-                const cloudUrl = await uploadWarrantyMedia(item, `gar_${w.id}_${idx}`);
-                return cloudUrl || item;
-              } catch (_) {
-                return item;
+            if (typeof item === 'string') {
+              if (item.startsWith('http://') || item.startsWith('https://')) return item;
+              if (item.startsWith('idb:')) return '';
+              if (item.startsWith('data:')) {
+                if (!isValidDataUrl(item)) return '';
+              }
+              if (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000) {
+                try {
+                  const cloudUrl = await uploadWarrantyMedia(item, `gar_${w.id}_${idx}`);
+                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+                    return cloudUrl;
+                  }
+                  return '';
+                } catch (_) {
+                  return '';
+                }
               }
             }
             return item;
           })
         );
-        cleanW.diagnosticPhotos = uploaded;
+        cleanW.diagnosticPhotos = uploaded.filter(Boolean);
       }
     }
 
@@ -818,8 +837,11 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
         const uploadedFotos = await Promise.all(
           cleanRec.fotos.map(async (item, idx) => {
             if (typeof item === 'string') {
-              if (item.startsWith('http://') || item.startsWith('https://') || item.startsWith('idb:')) {
+              if (item.startsWith('http://') || item.startsWith('https://')) {
                 return item;
+              }
+              if (item.startsWith('idb:')) {
+                return '';
               }
               if (item.startsWith('data:')) {
                 if (!isValidDataUrl(item)) {
@@ -830,7 +852,7 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
               if (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000) {
                 try {
                   const cloudUrl = await uploadWarrantyMedia(item, `als_${cleanRec.id}_foto_${idx}`);
-                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://') || cloudUrl.startsWith('idb:'))) {
+                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
                     return cloudUrl;
                   }
                   return '';

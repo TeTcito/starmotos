@@ -37,6 +37,7 @@ import {
   addStoredAlerts,
 } from '../data/mockMultiRoleData';
 import { cloudSaveClient, cloudSaveAlistamiento } from '../services/supabaseService';
+import { isValidMediaUrl } from '../services/mediaStorage';
 
 // Sucursales Oficiales StarMotos
 export const BRANCH_MATRIZ: Branch = {
@@ -862,14 +863,14 @@ const getClientActiveOrder = (
       status: matched.status || 'inicio',
       steps: steps,
       supervisorObservations: matchedAls?.observaciones || matched.servicesSummary || 'Servicio en proceso según especificaciones técnicas de fábrica.',
-      diagnosticPhotos: matchedAls?.fotos?.map((f, i) => ({
+      diagnosticPhotos: (matchedAls?.fotos || []).filter(isValidMediaUrl).map((f, i) => ({
         id: `foto-${i}`,
         url: f,
         title: `Inspección de Recepción ${i + 1}`,
         description: 'Estado de recepción de la motocicleta en taller',
         uploadedAt: entryTime,
         stage: 'Recepción',
-      })) || [],
+      })),
       alistamientoId: matchedAls?.id || matched.alistamientoId,
       serviciosRealizados: matchedAls?.serviciosRealizados || [],
       tecnicoResponsable: techName,
@@ -885,7 +886,7 @@ const getClientActiveOrder = (
       observacionesTaller: matchedAls?.observaciones || matched.servicesSummary || 'Servicio técnico en proceso según especificaciones técnicas de fábrica.',
       numeroFactura: matchedAls?.numeroFactura || '',
       numeroTicket: matchedAls?.numeroTicket || matched.otNumber || '',
-      fotosIngreso: matchedAls?.fotos || [],
+      fotosIngreso: (matchedAls?.fotos || []).filter(isValidMediaUrl),
       origenIngreso: matchedAls?.origen || 'Taller StarMotos',
       orderId: matched.id,
       rating: matched.rating,

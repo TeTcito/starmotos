@@ -10,6 +10,7 @@ import {
 import { MaintenanceRecord, ClientProfile, MotorcycleClientData } from '../../types/customer';
 import { ModalPortal } from './ModalPortal';
 import { compressImageBase64 } from '../../utils/imageCompressor';
+import { isValidMediaUrl } from '../../services/mediaStorage';
 
 interface Props {
   isOpen: boolean;
@@ -302,7 +303,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
               )}
             </label>
 
-            {evidenciaUrl ? (
+            {evidenciaUrl && isValidMediaUrl(evidenciaUrl) ? (
               <div className="relative rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 p-2.5 flex items-center gap-3">
                 <img
                   src={evidenciaUrl}

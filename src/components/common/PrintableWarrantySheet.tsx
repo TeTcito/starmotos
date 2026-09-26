@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { WarrantyRequest } from '../../types/customer';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
+import { isValidMediaUrl } from '../../services/mediaStorage';
 
 interface Props {
   warranty: WarrantyRequest;
@@ -29,7 +30,7 @@ const PHOTO_GUIDE_LABELS = [
 export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
   // Filtrar exclusivamente imágenes válidas para el PDF impreso
   const photoImages = (warranty.diagnosticPhotos || []).filter(
-    (url) => Boolean(url) && !isVideoUrl(url)
+    (url) => isValidMediaUrl(url) && !isVideoUrl(url)
   );
 
   const videoCount = (warranty.diagnosticPhotos || []).filter(

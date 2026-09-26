@@ -43,6 +43,7 @@ import {
 import { getWarrantyStatusInfo } from '../../common/WarrantyModule';
 import { isVideoUrl } from './NewWarrantyFormMobile';
 import { PrintableWarrantySheet } from '../../common/PrintableWarrantySheet';
+import { isValidMediaUrl } from '../../../services/mediaStorage';
 
 interface Props {
   warranty: WarrantyRequest;
@@ -1445,15 +1446,15 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 <Camera className="w-4 h-4" />
               </div>
               <span>
-                Inspección Visual del Daño ({formData.diagnosticPhotos.length} Evidencias Fotográficas)
+                Inspección Visual del Daño ({formData.diagnosticPhotos.filter(isValidMediaUrl).length} Evidencias Fotográficas)
               </span>
             </h4>
             <span className="text-[10px] text-zinc-400">Clic para ampliar</span>
           </div>
 
-          {formData.diagnosticPhotos.length > 0 ? (
+          {formData.diagnosticPhotos.filter(isValidMediaUrl).length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              {formData.diagnosticPhotos.map((url, idx) => {
+              {formData.diagnosticPhotos.filter(isValidMediaUrl).map((url, idx) => {
                 const isVideo = isVideoUrl(url);
                 return (
                   <div

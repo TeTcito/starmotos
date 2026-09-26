@@ -48,7 +48,7 @@ import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredA
 import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
-import { uploadWarrantyMedia } from '../../services/mediaStorage';
+import { uploadWarrantyMedia, isValidMediaUrl } from '../../services/mediaStorage';
 import { PrintableWarrantySheet } from './PrintableWarrantySheet';
 
 // =========================================================================
@@ -2020,13 +2020,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Camera className="w-4 h-4" />
               </div>
-              <span>Inspección Visual del Daño ({currentWarranty.diagnosticPhotos.length} Evidencias Fotográficas)</span>
+              <span>Inspección Visual del Daño ({currentWarranty.diagnosticPhotos.filter(isValidMediaUrl).length} Evidencias Fotográficas)</span>
             </h4>
             <span className="text-xs text-zinc-500 hidden sm:inline">Haga clic sobre una imagen para ampliarla</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-1">
-            {currentWarranty.diagnosticPhotos.map((url, i) => {
+            {currentWarranty.diagnosticPhotos.filter(isValidMediaUrl).map((url, i) => {
               const isVideo = isVideoUrl(url);
               return (
                 <div

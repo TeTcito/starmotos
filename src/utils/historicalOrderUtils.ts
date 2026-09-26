@@ -8,6 +8,7 @@ import {
 } from '../types/customer';
 import { getStoredFullAlistamientos, getStoredOrders } from '../data/mockMultiRoleData';
 import { ALL_BRANCHES, BRANCH_MATRIZ, DEFAULT_MOTORCYCLE } from '../hooks/useCustomerPortal';
+import { isValidMediaUrl } from '../services/mediaStorage';
 
 /**
  * Convierte un registro histórico de mantenimiento en una Orden de Trabajo completa
@@ -132,9 +133,11 @@ export const buildHistoricalWorkOrder = (
     },
   ];
 
+  const rawFotos = als?.fotos && als.fotos.length > 0 ? als.fotos : [];
+  const validFotos = rawFotos.filter(isValidMediaUrl);
   const fotos =
-    als?.fotos && als.fotos.length > 0
-      ? als.fotos
+    validFotos.length > 0
+      ? validFotos
       : [
           'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=900&q=80',
         ];

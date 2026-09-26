@@ -60,7 +60,7 @@ import {
   addStoredAlerts,
   updateClientCedulaCascade,
 } from '../../data/mockMultiRoleData';
-import { cloudSaveClient } from '../../services/supabaseService';
+import { cloudSaveClient, isValidMediaUrl } from '../../services/supabaseService';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
 
 export interface ClientRowData {
@@ -1972,37 +1972,43 @@ export const ClientesModule: React.FC<Props> = ({
                     </div>
 
                     {/* Miniaturas de Fotos de Evidencia con Zoom al hacer clic */}
-                    {rec.fotos && rec.fotos.length > 0 ? (
-                      <div className="pt-1">
-                        <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mb-1">
-                          <Camera className="w-3 h-3 text-zinc-400" />
-                          <span>Evidencias Fotográficas ({rec.fotos.length})</span>
-                        </span>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {rec.fotos.slice(0, 3).map((fotoUrl, fIdx) => (
-                            <div
-                              key={fIdx}
-                              onClick={() => setPreviewZoomImage(fotoUrl)}
-                              className="aspect-square rounded-lg overflow-hidden border border-zinc-200 bg-zinc-100 cursor-pointer relative group/img hover:ring-2 hover:ring-blue-500 transition-all"
-                              title="Haga clic para ampliar la imagen"
-                            >
-                              <img
-                                src={fotoUrl}
-                                alt={`Evidencia ${fIdx + 1}`}
-                                className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
-                              />
-                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                                <Maximize2 className="w-3.5 h-3.5 text-white" />
+                    {(() => {
+                      const validFotos = (rec.fotos || []).filter(isValidMediaUrl);
+                      if (validFotos.length === 0) {
+                        return (
+                          <div className="text-[10px] text-zinc-400 text-center py-1">
+                            Sin evidencias fotográficas adjuntas
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="pt-1">
+                          <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1 mb-1">
+                            <Camera className="w-3 h-3 text-zinc-400" />
+                            <span>Evidencias Fotográficas ({validFotos.length})</span>
+                          </span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {validFotos.slice(0, 3).map((fotoUrl, fIdx) => (
+                              <div
+                                key={fIdx}
+                                onClick={() => setPreviewZoomImage(fotoUrl)}
+                                className="aspect-square rounded-lg overflow-hidden border border-zinc-200 bg-zinc-100 cursor-pointer relative group/img hover:ring-2 hover:ring-blue-500 transition-all"
+                                title="Haga clic para ampliar la imagen"
+                              >
+                                <img
+                                  src={fotoUrl}
+                                  alt={`Evidencia ${fIdx + 1}`}
+                                  className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Maximize2 className="w-3.5 h-3.5 text-white" />
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-zinc-400 text-center py-1">
-                        Sin evidencias fotográficas adjuntas
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -2066,7 +2072,7 @@ export const ClientesModule: React.FC<Props> = ({
         </div>
 
         {/* Modal de Zoom de Fotografía de Evidencia */}
-        {previewZoomImage && (
+        {previewZoomImage && isValidMediaUrl(previewZoomImage) && (
           <div
             className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
             onClick={() => setPreviewZoomImage(null)}

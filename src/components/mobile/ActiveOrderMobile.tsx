@@ -22,6 +22,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { WorkOrder, MotorcycleClientData, TallerOrder } from '../../types/customer';
+import { isValidMediaUrl } from '../../services/mediaStorage';
 
 interface Props {
   activeOrder: WorkOrder;
@@ -148,10 +149,11 @@ export const ActiveOrderMobile: React.FC<Props> = ({
   const kmIngreso = activeOrder.kilometrajeIngreso !== undefined ? Number(activeOrder.kilometrajeIngreso) : motorcycle.currentKm;
   const kmSiguiente = activeOrder.proximoMantenimientoKm || (kmIngreso > 0 ? kmIngreso + 3000 : 3000);
 
-  // Fotos
-  const fotos = activeOrder.fotosIngreso && activeOrder.fotosIngreso.length > 0
+  // Fotos sanitizadas
+  const rawFotos = activeOrder.fotosIngreso && activeOrder.fotosIngreso.length > 0
     ? activeOrder.fotosIngreso
     : activeOrder.diagnosticPhotos?.map((p) => p.url) || [];
+  const fotos = rawFotos.filter(isValidMediaUrl);
 
   return (
     <div className="space-y-4 animate-fade-in pb-12 text-xs">

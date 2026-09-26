@@ -53,7 +53,7 @@ import {
 } from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
-import { getMediaFromIndexedDB, uploadWarrantyMedia } from '../../services/mediaStorage';
+import { getMediaFromIndexedDB, uploadWarrantyMedia, isValidMediaUrl } from '../../services/mediaStorage';
 import { cloudSaveAlistamiento } from '../../services/supabaseService';
 
 interface Props {
@@ -2270,7 +2270,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </span>
                           )}
                         </label>
-                        {detailFormData.evidenciaTransferencia ? (
+                        {detailFormData.evidenciaTransferencia && isValidMediaUrl(detailFormData.evidenciaTransferencia) ? (
                           <div className="rounded-lg border border-blue-200 bg-white p-2 flex items-center gap-3">
                             <a
                               href={detailFormData.evidenciaTransferencia}
@@ -2377,14 +2377,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
             </div>
 
             {/* Evidencia Fotográfica de Entrega */}
-            {detailFormData.fotos && detailFormData.fotos.length > 0 && (
+            {detailFormData.fotos && detailFormData.fotos.filter(isValidMediaUrl).length > 0 && (
               <div className="bg-white p-4 rounded-xl border border-zinc-200 space-y-2">
                 <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Inspección Visual & Evidencias Fotográficas ({detailFormData.fotos.length})</span>
+                  <span>Inspección Visual & Evidencias Fotográficas ({detailFormData.fotos.filter(isValidMediaUrl).length})</span>
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                  {detailFormData.fotos.map((url, i) => (
+                  {detailFormData.fotos.filter(isValidMediaUrl).map((url, i) => (
                     <a
                       key={i}
                       href={url}
@@ -2404,7 +2404,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
             )}
 
             {/* Evidencia de Transferencia Bancaria (Comprobante de Pago) en Ficha Técnica */}
-            {detailFormData.evidenciaTransferencia && (
+            {detailFormData.evidenciaTransferencia && isValidMediaUrl(detailFormData.evidenciaTransferencia) && (
               <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase text-emerald-950 tracking-wider flex items-center gap-1.5">
@@ -4274,7 +4274,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </span>
                           )}
                         </label>
-                        {formData.evidenciaTransferencia ? (
+                        {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
                           <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-3">
                             <a
                               href={formData.evidenciaTransferencia}
@@ -4427,10 +4427,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     </button>
                   </div>
 
-                  {formData.fotos.length > 0 ? (
+                  {formData.fotos.filter(isValidMediaUrl).length > 0 ? (
                     <div className="space-y-2">
                       <div className="grid grid-cols-3 gap-2">
-                        {formData.fotos.map((fUrl, idx) => (
+                        {formData.fotos.filter(isValidMediaUrl).map((fUrl, idx) => (
                           <div
                             key={idx}
                             className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group bg-black/5"
@@ -5151,7 +5151,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </span>
                           )}
                         </label>
-                        {formData.evidenciaTransferencia ? (
+                        {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
                           <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-2">
                             <a
                               href={formData.evidenciaTransferencia}
@@ -5216,9 +5216,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       <span>+ Subir Foto</span>
                     </button>
                   </div>
-                  {formData.fotos.length > 0 && (
+                  {formData.fotos.filter(isValidMediaUrl).length > 0 && (
                     <div className="grid grid-cols-3 gap-1.5">
-                      {formData.fotos.map((url, i) => (
+                      {formData.fotos.filter(isValidMediaUrl).map((url, i) => (
                         <div key={i} className="relative aspect-video rounded-lg overflow-hidden border">
                           <img src={url} alt="Foto" className="w-full h-full object-cover" />
                           <button
@@ -5521,7 +5521,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
 
                 {/* Evidencia Fotográfica / Captura */}
-                {abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl && (
+                {abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl && isValidMediaUrl(abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl) && (
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase text-zinc-600 block">Comprobante de Transferencia:</span>
                     <a
@@ -5769,7 +5769,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           )}
                         </label>
 
-                        {abonoFormData.evidenciaTransferencia ? (
+                        {abonoFormData.evidenciaTransferencia && isValidMediaUrl(abonoFormData.evidenciaTransferencia) ? (
                           <div className="relative rounded-xl border border-blue-300 bg-white p-2 flex items-center gap-3">
                             <a
                               href={abonoFormData.evidenciaTransferencia}

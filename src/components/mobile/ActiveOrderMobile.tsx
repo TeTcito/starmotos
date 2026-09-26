@@ -401,12 +401,15 @@ export const ActiveOrderMobile: React.FC<Props> = ({
         </div>
 
         {/* Fotos de Recepción */}
-        {fotos.length > 0 && (
-          <div className="bg-white rounded-xl p-3 border border-zinc-200 shadow-xs space-y-1.5">
+        <div className="bg-white rounded-xl p-3 border border-zinc-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase text-zinc-500 flex items-center gap-1">
-              <Camera className="w-3 h-3 text-indigo-600" />
-              <span>Fotos de Ingreso ({fotos.length})</span>
+              <Camera className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Fotos de Ingreso {fotos.length > 0 ? `(${fotos.length})` : ''}</span>
             </span>
+          </div>
+
+          {fotos.length > 0 ? (
             <div className="grid grid-cols-2 gap-2">
               {fotos.slice(0, 4).map((fUrl, idx) => (
                 <div
@@ -421,8 +424,16 @@ export const ActiveOrderMobile: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="p-5 bg-zinc-50 rounded-xl border border-dashed border-zinc-300 text-center flex flex-col items-center justify-center gap-1.5">
+              <div className="w-9 h-9 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center">
+                <Camera className="w-4 h-4 text-zinc-400" />
+              </div>
+              <span className="text-xs font-semibold text-zinc-600">Sin fotografías registradas</span>
+              <span className="text-[10px] text-zinc-400">Inspección visual conforme realizada al ingresar</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal Visor de Foto a Tamaño Completo en Móvil */}

@@ -702,14 +702,16 @@ export const ClientesModule: React.FC<Props> = ({
     setTimeout(() => setCopiedCedula(null), 1800);
   };
 
-  const getCleanWhatsappUrl = (phone: string, clientName: string) => {
+  const getCleanWhatsappUrl = (phone: string, clientName: string, isPending: boolean = false) => {
     const cleanDigits = phone.replace(/\D/g, '');
     let fullNumber = cleanDigits;
     if (fullNumber.startsWith('0')) {
       fullNumber = `593${fullNumber.substring(1)}`;
     }
     const message = encodeURIComponent(
-      `Estimado/a ${clientName}, le saludamos desde el Taller Oficial StarMotos. ¿En qué podemos ayudarle con su motocicleta?`
+      isPending
+        ? `Estimado/a ${clientName}, le saludamos de StarMotos. Tiene un saldo pendiente, por favor comunicarse con gerencia.`
+        : `Estimado/a ${clientName}, le saludamos desde el Taller Oficial StarMotos. ¿En qué podemos ayudarle con su motocicleta?`
     );
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
@@ -1456,7 +1458,8 @@ export const ClientesModule: React.FC<Props> = ({
               <a
                 href={getCleanWhatsappUrl(
                   clientFormData.phone,
-                  `${clientFormData.nombres} ${clientFormData.apellidos}`
+                  `${clientFormData.nombres} ${clientFormData.apellidos}`,
+                  clientFormData.estado === 'pendiente' || activeFilterTab === 'pendiente'
                 )}
                 target="_blank"
                 rel="noreferrer"
@@ -2474,7 +2477,11 @@ export const ClientesModule: React.FC<Props> = ({
                           </button>
                           {client.phone && (
                             <a
-                              href={getCleanWhatsappUrl(client.phone, client.fullName)}
+                              href={getCleanWhatsappUrl(
+                                client.phone,
+                                client.fullName,
+                                data.estado === 'pendiente' || activeFilterTab === 'pendiente'
+                              )}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}

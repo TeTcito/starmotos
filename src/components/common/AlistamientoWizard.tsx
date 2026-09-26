@@ -320,7 +320,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   };
 
   // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
-  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi'>('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento'>('all');
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -383,8 +383,46 @@ export const AlistamientoWizard: React.FC<Props> = ({
   // Paso para vista móvil (1: Cliente, 2: Moto, 3: Servicio)
   const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(1);
 
-  // Fecha de hoy por defecto en formato YYYY-MM-DD
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Helper para fecha local en formato YYYY-MM-DD
+  const getLocalDateStr = (d = new Date()) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper para extraer de forma robusta la fecha de cualquier registro sin desfase horario
+  const getRecordLocalDate = (raw?: string): { year: number; month: number; day: number } | null => {
+    if (!raw) return null;
+    const ymdMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (ymdMatch) {
+      return {
+        year: parseInt(ymdMatch[1], 10),
+        month: parseInt(ymdMatch[2], 10),
+        day: parseInt(ymdMatch[3], 10),
+      };
+    }
+    const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmyMatch) {
+      return {
+        year: parseInt(dmyMatch[3], 10),
+        month: parseInt(dmyMatch[2], 10),
+        day: parseInt(dmyMatch[1], 10),
+      };
+    }
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return {
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        day: d.getDate(),
+      };
+    }
+    return null;
+  };
+
+  // Fecha de hoy por defecto en formato YYYY-MM-DD local
+  const todayStr = getLocalDateStr();
 
   // Hora actual por defecto en formato HH:mm
   const getCurrentTimeStr = () => {
@@ -692,7 +730,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       fullNumber = `593${fullNumber.substring(1)}`;
     }
     const message = encodeURIComponent(
-      `Estimado/a ${clientName}, le saludamos desde StarMotos. Le compartimos la información de su orden de servicio y alistamiento.`
+      `Estimado/a ${clientName}, le saludamos de StarMotos. Quisiéramos saber si ha tenido alguna novedad con su motocicleta. Si tiene alguna inquietud sobre la garantía de su moto, por favor contáctese con nuestro supervisor al número 0939316698. ¡Estamos para servirle!`
     );
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
@@ -737,41 +775,45 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
       // 3. Filtro por Fechas
       if (filterDateRange !== 'all') {
-        const rawDate = r.fechaServicio || r.createdAt;
-        if (rawDate) {
-          const parts = rawDate.split('T')[0].split('-');
-          let recDate: Date | null = null;
-          if (parts.length === 3) {
-            recDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          } else {
-            recDate = new Date(rawDate);
-          }
+        const recDateObj = getRecordLocalDate(r.fechaServicio) || getRecordLocalDate(r.createdAt);
+        if (recDateObj) {
+          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day);
+          const now = new Date();
 
-          if (recDate && !isNaN(recDate.getTime())) {
-            const now = new Date();
-            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-            if (filterDateRange === 'today') {
-              if (recDate < todayStart || recDate > todayEnd) return false;
-            } else if (filterDateRange === 'this_week') {
-              const dayOfWeek = now.getDay();
-              const diffToMonday = (dayOfWeek + 6) % 7;
-              const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
-              const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
-              if (recDate < monday || recDate > sunday) return false;
-            } else if (filterDateRange === 'this_month') {
-              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-              if (recDate < monthStart || recDate > monthEnd) return false;
-            } else if (filterDateRange === 'custom') {
-              if (customStartDate) {
-                const cStart = new Date(customStartDate + 'T00:00:00');
-                if (!isNaN(cStart.getTime()) && recDate < cStart) return false;
+          if (filterDateRange === 'today') {
+            if (
+              recDateObj.year !== now.getFullYear() ||
+              recDateObj.month !== now.getMonth() + 1 ||
+              recDateObj.day !== now.getDate()
+            ) {
+              return false;
+            }
+          } else if (filterDateRange === 'this_week') {
+            const dayOfWeek = now.getDay();
+            const diffToMonday = (dayOfWeek + 6) % 7;
+            const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+            const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+            if (recDate < monday || recDate > sunday) return false;
+          } else if (filterDateRange === 'this_month') {
+            if (
+              recDateObj.year !== now.getFullYear() ||
+              recDateObj.month !== now.getMonth() + 1
+            ) {
+              return false;
+            }
+          } else if (filterDateRange === 'custom') {
+            if (customStartDate) {
+              const cStartObj = getRecordLocalDate(customStartDate);
+              if (cStartObj) {
+                const cStart = new Date(cStartObj.year, cStartObj.month - 1, cStartObj.day);
+                if (recDate < cStart) return false;
               }
-              if (customEndDate) {
-                const cEnd = new Date(customEndDate + 'T23:59:59');
-                if (!isNaN(cEnd.getTime()) && recDate > cEnd) return false;
+            }
+            if (customEndDate) {
+              const cEndObj = getRecordLocalDate(customEndDate);
+              if (cEndObj) {
+                const cEnd = new Date(cEndObj.year, cEndObj.month - 1, cEndObj.day, 23, 59, 59, 999);
+                if (recDate > cEnd) return false;
               }
             }
           }
@@ -844,6 +886,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
           if (isPdi || valor <= 0 || pendiente > 0.01) return false;
         } else if (filterPayment === 'pdi') {
           if (!isPdi) return false;
+        } else if (filterPayment === 'engrasado') {
+          const hasEngrasado =
+            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('engrasad')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('engrasad') ||
+            r.observaciones?.toLowerCase().includes('engrasad');
+          if (!hasEngrasado) return false;
+        } else if (filterPayment === 'mantenimiento') {
+          const hasMantenimiento =
+            r.serviciosRealizados?.some((s) => s.toLowerCase().includes('mantenimiento')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento') ||
+            r.observaciones?.toLowerCase().includes('mantenimiento');
+          if (!hasMantenimiento) return false;
         }
       }
       return true;
@@ -2699,6 +2753,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         { id: 'con_saldo', label: 'Pendiente (Con Saldo)' },
                         { id: 'pagados', label: 'Pagados (Al Día)' },
                         { id: 'pdi', label: 'PDI (Sin Costo)' },
+                        { id: 'engrasado', label: 'Engrasada' },
+                        { id: 'mantenimiento', label: 'Mantenimiento' },
                       ].map((item) => (
                         <button
                           key={item.id}
@@ -2800,12 +2856,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 {filterPayment !== 'all' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
                     <span>
-                      Pago:{' '}
+                      Filtro:{' '}
                       {filterPayment === 'con_saldo'
                         ? 'Con Saldo'
                         : filterPayment === 'pagados'
                         ? 'Pagados'
-                        : 'PDI'}
+                        : filterPayment === 'pdi'
+                        ? 'PDI'
+                        : filterPayment === 'engrasado'
+                        ? 'Engrasada'
+                        : 'Mantenimiento'}
                     </span>
                     <button
                       type="button"

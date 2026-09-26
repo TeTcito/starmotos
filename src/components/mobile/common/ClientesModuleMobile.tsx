@@ -131,14 +131,16 @@ export const ClientesModuleMobile: React.FC<Props> = ({
     observaciones: '',
   });
 
-  const getCleanWhatsappUrl = (phoneStr: string, clientName: string) => {
+  const getCleanWhatsappUrl = (phoneStr: string, clientName: string, isPending: boolean = false) => {
     const cleanDigits = phoneStr.replace(/\D/g, '');
     let fullNumber = cleanDigits;
     if (fullNumber.startsWith('0')) {
       fullNumber = `593${fullNumber.substring(1)}`;
     }
     const message = encodeURIComponent(
-      `Estimado/a ${clientName}, le saludamos desde StarMotos. ¿En qué podemos servirle?`
+      isPending
+        ? `Estimado/a ${clientName}, le saludamos de StarMotos. Tiene un saldo pendiente, por favor comunicarse con gerencia.`
+        : `Estimado/a ${clientName}, le saludamos desde StarMotos. ¿En qué podemos servirle?`
     );
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
@@ -819,7 +821,12 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                       <label className="block text-[11px] font-bold text-zinc-700">Teléfono / Celular 1 *</label>
                       {detailFormData.phone && (
                         <a
-                          href={getCleanWhatsappUrl(detailFormData.phone, `${detailFormData.nombres} ${detailFormData.apellidos}`)}
+                          href={getCleanWhatsappUrl(
+                            detailFormData.phone,
+                            `${detailFormData.nombres} ${detailFormData.apellidos}`,
+                            (selectedClientForDetail && clientOverrides[selectedClientForDetail.cedulaRuc]?.estado === 'pendiente') ||
+                              (selectedClientForDetail ? !selectedClientForDetail.pdiCompleted && selectedClientForDetail.records.length === 0 : false)
+                          )}
                           target="_blank"
                           rel="noreferrer"
                           className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5"
@@ -1578,7 +1585,11 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                       </div>
                       {phone && (
                         <a
-                          href={getCleanWhatsappUrl(phone, displayName)}
+                          href={getCleanWhatsappUrl(
+                            phone,
+                            displayName,
+                            override?.estado === 'pendiente' || (!client.pdiCompleted && client.records.length === 0)
+                          )}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}

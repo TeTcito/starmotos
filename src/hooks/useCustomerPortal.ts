@@ -161,7 +161,7 @@ export const DEFAULT_MOTORCYCLE: MotorcycleClientData = {
   reportedSymptoms: '',
   preferredPartsQuality: 'originales_oem',
   preferredBranchId: 'matriz-la-mana',
-  photoUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
+  photoUrl: '',
 };
 
 const INITIAL_PROFILE: ClientProfile = {
@@ -194,7 +194,7 @@ const INITIAL_MOTORCYCLE: MotorcycleClientData = {
   reportedSymptoms: 'Siento leve vibración en el tren delantero al pasar de 80 km/h y chillido ocasional en pastillas delanteras en clima frío.',
   preferredPartsQuality: 'originales_oem',
   preferredBranchId: 'matriz-la-mana',
-  photoUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1200&q=80',
+  photoUrl: '',
 };
 
 const INITIAL_SCHEDULED_MAINTENANCES: ScheduledMaintenance[] = [
@@ -669,6 +669,7 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
           abono: a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0),
           alistamientoId: a.id,
           solicitudAbonoPendiente: a.solicitudAbonoPendiente,
+          fotos: (a.fotos || []).filter(isValidMediaUrl),
         };
       })
     );
@@ -706,6 +707,7 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
       partsReplaced: ['Insumos de Taller'],
       totalPaid: o.totalCost || 0,
       technicianName: o.mechanicName || 'Técnico StarMotos',
+      alistamientoId: o.alistamientoId,
     });
   });
 
@@ -823,7 +825,7 @@ const getClientActiveOrder = (
       : undefined;
 
     if (!matchedAls) {
-      matchedAls = allAlistamientos.find((a) => {
+      const candidates = allAlistamientos.filter((a) => {
         const aId = norm(a.cedulaRuc);
         const cId = norm(p.idNumber);
         if (aId && cId && aId === cId) return true;
@@ -832,6 +834,10 @@ const getClientActiveOrder = (
         if (aPlate && mPlate && aPlate === mPlate) return true;
         return false;
       });
+      matchedAls =
+        candidates.find((a) => a.numeroTicket === matched.otNumber || a.id === matched.id) ||
+        candidates.find((a) => a.fotos && a.fotos.length > 0) ||
+        candidates[candidates.length - 1];
     }
 
     const orderBranch = ALL_BRANCHES.find((b) => b.id === matched.workshopId) || branch;

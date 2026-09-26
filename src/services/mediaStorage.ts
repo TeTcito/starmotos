@@ -79,9 +79,8 @@ export function isValidDataUrl(dataUrl: string): boolean {
   if (commaIdx === -1) return false;
 
   let b64Data = dataUrl.slice(commaIdx + 1).trim().replace(/\s+/g, '');
-  // Cualquier imagen fotográfica real WebP/PNG/JPG comprimida mide > 800 caracteres.
-  // Las imágenes truncadas que dan ERR_INVALID_URL miden 300 o 500 caracteres y son incompletas.
-  if (b64Data.length < 800) return false;
+  // Las imágenes truncadas con puntos suspensivos son incompletas y dan ERR_INVALID_URL
+  if (b64Data.length < 50) return false;
   if (b64Data.includes('…') || b64Data.includes('...')) return false;
 
   // Si b64Data.length % 4 === 1, es matemáticamente inválido en base64

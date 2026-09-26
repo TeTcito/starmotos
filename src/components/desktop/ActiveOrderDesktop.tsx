@@ -589,8 +589,12 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
                 ))}
               </div>
             ) : (
-              <div className="p-3 bg-zinc-50 rounded-xl border border-dashed border-zinc-200 text-center text-xs text-zinc-400">
-                <span>Inspección visual conforme realizada al ingresar en elevador de servicio.</span>
+              <div className="p-6 bg-zinc-50 rounded-xl border border-dashed border-zinc-300 text-center flex flex-col items-center justify-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-zinc-400" />
+                </div>
+                <span className="text-xs font-semibold text-zinc-600">Sin fotografías registradas al ingreso</span>
+                <span className="text-[10px] text-zinc-400">Inspección visual conforme realizada en elevador de servicio</span>
               </div>
             )}
           </div>

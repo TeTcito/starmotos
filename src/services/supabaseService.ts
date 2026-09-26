@@ -852,12 +852,12 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
               if (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000) {
                 try {
                   const cloudUrl = await uploadWarrantyMedia(item, `als_${cleanRec.id}_foto_${idx}`);
-                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://') || isValidDataUrl(cloudUrl))) {
                     return cloudUrl;
                   }
-                  return '';
+                  return isValidDataUrl(item) ? item : '';
                 } catch (_) {
-                  return '';
+                  return isValidDataUrl(item) ? item : '';
                 }
               }
             }

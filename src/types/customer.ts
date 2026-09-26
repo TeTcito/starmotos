@@ -222,6 +222,7 @@ export interface MaintenanceRecord {
   abono?: number;
   alistamientoId?: string;
   solicitudAbonoPendiente?: SolicitudAbonoCliente;
+  fotos?: string[];
 }
 
 export type WarrantyStatus = 'vigente' | 'por_vencer' | 'vencida';

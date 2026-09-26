@@ -25,13 +25,20 @@ export const buildHistoricalWorkOrder = (
   const allOrders = getStoredOrders();
 
   // Buscar coincidencia en alistamientos
-  const als = allAlistamientos.find(
+  let als = allAlistamientos.find(
     (a) =>
       (record.alistamientoId && a.id === record.alistamientoId) ||
       a.id === record.id ||
-      (record.otNumber && a.numeroTicket === record.otNumber) ||
-      (record.invoiceNumber && a.numeroFactura === record.invoiceNumber)
+      (record.otNumber && a.numeroTicket && (a.numeroTicket === record.otNumber || a.numeroTicket.includes(record.otNumber) || record.otNumber.includes(a.numeroTicket))) ||
+      (record.invoiceNumber && a.numeroFactura && a.numeroFactura === record.invoiceNumber)
   );
+
+  if (!als && safeMotorcycle.plate) {
+    const cleanPlate = safeMotorcycle.plate.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanPlate && !['sinplaca', 'sp', 'sn', 'entramite'].includes(cleanPlate)) {
+      als = allAlistamientos.find((a) => (a.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPlate);
+    }
+  }
 
   // Buscar coincidencia en órdenes de taller
   const ord = allOrders.find(
@@ -133,14 +140,14 @@ export const buildHistoricalWorkOrder = (
     },
   ];
 
-  const rawFotos = als?.fotos && als.fotos.length > 0 ? als.fotos : [];
+  const rawFotos =
+    record.fotos && record.fotos.length > 0
+      ? record.fotos
+      : als?.fotos && als.fotos.length > 0
+      ? als.fotos
+      : [];
   const validFotos = rawFotos.filter(isValidMediaUrl);
-  const fotos =
-    validFotos.length > 0
-      ? validFotos
-      : [
-          'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=900&q=80',
-        ];
+  const fotos = validFotos;
 
   const techName =
     als?.tecnicoResponsable ||

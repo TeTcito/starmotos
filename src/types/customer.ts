@@ -832,6 +832,8 @@ export interface GpsRecord {
   fechaSolicitud: string; // YYYY-MM-DD
   horaSolicitud?: string; // HH:mm
   // Paso 1: Datos del Cliente
+  sede?: string; // Sede / Taller donde se atiende o registra el GPS
+  sedeId?: string; // ID de la sede / taller
   clienteId?: string;
   nombres: string;
   apellidos: string;

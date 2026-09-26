@@ -28,8 +28,9 @@ import {
   Upload,
   Wrench,
   CreditCard,
+  MapPin,
 } from 'lucide-react';
-import { GpsRecord, SystemAlert, Technician } from '../../../types/customer';
+import { GpsRecord, SystemAlert, Technician, Workshop } from '../../../types/customer';
 import {
   getStoredClients,
   getStoredFullAlistamientos,
@@ -38,6 +39,7 @@ import {
   deleteStoredGpsRecord,
   addStoredAlerts,
   getStoredTechnicians,
+  getStoredWorkshops,
 } from '../../../data/mockMultiRoleData';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
@@ -76,7 +78,9 @@ export const GpsMatrizMobile: React.FC<Props> = ({
   const initialFormData = {
     id: '',
     ticketNumber: '',
-    // Módulo 1: Cliente & 3 Celulares
+    // Módulo 1: Sede & Cliente & 3 Celulares
+    sede: 'StarMotos Matriz La Maná',
+    sedeId: 'matriz-la-mana',
     cedulaRuc: '',
     nombres: '',
     apellidos: '',
@@ -115,14 +119,61 @@ export const GpsMatrizMobile: React.FC<Props> = ({
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{ title: string; fields: string[] } | null>(null);
 
+  // Lista oficial de Sedes / Talleres de StarMotos
+  const workshopsList = useMemo(() => getStoredWorkshops(), []);
+
   // Lista de Técnicos disponibles
   const techniciansList = useMemo(() => getStoredTechnicians(), []);
+
+  // Técnicos filtrados dinámicamente según la sede de atención seleccionada
+  const availableTechniciansForSede = useMemo(() => {
+    const currentWsId = (formData.sedeId || '').toLowerCase().trim();
+    const currentWsName = (formData.sede || '').toLowerCase().trim();
+
+    if (!currentWsId && !currentWsName) {
+      return techniciansList;
+    }
+
+    const currentWs = workshopsList.find(
+      (w) => w.id === formData.sedeId || w.name.toLowerCase() === currentWsName
+    );
+    const cityKey = currentWs?.city ? currentWs.city.split(',')[0].toLowerCase().trim() : '';
+
+    const matching = techniciansList.filter((t) => {
+      const tWsId = (t.workshopId || '').toLowerCase().trim();
+      const tWsName = (t.workshopName || '').toLowerCase().trim();
+
+      // 1. Coincidencia directa por ID de taller
+      if (tWsId && currentWsId && tWsId === currentWsId) return true;
+
+      // 2. Coincidencia por nombre de taller
+      if (tWsName && currentWsName && (tWsName.includes(currentWsName) || currentWsName.includes(tWsName))) return true;
+
+      // 3. Coincidencia por ciudad
+      if (cityKey && (tWsName.includes(cityKey) || tWsId.includes(cityKey))) return true;
+
+      return false;
+    });
+
+    return matching;
+  }, [techniciansList, formData.sedeId, formData.sede, workshopsList]);
 
   // Base de datos local para autocompletado rápido
   const existingClients = useMemo(() => {
     const list = getStoredClients();
     const alistamientos = getStoredFullAlistamientos();
-    const map = new Map<string, { idNumber: string; fullName: string; phone?: string; email?: string; address?: string; bike?: string; plate?: string; vin?: string }>();
+    const map = new Map<string, {
+      idNumber: string;
+      fullName: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      bike?: string;
+      plate?: string;
+      vin?: string;
+      workshopId?: string;
+      workshopName?: string;
+    }>();
 
     list.forEach((c) => {
       if (c.idNumber) {
@@ -135,21 +186,26 @@ export const GpsMatrizMobile: React.FC<Props> = ({
           bike: `${c.motorcycleBrand || ''} ${c.motorcycleModel || ''}`.trim(),
           plate: c.motorcyclePlate,
           vin: c.motorcycleVin,
+          workshopId: c.workshopId,
+          workshopName: c.workshopName,
         });
       }
     });
 
     alistamientos.forEach((a) => {
       if (a.cedulaRuc) {
+        const prev = map.get(a.cedulaRuc.trim());
         map.set(a.cedulaRuc.trim(), {
           idNumber: a.cedulaRuc,
           fullName: `${a.nombres} ${a.apellidos}`.trim(),
-          phone: a.celular1,
-          email: a.email,
-          address: a.direccion,
-          bike: a.modeloMarca,
-          plate: a.placa,
-          vin: a.chasis,
+          phone: a.celular1 || prev?.phone,
+          email: a.email || prev?.email,
+          address: a.direccion || prev?.address,
+          bike: a.modeloMarca || prev?.bike,
+          plate: a.placa || prev?.plate,
+          vin: a.chasis || prev?.vin,
+          workshopId: a.sedeId || prev?.workshopId,
+          workshopName: a.sede || prev?.workshopName,
         });
       }
     });
@@ -164,16 +220,27 @@ export const GpsMatrizMobile: React.FC<Props> = ({
 
     setSearchFeedback(null);
 
-    // 1. Base local
+    // 1. Base local (con recuperación de sede registrada)
     const localMatch = existingClients.find((c) => c.idNumber.trim() === idToSearch);
     if (localMatch) {
       const parts = localMatch.fullName.split(' ');
       const nombres = parts.slice(0, Math.ceil(parts.length / 2)).join(' ');
       const apellidos = parts.slice(Math.ceil(parts.length / 2)).join(' ');
 
+      // Determinar la sede registrada del cliente si ya existe
+      const matchedWs = workshopsList.find(
+        (w) =>
+          (localMatch.workshopId && w.id === localMatch.workshopId) ||
+          (localMatch.workshopName && (w.name.toLowerCase() === localMatch.workshopName.toLowerCase() || w.name.toLowerCase().includes(localMatch.workshopName.toLowerCase())))
+      );
+      const targetSede = matchedWs ? matchedWs.name : (localMatch.workshopName || formData.sede || 'StarMotos Matriz La Maná');
+      const targetSedeId = matchedWs ? matchedWs.id : (localMatch.workshopId || formData.sedeId || 'matriz-la-mana');
+
       setFormData((prev) => ({
         ...prev,
         cedulaRuc: idToSearch,
+        sede: targetSede,
+        sedeId: targetSedeId,
         nombres: nombres || localMatch.fullName,
         apellidos: apellidos || '',
         celular1: localMatch.phone || prev.celular1,
@@ -182,9 +249,10 @@ export const GpsMatrizMobile: React.FC<Props> = ({
         modeloMarca: localMatch.bike || prev.modeloMarca,
         placa: localMatch.plate || prev.placa,
         chasis: localMatch.vin || prev.chasis,
+        tecnicoResponsable: '',
       }));
-      setSearchFeedback(`✓ Cliente encontrado en base local: ${localMatch.fullName}`);
-      showToast?.(`Cliente recuperado: ${localMatch.fullName}`, 'info');
+      setSearchFeedback(`✓ Cliente registrado en ${targetSede}: ${localMatch.fullName}`);
+      showToast?.(`Cliente recuperado (${targetSede}): ${localMatch.fullName}`, 'info');
       return;
     }
 
@@ -238,6 +306,8 @@ export const GpsMatrizMobile: React.FC<Props> = ({
     setFormData({
       id: record.id,
       ticketNumber: record.ticketNumber,
+      sede: record.sede || 'StarMotos Matriz La Maná',
+      sedeId: record.sedeId || 'matriz-la-mana',
       cedulaRuc: record.cedulaRuc,
       nombres: record.nombres,
       apellidos: record.apellidos,
@@ -297,6 +367,8 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       // Actualizar registro existente
       const updatedRecord: GpsRecord = {
         ...(selectedRecordForDetail as GpsRecord),
+        sede: formData.sede || 'StarMotos Matriz La Maná',
+        sedeId: formData.sedeId || 'matriz-la-mana',
         nombres: formData.nombres.trim(),
         apellidos: formData.apellidos.trim(),
         cedulaRuc: formData.cedulaRuc.trim(),
@@ -340,6 +412,8 @@ export const GpsMatrizMobile: React.FC<Props> = ({
     const newRecord: GpsRecord = {
       id: `gps-${Date.now()}`,
       ticketNumber: `GPS-${randomTicket}`,
+      sede: formData.sede || 'StarMotos Matriz La Maná',
+      sedeId: formData.sedeId || 'matriz-la-mana',
       fechaSolicitud: todayStr,
       horaSolicitud: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
       nombres: formData.nombres.trim(),
@@ -788,7 +862,13 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                         </h4>
                         <span className="text-[10px] text-zinc-400 font-mono">{r.fechaSolicitud}</span>
                       </div>
-                      <p className="text-[11px] font-mono text-zinc-500">C.I. {r.cedulaRuc}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] font-mono text-zinc-500">C.I. {r.cedulaRuc}</span>
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-cyan-800 bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200">
+                          <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                          <span>{r.sede || 'Matriz'}</span>
+                        </span>
+                      </div>
 
                       <div className="flex flex-wrap gap-1 mt-1 text-[10px]">
                         <span
@@ -1017,6 +1097,40 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 <span className="text-[9px] font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
                   Propietario
                 </span>
+              </div>
+
+              {/* Sede / Taller de Atención */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-cyan-600" />
+                    <span>Sede / Taller de Atención *</span>
+                  </span>
+                  <span className="text-[9px] text-cyan-700 font-semibold bg-cyan-50 px-1 py-0.5 rounded border border-cyan-200">
+                    Cambiar si aplica
+                  </span>
+                </label>
+                <select
+                  value={formData.sedeId || formData.sede}
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    const selectedWs = workshopsList.find((w) => w.id === selectedVal || w.name === selectedVal);
+                    setFormData((prev) => ({
+                      ...prev,
+                      sedeId: selectedWs ? selectedWs.id : selectedVal,
+                      sede: selectedWs ? selectedWs.name : selectedVal,
+                      tecnicoResponsable: '',
+                    }));
+                  }}
+                  className="w-full px-2.5 py-1.5 text-xs font-bold text-zinc-800 bg-white border border-zinc-300 rounded-xl outline-none focus:border-cyan-600 cursor-pointer"
+                  required
+                >
+                  {workshopsList.map((ws) => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name} ({ws.city})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Cédula con búsqueda SRI */}
@@ -1356,25 +1470,34 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* TÉCNICO ENCARGADO */}
+              {/* TÉCNICO ENCARGADO (FILTRADO POR SEDE) */}
               <div>
-                <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Técnico Encargado</span>
+                <label className="block text-[10px] font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Técnico Encargado</span>
+                  </span>
+                  <span className="text-[9px] text-zinc-500 font-medium truncate max-w-[50%]">
+                    Sede: {formData.sede || 'Matriz'}
+                  </span>
                 </label>
                 <select
                   value={formData.tecnicoResponsable}
                   onChange={(e) => setFormData({ ...formData, tecnicoResponsable: e.target.value })}
                   className="w-full px-2.5 py-1.5 text-xs font-semibold text-zinc-800 bg-white border border-zinc-300 rounded-xl outline-none focus:border-emerald-600 cursor-pointer"
                 >
-                  <option value="">Seleccione Técnico Encargado...</option>
-                  {techniciansList.map((t) => (
+                  <option value="">
+                    {availableTechniciansForSede.length === 0
+                      ? `(Sin técnicos registrados en ${formData.sede || 'esta sede'})`
+                      : 'Seleccione Técnico Encargado...'}
+                  </option>
+                  {availableTechniciansForSede.map((t) => (
                     <option key={t.id} value={t.name}>
                       {t.name} {t.specialty ? `(${t.specialty})` : ''}
                     </option>
                   ))}
-                  {formData.tecnicoResponsable && !techniciansList.some((t) => t.name === formData.tecnicoResponsable) && (
-                    <option value={formData.tecnicoResponsable}>{formData.tecnicoResponsable}</option>
+                  {formData.tecnicoResponsable && !availableTechniciansForSede.some((t) => t.name === formData.tecnicoResponsable) && (
+                    <option value={formData.tecnicoResponsable}>{formData.tecnicoResponsable} (Asignado)</option>
                   )}
                 </select>
               </div>

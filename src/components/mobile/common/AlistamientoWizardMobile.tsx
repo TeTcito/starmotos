@@ -48,6 +48,7 @@ import {
   getStoredFullAlistamientos,
   getRegisteredBrands,
   getStoredOrders,
+  updateClientCedulaCascade,
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
@@ -1050,10 +1051,35 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   const handleSaveRecordDetail = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!detailFormData) return;
+
+    const oldCedula = (selectedRecordForDetail?.cedulaRuc || '').trim();
+    const newCedula = (detailFormData.cedulaRuc || '').trim();
+
+    if (!newCedula) {
+      alert('El número de cédula o RUC es obligatorio.');
+      return;
+    }
+
+    if (oldCedula && newCedula !== oldCedula) {
+      updateClientCedulaCascade(oldCedula, newCedula, {
+        fullName: `${detailFormData.nombres} ${detailFormData.apellidos}`.trim(),
+        phone: detailFormData.celular1,
+        email: detailFormData.email,
+        address: detailFormData.direccion,
+        motorcycleModel: detailFormData.modeloMarca,
+        motorcyclePlate: detailFormData.placa,
+        motorcycleVin: detailFormData.chasis,
+        motorcycleMileage: Number(detailFormData.kilometraje) || 0,
+        workshopName: detailFormData.sede,
+        workshopId: detailFormData.sedeId,
+      });
+    }
+
     const valServ = Number(detailFormData.valorServicio) || 0;
     const valAbono = detailFormData.abono !== undefined && detailFormData.abono !== '' ? Number(detailFormData.abono) : (detailFormData.montoPagado !== '' ? Number(detailFormData.montoPagado) : 0);
     const securedDetail: AlistamientoFullRecord = {
       ...detailFormData,
+      cedulaRuc: newCedula,
       kilometraje: Number(detailFormData.kilometraje) || 0,
       valorServicio: valServ,
       montoPagado: valAbono,
@@ -1070,7 +1096,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     if (onSaveRecord) {
       onSaveRecord(securedDetail);
     }
-    setDetailSuccessToast('✓ Ficha técnica actualizada correctamente.');
+    setDetailSuccessToast('✓ Ficha técnica y cédula actualizadas correctamente.');
     setTimeout(() => setDetailSuccessToast(null), 3000);
   };
 
@@ -1548,12 +1574,23 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Cédula o RUC *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-zinc-700">Cédula o RUC *</label>
+                      <span className="text-[9px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                        Modificable
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={detailFormData.cedulaRuc}
-                      readOnly
-                      className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none cursor-not-allowed"
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 13);
+                        setDetailFormData({ ...detailFormData, cedulaRuc: clean });
+                      }}
+                      placeholder="Ej: 1204567890"
+                      maxLength={13}
+                      required
+                      className="w-full px-2.5 py-1.5 bg-white border border-blue-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-500 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all shadow-2xs"
                     />
                   </div>
 

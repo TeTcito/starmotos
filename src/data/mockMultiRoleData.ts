@@ -1467,6 +1467,126 @@ export function isOrderRated(orderId: string): boolean {
   return ratings.some((r) => r.orderId === orderId || r.otNumber === orderId);
 }
 
+/**
+ * Actualiza la cédula/RUC de un cliente y propaga el cambio en cascada a todos los
+ * registros relacionados en el sistema: Ficha del Cliente, Alistamientos y Garantías.
+ */
+export function updateClientCedulaCascade(
+  oldCedula: string,
+  newCedula: string,
+  extraData?: Partial<TallerClient>
+): boolean {
+  const cleanOld = (oldCedula || '').trim();
+  const cleanNew = (newCedula || '').trim();
+  if (!cleanNew) return false;
+
+  try {
+    // 1. Actualizar en la base de clientes (TallerClient)
+    const storedClients = getStoredClients();
+    let clientToSync: TallerClient | null = null;
+    const clientIdx = storedClients.findIndex(
+      (c) => c.idNumber && c.idNumber.trim() === cleanOld
+    );
+
+    if (clientIdx >= 0) {
+      storedClients[clientIdx] = {
+        ...storedClients[clientIdx],
+        ...extraData,
+        idNumber: cleanNew,
+      };
+      clientToSync = storedClients[clientIdx];
+      saveStoredClients(storedClients);
+    } else if (extraData) {
+      const newEntry: TallerClient = {
+        id: `cli-${Date.now()}`,
+        fullName: extraData.fullName || 'Cliente',
+        idNumber: cleanNew,
+        phone: extraData.phone || '',
+        email: extraData.email || '',
+        address: extraData.address || '',
+        motorcycleBrand: extraData.motorcycleBrand || 'Moto',
+        motorcycleModel: extraData.motorcycleModel || '',
+        motorcyclePlate: extraData.motorcyclePlate || '',
+        motorcycleVin: extraData.motorcycleVin || '',
+        motorNumber: extraData.motorNumber,
+        color: extraData.color,
+        motorcycleMileage: extraData.motorcycleMileage || 0,
+        workshopName: extraData.workshopName || 'StarMotos',
+        workshopId: extraData.workshopId || 'taller-principal',
+        totalVisits: extraData.totalVisits || 1,
+        lastVisit: extraData.lastVisit || new Date().toISOString().split('T')[0],
+      };
+      storedClients.unshift(newEntry);
+      clientToSync = newEntry;
+      saveStoredClients(storedClients);
+    }
+
+    if (clientToSync) {
+      cloudSaveClient(clientToSync);
+    }
+
+    // 2. Propagar en Alistamientos
+    if (cleanOld && cleanOld !== cleanNew) {
+      const storedAls = getStoredFullAlistamientos();
+      let alsChanged = false;
+      const updatedAls = storedAls.map((r) => {
+        if (r.cedulaRuc && r.cedulaRuc.trim() === cleanOld) {
+          alsChanged = true;
+          return {
+            ...r,
+            cedulaRuc: cleanNew,
+            nombres: extraData?.fullName ? extraData.fullName.split(' ')[0] : r.nombres,
+            apellidos: extraData?.fullName ? extraData.fullName.split(' ').slice(1).join(' ') : r.apellidos,
+            celular1: extraData?.phone || r.celular1,
+            email: extraData?.email || r.email,
+            direccion: extraData?.address || r.direccion,
+            modeloMarca: extraData?.motorcycleModel || r.modeloMarca,
+            placa: extraData?.motorcyclePlate || r.placa,
+            chasis: extraData?.motorcycleVin || r.chasis,
+          };
+        }
+        return r;
+      });
+
+      if (alsChanged) {
+        saveStoredFullAlistamientos(updatedAls);
+      }
+
+      // 3. Propagar en Garantías
+      try {
+        const rawWar = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+        if (rawWar) {
+          const warList: WarrantyRequest[] = JSON.parse(rawWar);
+          let warChanged = false;
+          const updatedWars = warList.map((w) => {
+            if (w.clientIdNumber && w.clientIdNumber.trim() === cleanOld) {
+              warChanged = true;
+              const updatedW: WarrantyRequest = {
+                ...w,
+                clientIdNumber: cleanNew,
+                clientName: extraData?.fullName || w.clientName,
+                clientPhone: extraData?.phone || w.clientPhone,
+              };
+              cloudSaveWarranty(updatedW);
+              return updatedW;
+            }
+            return w;
+          });
+          if (warChanged) {
+            safeSaveWarrantiesToLocalStorage(updatedWars);
+            window.dispatchEvent(new Event('starmotos_warranties_updated'));
+          }
+        }
+      } catch (_) {}
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Error al actualizar cédula en cascada:', err);
+    return false;
+  }
+}
+
 // Función para reiniciar todos los módulos a vacío en pruebas
 export function resetAllSystemData() {
   localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify([]));

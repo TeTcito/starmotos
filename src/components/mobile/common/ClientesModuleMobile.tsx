@@ -42,6 +42,7 @@ import {
   saveStoredFullAlistamientos,
   querySriMock,
   addStoredAlerts,
+  updateClientCedulaCascade,
 } from '../../../data/mockMultiRoleData';
 import { cloudSaveClient } from '../../../services/supabaseService';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
@@ -367,94 +368,80 @@ export const ClientesModuleMobile: React.FC<Props> = ({
     if (e) e.preventDefault();
     if (!detailFormData || !selectedClientForDetail) return;
 
-    const cleanCedula = detailFormData.cedulaRuc;
-    const fullName = `${detailFormData.nombres} ${detailFormData.apellidos}`.trim();
+    const oldCedula = (selectedClientForDetail.cedulaRuc || '').trim();
+    const newCedula = (detailFormData.cedulaRuc || '').trim();
 
-    // 1. Guardar en estado local de overrides
-    setClientOverrides((prev) => ({
-      ...prev,
-      [cleanCedula]: {
-        ...detailFormData,
-        fullName,
-      },
-    }));
-
-    // 2. Persistir en localStorage
-    try {
-      const storedClients = getStoredClients();
-      const existingIdx = storedClients.findIndex((c) => c.idNumber === cleanCedula);
-      let updated: TallerClient[];
-
-      if (existingIdx >= 0) {
-        updated = [...storedClients];
-        updated[existingIdx] = {
-          ...updated[existingIdx],
-          fullName,
-          phone: detailFormData.phone,
-          email: detailFormData.email,
-          address: detailFormData.address,
-          motorcycleModel: detailFormData.motoModel,
-          motorcyclePlate: detailFormData.motoPlate,
-          motorcycleVin: detailFormData.motoChasis,
-          motorNumber: detailFormData.motorNumber,
-          color: detailFormData.motoColor,
-          motorcycleMileage: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : (storedClients[existingIdx]?.motorcycleMileage ?? 0),
-          workshopName: detailFormData.workshopName,
-          workshopId: detailFormData.workshopId,
-        };
-      } else {
-        const newEntry: TallerClient = {
-          id: `cli-${Date.now()}`,
-          fullName,
-          idNumber: cleanCedula,
-          phone: detailFormData.phone,
-          email: detailFormData.email,
-          address: detailFormData.address,
-          motorcycleBrand: detailFormData.motoModel.split(' ')[0] || 'StarMotos',
-          motorcycleModel: detailFormData.motoModel,
-          motorcyclePlate: detailFormData.motoPlate,
-          motorcycleVin: detailFormData.motoChasis,
-          motorNumber: detailFormData.motorNumber,
-          color: detailFormData.motoColor,
-          motorcycleMileage: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : 0,
-          workshopName: detailFormData.workshopName,
-          workshopId: detailFormData.workshopId,
-          totalVisits: selectedClientForDetail.records.length || 1,
-          lastVisit: new Date().toISOString().split('T')[0],
-        };
-        updated = [newEntry, ...storedClients];
-      }
-
-      saveStoredClients(updated);
-      cloudSaveClient(updated[existingIdx >= 0 ? existingIdx : 0]);
-
-      // Sincronizar también en registros de alistamiento de este cliente
-      const storedAlistamientos = getStoredFullAlistamientos();
-      let hasUpdatedAlistamientos = false;
-      const updatedAlistamientos = storedAlistamientos.map((rec) => {
-        if (rec.cedulaRuc === cleanCedula) {
-          hasUpdatedAlistamientos = true;
-          return {
-            ...rec,
-            modeloMarca: detailFormData.motoModel || rec.modeloMarca,
-            placa: detailFormData.motoPlate || rec.placa,
-            chasis: detailFormData.motoChasis || rec.chasis,
-            color: detailFormData.motoColor || rec.color,
-            kilometraje: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : rec.kilometraje,
-          };
-        }
-        return rec;
-      });
-
-      if (hasUpdatedAlistamientos) {
-        saveStoredFullAlistamientos(updatedAlistamientos);
-      }
-    } catch (err) {
-      console.error('Error guardando cliente móvil:', err);
+    if (!newCedula) {
+      alert('El número de cédula o RUC no puede estar vacío.');
+      return;
     }
 
+    if (newCedula !== oldCedula) {
+      const storedClients = getStoredClients();
+      const conflict = storedClients.find(
+        (c) => c.idNumber && c.idNumber.trim() === newCedula && c.idNumber.trim() !== oldCedula
+      );
+      if (conflict) {
+        const confirmMerge = window.confirm(
+          `Ya existe un cliente con la cédula ${newCedula} (${conflict.fullName}). ¿Desea actualizar y unificar esta ficha con esa cédula?`
+        );
+        if (!confirmMerge) return;
+      }
+    }
+
+    const fullName = `${detailFormData.nombres} ${detailFormData.apellidos}`.trim();
+
+    // 1. Guardar en estado local de overrides (transferir clave si cambió)
+    setClientOverrides((prev) => {
+      const next = { ...prev };
+      if (oldCedula && oldCedula !== newCedula) {
+        delete next[oldCedula];
+      }
+      next[newCedula] = {
+        ...detailFormData,
+        cedulaRuc: newCedula,
+        fullName,
+      };
+      return next;
+    });
+
+    // 2. Propagar en cascada a base de clientes, alistamientos y garantías
+    const extraData: Partial<TallerClient> = {
+      fullName,
+      phone: detailFormData.phone,
+      email: detailFormData.email,
+      address: detailFormData.address,
+      motorcycleBrand: detailFormData.motoModel.split(' ')[0] || 'StarMotos',
+      motorcycleModel: detailFormData.motoModel,
+      motorcyclePlate: detailFormData.motoPlate,
+      motorcycleVin: detailFormData.motoChasis,
+      motorNumber: detailFormData.motorNumber,
+      color: detailFormData.motoColor,
+      motorcycleMileage: detailFormData.motoMileage !== '' ? Number(detailFormData.motoMileage) : 0,
+      workshopName: detailFormData.workshopName,
+      workshopId: detailFormData.workshopId,
+    };
+
+    updateClientCedulaCascade(oldCedula, newCedula, extraData);
+
+    // 3. Actualizar cliente seleccionado en vista móvil
+    setSelectedClientForDetail((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        id: newCedula,
+        cedulaRuc: newCedula,
+        fullName,
+        nombres: detailFormData.nombres,
+        apellidos: detailFormData.apellidos,
+        phone: detailFormData.phone,
+        email: detailFormData.email,
+        address: detailFormData.address,
+      };
+    });
+
     confetti({ particleCount: 40, spread: 50, origin: { y: 0.7 } });
-    setDetailSuccessToast('¡Datos del cliente actualizados exitosamente!');
+    setDetailSuccessToast('✓ Ficha técnica y cédula actualizadas correctamente.');
     setTimeout(() => setDetailSuccessToast(null), 3000);
   };
 
@@ -785,12 +772,23 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">Cédula o RUC *</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-zinc-700">Cédula o RUC *</label>
+                      <span className="text-[9px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                        Modificable
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={detailFormData.cedulaRuc}
-                      readOnly
-                      className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none cursor-not-allowed"
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 13);
+                        setDetailFormData({ ...detailFormData, cedulaRuc: clean });
+                      }}
+                      placeholder="Ej: 1204567890"
+                      maxLength={13}
+                      required
+                      className="w-full px-2.5 py-1.5 bg-white border border-blue-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-500 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all shadow-2xs"
                     />
                   </div>
 

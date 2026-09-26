@@ -65,7 +65,7 @@ export async function compressImageBase64(
     };
 
     img.onerror = () => {
-      resolve(typeof input === 'string' ? input : '');
+      resolve('');
     };
 
     if (typeof input === 'string') {

@@ -16,7 +16,9 @@ import {
   AgendamientoTicket,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { uploadWarrantyMedia, saveMediaToIndexedDB } from './mediaStorage';
+import { uploadWarrantyMedia, saveMediaToIndexedDB, isValidDataUrl } from './mediaStorage';
+
+export { isValidDataUrl };
 
 let isRealtimeInitialized = false;
 let isSyncing = false;
@@ -180,27 +182,34 @@ export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRec
       if (stripMediaCompletely) {
         copy.fotos = [];
       } else {
-        copy.fotos = copy.fotos.map((f, i) => {
-          if (typeof f === 'string') {
-            if (f.startsWith('http://') || f.startsWith('https://')) return f;
-            if (f.length > 2000) {
-              const idbKey = `als_foto_${r.id}_${i}`;
-              try {
-                saveMediaToIndexedDB(idbKey, f);
-              } catch (_) {}
-              return `idb:${idbKey}`;
+        copy.fotos = copy.fotos
+          .filter((f) => {
+            if (typeof f === 'string' && f.startsWith('data:')) {
+              return isValidDataUrl(f);
             }
-          }
-          return f;
-        });
+            return Boolean(f);
+          })
+          .map((f, i) => {
+            if (typeof f === 'string') {
+              if (f.startsWith('http://') || f.startsWith('https://') || f.startsWith('idb:')) return f;
+              if (f.length > 2000) {
+                const idbKey = `als_foto_${r.id}_${i}`;
+                try {
+                  saveMediaToIndexedDB(idbKey, f);
+                } catch (_) {}
+                return `idb:${idbKey}`;
+              }
+            }
+            return f;
+          });
       }
     }
 
     // 2. Evidencia de Transferencia
     if (typeof copy.evidenciaTransferencia === 'string') {
-      if (stripMediaCompletely) {
+      if (stripMediaCompletely || (copy.evidenciaTransferencia.startsWith('data:') && !isValidDataUrl(copy.evidenciaTransferencia))) {
         copy.evidenciaTransferencia = '';
-      } else if (!copy.evidenciaTransferencia.startsWith('http://') && !copy.evidenciaTransferencia.startsWith('https://') && copy.evidenciaTransferencia.length > 2000) {
+      } else if (!copy.evidenciaTransferencia.startsWith('http://') && !copy.evidenciaTransferencia.startsWith('https://') && !copy.evidenciaTransferencia.startsWith('idb:') && copy.evidenciaTransferencia.length > 2000) {
         const idbKey = `als_evidencia_${r.id}`;
         try {
           saveMediaToIndexedDB(idbKey, copy.evidenciaTransferencia);
@@ -211,9 +220,9 @@ export function safeSaveAlistamientosToLocalStorage(records: AlistamientoFullRec
 
     // 3. Comprobante Pago URL
     if (typeof copy.comprobantePagoUrl === 'string') {
-      if (stripMediaCompletely) {
+      if (stripMediaCompletely || (copy.comprobantePagoUrl.startsWith('data:') && !isValidDataUrl(copy.comprobantePagoUrl))) {
         copy.comprobantePagoUrl = '';
-      } else if (!copy.comprobantePagoUrl.startsWith('http://') && !copy.comprobantePagoUrl.startsWith('https://') && copy.comprobantePagoUrl.length > 2000) {
+      } else if (!copy.comprobantePagoUrl.startsWith('http://') && !copy.comprobantePagoUrl.startsWith('https://') && !copy.comprobantePagoUrl.startsWith('idb:') && copy.comprobantePagoUrl.length > 2000) {
         const idbKey = `als_comprobante_${r.id}`;
         try {
           saveMediaToIndexedDB(idbKey, copy.comprobantePagoUrl);
@@ -808,43 +817,64 @@ export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
       if (hasBase64) {
         const uploadedFotos = await Promise.all(
           cleanRec.fotos.map(async (item, idx) => {
-            if (typeof item === 'string' && (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000)) {
-              try {
-                const cloudUrl = await uploadWarrantyMedia(item, `als_${cleanRec.id}_foto_${idx}`);
-                return cloudUrl || item;
-              } catch (_) {
+            if (typeof item === 'string') {
+              if (item.startsWith('http://') || item.startsWith('https://') || item.startsWith('idb:')) {
                 return item;
+              }
+              if (item.startsWith('data:')) {
+                if (!isValidDataUrl(item)) {
+                  // Descartar dataURL corrupto o incompleto para que no cause ERR_INVALID_URL
+                  return '';
+                }
+              }
+              if (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000) {
+                try {
+                  const cloudUrl = await uploadWarrantyMedia(item, `als_${cleanRec.id}_foto_${idx}`);
+                  if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://') || cloudUrl.startsWith('idb:'))) {
+                    return cloudUrl;
+                  }
+                  return '';
+                } catch (_) {
+                  return '';
+                }
               }
             }
             return item;
           })
         );
-        cleanRec.fotos = uploadedFotos;
+        cleanRec.fotos = uploadedFotos.filter(Boolean);
       }
     }
 
     // 2. Subir comprobante de transferencia bancaria si viene en base64/blob
     const ev = cleanRec.evidenciaTransferencia || cleanRec.comprobantePagoUrl;
     if (typeof ev === 'string' && (ev.startsWith('data:') || ev.startsWith('blob:') || ev.length > 2000)) {
-      try {
-        const cloudUrl = await uploadWarrantyMedia(ev, `als_${cleanRec.id}_transferencia`);
-        if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
-          cleanRec.evidenciaTransferencia = cloudUrl;
-          cleanRec.comprobantePagoUrl = cloudUrl;
-        }
-      } catch (_) {}
+      if (!ev.startsWith('data:') || isValidDataUrl(ev)) {
+        try {
+          const cloudUrl = await uploadWarrantyMedia(ev, `als_${cleanRec.id}_transferencia`);
+          if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+            cleanRec.evidenciaTransferencia = cloudUrl;
+            cleanRec.comprobantePagoUrl = cloudUrl;
+          }
+        } catch (_) {}
+      } else {
+        cleanRec.evidenciaTransferencia = '';
+        cleanRec.comprobantePagoUrl = '';
+      }
     }
 
     // 3. Subir comprobante de solicitud de abono del cliente si viene en base64/blob
     if (cleanRec.solicitudAbonoPendiente?.comprobanteUrl) {
       const solEv = cleanRec.solicitudAbonoPendiente.comprobanteUrl;
       if (typeof solEv === 'string' && (solEv.startsWith('data:') || solEv.startsWith('blob:') || solEv.length > 2000)) {
-        try {
-          const cloudUrl = await uploadWarrantyMedia(solEv, `als_${cleanRec.id}_solicitud_abono`);
-          if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
-            cleanRec.solicitudAbonoPendiente.comprobanteUrl = cloudUrl;
-          }
-        } catch (_) {}
+        if (!solEv.startsWith('data:') || isValidDataUrl(solEv)) {
+          try {
+            const cloudUrl = await uploadWarrantyMedia(solEv, `als_${cleanRec.id}_solicitud_abono`);
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              cleanRec.solicitudAbonoPendiente.comprobanteUrl = cloudUrl;
+            }
+          } catch (_) {}
+        }
       }
     }
 
@@ -1481,9 +1511,26 @@ export function initSupabaseRealtime() {
               if (!w.diagnosticPhotos || w.diagnosticPhotos.length === 0) return w;
               return {
                 ...w,
-                diagnosticPhotos: w.diagnosticPhotos.map((item) =>
-                  typeof item === 'string' && item.length > 30000 ? item.slice(0, 500) : item
-                ),
+                diagnosticPhotos: w.diagnosticPhotos.map((item, i) => {
+                  if (typeof item === 'string') {
+                    if (item.startsWith('http://') || item.startsWith('https://') || item.startsWith('idb:')) {
+                      return item;
+                    }
+                    if (item.startsWith('data:')) {
+                      if (!isValidDataUrl(item)) return '';
+                      if (item.length > 2000) {
+                        const idbKey = `gar_photo_${w.id}_${i}`;
+                        try {
+                          saveMediaToIndexedDB(idbKey, item);
+                          return `idb:${idbKey}`;
+                        } catch (_) {
+                          return '';
+                        }
+                      }
+                    }
+                  }
+                  return item;
+                }).filter(Boolean),
               };
             });
             try {

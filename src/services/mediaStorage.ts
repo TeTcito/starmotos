@@ -70,26 +70,74 @@ export async function getMediaFromIndexedDB(id: string): Promise<string | null> 
 }
 
 /**
+ * Valida si una cadena es un DataURL válido con contenido suficiente y sin caracteres corruptos
+ */
+export function isValidDataUrl(dataUrl: string): boolean {
+  if (!dataUrl || typeof dataUrl !== 'string') return false;
+  if (!dataUrl.startsWith('data:')) return false;
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx === -1) return false;
+  const dataPart = dataUrl.slice(commaIdx + 1).trim();
+  if (dataPart.length < 20) return false;
+  if (dataPart.includes('…') || dataPart.includes('...')) return false;
+  return true;
+}
+
+/**
  * Convierte un DataURL (Base64) a Blob binario para subida eficiente
  */
 export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string } | null {
-  try {
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) return null;
+  if (!dataUrl || typeof dataUrl !== 'string' || !isValidDataUrl(dataUrl)) {
+    return null;
+  }
 
-    const mimeType = match[1];
-    const b64Data = match[2];
-    const byteCharacters = atob(b64Data);
-    const arrayBuffer = new ArrayBuffer(byteCharacters.length);
-    const uint8Array = new Uint8Array(arrayBuffer);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      uint8Array[i] = byteCharacters.charCodeAt(i);
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    const header = dataUrl.slice(0, commaIdx);
+    let b64Data = dataUrl.slice(commaIdx + 1);
+
+    // Extraer mimeType del header
+    const mimeMatch = header.match(/^data:([^;]+)/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/webp';
+
+    // Limpieza estricta de b64Data (espacios, saltos de línea, caracteres corruptos)
+    b64Data = b64Data.trim().replace(/\s+/g, '');
+
+    if (b64Data.includes('…') || b64Data.includes('...')) {
+      return null;
     }
 
-    const blob = new Blob([arrayBuffer], { type: mimeType });
+    // Decodificar si viene con encoding URL
+    if (b64Data.includes('%')) {
+      try {
+        b64Data = decodeURIComponent(b64Data);
+      } catch (_) {}
+    }
+
+    // Convertir URL-safe Base64 a Base64 estándar
+    b64Data = b64Data.replace(/-/g, '+').replace(/_/g, '/');
+
+    // Reparar padding '=' si no es múltiplo de 4
+    const padLen = (4 - (b64Data.length % 4)) % 4;
+    if (padLen > 0) {
+      b64Data += '='.repeat(padLen);
+    }
+
+    // Validar que solo contenga caracteres válidos en Base64
+    if (!/^[A-Za-z0-9+/=]+$/.test(b64Data)) {
+      return null;
+    }
+
+    const byteCharacters = atob(b64Data);
+    const byteNumbers = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const blob = new Blob([byteNumbers], { type: mimeType });
     return { blob, mimeType };
-  } catch (e) {
-    console.error('Error convirtiendo base64 a blob:', e);
+  } catch (_) {
+    // Si la cadena está corrupta o incompleta, retornar null silenciosamente sin alertar con errores rojos
     return null;
   }
 }
@@ -105,7 +153,7 @@ export async function uploadWarrantyMedia(
 ): Promise<string> {
   // 1. Si ya es una URL externa de Supabase o internet, retornar tal cual
   if (typeof input === 'string') {
-    if (input.startsWith('http://') || input.startsWith('https://')) {
+    if (input.startsWith('http://') || input.startsWith('https://') || input.startsWith('idb:')) {
       return input;
     }
   }
@@ -116,12 +164,17 @@ export async function uploadWarrantyMedia(
     let ext = 'webp';
 
     if (typeof input === 'string') {
-      const parsed = dataUrlToBlob(input);
-      if (!parsed) {
+      if (input.startsWith('data:')) {
+        const parsed = dataUrlToBlob(input);
+        if (!parsed) {
+          // DataURL corrupto o incompleto: no retornar cadena rota para evitar net::ERR_INVALID_URL
+          return '';
+        }
+        blob = parsed.blob;
+        mimeType = parsed.mimeType;
+      } else {
         return input;
       }
-      blob = parsed.blob;
-      mimeType = parsed.mimeType;
     } else {
       blob = input;
       mimeType = input.type || 'application/octet-stream';

@@ -52,7 +52,7 @@ import {
 } from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { saveMediaToIndexedDB } from '../services/mediaStorage';
+import { saveMediaToIndexedDB, isValidDataUrl } from '../services/mediaStorage';
 export {
   STORAGE_KEYS,
   getDeletedTombstones,
@@ -495,15 +495,30 @@ export function getStoredWarranties(): WarrantyRequest[] {
           !isDeletedTombstone(w.id) &&
           (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
       );
+      const sanitized = filtered.map((w) => {
+        if (Array.isArray(w.diagnosticPhotos)) {
+          const clean = w.diagnosticPhotos.filter((p) => {
+            if (typeof p === 'string' && p.startsWith('data:')) {
+              return isValidDataUrl(p);
+            }
+            return Boolean(p);
+          });
+          if (clean.length !== w.diagnosticPhotos.length) {
+            return { ...w, diagnosticPhotos: clean };
+          }
+        }
+        return w;
+      });
+
       if (
         !isDeletedTombstone('gar-1790270366447') &&
         !isDeletedTombstone('GAR-2026-9135') &&
-        !filtered.some((w) => w.id === 'gar-1790270366447' || w.requestNumber === 'GAR-2026-9135')
+        !sanitized.some((w) => w.id === 'gar-1790270366447' || w.requestNumber === 'GAR-2026-9135')
       ) {
-        filtered.unshift(RESTORED_WARRANTY_9135);
-        safeSaveWarrantiesToLocalStorage(filtered);
+        sanitized.unshift(RESTORED_WARRANTY_9135);
+        safeSaveWarrantiesToLocalStorage(sanitized);
       }
-      return filtered;
+      return sanitized;
     } else {
       if (!isDeletedTombstone('gar-1790270366447') && !isDeletedTombstone('GAR-2026-9135')) {
         safeSaveWarrantiesToLocalStorage([RESTORED_WARRANTY_9135]);
@@ -1376,13 +1391,39 @@ export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
     const stored = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
     if (stored) {
       const parsed: AlistamientoFullRecord[] = JSON.parse(stored);
-      return parsed.filter(
-        (r) =>
-          r &&
-          r.id &&
-          !isDeletedTombstone(r.id) &&
-          (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
-      );
+      return parsed
+        .filter(
+          (r) =>
+            r &&
+            r.id &&
+            !isDeletedTombstone(r.id) &&
+            (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
+        )
+        .map((r) => {
+          let updated = false;
+          let fotos = r.fotos;
+          if (Array.isArray(fotos)) {
+            const cleanFotos = fotos.filter((f) => {
+              if (typeof f === 'string' && f.startsWith('data:')) {
+                return isValidDataUrl(f);
+              }
+              return Boolean(f);
+            });
+            if (cleanFotos.length !== fotos.length) {
+              fotos = cleanFotos;
+              updated = true;
+            }
+          }
+          let ev = r.evidenciaTransferencia;
+          if (typeof ev === 'string' && ev.startsWith('data:') && !isValidDataUrl(ev)) {
+            ev = '';
+            updated = true;
+          }
+          if (updated) {
+            return { ...r, fotos, evidenciaTransferencia: ev };
+          }
+          return r;
+        });
     }
   } catch (e) {
     console.error('Error reading alistamientos from localStorage', e);

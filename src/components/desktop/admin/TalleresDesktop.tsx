@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, ArrowLeft, Wrench, ShieldCheck, Users, Package, Clock, 
   CheckCircle2, AlertTriangle, MapPin, Phone, TrendingUp, DollarSign, 
-  FileText, ChevronRight, User, Search, ChevronDown
+  FileText, ChevronRight, User, Search, ChevronDown, Star, MessageSquare
 } from 'lucide-react';
-import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Technician, TallerOrder, InventoryItem, AdminInvoice } from '../../../types/customer';
+import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Technician, TallerOrder, InventoryItem, AdminInvoice, OrderRating } from '../../../types/customer';
 import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp } from '../../common/AlistamientoWizard';
-import { saveStoredOrders, getStoredOrders } from '../../../data/mockMultiRoleData';
+import { saveStoredOrders, getStoredOrders, getStoredRatings } from '../../../data/mockMultiRoleData';
 
 interface Props {
   workshops: Workshop[];
@@ -71,6 +71,36 @@ export const TalleresDesktop: React.FC<Props> = ({
   const [searchWorkshop, setSearchWorkshop] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
+  const [ratings, setRatings] = useState<OrderRating[]>(getStoredRatings);
+
+  useEffect(() => {
+    const handleRatingsUpdate = () => setRatings(getStoredRatings());
+    window.addEventListener('starmotos_ratings_updated', handleRatingsUpdate);
+    return () => window.removeEventListener('starmotos_ratings_updated', handleRatingsUpdate);
+  }, []);
+
+  const getWorkshopRatings = (wsId: string, wsName: string) => {
+    return ratings.filter((r) => {
+      if (r.workshopId && r.workshopId === wsId) return true;
+      if (r.workshopName && wsName && r.workshopName.toLowerCase().trim() === wsName.toLowerCase().trim()) return true;
+      if (
+        (wsId === 'matriz-la-mana' || wsName.toLowerCase().includes('matriz')) &&
+        (!r.workshopId || r.workshopId === 'matriz-la-mana' || r.workshopName?.toLowerCase().includes('matriz'))
+      ) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const getWorkshopRatingStats = (wsRatings: OrderRating[]) => {
+    if (wsRatings.length === 0) {
+      return { avg: 5.0, count: 0, hasRatings: false };
+    }
+    const sum = wsRatings.reduce((acc, curr) => acc + (curr.stars || 5), 0);
+    const avg = sum / wsRatings.length;
+    return { avg, count: wsRatings.length, hasRatings: true };
+  };
 
   const handleOrderStatusChange = (orderId: string, newStatus: string) => {
     if (onUpdateOrderStatus) {
@@ -203,20 +233,24 @@ export const TalleresDesktop: React.FC<Props> = ({
     const totalCobrado = wsAlistamientos.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : (a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0))), 0) + ordersTotal;
     const totalPendiente = Math.max(0, totalIngresos - totalCobrado);
 
+    const wsRatings = getWorkshopRatings(ws.id, ws.name);
+    const wsRatingStats = getWorkshopRatingStats(wsRatings);
+    const wsRatingsWithComments = wsRatings.filter((r) => r.comment && r.comment.trim() !== '');
+
     return (
       <div className="flex flex-col gap-6 animate-fade-in pb-10">
         <button 
           onClick={() => setSelectedWorkshopId(null)}
-          className="flex items-center gap-2 text-zinc-500 hover:text-blue-700 transition-colors w-fit font-medium text-sm"
+          className="flex items-center gap-2 text-zinc-500 hover:text-blue-700 transition-colors w-fit font-medium text-sm cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver a la Red de Talleres
         </button>
 
         {/* Workshop Header Card */}
-        <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row gap-6 items-start">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex flex-col lg:flex-row gap-6 items-start">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h2 className="text-xl font-bold text-zinc-800">{ws.name}</h2>
               <span className="px-2 py-1 bg-zinc-100 text-zinc-600 rounded text-xs font-mono">{ws.code}</span>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-200">
@@ -252,6 +286,103 @@ export const TalleresDesktop: React.FC<Props> = ({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Bloque derecho: Calificación promedio en la esquina y contenedor de hasta 4 comentarios con scroll */}
+          <div className="w-full lg:w-96 shrink-0 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
+            {/* Esquina superior derecha: Estrellas de calificación y promedio */}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
+                  <span className="text-2xl font-black text-zinc-900">{wsRatingStats.avg.toFixed(1)}</span>
+                  <span className="text-xs text-zinc-500 font-semibold">/ 5.0</span>
+                </div>
+                <div className="flex items-center gap-0.5 mt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-3.5 h-3.5 ${
+                        star <= Math.round(wsRatingStats.avg)
+                          ? 'text-amber-500 fill-amber-400'
+                          : 'text-zinc-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                  Calificación Sede
+                </span>
+                <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                  {wsRatings.length} {wsRatings.length === 1 ? 'opinión registrada' : 'opiniones registradas'}
+                </p>
+              </div>
+            </div>
+
+            {/* Abajo: Bloque contenedor de hasta 4 comentarios (con scroll si hay más en el espacio de 4) */}
+            <div className="flex flex-col">
+              <div className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
+                  Comentarios de Clientes
+                </span>
+                <span className="text-[10px] font-semibold text-zinc-400">
+                  {wsRatingsWithComments.length} {wsRatingsWithComments.length === 1 ? 'reseña' : 'reseñas'}
+                </span>
+              </div>
+
+              {wsRatingsWithComments.length === 0 ? (
+                <div className="p-4 text-center text-xs text-zinc-400 bg-white rounded-lg border border-dashed border-zinc-200">
+                  No hay comentarios registrados para esta sede.
+                </div>
+              ) : (
+                <div 
+                  className="space-y-2 overflow-y-auto pr-1 max-h-[280px]"
+                  style={{ maxHeight: '280px' }}
+                >
+                  {wsRatingsWithComments.map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-2.5 bg-white rounded-lg border border-slate-200 shadow-2xs text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-zinc-900 text-[11px] truncate">
+                          {r.clientName || 'Cliente'}
+                        </span>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              className={`w-2.5 h-2.5 ${
+                                s <= r.stars
+                                  ? 'text-amber-500 fill-amber-400'
+                                  : 'text-zinc-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-zinc-600 italic leading-snug line-clamp-3">
+                        "{r.comment}"
+                      </p>
+
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-100">
+                        <span className="truncate max-w-[170px]">
+                          {r.motorcycleInfo || r.plate || r.serviceSummary || 'Servicio de Taller'}
+                        </span>
+                        <span className="shrink-0">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-EC') : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -651,43 +782,101 @@ export const TalleresDesktop: React.FC<Props> = ({
         {filteredWorkshops.map(ws => {
           const isMatriz = ws.id === 'matriz-la-mana' || ws.name.toLowerCase().includes('matriz');
           
-          const wsOrdersCount = orders.filter(o => (o as any).workshopId === ws.id || (o as any).tallerId === ws.id).length || ws.activeOrders;
+          const wsOrders = orders.filter(o => (o as any).workshopId === ws.id || (o as any).tallerId === ws.id);
+          const wsOrdersCount = wsOrders.length || ws.activeOrders;
           const wsWarrantiesCount = warranties.filter(w => w.tallerOriginId === ws.id || w.tallerOrigin === ws.name || (w as any).tallerOrigin === ws.id).length || ws.pendingWarranties;
           const wsMechanicsCount = technicians.filter(t => t.workshopId === ws.id || t.workshopName === ws.name).length || ws.mechanics;
+
+          // Financial metrics
+          const wsAls = fullAlistamientos.filter(a => matchRecordToWorkshop(a, ws.id, workshops));
+          const alistamientosTotal = wsAls.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : Number(a.valorServicio || 0)), 0);
+          const ordersTotal = wsOrders.reduce((acc, o) => acc + Number(o.totalCost || 0), 0);
+          const totalFacturado = alistamientosTotal + ordersTotal;
+          const totalCobrado = wsAls.reduce((acc, a) => acc + (isPdiOnlyRecord(a) ? 0 : (a.abono !== undefined ? Number(a.abono) : Number(a.montoPagado || 0))), 0) + ordersTotal;
+          const totalPendiente = Math.max(0, totalFacturado - totalCobrado);
+
+          // Ratings
+          const wsRatings = getWorkshopRatings(ws.id, ws.name);
+          const wsRatingStats = getWorkshopRatingStats(wsRatings);
 
           return (
             <div 
               key={ws.id}
               onClick={() => setSelectedWorkshopId(ws.id)}
-              className={`bg-white border rounded-xl p-2.5 cursor-pointer hover:shadow-md transition-all flex flex-col ${
+              className={`bg-white border rounded-xl p-3 cursor-pointer hover:shadow-md transition-all flex flex-col justify-between ${
                 isMatriz ? 'border-blue-400 ring-1 ring-blue-400/20' : 'border-zinc-200 hover:border-blue-300'
               }`}
             >
-              <div className="flex items-start justify-between mb-1.5">
-                <span className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[9px] font-mono tracking-wider">
-                  {ws.code}
-                </span>
-                <div className="flex items-center gap-1.5" title={ws.status}>
-                  <span className={`w-2 h-2 rounded-full ${ws.status === 'operativo' ? 'bg-emerald-500' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
+              <div>
+                <div className="flex items-start justify-between mb-1.5">
+                  <span className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[9px] font-mono tracking-wider font-semibold">
+                    {ws.code}
+                  </span>
+                  <div className="flex items-center gap-1.5" title={ws.status}>
+                    <span className={`w-2 h-2 rounded-full ${ws.status === 'operativo' ? 'bg-emerald-500' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
+                    <span className="text-[10px] capitalize text-zinc-500 font-medium">{ws.status}</span>
+                  </div>
+                </div>
+                
+                <h3 className="text-[13px] font-bold text-zinc-800 line-clamp-1">{ws.name}</h3>
+                <div className="text-[10px] text-zinc-500 mt-0.5 mb-2.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-zinc-400 shrink-0" />
+                  <span className="truncate">{ws.city}</span>
+                </div>
+
+                {/* Calificación de la sede */}
+                <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/70 rounded-lg px-2 py-1 mb-2.5">
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                    <span className="text-xs font-bold text-amber-900">
+                      {wsRatingStats.avg > 0 ? wsRatingStats.avg.toFixed(1) : 'S/C'}
+                    </span>
+                    {wsRatingStats.avg > 0 && (
+                      <span className="text-[10px] text-amber-700/80 font-medium">/ 5.0</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-amber-800 font-medium">
+                    {wsRatingStats.count} {wsRatingStats.count === 1 ? 'reseña' : 'reseñas'}
+                  </span>
+                </div>
+
+                {/* Valores apilados uno encima del otro: Cobros, Pendientes, Total Facturado */}
+                <div className="flex flex-col gap-1 text-[11px] mb-2.5 bg-zinc-50/80 border border-zinc-200/80 rounded-lg p-1.5">
+                  {/* Cobros */}
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-emerald-50 border border-emerald-100/90">
+                    <span className="text-[10px] font-semibold text-emerald-800">Cobros:</span>
+                    <span className="font-bold text-emerald-700 font-mono text-[11px]">
+                      ${totalCobrado.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {/* Pendientes */}
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-amber-50 border border-amber-100/90">
+                    <span className="text-[10px] font-semibold text-amber-800">Pendientes:</span>
+                    <span className="font-bold text-amber-700 font-mono text-[11px]">
+                      ${totalPendiente.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {/* Total Facturado */}
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-blue-50 border border-blue-100/90">
+                    <span className="text-[10px] font-bold text-blue-900">Total Facturado:</span>
+                    <span className="font-extrabold text-blue-950 font-mono text-[11px]">
+                      ${totalFacturado.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
               </div>
-              
-              <h3 className="text-[13px] font-bold text-zinc-800 line-clamp-1">{ws.name}</h3>
-              <div className="text-[10px] text-zinc-500 mt-0.5 mb-2 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {ws.city}
-              </div>
 
-              <div className="flex items-center gap-1 mt-auto pt-2 border-t border-zinc-100">
-                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Órdenes">
+              {/* Métricas operativas en footer */}
+              <div className="flex items-center justify-between gap-1 pt-2 border-t border-zinc-100 text-zinc-600">
+                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[9px]" title="Órdenes">
                   <Wrench className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsOrdersCount}</span>
                 </div>
-                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Garantías">
+                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[9px]" title="Garantías">
                   <ShieldCheck className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsWarrantiesCount}</span>
                 </div>
-                <div className="flex items-center gap-1 bg-zinc-50 px-1 py-0.5 rounded text-[9px] text-zinc-600" title="Mecánicos">
+                <div className="flex items-center gap-1 bg-zinc-50 px-1.5 py-0.5 rounded text-[9px]" title="Mecánicos">
                   <Users className="w-2.5 h-2.5 text-zinc-400" />
                   <span className="font-semibold">{wsMechanicsCount}</span>
                 </div>

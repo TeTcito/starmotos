@@ -12,6 +12,7 @@ import {
   WorkshopManagerAccount,
   DictamenRecord,
   AdminPendiente,
+  OrderRating,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { uploadWarrantyMedia, saveMediaToIndexedDB } from './mediaStorage';
@@ -639,6 +640,26 @@ export async function syncAllFromSupabase(): Promise<{
       console.warn('Error sincronizando pendientes:', e);
     }
 
+    // -----------------------------------------------------------------------
+    // 12. CALIFICACIONES Y RESEÑAS DE TALLERES
+    // -----------------------------------------------------------------------
+    try {
+      const { data: ratData, error: ratErr } = await supabase
+        .from('ratings')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!ratErr && ratData && ratData.length > 0) {
+        const items: OrderRating[] = ratData.map((row) => row.data as OrderRating).filter(Boolean);
+        if (items.length > 0) {
+          localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(items));
+          window.dispatchEvent(new Event('starmotos_ratings_updated'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error sincronizando calificaciones:', e);
+    }
+
     return {
       warrantiesCount,
       alistamientosCount,
@@ -1141,6 +1162,28 @@ export async function cloudDeletePendiente(id: string) {
   }
 }
 
+export async function cloudSaveRating(r: OrderRating) {
+  try {
+    const payload = {
+      id: r.id,
+      order_id: r.orderId || null,
+      ot_number: r.otNumber || null,
+      client_id_number: r.clientIdNumber || null,
+      client_name: r.clientName || null,
+      workshop_id: r.workshopId || null,
+      workshop_name: r.workshopName || null,
+      stars: r.stars || 5,
+      comment: r.comment || null,
+      data: r,
+      created_at: r.createdAt || new Date().toISOString(),
+    };
+    const { error } = await supabase.from('ratings').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando rating:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando rating:', err);
+  }
+}
+
 export async function cloudPurgeQuevedoWarranties() {
   // No-op intencional: las garantías anteriores ya fueron depuradas. No purgar nuevas solicitudes de Quevedo.
 }
@@ -1573,6 +1616,37 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_pendientes_updated'));
         } catch (e) {
           console.error('Error procesando realtime pendientes:', e);
+        }
+      }
+    )
+    // Calificaciones y Reseñas
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'ratings' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.RATINGS);
+          let current: OrderRating[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as OrderRating;
+            if (newDoc && !current.some((r) => r.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as OrderRating;
+            if (updatedDoc) {
+              current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            current = current.filter((r) => r.id !== deletedId);
+          }
+
+          localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_ratings_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime ratings:', e);
         }
       }
     )

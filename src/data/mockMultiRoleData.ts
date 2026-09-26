@@ -38,6 +38,7 @@ import {
   cloudDeleteAlerts,
   cloudSavePendiente,
   cloudDeletePendiente,
+  cloudSaveRating,
   getDeletedTombstones,
   addDeletedTombstone,
   removeDeletedTombstone,
@@ -1444,14 +1445,184 @@ export function deleteStoredAlistamiento(id: string) {
 
 
 // ===================== CALIFICACIONES DE SERVICIOS TALLER =====================
+
+export const INITIAL_RATINGS: OrderRating[] = [
+  // --- Matriz La Maná (6 comentarios) ---
+  {
+    id: 'rat-matriz-1',
+    orderId: 'ot-mat-101',
+    otNumber: 'OT-MAT-101',
+    clientIdNumber: '0502391204',
+    clientName: 'Carlos Zambrano',
+    motorcycleInfo: 'Benelli TRK 502X',
+    plate: 'LAB-1204',
+    technicianName: 'Mateo Enríquez',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Mantenimiento preventivo 5000 km y calibración',
+    stars: 5,
+    comment: 'Excelente atención en la Matriz. Cambiaron el kit de arrastre y filtros con repuestos originales. La moto quedó perfecta.',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: 'rat-matriz-2',
+    orderId: 'ot-mat-102',
+    otNumber: 'OT-MAT-102',
+    clientIdNumber: '0501893421',
+    clientName: 'María Fernanda Cedeño',
+    motorcycleInfo: 'Shineray XY200GY',
+    plate: 'PCB-3091',
+    technicianName: 'Daniel Meza',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Cambio de aceite Motul 7100 y pastillas de freno',
+    stars: 5,
+    comment: 'Muy profesionales en la revisión preventiva y alistamiento. Puntuales y me entregaron la moto lavada.',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+  },
+  {
+    id: 'rat-matriz-3',
+    orderId: 'ot-mat-103',
+    otNumber: 'OT-MAT-103',
+    clientIdNumber: '0503412098',
+    clientName: 'Jorge Luis Morales',
+    motorcycleInfo: 'Dayun DY200',
+    plate: 'COT-8912',
+    technicianName: 'Jefferson Macías',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Engrasado general y ajuste de suspensión',
+    stars: 5,
+    comment: 'Buen servicio técnico, puntual en la entrega y me explicaron todo el mantenimiento realizado en la hoja de trabajo.',
+    createdAt: new Date(Date.now() - 86400000 * 6).toISOString(),
+  },
+  {
+    id: 'rat-matriz-4',
+    orderId: 'ot-mat-104',
+    otNumber: 'OT-MAT-104',
+    clientIdNumber: '0504123890',
+    clientName: 'Edison Quintero',
+    motorcycleInfo: 'Benelli Leoncino 500',
+    plate: 'PCH-9021',
+    technicianName: 'Mateo Enríquez',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Diagnóstico escáner OBD y cambio de bujías iridium',
+    stars: 4,
+    comment: 'Atención rápida y repuestos legítimos. Los mecánicos son muy amables y detallistas con la moto.',
+    createdAt: new Date(Date.now() - 86400000 * 9).toISOString(),
+  },
+  {
+    id: 'rat-matriz-5',
+    orderId: 'ot-mat-105',
+    otNumber: 'OT-MAT-105',
+    clientIdNumber: '0502891102',
+    clientName: 'Roberto Vera Alarcón',
+    motorcycleInfo: 'Shineray Chief 250',
+    plate: 'LAA-5542',
+    technicianName: 'William Meza',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Regulación de válvulas y carburación',
+    stars: 5,
+    comment: 'Gran trabajo con el motor y frenos. Todo garantizado y con factura electrónica del SRI.',
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+  },
+  {
+    id: 'rat-matriz-6',
+    orderId: 'ot-mat-106',
+    otNumber: 'OT-MAT-106',
+    clientIdNumber: '0501129043',
+    clientName: 'Gladys Villacreses',
+    motorcycleInfo: 'Motor1 FOX 150',
+    plate: 'QWE-7712',
+    technicianName: 'Jefferson Macías',
+    workshopId: 'matriz-la-mana',
+    workshopName: 'StarMotos Matriz La Maná',
+    serviceSummary: 'Cambio de kit de arrastre y zapatas traseras',
+    stars: 5,
+    comment: 'Muy satisfecha con el trabajo y el tiempo de respuesta. 100% recomendado el taller matriz.',
+    createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+  },
+
+  // --- Sucursales (Buena Fe, Balzar, El Carmen, Quevedo, etc.) ---
+  {
+    id: 'rat-suc-201',
+    orderId: 'ot-bf-201',
+    otNumber: 'OT-BF-201',
+    clientIdNumber: '1204891230',
+    clientName: 'Marcos Paredes',
+    motorcycleInfo: 'Shineray XY250GY',
+    plate: 'R-78901',
+    technicianName: 'Técnico Buena Fe',
+    workshopId: 'taller-buena-fe',
+    workshopName: 'StarMotos Sucursal Buena Fe',
+    serviceSummary: 'Mantenimiento completo y cambio de llanta',
+    stars: 5,
+    comment: 'Excelente atención en la sucursal de Buena Fe. Me atendieron rápido y dejaron la moto a punto.',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+  {
+    id: 'rat-suc-202',
+    orderId: 'ot-bf-202',
+    otNumber: 'OT-BF-202',
+    clientIdNumber: '1203498124',
+    clientName: 'Wilson Guizado',
+    motorcycleInfo: 'Dayun DY150',
+    plate: 'R-45123',
+    technicianName: 'Técnico Buena Fe',
+    workshopId: 'taller-buena-fe',
+    workshopName: 'StarMotos Sucursal Buena Fe',
+    serviceSummary: 'Limpieza de carburador y cambio de filtro',
+    stars: 4,
+    comment: 'Muy buena atención, buenos precios y repuestos disponibles en el local.',
+    createdAt: new Date(Date.now() - 86400000 * 8).toISOString(),
+  },
+  {
+    id: 'rat-suc-301',
+    orderId: 'ot-bal-301',
+    otNumber: 'OT-BAL-301',
+    clientIdNumber: '0928374615',
+    clientName: 'Ángel Baque',
+    motorcycleInfo: 'Shineray XY150',
+    plate: 'G-34190',
+    technicianName: 'Técnico Balzar',
+    workshopId: 'taller-balzar',
+    workshopName: 'StarMotos Sucursal Balzar',
+    serviceSummary: 'Cambio de aceite y ajuste de frenos',
+    stars: 5,
+    comment: 'Rápido y eficiente servicio en Balzar. Recomendados para toda la zona.',
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+  {
+    id: 'rat-suc-401',
+    orderId: 'ot-ec-401',
+    otNumber: 'OT-EC-401',
+    clientIdNumber: '1314902831',
+    clientName: 'Javier Moreira',
+    motorcycleInfo: 'Benelli TNT 150i',
+    plate: 'M-90182',
+    technicianName: 'Técnico El Carmen',
+    workshopId: 'taller-el-carmen',
+    workshopName: 'StarMotos Sucursal El Carmen',
+    serviceSummary: 'Revisión sistema de inyección electrónica',
+    stars: 5,
+    comment: 'Excelente servicio en El Carmen, resolvieron una falla que otros no encontraban.',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+  },
+];
+
 export function getStoredRatings(): OrderRating[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.RATINGS);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
   } catch (e) {
     console.error('Error reading ratings from localStorage', e);
   }
-  return [];
+  return INITIAL_RATINGS;
 }
 
 export function saveStoredRating(rating: OrderRating) {
@@ -1460,6 +1631,7 @@ export function saveStoredRating(rating: OrderRating) {
     const updated = [rating, ...current.filter((r) => r.id !== rating.id && r.orderId !== rating.orderId)];
     localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(updated));
     window.dispatchEvent(new Event('starmotos_ratings_updated'));
+    cloudSaveRating(rating);
   } catch (e) {
     console.error('Error saving rating to localStorage', e);
   }

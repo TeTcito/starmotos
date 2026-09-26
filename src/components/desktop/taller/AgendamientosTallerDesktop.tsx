@@ -290,7 +290,7 @@ export const AgendamientosTallerDesktop: React.FC<Props> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5">
           {filteredTickets.map((ticket) => {
             const isToday = ticket.scheduledDate === todayStr;
             const isPdi = ticket.serviceId.includes('pdi');
@@ -302,108 +302,112 @@ export const AgendamientosTallerDesktop: React.FC<Props> = ({
                 key={ticket.id}
                 className="bg-white rounded-2xl border border-zinc-200/90 hover:border-blue-400 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between"
               >
-                {/* Cabecera del Ticket */}
-                <div className="bg-gradient-to-r from-zinc-50 to-zinc-100/60 px-5 py-3.5 border-b border-zinc-200/80 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
+                {/* Cabecera del Ticket Compacta */}
+                <div className="bg-gradient-to-r from-zinc-50 to-zinc-100/60 px-3.5 py-2.5 border-b border-zinc-200/80 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-mono text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-md shrink-0">
                       {ticket.ticketNumber || ticket.id}
                     </span>
                     {isToday ? (
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider animate-pulse">
-                        ¡Cita Hoy!
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse shrink-0">
+                        ¡Hoy!
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-md bg-zinc-200 text-zinc-700 text-[10px] font-bold uppercase">
-                        Programada
+                      <span className="px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-700 text-[9px] font-bold uppercase shrink-0">
+                        Prog.
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-600">
-                    <Building2 className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="font-bold text-[11px] truncate max-w-[200px]">
+                  <div className="flex items-center gap-1 text-[11px] text-zinc-500 truncate shrink-0 max-w-[120px]" title={ticket.workshopName}>
+                    <Building2 className="w-3 h-3 text-zinc-400 shrink-0" />
+                    <span className="font-bold truncate text-[10px]">
                       {ticket.workshopName}
                     </span>
                   </div>
                 </div>
 
-                {/* Contenido Principal */}
-                <div className="p-5 space-y-4">
+                {/* Contenido Principal Compacto */}
+                <div className="p-3 space-y-2.5">
                   {/* Fecha y Turno */}
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-blue-600 text-white">
-                        <Calendar className="w-4 h-4" />
+                  <div className="grid grid-cols-2 gap-1.5 p-2 rounded-xl bg-blue-50/60 border border-blue-100 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1.5 rounded-lg bg-blue-600 text-white shrink-0">
+                        <Calendar className="w-3.5 h-3.5" />
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
-                          Fecha Solicitada
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-700 block truncate">
+                          Fecha
                         </span>
-                        <span className="text-sm font-black text-zinc-900">
+                        <span className="text-xs font-black text-zinc-900 block truncate">
                           {ticket.scheduledDate}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 pl-4 border-l border-blue-200">
-                      <div className="p-2 rounded-xl bg-blue-100 text-blue-700">
-                        <Clock className="w-4 h-4" />
+                    <div className="flex items-center gap-2 pl-2 border-l border-blue-200 min-w-0">
+                      <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+                        <Clock className="w-3.5 h-3.5" />
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
-                          Turno Asignado
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-700 block truncate">
+                          Turno
                         </span>
-                        <span className="text-sm font-black text-blue-900">
+                        <span className="text-xs font-black text-blue-800 block truncate">
                           {ticket.scheduledTime}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Datos del Cliente y la Motocicleta en 2 Columnas */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Datos del Cliente y la Motocicleta */}
+                  <div className="space-y-1.5 text-xs">
                     {/* Cliente */}
-                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200/70 space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-zinc-500 font-bold text-[10px] uppercase">
-                        <User className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>Datos del Cliente</span>
+                    <div className="p-2 bg-zinc-50 rounded-xl border border-zinc-200/80 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-zinc-500 font-bold text-[9px] uppercase">
+                          <User className="w-3 h-3 text-zinc-400" />
+                          Cliente
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          CI: <strong className="text-zinc-700">{ticket.clientCedula || 'S/N'}</strong>
+                        </span>
                       </div>
                       <p className="font-bold text-zinc-900 truncate text-xs">
                         {ticket.clientName}
                       </p>
-                      <p className="text-[11px] text-zinc-600 font-mono">
-                        C.I: <span className="font-bold">{ticket.clientCedula || 'No registrada'}</span>
-                      </p>
-                      <p className="text-[11px] text-zinc-600">
-                        Tel: <span className="font-bold">{ticket.clientPhone || 'S/N'}</span>
-                      </p>
+                      {ticket.clientPhone && (
+                        <p className="text-[10px] text-zinc-500">
+                          Tel: <span className="font-semibold text-zinc-700">{ticket.clientPhone}</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Moto */}
-                    <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200/70 space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-zinc-500 font-bold text-[10px] uppercase">
-                        <Bike className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>Motocicleta</span>
+                    <div className="p-2 bg-zinc-50 rounded-xl border border-zinc-200/80 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-zinc-500 font-bold text-[9px] uppercase">
+                          <Bike className="w-3 h-3 text-zinc-400" />
+                          Motocicleta
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-zinc-200 text-zinc-900 font-mono font-black text-[10px] border border-zinc-300">
+                          {ticket.motoPlate || 'S/P'}
+                        </span>
                       </div>
                       <p className="font-bold text-zinc-900 truncate text-xs">
                         {ticket.motoBrand ? `${ticket.motoBrand} ` : ''}{ticket.motoModel}
                       </p>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded bg-zinc-200 text-zinc-900 font-mono font-black text-[11px] border border-zinc-300">
-                          {ticket.motoPlate || 'S/P'}
-                        </span>
-                        {ticket.motoChasis && (
-                          <span className="text-[10px] text-zinc-500 font-mono truncate">
-                            VIN: {ticket.motoChasis.slice(-6)}
-                          </span>
-                        )}
-                      </div>
+                      {ticket.motoChasis && (
+                        <p className="text-[9px] text-zinc-400 font-mono truncate">
+                          VIN: {ticket.motoChasis}
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   {/* Servicio Solicitado de Alistamiento */}
                   <div
-                    className={`p-3 rounded-xl border ${
+                    className={`p-2.5 rounded-xl border ${
                       isPdi
                         ? 'bg-blue-50/40 border-blue-200'
                         : isEngrasado
@@ -412,12 +416,12 @@ export const AgendamientosTallerDesktop: React.FC<Props> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1">
                         <Wrench className="w-3 h-3 text-zinc-400" />
-                        Servicio de Alistamiento Solicitado
+                        Servicio
                       </span>
                       <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded-full ${
                           isPdi
                             ? 'bg-blue-600 text-white'
                             : isEngrasado
@@ -429,39 +433,38 @@ export const AgendamientosTallerDesktop: React.FC<Props> = ({
                       </span>
                     </div>
 
-                    <h4 className="text-xs font-black text-zinc-900">
+                    <h4 className="text-xs font-black text-zinc-900 leading-snug">
                       {ticket.serviceTitle}
                     </h4>
 
                     {ticket.notes && (
-                      <p className="text-[11px] text-zinc-600 italic mt-1.5 bg-white/70 p-2 rounded-lg border border-zinc-200/50">
+                      <p className="text-[10px] text-zinc-600 italic mt-1 bg-white/80 p-1.5 rounded-lg border border-zinc-200/50 line-clamp-2">
                         &quot;{ticket.notes}&quot;
                       </p>
                     )}
                   </div>
                 </div>
 
-                {/* Footer de Acciones */}
-                <div className="bg-zinc-50/90 px-5 py-3 border-t border-zinc-200 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                {/* Footer de Acciones Compacto */}
+                <div className="bg-zinc-50/90 px-3 py-2 border-t border-zinc-200 flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => handleOpenWhatsApp(ticket)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
-                      title="Contactar al cliente por WhatsApp"
+                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs transition cursor-pointer"
+                      title="WhatsApp"
                     >
-                      <MessageCircle className="w-3.5 h-3.5" />
+                      <MessageCircle className="w-3 h-3" />
                       <span>WhatsApp</span>
                     </button>
 
                     {ticket.clientPhone && (
                       <a
                         href={`tel:${ticket.clientPhone}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-bold transition"
-                        title="Llamar al cliente"
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-[11px] font-bold transition"
+                        title="Llamar"
                       >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>Llamar</span>
+                        <Phone className="w-3 h-3" />
                       </a>
                     )}
                   </div>
@@ -469,11 +472,11 @@ export const AgendamientosTallerDesktop: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setTicketToDelete(ticket)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition cursor-pointer"
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold transition cursor-pointer"
                     title="Eliminar este agendamiento"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Borrar Ticket</span>
+                    <Trash2 className="w-3 h-3" />
+                    <span>Borrar</span>
                   </button>
                 </div>
               </div>

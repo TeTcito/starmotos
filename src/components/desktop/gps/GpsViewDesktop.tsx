@@ -35,6 +35,7 @@ import {
 import confetti from 'canvas-confetti';
 import { GpsRecord, GpsProfile, GpsSection } from '../../../types/customer';
 import { GpsCredentialModal } from '../../common/GpsCredentialModal';
+import { GpsSquareCard, GpsFormView } from '../../common/GpsModule';
 
 interface Props {
   activeSection: GpsSection;
@@ -319,390 +320,292 @@ export const GpsViewDesktop: React.FC<Props> = ({
         <main className="flex-1 overflow-y-auto bg-slate-50/50 p-6">
           {/* MÓDULO 1: BANDEJA DE ENTRADA (SOLICITUDES PENDIENTES) */}
           {activeSection === 'solicitudes_gps' && (
-            <div className="space-y-6 max-w-7xl mx-auto">
-              {/* Resumen & Buscador */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping" />
-                    <h2 className="text-base font-black text-zinc-900">
-                      Solicitudes de GPS Pendientes de Asignación
-                    </h2>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Revise los datos técnicos del equipo instalado, motocicleta y cliente para generar las credenciales de la app satelital.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="relative min-w-[280px]">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Buscar por cliente, placa, IMEI, chip o sede..."
-                      className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-medium text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 shrink-0">
-                    {filteredPending.length} Pendiente{filteredPending.length === 1 ? '' : 's'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista / Cards de Solicitudes Pendientes */}
-              {filteredPending.length === 0 ? (
-                <div className="bg-white border border-zinc-200 rounded-2xl p-16 text-center shadow-xs">
-                  <Inbox className="w-12 h-12 mx-auto text-zinc-300 mb-3" />
-                  <h3 className="text-sm font-bold text-zinc-700">No hay solicitudes pendientes en la bandeja</h3>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                    {searchTerm.trim()
-                      ? 'No hay registros que coincidan con el término de búsqueda.'
-                      : 'Todas las solicitudes enviadas por Matriz han sido revisadas y cuentan con credenciales activas.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  {filteredPending.map((record) => {
-                    const hasPhotos = record.fotos && record.fotos.length > 0;
-                    return (
-                      <div
-                        key={record.id}
-                        className="bg-white border border-zinc-200 hover:border-blue-300 rounded-2xl p-5 shadow-xs transition-all space-y-4 flex flex-col justify-between"
-                      >
-                        {/* Cabecera de la Solicitud */}
-                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-100">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                                {record.ticketNumber}
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                                <MapPin className="w-3 h-3 text-cyan-600" />
-                                <span>{record.sede || 'Matriz'}</span>
-                              </span>
-                            </div>
-                            <h3 className="text-sm font-black text-zinc-900 mt-1.5">
-                              {record.nombres} {record.apellidos}
-                            </h3>
-                            <span className="text-[10px] text-zinc-400 font-mono">
-                              C.I. {record.cedulaRuc} • Fecha: {record.fechaSolicitud}
-                            </span>
-                          </div>
-
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shrink-0">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            <span>Pendiente</span>
-                          </span>
-                        </div>
-
-                        {/* Teléfonos y Contacto (3 números) */}
-                        <div className="bg-zinc-50/80 rounded-xl p-3 border border-zinc-100 space-y-1.5">
-                          <span className="text-[10px] font-black uppercase text-zinc-400 block tracking-wider">
-                            Números de Celular del Cliente
-                          </span>
-                          <div className="flex flex-wrap gap-2">
-                            <a
-                              href={`https://api.whatsapp.com/send?phone=593${record.celular1.replace(/\D/g, '').replace(/^0/, '')}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 transition"
-                              title="Chatear por WhatsApp"
-                            >
-                              <MessageCircle className="w-3 h-3 text-emerald-600" />
-                              <span>📱 {record.celular1} (Principal)</span>
-                            </a>
-                            {record.celular2 && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-700 bg-white px-2 py-0.5 rounded-lg border border-zinc-200">
-                                <span>📞 {record.celular2}</span>
-                              </span>
-                            )}
-                            {record.celular3 && (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-700 bg-white px-2 py-0.5 rounded-lg border border-zinc-200">
-                                <span>📞 {record.celular3}</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Detalles de la Motocicleta & Hardware GPS */}
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          {/* Moto */}
-                          <div className="bg-slate-50/60 rounded-xl p-3 border border-slate-200/80 space-y-1">
-                            <span className="text-[10px] font-black uppercase text-blue-900 block flex items-center gap-1">
-                              <Bike className="w-3 h-3 text-blue-600" />
-                              <span>Motocicleta</span>
-                            </span>
-                            <div className="font-bold text-zinc-900 truncate">{record.modeloMarca}</div>
-                            <div className="text-[11px] text-zinc-600">
-                              Placa: <strong className="font-mono text-zinc-800">{record.placa}</strong>
-                            </div>
-                            <div className="text-[10px] text-zinc-500 font-mono truncate" title={record.chasis}>
-                              VIN: {record.chasis}
-                            </div>
-                          </div>
-
-                          {/* Hardware GPS */}
-                          <div className="bg-cyan-50/50 rounded-xl p-3 border border-cyan-200/80 space-y-1">
-                            <span className="text-[10px] font-black uppercase text-cyan-900 block flex items-center gap-1">
-                              <Cpu className="w-3 h-3 text-cyan-600" />
-                              <span>Dispositivo GPS</span>
-                            </span>
-                            <div className="text-[11px]">
-                              <span className="text-zinc-500 text-[10px]">IMEI:</span>{' '}
-                              <strong className="font-mono text-cyan-950 font-bold">{record.serieGps}</strong>
-                            </div>
-                            <div className="text-[11px]">
-                              <span className="text-zinc-500 text-[10px]">SIM:</span>{' '}
-                              <strong className="font-mono text-zinc-800">{record.serieChip}</strong>
-                            </div>
-                            <div className="text-[10px] text-zinc-500">
-                              Vigencia: {record.fechaInicio} al {record.fechaVencimiento}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Evidencias fotográficas / Instalación */}
-                        {hasPhotos && (
-                          <div className="space-y-1 pt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-zinc-500 flex items-center gap-1">
-                                <Camera className="w-3 h-3 text-cyan-600" />
-                                <span>Fotos de Instalación ({record.fotos!.length}):</span>
-                              </span>
-                            </div>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                              {record.fotos!.map((foto, idx) => (
-                                <img
-                                  key={idx}
-                                  src={foto}
-                                  alt={`Evidencia ${idx + 1}`}
-                                  className="w-12 h-12 rounded-lg object-cover border border-zinc-200 cursor-pointer hover:scale-105 transition shadow-2xs shrink-0"
-                                  onClick={() => setPreviewImage(foto)}
-                                  title="Clic para ver en tamaño completo"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Botón de Acción Principal: Revisar y Aceptar */}
-                        <div className="pt-2 flex items-center gap-2 border-t border-zinc-100">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecordForReview(record)}
-                            className="flex-1 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-zinc-600" />
-                            <span>Revisar Ficha Completa</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRecordForAssign(record)}
-                            className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <KeyRound className="w-3.5 h-3.5" />
-                            <span>Revisar & Aceptar</span>
-                          </button>
-                        </div>
+            selectedRecordForReview ? (
+              <GpsFormView
+                record={selectedRecordForReview}
+                onBack={() => setSelectedRecordForReview(null)}
+                onAssignCredentials={(id, u, p) => {
+                  onAssignCredentials(id, u, p);
+                  setSelectedRecordForReview(null);
+                }}
+                onSendWhatsApp={handleSendWhatsApp}
+                showToast={showToast}
+              />
+            ) : (
+              <div className="space-y-4 max-w-7xl mx-auto">
+                {/* Header Superior y Barra de Búsqueda (Estilo Garante) */}
+                <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                        <Inbox className="w-5 h-5" />
                       </div>
-                    );
-                  })}
+                      <div>
+                        <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
+                          Bandeja de Entrada • Solicitudes GPS Pendientes
+                        </h2>
+                        <p className="text-xs text-zinc-500 font-medium">
+                          Auditoría técnica de solicitudes enviadas por Matriz. Abra la ficha técnica para dictaminar y generar credenciales.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 flex items-center gap-1.5 shadow-2xs">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Pendientes por Dictaminar: {pendingRequests.length}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Barra de Búsqueda */}
+                  <div className="pt-3 border-t border-zinc-100">
+                    <div className="relative flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border border-zinc-300 focus-within:border-blue-600 rounded-xl px-3.5 py-2 transition-all">
+                      <Search className="w-4 h-4 text-zinc-400 shrink-0 mr-2" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar por N° Ticket, Cédula, Cliente, Placa, Modelo o Sede..."
+                        className="w-full bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 outline-none"
+                      />
+                      {searchTerm && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchTerm('')}
+                          className="text-zinc-400 hover:text-zinc-600 text-xs font-bold px-1 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* GRID DE TARJETAS CUADRADAS (ESTILO GARANTE) */}
+                {filteredPending.length === 0 ? (
+                  <div className="text-center py-16 bg-emerald-50/40 border border-dashed border-emerald-300 rounded-2xl">
+                    <Inbox className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+                    <h3 className="text-sm font-bold text-emerald-950">¡Bandeja de dictamen al día!</h3>
+                    <p className="text-xs text-emerald-800 mt-1 max-w-md mx-auto">
+                      {searchTerm.trim()
+                        ? 'No se encontraron solicitudes que coincidan con la búsqueda.'
+                        : 'No hay solicitudes de GPS pendientes de resolución en este momento.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredPending.map((record) => (
+                      <GpsSquareCard
+                        key={record.id}
+                        record={record}
+                        onClick={() => setSelectedRecordForReview(record)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
           )}
 
           {/* MÓDULO 2: HISTORIAL (SOLICITUDES APROBADAS / ACTIVAS) */}
           {activeSection === 'historial_gps' && (
-            <div className="space-y-6 max-w-7xl mx-auto">
-              {/* Cabecera del Historial */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <History className="w-5 h-5 text-blue-600" />
-                    <h2 className="text-base font-black text-zinc-900">
-                      Historial Consolidado de Dispositivos GPS
-                    </h2>
+            selectedRecordForReview ? (
+              <GpsFormView
+                record={selectedRecordForReview}
+                onBack={() => setSelectedRecordForReview(null)}
+                onSendWhatsApp={handleSendWhatsApp}
+                showToast={showToast}
+              />
+            ) : (
+              <div className="space-y-6 max-w-7xl mx-auto">
+                {/* Cabecera del Historial */}
+                <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <History className="w-5 h-5 text-blue-600" />
+                      <h2 className="text-base font-black text-zinc-900">
+                        Historial Consolidado de Dispositivos GPS
+                      </h2>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Consulte los accesos satelitales asignados, reenvíe credenciales por WhatsApp y revise la ficha técnica a detalle.
+                    </p>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Consulte los accesos satelitales asignados, reenvíe credenciales por WhatsApp y revise la auditoría de cada unidad.
-                  </p>
+
+                  <div className="flex items-center gap-3">
+                    <div className="relative min-w-[280px]">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Buscar en el historial por cliente, placa, IMEI o SIM..."
+                        className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-medium text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                      />
+                    </div>
+                    <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 shrink-0">
+                      {filteredHistory.length} Activo{filteredHistory.length === 1 ? '' : 's'}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="relative min-w-[280px]">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Buscar en el historial..."
-                      className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-medium text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-                    />
+                {/* Listado del Historial */}
+                {filteredHistory.length === 0 ? (
+                  <div className="bg-white border border-zinc-200 rounded-2xl p-16 text-center shadow-xs">
+                    <Radio className="w-12 h-12 mx-auto text-zinc-300 mb-3 animate-pulse" />
+                    <h3 className="text-sm font-bold text-zinc-700">No se encontraron dispositivos en el historial</h3>
+                    <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+                      Los dispositivos aprobados desde la Bandeja de Entrada aparecerán aquí con sus credenciales oficiales.
+                    </p>
                   </div>
-                  <div className="px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 shrink-0">
-                    {filteredHistory.length} Activo{filteredHistory.length === 1 ? '' : 's'}
+                ) : (
+                  <div className="bg-white border border-zinc-200 rounded-2xl shadow-xs overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-zinc-100/80 border-b border-zinc-200 text-zinc-600 font-bold uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="px-4 py-3">Ticket / Fecha</th>
+                            <th className="px-4 py-3">Cliente</th>
+                            <th className="px-4 py-3">Motocicleta</th>
+                            <th className="px-4 py-3">Sede</th>
+                            <th className="px-4 py-3">Hardware GPS / SIM</th>
+                            <th className="px-4 py-3">Usuario & Clave</th>
+                            <th className="px-4 py-3 text-center">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 text-zinc-800">
+                          {filteredHistory.map((record) => {
+                            const isRevealed = revealedPasswordId === record.id;
+                            return (
+                              <tr key={record.id} className="hover:bg-blue-50/40 transition">
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-max">
+                                    {record.ticketNumber}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400 block mt-0.5">
+                                    Aprobado: {record.fechaAprobacion || record.fechaSolicitud}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3 max-w-[180px]">
+                                  <span className="font-bold text-zinc-900 block truncate">
+                                    {record.nombres} {record.apellidos}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400 font-mono block">
+                                    C.I. {record.cedulaRuc}
+                                  </span>
+                                  <span className="text-[10px] text-emerald-700 font-mono block">
+                                    📱 {record.celular1}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3 max-w-[180px]">
+                                  <span className="font-semibold text-zinc-900 block truncate">
+                                    {record.modeloMarca}
+                                  </span>
+                                  <span className="font-mono font-bold text-zinc-700 text-[11px] block">
+                                    Placa: {record.placa}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                                    <MapPin className="w-3 h-3 text-cyan-600" />
+                                    <span>{record.sede || 'Matriz'}</span>
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3">
+                                  <div className="text-[11px]">
+                                    <span className="text-zinc-400 text-[9px] uppercase font-bold">IMEI:</span>{' '}
+                                    <span className="font-mono font-bold text-zinc-800">{record.serieGps}</span>
+                                  </div>
+                                  <div className="text-[11px]">
+                                    <span className="text-zinc-400 text-[9px] uppercase font-bold">SIM:</span>{' '}
+                                    <span className="font-mono text-zinc-600">{record.serieChip}</span>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-bold text-zinc-800 font-mono bg-zinc-100 px-2 py-0.5 rounded">
+                                      👤 {record.gpsUser || 'Sin usuario'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyText(record.gpsUser || '', `u-${record.id}`)}
+                                      className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
+                                      title="Copiar usuario"
+                                    >
+                                      {copiedId === `u-${record.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <span className="text-[11px] font-mono text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded">
+                                      🔑 {isRevealed ? record.gpsPassword : '••••••••'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRevealedPasswordId(isRevealed ? null : record.id)}
+                                      className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
+                                      title={isRevealed ? 'Ocultar' : 'Ver clave'}
+                                    >
+                                      {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyText(record.gpsPassword || '', `p-${record.id}`)}
+                                      className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
+                                      title="Copiar contraseña"
+                                    >
+                                      {copiedId === `p-${record.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3 text-center whitespace-nowrap">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSendWhatsApp(record)}
+                                      className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                      title="Reenviar credenciales por WhatsApp"
+                                    >
+                                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>WhatsApp</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedRecordForReview(record)}
+                                      className="p-1.5 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                                      title="Ver ficha técnica a detalle"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Ver Ficha</span>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-
-              {/* Listado del Historial */}
-              {filteredHistory.length === 0 ? (
-                <div className="bg-white border border-zinc-200 rounded-2xl p-16 text-center shadow-xs">
-                  <Radio className="w-12 h-12 mx-auto text-zinc-300 mb-3 animate-pulse" />
-                  <h3 className="text-sm font-bold text-zinc-700">No se encontraron dispositivos en el historial</h3>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
-                    Los dispositivos aprobados desde la Bandeja de Entrada aparecerán aquí con sus credenciales oficiales.
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-white border border-zinc-200 rounded-2xl shadow-xs overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-zinc-100/80 border-b border-zinc-200 text-zinc-600 font-bold uppercase text-[10px] tracking-wider">
-                        <tr>
-                          <th className="px-4 py-3">Ticket / Fecha</th>
-                          <th className="px-4 py-3">Cliente</th>
-                          <th className="px-4 py-3">Motocicleta</th>
-                          <th className="px-4 py-3">Sede</th>
-                          <th className="px-4 py-3">Hardware GPS / SIM</th>
-                          <th className="px-4 py-3">Usuario & Clave</th>
-                          <th className="px-4 py-3 text-center">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200 text-zinc-800">
-                        {filteredHistory.map((record) => {
-                          const isRevealed = revealedPasswordId === record.id;
-                          return (
-                            <tr key={record.id} className="hover:bg-blue-50/40 transition">
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-max">
-                                  {record.ticketNumber}
-                                </span>
-                                <span className="text-[10px] text-zinc-400 block mt-0.5">
-                                  Aprobado: {record.fechaAprobacion || record.fechaSolicitud}
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-3 max-w-[180px]">
-                                <span className="font-bold text-zinc-900 block truncate">
-                                  {record.nombres} {record.apellidos}
-                                </span>
-                                <span className="text-[10px] text-zinc-400 font-mono block">
-                                  C.I. {record.cedulaRuc}
-                                </span>
-                                <span className="text-[10px] text-emerald-700 font-mono block">
-                                  📱 {record.celular1}
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-3 max-w-[180px]">
-                                <span className="font-semibold text-zinc-900 block truncate">
-                                  {record.modeloMarca}
-                                </span>
-                                <span className="font-mono font-bold text-zinc-700 text-[11px] block">
-                                  Placa: {record.placa}
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-900 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                                  <MapPin className="w-3 h-3 text-cyan-600" />
-                                  <span>{record.sede || 'Matriz'}</span>
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-3">
-                                <div className="text-[11px]">
-                                  <span className="text-zinc-400 text-[9px] uppercase font-bold">IMEI:</span>{' '}
-                                  <span className="font-mono font-bold text-zinc-800">{record.serieGps}</span>
-                                </div>
-                                <div className="text-[11px]">
-                                  <span className="text-zinc-400 text-[9px] uppercase font-bold">SIM:</span>{' '}
-                                  <span className="font-mono text-zinc-600">{record.serieChip}</span>
-                                </div>
-                              </td>
-
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[11px] font-bold text-zinc-800 font-mono bg-zinc-100 px-2 py-0.5 rounded">
-                                    👤 {record.gpsUser || 'Sin usuario'}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyText(record.gpsUser || '', `u-${record.id}`)}
-                                    className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
-                                    title="Copiar usuario"
-                                  >
-                                    {copiedId === `u-${record.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="text-[11px] font-mono text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded">
-                                    🔑 {isRevealed ? record.gpsPassword : '••••••••'}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setRevealedPasswordId(isRevealed ? null : record.id)}
-                                    className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
-                                    title={isRevealed ? 'Ocultar' : 'Ver clave'}
-                                  >
-                                    {isRevealed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyText(record.gpsPassword || '', `p-${record.id}`)}
-                                    className="p-1 hover:bg-zinc-200 rounded text-zinc-500 cursor-pointer"
-                                    title="Copiar contraseña"
-                                  >
-                                    {copiedId === `p-${record.id}` ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                </div>
-                              </td>
-
-                              <td className="px-4 py-3 text-center whitespace-nowrap">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSendWhatsApp(record)}
-                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                                    title="Reenviar credenciales por WhatsApp"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>WhatsApp</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedRecordForReview(record)}
-                                    className="p-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition cursor-pointer"
-                                    title="Ver ficha técnica"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
+            )
           )}
 
           {/* MÓDULO 3: MI PERFIL (EDITOR OFICIAL DE OPERADOR SATELITAL) */}
@@ -809,191 +712,7 @@ export const GpsViewDesktop: React.FC<Props> = ({
         </main>
       </div>
 
-      {/* MODAL DE REVISIÓN COMPLETA DE FICHA (SIN PRECIOS) */}
-      {selectedRecordForReview && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
-          onClick={() => setSelectedRecordForReview(null)}
-        >
-          <div
-            className="bg-white rounded-3xl max-w-2xl w-full border border-zinc-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header Modal */}
-            <div className="bg-gradient-to-r from-blue-700 to-cyan-800 text-white p-5 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs text-cyan-200 bg-white/20 px-2 py-0.5 rounded">
-                    {selectedRecordForReview.ticketNumber}
-                  </span>
-                  <span className="text-xs text-blue-200">
-                    Sede: {selectedRecordForReview.sede || 'Matriz'}
-                  </span>
-                </div>
-                <h3 className="text-base font-black text-white mt-1">
-                  Ficha Técnica GPS: {selectedRecordForReview.nombres} {selectedRecordForReview.apellidos}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedRecordForReview(null)}
-                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            {/* Contenido Modal */}
-            <div className="p-6 overflow-y-auto space-y-4">
-              {/* Sección Cliente */}
-              <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-200 space-y-2">
-                <span className="text-[10px] font-black uppercase text-zinc-500 block tracking-wider">
-                  Datos del Propietario
-                </span>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Cédula / RUC</span>
-                    <strong className="font-mono text-zinc-900">{selectedRecordForReview.cedulaRuc}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Celular Principal</span>
-                    <strong className="font-mono text-emerald-700">{selectedRecordForReview.celular1}</strong>
-                  </div>
-                  {selectedRecordForReview.celular2 && (
-                    <div>
-                      <span className="text-zinc-400 block text-[10px]">Celular Secundario</span>
-                      <strong className="font-mono text-zinc-800">{selectedRecordForReview.celular2}</strong>
-                    </div>
-                  )}
-                  {selectedRecordForReview.celular3 && (
-                    <div>
-                      <span className="text-zinc-400 block text-[10px]">Celular Adicional</span>
-                      <strong className="font-mono text-zinc-800">{selectedRecordForReview.celular3}</strong>
-                    </div>
-                  )}
-                  {selectedRecordForReview.direccion && (
-                    <div className="col-span-2">
-                      <span className="text-zinc-400 block text-[10px]">Dirección</span>
-                      <span className="text-zinc-700">{selectedRecordForReview.direccion}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Sección Motocicleta */}
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2">
-                <span className="text-[10px] font-black uppercase text-blue-900 block tracking-wider">
-                  Datos de la Motocicleta
-                </span>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Modelo / Marca</span>
-                    <strong className="text-zinc-900">{selectedRecordForReview.modeloMarca}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Placa</span>
-                    <strong className="font-mono text-zinc-900">{selectedRecordForReview.placa}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Chasis (VIN)</span>
-                    <span className="font-mono text-zinc-700">{selectedRecordForReview.chasis}</span>
-                  </div>
-                  {selectedRecordForReview.numeroMotor && (
-                    <div>
-                      <span className="text-zinc-400 block text-[10px]">Número de Motor</span>
-                      <span className="font-mono text-zinc-700">{selectedRecordForReview.numeroMotor}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Sección Dispositivo GPS & Vigencia */}
-              <div className="bg-cyan-50/50 rounded-2xl p-4 border border-cyan-200 space-y-2">
-                <span className="text-[10px] font-black uppercase text-cyan-900 block tracking-wider">
-                  Hardware GPS & Vigencia
-                </span>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Serie GPS (IMEI)</span>
-                    <strong className="font-mono text-cyan-950 font-bold">{selectedRecordForReview.serieGps}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Serie SIM (Chip)</span>
-                    <strong className="font-mono text-zinc-900">{selectedRecordForReview.serieChip}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Fecha de Inicio</span>
-                    <span className="font-mono text-zinc-700">{selectedRecordForReview.fechaInicio}</span>
-                  </div>
-                  <div>
-                    <span className="text-zinc-400 block text-[10px]">Fecha de Vencimiento</span>
-                    <span className="font-mono text-zinc-700">{selectedRecordForReview.fechaVencimiento}</span>
-                  </div>
-                  {selectedRecordForReview.tecnicoResponsable && (
-                    <div className="col-span-2">
-                      <span className="text-zinc-400 block text-[10px]">Técnico Instalador Encargado</span>
-                      <span className="font-semibold text-zinc-800">{selectedRecordForReview.tecnicoResponsable}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Fotografías / Evidencias */}
-              {selectedRecordForReview.fotos && selectedRecordForReview.fotos.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black uppercase text-zinc-500 block tracking-wider">
-                    Fotografías Adjuntas ({selectedRecordForReview.fotos.length})
-                  </span>
-                  <div className="grid grid-cols-4 gap-2">
-                    {selectedRecordForReview.fotos.map((foto, idx) => (
-                      <div
-                        key={idx}
-                        className="relative rounded-xl overflow-hidden border border-zinc-200 aspect-square group cursor-pointer"
-                        onClick={() => setPreviewImage(foto)}
-                      >
-                        <img
-                          src={foto}
-                          alt={`Evidencia ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition"
-                        />
-                        <span className="absolute bottom-1 left-1 text-[8px] font-bold bg-black/60 text-white px-1 rounded">
-                          Foto #{idx + 1}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Modal */}
-            <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedRecordForReview(null)}
-                className="py-2.5 px-4 rounded-xl text-xs font-bold text-zinc-700 hover:bg-zinc-200 transition cursor-pointer"
-              >
-                Cerrar
-              </button>
-
-              {selectedRecordForReview.estado === 'pendiente' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const rec = selectedRecordForReview;
-                    setSelectedRecordForReview(null);
-                    setSelectedRecordForAssign(rec);
-                  }}
-                  className="py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Aceptar & Asignar Credenciales</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL DE ASIGNACIÓN DE CREDENCIALES (ACEPTAR SOLICITUD) */}
       <GpsCredentialModal

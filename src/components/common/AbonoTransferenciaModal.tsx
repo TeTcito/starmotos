@@ -5,13 +5,6 @@ import {
   Upload,
   CheckCircle2,
   AlertCircle,
-  Building2,
-  Copy,
-  Check,
-  X,
-  FileText,
-  ImageIcon,
-  ShieldCheck,
   Loader2,
 } from 'lucide-react';
 import { MaintenanceRecord, ClientProfile, MotorcycleClientData } from '../../types/customer';
@@ -55,7 +48,6 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [copiedAccount, setCopiedAccount] = useState<boolean>(false);
 
   // Inicializar servicio seleccionado y monto sugerido
   useEffect(() => {
@@ -107,12 +99,6 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
     } finally {
       setIsCompressing(false);
     }
-  };
-
-  const handleCopyAccount = () => {
-    navigator.clipboard.writeText('2100234567');
-    setCopiedAccount(true);
-    setTimeout(() => setCopiedAccount(false), 2000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,61 +181,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* 1. Datos Bancarios Oficiales StarMotos */}
-          <div className="bg-gradient-to-br from-purple-50/70 via-indigo-50/50 to-white p-4 rounded-2xl border border-purple-200/80 space-y-2.5">
-            <div className="flex items-center justify-between border-b border-purple-200/60 pb-2">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-purple-700" />
-                <span className="font-bold text-zinc-900 text-xs uppercase tracking-wide">
-                  Cuenta Oficial para Transferencias
-                </span>
-              </div>
-              <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full border border-purple-300">
-                SRI / Bancario
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-zinc-700">
-              <div>
-                <span className="text-zinc-500 block text-[10px]">Banco:</span>
-                <strong className="text-zinc-900">Banco Pichincha (Cta. Corriente)</strong>
-              </div>
-              <div>
-                <span className="text-zinc-500 block text-[10px]">Titular de Cuenta:</span>
-                <strong className="text-zinc-900">STARMOTOS S.A.</strong>
-              </div>
-              <div className="flex items-center justify-between sm:col-span-2 bg-white/90 p-2 rounded-xl border border-purple-200">
-                <div>
-                  <span className="text-zinc-500 text-[10px] block">Número de Cuenta Corriente:</span>
-                  <span className="font-mono font-extrabold text-purple-900 text-sm tracking-wider select-all">
-                    2100234567
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCopyAccount}
-                  className="px-2.5 py-1 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
-                >
-                  {copiedAccount ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedAccount ? 'Copiado' : 'Copiar'}</span>
-                </button>
-              </div>
-              <div>
-                <span className="text-zinc-500 block text-[10px]">RUC:</span>
-                <span className="font-mono font-semibold text-zinc-800">1792489012001</span>
-              </div>
-              <div>
-                <span className="text-zinc-500 block text-[10px]">Correo de Notificación:</span>
-                <span className="font-medium text-purple-800">pagos@starmotos.ec</span>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-zinc-500 italic pt-1 border-t border-purple-100">
-              * Por favor realiza la transferencia desde la banca web o app de tu banco y guarda la captura del comprobante.
-            </p>
-          </div>
-
-          {/* 2. Selección de Orden / Servicio */}
+          {/* Selección de Orden / Servicio */}
           <div className="space-y-1.5">
             <label className="font-bold text-zinc-800 block text-xs">
               Servicio u Orden a Abonar:
@@ -285,7 +217,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* 3. Monto a Abonar */}
+          {/* Monto a Abonar */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="font-bold text-zinc-800 text-xs">
@@ -326,7 +258,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 4. Banco Origen y Referencia */}
+          {/* Banco Origen y Referencia */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="font-bold text-zinc-700 text-[11px]">Banco Emisor:</label>
@@ -359,7 +291,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 5. Subida de Evidencia Fotográfica (Obligatorio) */}
+          {/* Subida de Evidencia Fotográfica (Obligatorio) */}
           <div className="space-y-1.5">
             <label className="font-bold text-zinc-800 text-xs flex items-center justify-between">
               <span>Evidencia de la Transferencia (Foto o Captura) *</span>
@@ -419,7 +351,7 @@ export const AbonoTransferenciaModal: React.FC<Props> = ({
             )}
           </div>
 
-          {/* 6. Notas adicionales */}
+          {/* Notas adicionales */}
           <div className="space-y-1">
             <label className="font-bold text-zinc-700 text-[11px]">Notas o Comentarios (Opcional):</label>
             <input

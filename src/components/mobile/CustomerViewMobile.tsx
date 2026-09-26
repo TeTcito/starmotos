@@ -164,7 +164,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
         )}
 
         {(activeSection === 'historial' || activeSection === 'garantias') && (
-          <HistoryMobile history={history} warranties={warranties} />
+          <HistoryMobile history={history} warranties={warranties} motorcycle={motorcycle} />
         )}
 
         {/* Fallbacks para compatibilidad con rutas guardadas */}

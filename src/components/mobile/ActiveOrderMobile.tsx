@@ -19,6 +19,7 @@ import {
   Receipt,
   Eye,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import { WorkOrder, MotorcycleClientData, TallerOrder } from '../../types/customer';
 
@@ -28,6 +29,8 @@ interface Props {
   onOpenApprovalModal?: () => void;
   pendingRatingOrder?: TallerOrder | null;
   onOpenRatingModal?: () => void;
+  isHistoryView?: boolean;
+  onBack?: () => void;
 }
 
 const SERVICE_LABELS: Record<string, { label: string; desc: string }> = {
@@ -50,6 +53,8 @@ export const ActiveOrderMobile: React.FC<Props> = ({
   motorcycle,
   pendingRatingOrder,
   onOpenRatingModal,
+  isHistoryView = false,
+  onBack,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
@@ -57,9 +62,21 @@ export const ActiveOrderMobile: React.FC<Props> = ({
   if (!activeOrder || !activeOrder.otNumber) {
     return (
       <div className="space-y-4 animate-fade-in pb-12">
-        <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
-          <Clock className="w-5 h-5 text-blue-600" />
-          <h2 className="text-base font-bold text-zinc-900">Orden de Trabajo</h2>
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-600" />
+            <h2 className="text-base font-bold text-zinc-900">Orden de Trabajo</h2>
+          </div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Volver</span>
+            </button>
+          )}
         </div>
 
         {/* Tarjeta de invitación a calificar orden entregada en móvil */}
@@ -115,6 +132,8 @@ export const ActiveOrderMobile: React.FC<Props> = ({
     );
   }
 
+  const isDelivered = isHistoryView || activeOrder.status === 'entregado' || activeOrder.status === 'entregada';
+
   // Servicios
   const activeServices = activeOrder.serviciosRealizados && activeOrder.serviciosRealizados.length > 0
     ? activeOrder.serviciosRealizados
@@ -137,14 +156,33 @@ export const ActiveOrderMobile: React.FC<Props> = ({
   return (
     <div className="space-y-4 animate-fade-in pb-12 text-xs">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+      <div className="flex items-center justify-between pb-3 border-b border-zinc-200 gap-2">
         <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-blue-600" />
-          <h2 className="text-base font-bold text-zinc-900">Orden de Trabajo</h2>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 cursor-pointer"
+              title="Volver al historial"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <Clock className={`w-5 h-5 ${isDelivered ? 'text-emerald-600' : 'text-blue-600'}`} />
+          <h2 className="text-base font-bold text-zinc-900">
+            {isHistoryView ? 'Detalle de Orden' : 'Orden de Trabajo'}
+          </h2>
         </div>
-        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-300">
-          En Taller
-        </span>
+        {isDelivered ? (
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            <span>Servicio Entregado</span>
+          </span>
+        ) : (
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-300">
+            En Taller
+          </span>
+        )}
       </div>
 
       {/* Resumen OT */}
@@ -169,40 +207,53 @@ export const ActiveOrderMobile: React.FC<Props> = ({
 
       {/* Stepper de Fases Móvil */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5 text-blue-600" />
-          <span>Progreso del Taller</span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <Clock className={`w-3.5 h-3.5 ${isDelivered ? 'text-emerald-600' : 'text-blue-600'}`} />
+            <span>Progreso del Taller</span>
+          </h3>
+          {isDelivered && (
+            <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              Entregada
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
-          {activeOrder.steps.map((step, idx) => (
-            <div
-              key={step.id}
-              className={`rounded-xl p-2.5 border transition-all ${
-                step.current
-                  ? 'bg-blue-50/80 border-blue-400 shadow-2xs'
-                  : step.completed
-                  ? 'bg-white border-zinc-200 shadow-2xs'
-                  : 'bg-zinc-50 border-zinc-200 opacity-60'
-              }`}
-            >
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[9px] font-mono text-zinc-500 font-bold">0{idx + 1}</span>
-                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] ${
-                  step.completed
-                    ? 'bg-emerald-600 text-white font-bold'
+          {activeOrder.steps.map((step, idx) => {
+            const isStepGreen = isDelivered || step.completed;
+            return (
+              <div
+                key={step.id}
+                className={`rounded-xl p-2.5 border transition-all ${
+                  isDelivered
+                    ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
                     : step.current
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'bg-zinc-200 text-zinc-600'
-                }`}>
-                  {step.completed ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : idx + 1}
+                    ? 'bg-blue-50/80 border-blue-400 shadow-2xs'
+                    : step.completed
+                    ? 'bg-white border-zinc-200 shadow-2xs'
+                    : 'bg-zinc-50 border-zinc-200 opacity-60'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span className={`text-[9px] font-mono font-bold ${isDelivered ? 'text-emerald-700' : 'text-zinc-500'}`}>0{idx + 1}</span>
+                  <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] ${
+                    isStepGreen
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : step.current
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-zinc-200 text-zinc-600'
+                  }`}>
+                    {isStepGreen ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : idx + 1}
+                  </div>
                 </div>
+                <h4 className={`text-xs font-bold truncate ${isDelivered ? 'text-emerald-950' : step.current ? 'text-blue-900' : 'text-zinc-800'}`}>
+                  {step.shortLabel}
+                </h4>
               </div>
-              <h4 className={`text-xs font-bold truncate ${step.current ? 'text-blue-900' : 'text-zinc-800'}`}>
-                {step.shortLabel}
-              </h4>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

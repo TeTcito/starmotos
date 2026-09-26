@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Eye,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import { WorkOrder, MotorcycleClientData, TallerOrder } from '../../types/customer';
 
@@ -29,6 +30,8 @@ interface Props {
   onOpenApprovalModal?: () => void;
   pendingRatingOrder?: TallerOrder | null;
   onOpenRatingModal?: () => void;
+  isHistoryView?: boolean;
+  onBack?: () => void;
 }
 
 const SERVICE_LABELS: Record<string, { label: string; desc: string; badgeBg: string }> = {
@@ -54,6 +57,8 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
   motorcycle,
   pendingRatingOrder,
   onOpenRatingModal,
+  isHistoryView = false,
+  onBack,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
@@ -127,6 +132,8 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
     );
   }
 
+  const isDelivered = isHistoryView || activeOrder.status === 'entregado' || activeOrder.status === 'entregada';
+
   // Servicios realizados
   const activeServices = activeOrder.serviciosRealizados && activeOrder.serviciosRealizados.length > 0
     ? activeOrder.serviciosRealizados
@@ -152,21 +159,41 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
       <div className="flex items-center justify-between pb-4 border-b border-zinc-200">
         <div>
           <div className="flex items-center gap-2.5">
-            <Clock className="w-6 h-6 text-blue-600" />
+            <Clock className={`w-6 h-6 ${isDelivered ? 'text-emerald-600' : 'text-blue-600'}`} />
             <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
-              Seguimiento de Orden de Trabajo
+              {isHistoryView ? 'Detalle de Orden de Trabajo (Historial)' : 'Seguimiento de Orden de Trabajo'}
             </h2>
           </div>
           <p className="text-xs text-zinc-500 mt-1">
-            Estado técnico en tiempo real, técnico asignado y condiciones acordadas en alistamiento
+            {isDelivered
+              ? 'Expediente histórico del servicio técnico finalizado y entregado con conformidad'
+              : 'Estado técnico en tiempo real, técnico asignado y condiciones acordadas en alistamiento'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold uppercase px-3 py-1.5 rounded-xl shadow-xs bg-blue-50 text-blue-700 border border-blue-300 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-            <span>En Proceso de Taller</span>
-          </span>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+            >
+              <ArrowLeft className="w-4 h-4 text-zinc-600" />
+              <span>Volver al Historial</span>
+            </button>
+          )}
+
+          {isDelivered ? (
+            <span className="text-xs font-black uppercase px-3.5 py-1.5 rounded-xl shadow-xs bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Servicio Entregado</span>
+            </span>
+          ) : (
+            <span className="text-xs font-bold uppercase px-3 py-1.5 rounded-xl shadow-xs bg-blue-50 text-blue-700 border border-blue-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+              <span>En Proceso de Taller</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -208,43 +235,56 @@ export const ActiveOrderDesktop: React.FC<Props> = ({
 
       {/* Stepper Panorámico Horizontal de 5 Fases */}
       <div className="space-y-3">
-        <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-2">
-          <Clock className="w-4 h-4 text-blue-600" />
-          <span>Fases del Servicio Técnico</span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-2">
+            <Clock className={`w-4 h-4 ${isDelivered ? 'text-emerald-600' : 'text-blue-600'}`} />
+            <span>Fases del Servicio Técnico</span>
+          </h3>
+          {isDelivered && (
+            <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Todas las etapas completadas
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
-          {activeOrder.steps.map((step, idx) => (
-            <div
-              key={step.id}
-              className={`rounded-2xl p-3.5 border transition-all ${
-                step.current
-                  ? 'bg-blue-50/80 border-blue-400 shadow-sm'
-                  : step.completed
-                  ? 'bg-white border-zinc-200 shadow-2xs'
-                  : 'bg-zinc-50/80 border-zinc-200 opacity-60'
-              }`}
-            >
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[11px] font-mono text-zinc-500 font-bold">0{idx + 1}</span>
-                <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
-                  step.completed
-                    ? 'bg-emerald-600 text-white font-bold'
+          {activeOrder.steps.map((step, idx) => {
+            const isStepGreen = isDelivered || step.completed;
+            return (
+              <div
+                key={step.id}
+                className={`rounded-2xl p-3.5 border transition-all ${
+                  isDelivered
+                    ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
                     : step.current
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'bg-zinc-200 text-zinc-600'
-                }`}>
-                  {step.completed ? <Check className="w-3 h-3 stroke-[3]" /> : idx + 1}
+                    ? 'bg-blue-50/80 border-blue-400 shadow-sm'
+                    : step.completed
+                    ? 'bg-white border-zinc-200 shadow-2xs'
+                    : 'bg-zinc-50/80 border-zinc-200 opacity-60'
+                }`}
+              >
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className={`text-[11px] font-mono font-bold ${isDelivered ? 'text-emerald-700' : 'text-zinc-500'}`}>0{idx + 1}</span>
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${
+                    isStepGreen
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : step.current
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'bg-zinc-200 text-zinc-600'
+                  }`}>
+                    {isStepGreen ? <Check className="w-3 h-3 stroke-[3]" /> : idx + 1}
+                  </div>
                 </div>
+                <h4 className={`text-xs font-bold ${isDelivered ? 'text-emerald-950 font-black' : step.current ? 'text-blue-900' : 'text-zinc-800'}`}>
+                  {step.shortLabel}
+                </h4>
+                <p className={`text-[10px] mt-1 line-clamp-2 ${isDelivered ? 'text-emerald-800/80' : 'text-zinc-500'}`}>
+                  {isDelivered && step.id === 'entregado' ? 'Entregada al cliente con conformidad.' : step.description}
+                </p>
               </div>
-              <h4 className={`text-xs font-bold ${step.current ? 'text-blue-900' : 'text-zinc-800'}`}>
-                {step.shortLabel}
-              </h4>
-              <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2">
-                {step.description}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

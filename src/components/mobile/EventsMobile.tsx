@@ -17,6 +17,8 @@ import {
 import { MaintenanceRecord, MotorcycleClientData, ClientProfile } from '../../types/customer';
 import { ModalPortal } from '../common/ModalPortal';
 import { AbonoTransferenciaModal } from '../common/AbonoTransferenciaModal';
+import { ActiveOrderMobile } from './ActiveOrderMobile';
+import { buildHistoricalWorkOrder } from '../../utils/historicalOrderUtils';
 
 interface Props {
   history: MaintenanceRecord[];
@@ -39,7 +41,21 @@ export const EventsMobile: React.FC<Props> = ({
   onSubmitAbono,
 }) => {
   const [selectedInvoice, setSelectedInvoice] = useState<MaintenanceRecord | null>(null);
+  const [selectedOrderRecord, setSelectedOrderRecord] = useState<MaintenanceRecord | null>(null);
   const [isAbonoModalOpen, setIsAbonoModalOpen] = useState(false);
+
+  // Si se selecciona ver la orden en móvil
+  if (selectedOrderRecord) {
+    const historicalOrder = buildHistoricalWorkOrder(selectedOrderRecord, motorcycle);
+    return (
+      <ActiveOrderMobile
+        activeOrder={historicalOrder}
+        motorcycle={motorcycle}
+        isHistoryView={true}
+        onBack={() => setSelectedOrderRecord(null)}
+      />
+    );
+  }
 
   // Cálculo de totales
   const totalInvested = history.reduce((sum, item) => sum + item.totalPaid, 0);
@@ -247,16 +263,28 @@ export const EventsMobile: React.FC<Props> = ({
                     </ul>
                   </div>
 
-                  {/* Botón ver factura vinculada */}
+                  {/* Botón ver orden y factura vinculada */}
                   <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500 truncate max-w-[160px]">{record.branchName}</span>
-                    <button
-                      onClick={() => setSelectedInvoice(record)}
-                      className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
-                    >
-                      <Receipt className="w-3 h-3" />
-                      <span>Ver Factura</span>
-                    </button>
+                    <span className="text-zinc-500 truncate max-w-[130px]">{record.branchName}</span>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderRecord(record)}
+                        className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Ver Orden</span>
+                      </button>
+                      <span className="text-zinc-300">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoice(record)}
+                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Receipt className="w-3 h-3" />
+                        <span>Factura</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

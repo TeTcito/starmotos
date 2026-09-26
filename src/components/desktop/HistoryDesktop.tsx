@@ -1,15 +1,35 @@
 // src/components/desktop/HistoryDesktop.tsx
 import React, { useState } from 'react';
-import { History, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
-import { MaintenanceRecord, WarrantyItem } from '../../types/customer';
+import { History, ShieldCheck, Sparkles, CheckCircle2, Eye, ArrowRight, Wrench } from 'lucide-react';
+import { MaintenanceRecord, WarrantyItem, MotorcycleClientData } from '../../types/customer';
+import { ActiveOrderDesktop } from './ActiveOrderDesktop';
+import { buildHistoricalWorkOrder } from '../../utils/historicalOrderUtils';
+import { DEFAULT_MOTORCYCLE } from '../../hooks/useCustomerPortal';
 
 interface Props {
   history: MaintenanceRecord[];
   warranties?: WarrantyItem[];
+  motorcycle?: MotorcycleClientData;
 }
 
-export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [] }) => {
+export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [], motorcycle }) => {
   const [activeTab, setActiveTab] = useState<'servicios' | 'garantias'>('servicios');
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+
+  // Si hay un registro seleccionado, mostramos la Orden de Trabajo histórica con todo en verde y estado entregado
+  if (selectedRecord) {
+    const historicalOrder = buildHistoricalWorkOrder(selectedRecord, motorcycle);
+    const motoData: MotorcycleClientData = motorcycle || DEFAULT_MOTORCYCLE;
+
+    return (
+      <ActiveOrderDesktop
+        activeOrder={historicalOrder}
+        motorcycle={motoData}
+        isHistoryView={true}
+        onBack={() => setSelectedRecord(null)}
+      />
+    );
+  }
 
   return (
     <div className="w-full space-y-6 animate-fade-in pb-16">
@@ -75,7 +95,8 @@ export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [] }) =>
             {history.map((record) => (
               <div
                 key={record.id}
-                className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm space-y-3 hover:border-zinc-300 transition"
+                onClick={() => setSelectedRecord(record)}
+                className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-xs hover:border-blue-400 hover:shadow-md transition cursor-pointer group space-y-3.5"
               >
                 <div className="flex justify-between items-center border-b border-zinc-100 pb-3">
                   <div className="flex items-center gap-4">
@@ -83,8 +104,12 @@ export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [] }) =>
                     <span className="text-blue-700 font-mono text-xs bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 font-medium">
                       {record.mileage.toLocaleString()} KM
                     </span>
-                    <span className="text-xs text-zinc-500 font-mono">
+                    <span className="text-xs text-zinc-600 font-mono font-bold bg-zinc-100 px-2.5 py-1 rounded-lg border border-zinc-200">
                       OT: {record.otNumber}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Entregado
                     </span>
                   </div>
                   <span className="font-bold text-emerald-700 font-mono text-base">
@@ -103,6 +128,24 @@ export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [] }) =>
 
                 <div className="text-xs text-zinc-600 pt-1">
                   <strong className="text-zinc-800">Trabajos Efectuados:</strong> {record.workSummary.join(' • ')}
+                </div>
+
+                <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
+                  <span className="text-[11px] text-zinc-400 font-medium">
+                    Haz clic para ver el expediente técnico completo con todas las fases
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRecord(record);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-50 group-hover:bg-blue-600 text-blue-700 group-hover:text-white font-bold text-xs transition cursor-pointer shadow-2xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Ver Orden de Trabajo</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}

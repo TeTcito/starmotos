@@ -331,7 +331,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
             )}
 
             {(activeSection === 'historial' || activeSection === 'garantias') && (
-              <HistoryDesktop history={history} warranties={warranties} />
+              <HistoryDesktop history={history} warranties={warranties} motorcycle={motorcycle} />
             )}
 
             {/* Fallbacks para compatibilidad con rutas guardadas en historial */}

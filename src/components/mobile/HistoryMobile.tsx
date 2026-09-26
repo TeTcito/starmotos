@@ -1,15 +1,35 @@
 // src/components/mobile/HistoryMobile.tsx
 import React, { useState } from 'react';
-import { History, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
-import { MaintenanceRecord, WarrantyItem } from '../../types/customer';
+import { History, ShieldCheck, Sparkles, CheckCircle2, ChevronRight, Eye } from 'lucide-react';
+import { MaintenanceRecord, WarrantyItem, MotorcycleClientData } from '../../types/customer';
+import { ActiveOrderMobile } from './ActiveOrderMobile';
+import { buildHistoricalWorkOrder } from '../../utils/historicalOrderUtils';
+import { DEFAULT_MOTORCYCLE } from '../../hooks/useCustomerPortal';
 
 interface Props {
   history: MaintenanceRecord[];
   warranties?: WarrantyItem[];
+  motorcycle?: MotorcycleClientData;
 }
 
-export const HistoryMobile: React.FC<Props> = ({ history, warranties = [] }) => {
+export const HistoryMobile: React.FC<Props> = ({ history, warranties = [], motorcycle }) => {
   const [activeTab, setActiveTab] = useState<'servicios' | 'garantias'>('servicios');
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+
+  // Si se selecciona un registro, mostramos la orden histórica en verde de sólo lectura
+  if (selectedRecord) {
+    const historicalOrder = buildHistoricalWorkOrder(selectedRecord, motorcycle);
+    const motoData: MotorcycleClientData = motorcycle || DEFAULT_MOTORCYCLE;
+
+    return (
+      <ActiveOrderMobile
+        activeOrder={historicalOrder}
+        motorcycle={motoData}
+        isHistoryView={true}
+        onBack={() => setSelectedRecord(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4 animate-fade-in pb-12">
@@ -62,11 +82,21 @@ export const HistoryMobile: React.FC<Props> = ({ history, warranties = [] }) => 
         ) : (
           <div className="space-y-3">
             {history.map((record) => (
-              <div key={record.id} className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-sm space-y-1.5 text-xs">
+              <div
+                key={record.id}
+                onClick={() => setSelectedRecord(record)}
+                className="bg-white p-3.5 rounded-xl border border-zinc-200 shadow-xs hover:border-blue-400 active:scale-99 transition cursor-pointer space-y-2 text-xs"
+              >
                 <div className="flex justify-between items-center border-b border-zinc-100 pb-1.5">
-                  <div>
+                  <div className="flex items-center gap-1.5">
                     <span className="font-bold text-zinc-900">{record.date}</span>
-                    <span className="text-blue-600 font-mono font-medium text-[11px] ml-2">{record.mileage.toLocaleString()} KM</span>
+                    <span className="text-blue-600 font-mono font-medium text-[11px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                      {record.mileage.toLocaleString()} KM
+                    </span>
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-0.5">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                      Entregado
+                    </span>
                   </div>
                   <span className="font-bold text-emerald-700 font-mono">${record.totalPaid.toFixed(2)}</span>
                 </div>
@@ -75,6 +105,13 @@ export const HistoryMobile: React.FC<Props> = ({ history, warranties = [] }) => 
                 </div>
                 <div className="text-[11px] text-zinc-600">
                   {record.workSummary.join(' • ')}
+                </div>
+                <div className="pt-1.5 border-t border-zinc-100 flex items-center justify-between text-blue-600 font-bold text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <Eye className="w-3 h-3" />
+                    <span>Ver orden de trabajo</span>
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </div>
               </div>
             ))}

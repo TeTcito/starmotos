@@ -22,6 +22,8 @@ import {
 import { MaintenanceRecord, MotorcycleClientData, ClientProfile } from '../../types/customer';
 import { ModalPortal } from '../common/ModalPortal';
 import { AbonoTransferenciaModal } from '../common/AbonoTransferenciaModal';
+import { ActiveOrderDesktop } from './ActiveOrderDesktop';
+import { buildHistoricalWorkOrder } from '../../utils/historicalOrderUtils';
 
 interface Props {
   history: MaintenanceRecord[];
@@ -44,6 +46,7 @@ export const EventsDesktop: React.FC<Props> = ({
   onSubmitAbono,
 }) => {
   const [selectedInvoice, setSelectedInvoice] = useState<MaintenanceRecord | null>(null);
+  const [selectedOrderRecord, setSelectedOrderRecord] = useState<MaintenanceRecord | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'maintenances' | 'pendientes'>('all');
   const [isAbonoModalOpen, setIsAbonoModalOpen] = useState(false);
 
@@ -67,6 +70,19 @@ export const EventsDesktop: React.FC<Props> = ({
     }
     return history;
   }, [history, filterType]);
+
+  // Si se selecciona ver la orden, mostramos ActiveOrderDesktop en modo historial
+  if (selectedOrderRecord) {
+    const historicalOrder = buildHistoricalWorkOrder(selectedOrderRecord, motorcycle);
+    return (
+      <ActiveOrderDesktop
+        activeOrder={historicalOrder}
+        motorcycle={motorcycle}
+        isHistoryView={true}
+        onBack={() => setSelectedOrderRecord(null)}
+      />
+    );
+  }
 
   return (
     <div className="w-full space-y-6 animate-fade-in pb-16">
@@ -358,13 +374,25 @@ export const EventsDesktop: React.FC<Props> = ({
                         <UserCheck className="w-3.5 h-3.5 text-zinc-400" />
                         Técnico: <strong className="text-zinc-700">{record.technicianName}</strong>
                       </span>
-                      <button
-                        onClick={() => setSelectedInvoice(record)}
-                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer hover:underline"
-                      >
-                        <Receipt className="w-3.5 h-3.5" />
-                        Ver Factura
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrderRecord(record)}
+                          className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer hover:underline"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver Orden
+                        </button>
+                        <span className="text-zinc-300">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInvoice(record)}
+                          className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer hover:underline"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          Ver Factura
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

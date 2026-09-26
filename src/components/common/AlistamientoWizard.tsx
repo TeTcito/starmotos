@@ -52,7 +52,7 @@ import {
 } from '../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
-import { getMediaFromIndexedDB } from '../../services/mediaStorage';
+import { getMediaFromIndexedDB, uploadWarrantyMedia } from '../../services/mediaStorage';
 
 interface Props {
   defaultAtendidoPor: string;
@@ -1229,7 +1229,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
     });
   };
 
-  // Subir archivos reales desde el computador o dispositivo (comprimidas)
+  // Subir archivos reales desde el computador o dispositivo (comprimidas y subidas a Storage)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1242,6 +1242,22 @@ export const AlistamientoWizard: React.FC<Props> = ({
           ...prev,
           fotos: [...prev.fotos, compressed],
         }));
+
+        uploadWarrantyMedia(compressed, `als_foto_${Date.now()}`)
+          .then((cloudUrl) => {
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              setFormData((p) => {
+                const nextFotos = [...p.fotos];
+                const foundIdx = nextFotos.indexOf(compressed);
+                if (foundIdx >= 0) {
+                  nextFotos[foundIdx] = cloudUrl;
+                  return { ...p, fotos: nextFotos };
+                }
+                return p;
+              });
+            }
+          })
+          .catch((err) => console.warn('Subida en background de foto:', err));
       }
     }
 

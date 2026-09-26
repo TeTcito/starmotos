@@ -137,7 +137,8 @@ export async function uploadWarrantyMedia(
     const cleanPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     const fileName = `${cleanPrefix}_${Date.now()}_${randomSuffix}.${ext}`;
-    const filePath = `garantias/${fileName}`;
+    const folder = cleanPrefix.startsWith('als_') ? 'alistamientos' : 'garantias';
+    const filePath = `${folder}/${fileName}`;
 
     // Subir al bucket público en Supabase Storage
     const { error: uploadError } = await supabase.storage

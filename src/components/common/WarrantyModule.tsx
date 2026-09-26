@@ -2637,11 +2637,19 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     }
   };
 
-  // Procesamiento de selección de archivo de video (subida directa a Storage + compresión de respaldo)
+  // Procesamiento de selección de archivo de video (compresión en cliente + subida a Storage)
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const active = activeSlotRef.current;
     if (!file || !active || active.type !== 'video') return;
+
+    const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max
+    if (file.size > MAX_VIDEO_SIZE_BYTES) {
+      alert('El video supera el límite de 25 MB. Por favor seleccione o grabe un clip técnico breve de 15 a 20 segundos.');
+      e.target.value = '';
+      return;
+    }
+
     setUploadingSlot({ type: 'video', index: active.index });
     try {
       // 1. Previsualización local inmediata
@@ -2652,8 +2660,21 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         return next;
       });
 
-      // 2. Subida directa del archivo binario a Supabase Storage
-      const cloudUrl = await uploadWarrantyMedia(file, `video_${active.index + 1}`);
+      // 2. Comprimir video en el cliente si es mayor a 1.5 MB para no saturar Storage
+      let videoToUpload: File | Blob | string = file;
+      if (file.size > 1.5 * 1024 * 1024) {
+        try {
+          const compressed = await compressVideoBase64(file, 640, 480, 20);
+          if (compressed && compressed.length > 50) {
+            videoToUpload = compressed;
+          }
+        } catch (compErr) {
+          console.warn('Compresión previa de video falló, usando archivo:', compErr);
+        }
+      }
+
+      // 3. Subida del video optimizado a Supabase Storage
+      const cloudUrl = await uploadWarrantyMedia(videoToUpload, `video_${active.index + 1}`);
       if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
         setVideoSlots((prev) => {
           const next = [...prev];
@@ -2662,18 +2683,26 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         });
       } else {
         // Fallback local con compresión ligera
-        const compressed = await compressVideoBase64(file);
-        if (compressed) {
+        if (typeof videoToUpload === 'string') {
           setVideoSlots((prev) => {
             const next = [...prev];
-            next[active.index] = compressed;
+            next[active.index] = videoToUpload as string;
             return next;
           });
+        } else {
+          const compressed = await compressVideoBase64(file, 640, 480, 20);
+          if (compressed) {
+            setVideoSlots((prev) => {
+              const next = [...prev];
+              next[active.index] = compressed;
+              return next;
+            });
+          }
         }
       }
     } catch (err) {
-      console.error('Error al comprimir video:', err);
-      alert('Ocurrió un error al comprimir el video.');
+      console.error('Error al procesar video:', err);
+      alert('Ocurrió un error al procesar el video.');
     } finally {
       setUploadingSlot(null);
       e.target.value = '';
@@ -2720,6 +2749,11 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         alert('Por favor arrastre un video válido (MP4, WEBM, MOV).');
         return;
       }
+      const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024;
+      if (file.size > MAX_VIDEO_SIZE_BYTES) {
+        alert('El video supera el límite de 25 MB. Por favor seleccione o grabe un clip técnico breve de 15 a 20 segundos.');
+        return;
+      }
       setUploadingSlot({ type: 'video', index });
       try {
         const previewUrl = URL.createObjectURL(file);
@@ -2728,7 +2762,20 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
           next[index] = previewUrl;
           return next;
         });
-        const cloudUrl = await uploadWarrantyMedia(file, `video_${index + 1}`);
+
+        let videoToUpload: File | Blob | string = file;
+        if (file.size > 1.5 * 1024 * 1024) {
+          try {
+            const compressed = await compressVideoBase64(file, 640, 480, 20);
+            if (compressed && compressed.length > 50) {
+              videoToUpload = compressed;
+            }
+          } catch (compErr) {
+            console.warn('Compresión de video falló:', compErr);
+          }
+        }
+
+        const cloudUrl = await uploadWarrantyMedia(videoToUpload, `video_${index + 1}`);
         if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
           setVideoSlots((prev) => {
             const next = [...prev];
@@ -2736,13 +2783,21 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
             return next;
           });
         } else {
-          const compressed = await compressVideoBase64(file);
-          if (compressed) {
+          if (typeof videoToUpload === 'string') {
             setVideoSlots((prev) => {
               const next = [...prev];
-              next[index] = compressed;
+              next[index] = videoToUpload as string;
               return next;
             });
+          } else {
+            const compressed = await compressVideoBase64(file, 640, 480, 20);
+            if (compressed) {
+              setVideoSlots((prev) => {
+                const next = [...prev];
+                next[index] = compressed;
+                return next;
+              });
+            }
           }
         }
       } catch (err) {

@@ -51,7 +51,7 @@ import {
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
-import { getMediaFromIndexedDB } from '../../../services/mediaStorage';
+import { getMediaFromIndexedDB, uploadWarrantyMedia } from '../../../services/mediaStorage';
 import { matchRecordToWorkshop, getRecordTimestamp, getRecordOrderStatus } from '../../common/AlistamientoWizard';
 
 interface Props {
@@ -1170,6 +1170,29 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             fotos: [...prev.fotos, compressed],
           }));
         }
+
+        uploadWarrantyMedia(compressed, `als_movil_${Date.now()}`)
+          .then((cloudUrl) => {
+            if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+              if (selectedRecordForDetail) {
+                setDetailFormData((prev) => {
+                  if (!prev) return null;
+                  const nextFotos = [...(prev.fotos || [])];
+                  const idx = nextFotos.indexOf(compressed);
+                  if (idx >= 0) nextFotos[idx] = cloudUrl;
+                  return { ...prev, fotos: nextFotos };
+                });
+              } else {
+                setFormData((prev) => {
+                  const nextFotos = [...prev.fotos];
+                  const idx = nextFotos.indexOf(compressed);
+                  if (idx >= 0) nextFotos[idx] = cloudUrl;
+                  return { ...prev, fotos: nextFotos };
+                });
+              }
+            }
+          })
+          .catch((err) => console.warn('Subida en background móvil:', err));
       }
     }
     e.target.value = '';

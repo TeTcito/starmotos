@@ -693,17 +693,55 @@ export async function cloudSaveWarranty(w: WarrantyRequest) {
 export async function cloudSaveAlistamiento(rec: AlistamientoFullRecord) {
   try {
     removeDeletedTombstone(rec.id, rec.cedulaRuc);
+
+    let cleanRec = { ...rec };
+
+    // 1. Subir fotos de alistamiento si vienen en base64/blob a Storage para no inflar la base de datos PostgreSQL
+    if (cleanRec.fotos && Array.isArray(cleanRec.fotos) && cleanRec.fotos.length > 0) {
+      const hasBase64 = cleanRec.fotos.some(
+        (f) => typeof f === 'string' && (f.startsWith('data:') || f.startsWith('blob:') || f.length > 2000)
+      );
+      if (hasBase64) {
+        const uploadedFotos = await Promise.all(
+          cleanRec.fotos.map(async (item, idx) => {
+            if (typeof item === 'string' && (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000)) {
+              try {
+                const cloudUrl = await uploadWarrantyMedia(item, `als_${cleanRec.id}_foto_${idx}`);
+                return cloudUrl || item;
+              } catch (_) {
+                return item;
+              }
+            }
+            return item;
+          })
+        );
+        cleanRec.fotos = uploadedFotos;
+      }
+    }
+
+    // 2. Subir comprobante de transferencia bancaria si viene en base64/blob
+    const ev = cleanRec.evidenciaTransferencia || cleanRec.comprobantePagoUrl;
+    if (typeof ev === 'string' && (ev.startsWith('data:') || ev.startsWith('blob:') || ev.length > 2000)) {
+      try {
+        const cloudUrl = await uploadWarrantyMedia(ev, `als_${cleanRec.id}_transferencia`);
+        if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+          cleanRec.evidenciaTransferencia = cloudUrl;
+          cleanRec.comprobantePagoUrl = cloudUrl;
+        }
+      } catch (_) {}
+    }
+
     const payload = {
-      id: rec.id,
-      cedula_ruc: rec.cedulaRuc || null,
-      nombres: rec.nombres || null,
-      apellidos: rec.apellidos || null,
-      sede: rec.sede || 'StarMotos',
-      sede_id: rec.sedeId || 'taller-principal',
-      placa: rec.placa || null,
-      chasis: rec.chasis || null,
-      evidencia_transferencia: rec.evidenciaTransferencia || rec.comprobantePagoUrl || null,
-      data: rec,
+      id: cleanRec.id,
+      cedula_ruc: cleanRec.cedulaRuc || null,
+      nombres: cleanRec.nombres || null,
+      apellidos: cleanRec.apellidos || null,
+      sede: cleanRec.sede || 'StarMotos',
+      sede_id: cleanRec.sedeId || 'taller-principal',
+      placa: cleanRec.placa || null,
+      chasis: cleanRec.chasis || null,
+      evidencia_transferencia: cleanRec.evidenciaTransferencia || cleanRec.comprobantePagoUrl || null,
+      data: cleanRec,
       updated_at: new Date().toISOString(),
     };
 

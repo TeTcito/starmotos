@@ -76,29 +76,67 @@ export const TalleresDesktop: React.FC<Props> = ({
   useEffect(() => {
     const handleRatingsUpdate = () => setRatings(getStoredRatings());
     window.addEventListener('starmotos_ratings_updated', handleRatingsUpdate);
-    return () => window.removeEventListener('starmotos_ratings_updated', handleRatingsUpdate);
+    window.addEventListener('storage', handleRatingsUpdate);
+    return () => {
+      window.removeEventListener('starmotos_ratings_updated', handleRatingsUpdate);
+      window.removeEventListener('storage', handleRatingsUpdate);
+    };
   }, []);
 
-  const getWorkshopRatings = (wsId: string, wsName: string) => {
-    return ratings.filter((r) => {
-      if (r.workshopId && r.workshopId === wsId) return true;
-      if (r.workshopName && wsName && r.workshopName.toLowerCase().trim() === wsName.toLowerCase().trim()) return true;
-      if (
-        (wsId === 'matriz-la-mana' || wsName.toLowerCase().includes('matriz')) &&
-        (!r.workshopId || r.workshopId === 'matriz-la-mana' || r.workshopName?.toLowerCase().includes('matriz'))
-      ) {
+  // Unificar calificaciones de almacenamiento local con calificaciones adjuntas a las órdenes
+  const allRatings = useMemo(() => {
+    const list: OrderRating[] = [...ratings];
+    for (const ord of orders) {
+      const r = (ord as any).rating;
+      if (r && r.stars && !list.some(existing => existing.id === r.id || existing.orderId === (r.orderId || ord.id))) {
+        list.push(r);
+      }
+    }
+    // Descartar calificaciones de prueba/ficticias
+    return list.filter(r => r && !r.id.startsWith('rat-matriz-') && !r.id.startsWith('rat-suc-'));
+  }, [ratings, orders]);
+
+  const matchRatingToWorkshop = (r: OrderRating, wsId: string, wsName: string) => {
+    if (!r) return false;
+    const normWsName = (wsName || '').toLowerCase().trim();
+    const rTaller = (r.workshopName || '').toLowerCase().trim();
+    const rWsId = r.workshopId || '';
+
+    // Coincidencia exacta de ID
+    if (rWsId && rWsId === wsId) return true;
+
+    // Coincidencia exacta o contenida por nombre
+    if (rTaller && normWsName && (rTaller === normWsName || normWsName.includes(rTaller) || rTaller.includes(normWsName))) {
+      return true;
+    }
+
+    // Coincidencia por palabra clave de sede
+    const keywords = ['mocache', 'buena fe', 'balzar', 'el carmen', 'quevedo', 'ventanas', 'quinzaloma', 'moraspungo', 'empalme', 'la mana', 'la maná'];
+    for (const kw of keywords) {
+      if ((wsId.includes(kw) || normWsName.includes(kw)) && (rWsId.includes(kw) || rTaller.includes(kw))) {
         return true;
       }
-      return false;
-    });
+    }
+
+    // Sede matriz
+    const isMatrizTarget = wsId === 'matriz-la-mana' || normWsName.includes('matriz');
+    if (isMatrizTarget && (rWsId === 'matriz-la-mana' || rTaller.includes('matriz'))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const getWorkshopRatings = (wsId: string, wsName: string) => {
+    return allRatings.filter((r) => matchRatingToWorkshop(r, wsId, wsName));
   };
 
   const getWorkshopRatingStats = (wsRatings: OrderRating[]) => {
     if (wsRatings.length === 0) {
-      return { avg: 5.0, count: 0, hasRatings: false };
+      return { avg: 0, count: 0, hasRatings: false };
     }
     const sum = wsRatings.reduce((acc, curr) => acc + (curr.stars || 5), 0);
-    const avg = sum / wsRatings.length;
+    const avg = Number((sum / wsRatings.length).toFixed(1));
     return { avg, count: wsRatings.length, hasRatings: true };
   };
 
@@ -295,16 +333,18 @@ export const TalleresDesktop: React.FC<Props> = ({
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
                 <div className="flex items-center gap-1.5">
-                  <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-                  <span className="text-2xl font-black text-zinc-900">{wsRatingStats.avg.toFixed(1)}</span>
-                  <span className="text-xs text-zinc-500 font-semibold">/ 5.0</span>
+                  <Star className={`w-5 h-5 ${wsRatingStats.avg > 0 ? 'text-amber-500 fill-amber-400' : 'text-zinc-300'}`} />
+                  <span className="text-2xl font-black text-zinc-900">
+                    {wsRatingStats.avg > 0 ? wsRatingStats.avg.toFixed(1) : 'S/C'}
+                  </span>
+                  {wsRatingStats.avg > 0 && <span className="text-xs text-zinc-500 font-semibold">/ 5.0</span>}
                 </div>
                 <div className="flex items-center gap-0.5 mt-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
                       className={`w-3.5 h-3.5 ${
-                        star <= Math.round(wsRatingStats.avg)
+                        wsRatingStats.avg > 0 && star <= Math.round(wsRatingStats.avg)
                           ? 'text-amber-500 fill-amber-400'
                           : 'text-zinc-300'
                       }`}
@@ -314,11 +354,17 @@ export const TalleresDesktop: React.FC<Props> = ({
               </div>
 
               <div className="text-right">
-                <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                <span className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${
+                  wsRatingStats.avg > 0 
+                    ? 'bg-amber-100 text-amber-900 border-amber-300' 
+                    : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                }`}>
                   Calificación Sede
                 </span>
                 <p className="text-[11px] text-zinc-500 mt-1 font-medium">
-                  {wsRatings.length} {wsRatings.length === 1 ? 'opinión registrada' : 'opiniones registradas'}
+                  {wsRatings.length === 0 
+                    ? 'Sin opiniones registradas' 
+                    : `${wsRatings.length} ${wsRatings.length === 1 ? 'opinión registrada' : 'opiniones registradas'}`}
                 </p>
               </div>
             </div>
@@ -825,18 +871,20 @@ export const TalleresDesktop: React.FC<Props> = ({
                 </div>
 
                 {/* Calificación de la sede */}
-                <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/70 rounded-lg px-2 py-1 mb-2.5">
+                <div className={`flex items-center justify-between border rounded-lg px-2 py-1 mb-2.5 ${
+                  wsRatingStats.avg > 0 ? 'bg-amber-50/80 border-amber-200/70' : 'bg-zinc-50 border-zinc-200/60'
+                }`}>
                   <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
-                    <span className="text-xs font-bold text-amber-900">
+                    <Star className={`w-3.5 h-3.5 shrink-0 ${wsRatingStats.avg > 0 ? 'fill-amber-400 text-amber-500' : 'text-zinc-300'}`} />
+                    <span className={`text-xs font-bold ${wsRatingStats.avg > 0 ? 'text-amber-900' : 'text-zinc-500'}`}>
                       {wsRatingStats.avg > 0 ? wsRatingStats.avg.toFixed(1) : 'S/C'}
                     </span>
                     {wsRatingStats.avg > 0 && (
                       <span className="text-[10px] text-amber-700/80 font-medium">/ 5.0</span>
                     )}
                   </div>
-                  <span className="text-[10px] text-amber-800 font-medium">
-                    {wsRatingStats.count} {wsRatingStats.count === 1 ? 'reseña' : 'reseñas'}
+                  <span className={`text-[10px] font-medium ${wsRatingStats.avg > 0 ? 'text-amber-800' : 'text-zinc-400'}`}>
+                    {wsRatingStats.count === 0 ? '0 opiniones' : `${wsRatingStats.count} ${wsRatingStats.count === 1 ? 'reseña' : 'reseñas'}`}
                   </span>
                 </div>
 

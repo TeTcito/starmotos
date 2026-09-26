@@ -646,16 +646,50 @@ export async function syncAllFromSupabase(): Promise<{
     try {
       const { data: ratData, error: ratErr } = await supabase
         .from('ratings')
-        .select('data')
+        .select('*')
         .order('created_at', { ascending: false });
 
+      let items: OrderRating[] = [];
       if (!ratErr && ratData && ratData.length > 0) {
-        const items: OrderRating[] = ratData.map((row) => row.data as OrderRating).filter(Boolean);
-        if (items.length > 0) {
-          localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(items));
-          window.dispatchEvent(new Event('starmotos_ratings_updated'));
-        }
+        items = ratData
+          .map((row: any) => (row.data ? (row.data as OrderRating) : {
+            id: row.id,
+            orderId: row.order_id,
+            otNumber: row.ot_number,
+            clientIdNumber: row.client_id_number,
+            clientName: row.client_name,
+            workshopId: row.workshop_id,
+            workshopName: row.workshop_name,
+            technicianName: row.data?.technicianName || 'Técnico Taller',
+            stars: row.stars,
+            comment: row.comment,
+            createdAt: row.created_at,
+          }))
+          .filter((r) => r && !r.id.startsWith('rat-matriz-') && !r.id.startsWith('rat-suc-'));
       }
+
+      // También extraer calificaciones desde las órdenes sincronizadas en Supabase
+      const storedOrdersRaw = localStorage.getItem(STORAGE_KEYS.ORDERS);
+      if (storedOrdersRaw) {
+        try {
+          const parsedOrders = JSON.parse(storedOrdersRaw);
+          if (Array.isArray(parsedOrders)) {
+            for (const o of parsedOrders) {
+              if (o.rating && o.rating.stars) {
+                const r = o.rating as OrderRating;
+                if (!r.id.startsWith('rat-matriz-') && !r.id.startsWith('rat-suc-')) {
+                  if (!items.some((ex) => ex.id === r.id || ex.orderId === (r.orderId || o.id))) {
+                    items.push(r);
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(items));
+      window.dispatchEvent(new Event('starmotos_ratings_updated'));
     } catch (e) {
       console.warn('Error sincronizando calificaciones:', e);
     }
@@ -1628,13 +1662,31 @@ export function initSupabaseRealtime() {
           const raw = localStorage.getItem(STORAGE_KEYS.RATINGS);
           let current: OrderRating[] = raw ? JSON.parse(raw) : [];
 
+          const extractRatingDoc = (row: any): OrderRating | null => {
+            if (!row) return null;
+            if (row.data && row.data.id) return row.data as OrderRating;
+            return {
+              id: row.id,
+              orderId: row.order_id,
+              otNumber: row.ot_number,
+              clientIdNumber: row.client_id_number,
+              clientName: row.client_name,
+              workshopId: row.workshop_id,
+              workshopName: row.workshop_name,
+              technicianName: row.data?.technicianName || 'Técnico Taller',
+              stars: row.stars,
+              comment: row.comment,
+              createdAt: row.created_at,
+            } as OrderRating;
+          };
+
           if (payload.eventType === 'INSERT') {
-            const newDoc = payload.new.data as OrderRating;
+            const newDoc = extractRatingDoc(payload.new);
             if (newDoc && !current.some((r) => r.id === newDoc.id)) {
               current = [newDoc, ...current];
             }
           } else if (payload.eventType === 'UPDATE') {
-            const updatedDoc = payload.new.data as OrderRating;
+            const updatedDoc = extractRatingDoc(payload.new);
             if (updatedDoc) {
               current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
             }

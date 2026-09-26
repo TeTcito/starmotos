@@ -54,13 +54,33 @@ const getOrderStatusLabel = (status: string) => {
 };
 
 const matchRatingToWorkshop = (r: OrderRating, wsId: string, wsName: string) => {
+  if (!r) return false;
   const normName = (wsName || '').toLowerCase().trim();
   const rTaller = (r.workshopName || '').toLowerCase().trim();
-  const isMatrizTarget = wsId === 'matriz-la-mana' || normName.includes('matriz');
+  const rWsId = r.workshopId || '';
 
-  if (r.workshopId === wsId) return true;
-  if (rTaller && (rTaller === normName || normName.includes(rTaller) || rTaller.includes(normName))) return true;
-  if (isMatrizTarget && (rTaller.includes('matriz') || rTaller.includes('la mana') || rTaller.includes('la maná') || r.workshopId === 'matriz-la-mana')) return true;
+  // Coincidencia exacta de ID
+  if (rWsId && rWsId === wsId) return true;
+
+  // Coincidencia exacta o contenida por nombre
+  if (rTaller && normName && (rTaller === normName || normName.includes(rTaller) || rTaller.includes(normName))) {
+    return true;
+  }
+
+  // Coincidencia por palabra clave de sede
+  const keywords = ['mocache', 'buena fe', 'balzar', 'el carmen', 'quevedo', 'ventanas', 'quinzaloma', 'moraspungo', 'empalme', 'la mana', 'la maná'];
+  for (const kw of keywords) {
+    if ((wsId.includes(kw) || normName.includes(kw)) && (rWsId.includes(kw) || rTaller.includes(kw))) {
+      return true;
+    }
+  }
+
+  // Sede matriz
+  const isMatrizTarget = wsId === 'matriz-la-mana' || normName.includes('matriz');
+  if (isMatrizTarget && (rWsId === 'matriz-la-mana' || rTaller.includes('matriz'))) {
+    return true;
+  }
+
   return false;
 };
 
@@ -89,8 +109,20 @@ export const TalleresMobile: React.FC<Props> = ({
     };
   }, []);
 
+  // Unificar calificaciones con las órdenes
+  const allRatings = useMemo(() => {
+    const list: OrderRating[] = [...ratings];
+    for (const ord of orders) {
+      const r = (ord as any).rating;
+      if (r && r.stars && !list.some(existing => existing.id === r.id || existing.orderId === (r.orderId || ord.id))) {
+        list.push(r);
+      }
+    }
+    return list.filter(r => r && !r.id.startsWith('rat-matriz-') && !r.id.startsWith('rat-suc-'));
+  }, [ratings, orders]);
+
   const getWorkshopRatings = (wsId: string, wsName: string) => {
-    return ratings.filter((r) => matchRatingToWorkshop(r, wsId, wsName));
+    return allRatings.filter((r) => matchRatingToWorkshop(r, wsId, wsName));
   };
 
   const getWorkshopRatingStats = (wsRatings: OrderRating[]) => {
@@ -164,10 +196,12 @@ export const TalleresMobile: React.FC<Props> = ({
             </div>
 
             {/* Esquina superior derecha: Calificación promedio con estrellas */}
-            <div className="text-right shrink-0 bg-amber-50/80 border border-amber-200/80 rounded-lg px-2.5 py-1.5 flex flex-col items-end">
+            <div className={`text-right shrink-0 border rounded-lg px-2.5 py-1.5 flex flex-col items-end ${
+              wsRatingStats.avg > 0 ? 'bg-amber-50/80 border-amber-200/80' : 'bg-zinc-50 border-zinc-200/60'
+            }`}>
               <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-                <span className="text-base font-black text-amber-950">
+                <Star className={`w-4 h-4 ${wsRatingStats.avg > 0 ? 'fill-amber-400 text-amber-500' : 'text-zinc-300'}`} />
+                <span className={`text-base font-black ${wsRatingStats.avg > 0 ? 'text-amber-950' : 'text-zinc-500'}`}>
                   {wsRatingStats.avg > 0 ? wsRatingStats.avg.toFixed(1) : 'S/C'}
                 </span>
                 {wsRatingStats.avg > 0 && <span className="text-[10px] text-zinc-500 font-semibold">/ 5.0</span>}
@@ -177,15 +211,15 @@ export const TalleresMobile: React.FC<Props> = ({
                   <Star
                     key={star}
                     className={`w-2.5 h-2.5 ${
-                      star <= Math.round(wsRatingStats.avg)
+                      wsRatingStats.avg > 0 && star <= Math.round(wsRatingStats.avg)
                         ? 'text-amber-500 fill-amber-400'
                         : 'text-zinc-300'
                     }`}
                   />
                 ))}
               </div>
-              <span className="text-[9px] text-amber-800 font-medium mt-0.5">
-                {wsRatings.length} {wsRatings.length === 1 ? 'opinión' : 'opiniones'}
+              <span className={`text-[9px] font-medium mt-0.5 ${wsRatingStats.avg > 0 ? 'text-amber-800' : 'text-zinc-400'}`}>
+                {wsRatings.length === 0 ? '0 opiniones' : `${wsRatings.length} ${wsRatings.length === 1 ? 'opinión' : 'opiniones'}`}
               </span>
             </div>
           </div>
@@ -499,18 +533,20 @@ export const TalleresMobile: React.FC<Props> = ({
                 </div>
 
                 {/* Calificación de la sede */}
-                <div className="flex items-center justify-between bg-amber-50/80 border border-amber-200/70 rounded-lg px-2 py-1 mb-2">
+                <div className={`flex items-center justify-between border rounded-lg px-2 py-1 mb-2 ${
+                  wsRatingStats.avg > 0 ? 'bg-amber-50/80 border-amber-200/70' : 'bg-zinc-50 border-zinc-200/60'
+                }`}>
                   <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                    <span className="text-xs font-bold text-amber-900">
+                    <Star className={`w-3.5 h-3.5 ${wsRatingStats.avg > 0 ? 'fill-amber-400 text-amber-500' : 'text-zinc-300'}`} />
+                    <span className={`text-xs font-bold ${wsRatingStats.avg > 0 ? 'text-amber-900' : 'text-zinc-500'}`}>
                       {wsRatingStats.avg > 0 ? wsRatingStats.avg.toFixed(1) : 'S/C'}
                     </span>
                     {wsRatingStats.avg > 0 && (
                       <span className="text-[10px] text-amber-700 font-medium">/ 5.0</span>
                     )}
                   </div>
-                  <span className="text-[10px] text-amber-800 font-medium">
-                    {wsRatingStats.count} {wsRatingStats.count === 1 ? 'opinión' : 'opiniones'}
+                  <span className={`text-[10px] font-medium ${wsRatingStats.avg > 0 ? 'text-amber-800' : 'text-zinc-400'}`}>
+                    {wsRatingStats.count === 0 ? '0 opiniones' : `${wsRatingStats.count} ${wsRatingStats.count === 1 ? 'opinión' : 'opiniones'}`}
                   </span>
                 </div>
 

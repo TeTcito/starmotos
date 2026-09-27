@@ -19,4 +19,5 @@ export const STORAGE_KEYS = {
   AGENDAMIENTOS: 'starmotos_shared_agendamientos_v1',
   GPS_RECORDS: 'starmotos_shared_gps_records_v1',
   GPS_PROFILE: 'starmotos_shared_gps_profile_v1',
+  GARANTIAS_PLUS: 'starmotos_shared_garantias_plus_v1',
 } as const;

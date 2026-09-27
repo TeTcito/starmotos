@@ -36,7 +36,9 @@ import {
   AdminProfile,
   AdminPendiente,
   GpsRecord,
+  GarantiaPlusRecord,
 } from '../../../types/customer';
+import { Sparkles } from 'lucide-react';
 import { TalleresMobile } from './TalleresMobile';
 import { AlistamientoWizardMobile } from '../common/AlistamientoWizardMobile';
 import { ClientesModuleMobile } from '../common/ClientesModuleMobile';
@@ -46,6 +48,7 @@ import { FacturacionMobile } from './FacturacionMobile';
 import { AlertasMobile } from './AlertasMobile';
 import { PerfilAdminMobile } from './PerfilAdminMobile';
 import { GpsMatrizMobile } from './GpsMatrizMobile';
+import { GarantiasPlusMobile } from './GarantiasPlusMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
 
@@ -97,6 +100,9 @@ interface Props {
   gpsRecords?: GpsRecord[];
   onSaveGpsRecord?: (record: GpsRecord) => void;
   onDeleteGpsRecord?: (id: string) => void;
+  garantiasPlusRecords?: GarantiaPlusRecord[];
+  onSaveGarantiaPlusRecord?: (record: GarantiaPlusRecord) => void;
+  onDeleteGarantiaPlusRecord?: (id: string) => void;
 }
 
 export const AdminViewMobile: React.FC<Props> = ({
@@ -147,6 +153,9 @@ export const AdminViewMobile: React.FC<Props> = ({
   gpsRecords = [],
   onSaveGpsRecord,
   onDeleteGpsRecord,
+  garantiasPlusRecords = [],
+  onSaveGarantiaPlusRecord,
+  onDeleteGarantiaPlusRecord,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
@@ -160,6 +169,7 @@ export const AdminViewMobile: React.FC<Props> = ({
       badge: uncompletedPendientesCount > 0 ? `${uncompletedPendientesCount}` : undefined,
     },
     { id: 'alistamiento', label: 'Alistamiento', icon: <UserCheck className="w-4 h-4" /> },
+    { id: 'garantias_plus', label: 'Garantías Plus', icon: <Sparkles className="w-4 h-4 text-amber-500" />, badge: 'Plus' },
     { id: 'gps', label: 'GPS Matriz', icon: <Radio className="w-4 h-4" />, badge: 'GPS' },
     { id: 'clientes_admin', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'tecnicos', label: 'Técnicos', icon: <Wrench className="w-4 h-4" />, badge: `${technicians.length}` },
@@ -173,6 +183,7 @@ export const AdminViewMobile: React.FC<Props> = ({
     talleres: 'Control de Talleres',
     pendientes: 'Registrar Pendientes',
     alistamiento: 'Alistamiento & PDI',
+    garantias_plus: 'Garantías Plus Matriz',
     gps: 'Módulo GPS Matriz',
     clientes_admin: 'Clientes & Flota',
     tecnicos: 'Equipo Técnico',
@@ -321,6 +332,14 @@ export const AdminViewMobile: React.FC<Props> = ({
             recentRecords={fullAlistamientos}
             isMatriz={true}
             orders={orders}
+            onNavigateSection={setActiveSection}
+          />
+        )}
+        {activeSection === 'garantias_plus' && (
+          <GarantiasPlusMobile
+            records={garantiasPlusRecords}
+            onSaveRecord={onSaveGarantiaPlusRecord}
+            onDeleteRecord={onDeleteGarantiaPlusRecord}
           />
         )}
         {activeSection === 'gps' && (

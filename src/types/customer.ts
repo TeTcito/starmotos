@@ -316,6 +316,7 @@ export type AdminSection =
   | 'talleres'
   | 'pendientes'
   | 'alistamiento'
+  | 'garantias_plus'
   | 'gps'
   | 'clientes_admin'
   | 'garantias_admin'
@@ -490,7 +491,7 @@ export interface AlistamientoFullRecord {
   saldoPendiente?: number;
   esCredito?: boolean;
   mesesCredito?: number;
-  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito' | 'Crédito Directo';
+  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito' | 'Crédito Directo' | 'Garantía Plus';
   observaciones: string;
   proximoMantenimientoKm: number;
   fotos: string[];
@@ -886,4 +887,61 @@ export interface GpsProfile {
   phone: string;
   roleTitle?: string;
   companyName?: string;
+}
+
+// --- Registro Oficial de Garantía Plus (Solo Matriz) ---
+export interface GarantiaPlusRecord {
+  id: string; // ej: "gp-179048392"
+  numeroTicket: string; // ej: "GP-00124"
+  // Paso 1: Atención & Sede
+  atendidoPor: string;
+  sede: string;
+  sedeId: string;
+  fechaServicio: string; // Fecha de inicio de la Garantía Plus (YYYY-MM-DD)
+  fechaVencimiento: string; // Fecha de vencimiento (YYYY-MM-DD) - Reemplaza a la hora
+  // Paso 1: Datos del cliente
+  nombres: string;
+  apellidos: string;
+  cedulaRuc: string;
+  celular1: string;
+  celular2?: string;
+  celular3?: string;
+  email: string;
+  direccion: string;
+  origen: string;
+  // Paso 2: Datos de la moto
+  motoPreviaId?: string;
+  chasis: string; // VIN
+  numeroMotor?: string;
+  ramv?: string;
+  placa: string;
+  modeloMarca: string;
+  color?: string;
+  year?: number;
+  // Paso 3: Datos del servicio y cobertura
+  serviciosRealizados: ServiceActionType[];
+  tecnicoResponsable: string;
+  tecnicoId: string;
+  kilometraje: number;
+  aceite: 'sin_aceite' | 'con_aceite' | string;
+  nivelAceite?: string;
+  tipoAceite?: string;
+  numeroFactura?: string;
+  valorServicio: number; // Costo de la Garantía Plus
+  montoPagado: number;
+  abono?: number;
+  saldoPendiente?: number;
+  esCredito?: boolean;
+  mesesCredito?: number;
+  metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito' | 'Crédito Directo' | string;
+  observaciones: string;
+  proximoMantenimientoKm?: number;
+  fotos?: string[];
+  evidenciaTransferencia?: string;
+  comprobantePagoUrl?: string;
+  historialAbonos?: AbonoRecord[];
+  solicitudAbonoPendiente?: SolicitudAbonoCliente;
+  estado: 'activa' | 'vencida' | 'cancelada';
+  createdAt: string;
+  updatedAt?: string;
 }

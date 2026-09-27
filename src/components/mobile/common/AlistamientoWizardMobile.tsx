@@ -32,6 +32,9 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Eye,
+  Sparkles,
+  Radio,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   AlistamientoFullRecord,
@@ -50,6 +53,7 @@ import {
   getRegisteredBrands,
   getStoredOrders,
   updateClientCedulaCascade,
+  checkClientGarantiaPlus,
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
@@ -75,6 +79,7 @@ interface Props {
   selectedWorkshopFilter?: string;
   onSelectWorkshopFilter?: (wsId: string) => void;
   orders?: TallerOrder[];
+  onNavigateSection?: (section: any) => void;
 }
 
 export const isPdiOnlyRecord = (record: AlistamientoFullRecord): boolean => {
@@ -103,6 +108,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   selectedWorkshopFilter: propSelectedWorkshopFilter,
   onSelectWorkshopFilter,
   orders: propOrders,
+  onNavigateSection,
 }) => {
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
@@ -315,6 +321,27 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
     fotos: [],
     createdAt: '',
   });
+
+  // Verificación reactiva de Garantía Plus activa para el cliente o moto ingresados
+  const garantiaPlusStatus = useMemo(() => {
+    const cedula = (formData.cedulaRuc || '').trim();
+    const placa = (formData.placa || '').trim();
+    const chasis = (formData.chasis || '').trim();
+
+    if (cedula) {
+      const res = checkClientGarantiaPlus(cedula);
+      if (res.hasGarantiaPlus) return res;
+    }
+    if (placa) {
+      const res = checkClientGarantiaPlus(placa);
+      if (res.hasGarantiaPlus) return res;
+    }
+    if (chasis) {
+      const res = checkClientGarantiaPlus(chasis);
+      if (res.hasGarantiaPlus) return res;
+    }
+    return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
+  }, [formData.cedulaRuc, formData.placa, formData.chasis]);
 
   const [customOilTypes, setCustomOilTypes] = useState<string[]>([]);
   const [showCustomOilInput, setShowCustomOilInput] = useState(false);
@@ -1514,7 +1541,9 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       missingStep3.push('¿Qué se realizó?');
     }
     const isPdiOnly = formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi';
-    if (!isPdiOnly && (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio)))) {
+    const isGarantiaPlusCovered = Boolean(garantiaPlusStatus.hasGarantiaPlus);
+
+    if (!isPdiOnly && !isGarantiaPlusCovered && (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio)))) {
       missingStep3.push('Valor del servicio ($)');
     }
 
@@ -1550,12 +1579,19 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
 
     setValidationAlert(null);
 
-    const isCred = formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito;
-    const numVal = Number(formData.valorServicio) || 0;
-    const numAbono = formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal);
-    const finalValor = isPdiOnly ? 0 : numVal;
-    const finalAbono = isPdiOnly ? 0 : (isCred ? 0 : numAbono);
-    const finalSaldo = isPdiOnly ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono)));
+    const isCred = !isGarantiaPlusCovered && (formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito);
+    const numVal = isGarantiaPlusCovered ? 0 : (Number(formData.valorServicio) || 0);
+    const numAbono = isGarantiaPlusCovered ? 0 : (formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal));
+    const finalValor = isPdiOnly || isGarantiaPlusCovered ? 0 : numVal;
+    const finalAbono = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? 0 : numAbono);
+    const finalSaldo = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono)));
+
+    const obsText = (formData.observaciones || '').trim();
+    const finalObservaciones = isGarantiaPlusCovered
+      ? (obsText
+          ? `${obsText}\n[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`
+          : `[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`)
+      : formData.observaciones;
 
     const fullRecord: AlistamientoFullRecord = {
       ...formData,
@@ -1564,13 +1600,14 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       year: formData.year !== undefined && formData.year !== '' ? Number(formData.year) : undefined,
       mesesCredito: Number(formData.mesesCredito) || 3,
       esCredito: isCred,
-      metodoPago: isCred ? 'Crédito' : formData.metodoPago,
+      metodoPago: isGarantiaPlusCovered ? 'Garantía Plus' : (isCred ? 'Crédito' : formData.metodoPago),
       evidenciaTransferencia: formData.evidenciaTransferencia || '',
       comprobantePagoUrl: formData.evidenciaTransferencia || '',
       valorServicio: finalValor,
       montoPagado: finalAbono,
       abono: finalAbono,
       saldoPendiente: finalSaldo,
+      observaciones: finalObservaciones,
       id: `als-${Date.now()}`,
       createdAt: new Date().toLocaleString('es-EC', {
         dateStyle: 'medium',
@@ -2725,6 +2762,30 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             )}
           </div>
 
+          {/* Accesos directos a Garantías Plus y GPS en Móvil */}
+          {onNavigateSection && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar shrink-0">
+              <button
+                type="button"
+                onClick={() => onNavigateSection('garantias_plus')}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 rounded-xl text-xs font-black shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+                title="Crear o gestionar contratos de Garantía Plus"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                <span>Garantía Plus</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateSection('gps')}
+                className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+                title="Crear o gestionar solicitudes de GPS"
+              >
+                <Radio className="w-3.5 h-3.5 text-blue-400" />
+                <span>GPS Matriz</span>
+              </button>
+            </div>
+          )}
+
           {/* Panel Desplegable de Filtros Móvil */}
           {isFilterOpen && (
             <div className="bg-zinc-50 border border-blue-200 rounded-xl p-3 shadow-xs space-y-3 shrink-0 animate-fade-in">
@@ -3056,6 +3117,11 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                           <h4 className="font-bold text-xs text-zinc-900 truncate leading-tight">
                             {record.nombres} {record.apellidos}
                           </h4>
+                          {(record.metodoPago === 'Garantía Plus' || record.observaciones?.includes('Garantía Plus')) && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs inline-flex items-center gap-0.5" title="Cubierto por Garantía Plus">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-600" /> G. Plus
+                            </span>
+                          )}
                           {orderStatus === 'completed' && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
                               Entregado
@@ -3138,11 +3204,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                         const pagado = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
                         const saldoPendiente = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - pagado);
                         const isPdi = isPdiOnlyRecord(record);
-                        const isPaid = isPdi || saldoPendiente <= 0.01;
+                        const isGarantiaPlus = record.metodoPago === 'Garantía Plus' || record.observaciones?.includes('Garantía Plus');
+                        const isPaid = isPdi || isGarantiaPlus || saldoPendiente <= 0.01;
                         const hasPendingAbono = record.solicitudAbonoPendiente?.estado === 'pendiente';
                         const isApprovedAbono = record.solicitudAbonoPendiente?.estado === 'aprobado';
 
-                        if (isPdi) return null;
+                        if (isPdi || isGarantiaPlus) return null;
 
                         return (
                           <button
@@ -3197,6 +3264,19 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                           const val = Number(record.valorServicio) || 0;
                           const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
                           const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                          const isGarantiaPlus = record.metodoPago === 'Garantía Plus' || record.observaciones?.includes('Garantía Plus');
+
+                          if (isGarantiaPlus || (val === 0 && pag === 0 && pend === 0 && !isPdiOnlyRecord(record))) {
+                            return (
+                              <div className="flex flex-col items-end leading-none text-right">
+                                <span className="font-mono font-black text-amber-600 text-xs">$0.00</span>
+                                <span className="text-[9px] font-sans font-bold text-amber-700 flex items-center gap-0.5" title="Cubierto por Garantía Plus">
+                                  <Sparkles className="w-2.5 h-2.5 text-amber-500" /> G. Plus
+                                </span>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div className="flex flex-col items-end leading-none text-right">
                               <span className="font-mono font-black text-zinc-900 text-xs">
@@ -3257,6 +3337,52 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS MÓVIL */}
+          {onNavigateSection && (
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-2.5 rounded-xl shadow-xs flex items-center justify-between gap-2 text-white">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[11px] font-bold truncate">Módulos Especiales:</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onNavigateSection('garantias_plus')}
+                  className="px-2 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 rounded-lg text-[10px] font-black shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Garantía Plus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigateSection('gps')}
+                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-2xs cursor-pointer active:scale-95"
+                >
+                  GPS
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* BANNER DESTACADO: CLIENTE CON GARANTÍA PLUS ACTIVA MÓVIL */}
+          {garantiaPlusStatus.hasGarantiaPlus && (
+            <div className="p-3 bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-amber-500/15 border-2 border-amber-400 rounded-xl shadow-2xs space-y-1.5 animate-slide-in">
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-[10px] font-black uppercase px-2 py-0.2 rounded-full bg-amber-500 text-slate-950">
+                    👑 Garantía Plus Activa
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-amber-900">
+                  {garantiaPlusStatus.daysRemaining} días rest.
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-950 font-medium leading-tight">
+                Vence el <strong>{garantiaPlusStatus.record?.fechaVencimiento}</strong>. Todos los mantenimientos y servicios salen <strong>$0.00 (Pagados)</strong>.
+              </p>
             </div>
           )}
 
@@ -3861,7 +3987,23 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+              {/* Si el cliente tiene Garantía Plus activa: Servicios sin costo $0.00 Pagados */}
+              {garantiaPlusStatus.hasGarantiaPlus ? (
+                <div className="p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl space-y-1.5 shadow-2xs animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-black uppercase text-amber-900">Garantía Plus Activa</span>
+                    </div>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase">
+                      ✓ Pagado ($0.00)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-950 font-medium">
+                    Servicios y mantenimientos cubiertos al 100% sin costo para el cliente (Vence: {garantiaPlusStatus.record?.fechaVencimiento}).
+                  </p>
+                </div>
+              ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
                 <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                   <span className="text-xs text-blue-900 font-bold">

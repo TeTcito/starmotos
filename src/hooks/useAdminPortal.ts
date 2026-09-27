@@ -20,6 +20,7 @@ import {
   AdminProfile,
   AdminPendiente,
   GpsRecord,
+  GarantiaPlusRecord,
 } from '../types/customer';
 import {
   getStoredWarranties,
@@ -57,6 +58,9 @@ import {
   getStoredGpsRecords,
   saveStoredGpsRecord,
   deleteStoredGpsRecord,
+  getStoredGarantiasPlusRecords,
+  saveStoredGarantiaPlusRecord,
+  deleteStoredGarantiaPlusRecord,
 } from '../data/mockMultiRoleData';
 import { cloudSaveWarranty, syncAllFromSupabase } from '../services/supabaseService';
 
@@ -64,6 +68,7 @@ export const ADMIN_SECTIONS: AdminSectionMobile[] = [
   'talleres',
   'pendientes',
   'alistamiento',
+  'garantias_plus',
   'gps',
   'clientes_admin',
   'garantias_admin',
@@ -102,6 +107,7 @@ export function useAdminPortal() {
   const [adminProfile, setAdminProfile] = useState<AdminProfile>(getStoredAdminProfile);
   const [pendientes, setPendientes] = useState<AdminPendiente[]>(getStoredPendientes);
   const [gpsRecords, setGpsRecords] = useState<GpsRecord[]>(getStoredGpsRecords);
+  const [garantiasPlusRecords, setGarantiasPlusRecords] = useState<GarantiaPlusRecord[]>(getStoredGarantiasPlusRecords);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Escuchar actualizaciones externas de localStorage (evento sincronizado)
@@ -119,6 +125,7 @@ export function useAdminPortal() {
     const handleWorkshopsUpdate = () => setWorkshops(getStoredWorkshops());
     const handlePendientesUpdate = () => setPendientes(getStoredPendientes());
     const handleGpsUpdate = () => setGpsRecords(getStoredGpsRecords());
+    const handleGarantiasPlusUpdate = () => setGarantiasPlusRecords(getStoredGarantiasPlusRecords());
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (!e.key || e.key.startsWith('starmotos_shared_')) {
@@ -135,6 +142,7 @@ export function useAdminPortal() {
         handleWorkshopsUpdate();
         handlePendientesUpdate();
         handleGpsUpdate();
+        handleGarantiasPlusUpdate();
       }
     };
 
@@ -151,6 +159,7 @@ export function useAdminPortal() {
     window.addEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
     window.addEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
     window.addEventListener('starmotos_gps_updated', handleGpsUpdate);
+    window.addEventListener('starmotos_garantias_plus_updated', handleGarantiasPlusUpdate);
     window.addEventListener('storage', handleStorageEvent);
 
     // Sincronización proactiva de arranque para asegurar que Matriz reciba toda la red
@@ -170,6 +179,7 @@ export function useAdminPortal() {
       window.removeEventListener('starmotos_workshops_updated', handleWorkshopsUpdate);
       window.removeEventListener('starmotos_pendientes_updated', handlePendientesUpdate);
       window.removeEventListener('starmotos_gps_updated', handleGpsUpdate);
+      window.removeEventListener('starmotos_garantias_plus_updated', handleGarantiasPlusUpdate);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
@@ -1016,6 +1026,32 @@ export function useAdminPortal() {
     [showToast]
   );
 
+  const saveGarantiaPlusRecord = useCallback(
+    (record: GarantiaPlusRecord) => {
+      saveStoredGarantiaPlusRecord(record);
+      setGarantiasPlusRecords((prev) => {
+        const idx = prev.findIndex((r) => r.id === record.id);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = record;
+          return updated;
+        }
+        return [record, ...prev];
+      });
+      showToast('Garantía Plus guardada exitosamente.', 'success');
+    },
+    [showToast]
+  );
+
+  const deleteGarantiaPlusRecord = useCallback(
+    (id: string) => {
+      deleteStoredGarantiaPlusRecord(id);
+      setGarantiasPlusRecords((prev) => prev.filter((r) => r.id !== id));
+      showToast('Registro de Garantía Plus eliminado.', 'info');
+    },
+    [showToast]
+  );
+
   return {
     activeSection,
     setActiveSection,
@@ -1039,6 +1075,10 @@ export function useAdminPortal() {
     gpsRecords,
     saveGpsRecord,
     deleteGpsRecord,
+    // Garantías Plus Matriz
+    garantiasPlusRecords,
+    saveGarantiaPlusRecord,
+    deleteGarantiaPlusRecord,
     // Pendientes & Agendamiento
     pendientes,
     savePendiente,

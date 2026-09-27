@@ -18,6 +18,7 @@ import {
   AgendamientoTicket,
   GpsRecord,
   GpsProfile,
+  GarantiaPlusRecord,
 } from '../types/customer';
 import {
   cloudSaveWarranty,
@@ -2121,6 +2122,205 @@ export function saveStoredGpsProfile(profile: GpsProfile) {
   } catch (e) {
     console.error('Error al guardar perfil GPS:', e);
   }
+}
+
+// =========================================================================
+// REGISTROS INICIALES Y STORAGE DE GARANTÍAS PLUS (MATRIZ)
+// =========================================================================
+
+export const INITIAL_GARANTIAS_PLUS: GarantiaPlusRecord[] = [
+  {
+    id: 'gp-001',
+    numeroTicket: 'GP-00101',
+    atendidoPor: 'William Daniel Meza (Gerente)',
+    sede: 'StarMotos Matriz La Maná',
+    sedeId: 'matriz-la-mana',
+    fechaServicio: '2026-03-15',
+    fechaVencimiento: '2027-03-15',
+    nombres: 'José Zambrano',
+    apellidos: 'Loor',
+    cedulaRuc: '1205928174',
+    celular1: '0991234567',
+    celular2: '0987654321',
+    email: 'jose.zambrano@gmail.com',
+    direccion: 'Av. 19 de Mayo y Guayas, La Maná',
+    origen: 'Almacén Principal La Maná',
+    chasis: '3PC8E10B5N1098412',
+    numeroMotor: '157FMI-894120',
+    placa: 'AA-892B',
+    modeloMarca: 'Shineray XY200GY',
+    color: 'Negro Brillante',
+    year: 2026,
+    serviciosRealizados: ['alistamiento_pdi', 'engrasado', 'mantenimiento'],
+    tecnicoResponsable: 'Carlos Andrés Macías (Técnico Senior)',
+    tecnicoId: 'tech-01',
+    kilometraje: 1200,
+    aceite: 'con_aceite',
+    nivelAceite: 'semisintetico',
+    tipoAceite: '10W-40 Motul',
+    numeroFactura: 'FAC-001-0941',
+    valorServicio: 180.0,
+    montoPagado: 180.0,
+    abono: 180.0,
+    saldoPendiente: 0.0,
+    esCredito: false,
+    metodoPago: 'Efectivo',
+    observaciones: 'Paquete Garantía Plus contratado por 1 año. Mantenimientos y engrasados cubiertos al 100%.',
+    proximoMantenimientoKm: 3000,
+    fotos: [],
+    estado: 'activa',
+    createdAt: '2026-03-15T10:30:00Z',
+  },
+  {
+    id: 'gp-002',
+    numeroTicket: 'GP-00102',
+    atendidoPor: 'William Daniel Meza (Gerente)',
+    sede: 'StarMotos Matriz La Maná',
+    sedeId: 'matriz-la-mana',
+    fechaServicio: '2026-02-10',
+    fechaVencimiento: '2027-02-10',
+    nombres: 'Carlos Alberto',
+    apellidos: 'Mendoza Ruiz',
+    cedulaRuc: '0928471928',
+    celular1: '0981122334',
+    email: 'carlos.mendoza@hotmail.com',
+    direccion: 'Sector San Carlos, La Maná',
+    origen: 'Almacén Principal La Maná',
+    chasis: '9FB2D34C7N8912304',
+    numeroMotor: '162FMJ-904123',
+    placa: 'PQ-451C',
+    modeloMarca: 'Dayun DY150-7',
+    color: 'Rojo Carmesí',
+    year: 2025,
+    serviciosRealizados: ['engrasado', 'mantenimiento'],
+    tecnicoResponsable: 'Luis Gabriel Moreira (Mecánico Maestro)',
+    tecnicoId: 'tech-02',
+    kilometraje: 4500,
+    aceite: 'con_aceite',
+    nivelAceite: 'mineral',
+    tipoAceite: '20W-50 Castrol',
+    numeroFactura: 'FAC-001-0812',
+    valorServicio: 150.0,
+    montoPagado: 150.0,
+    abono: 150.0,
+    saldoPendiente: 0.0,
+    esCredito: false,
+    metodoPago: 'Transferencia',
+    observaciones: 'Garantía Plus activada con transferencia confirmada. Mantenimientos sin costo durante la vigencia.',
+    proximoMantenimientoKm: 6000,
+    fotos: [],
+    estado: 'activa',
+    createdAt: '2026-02-10T14:15:00Z',
+  },
+];
+
+export function getStoredGarantiasPlusRecords(): GarantiaPlusRecord[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.GARANTIAS_PLUS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error al leer registros de Garantías Plus de localStorage:', e);
+  }
+  return INITIAL_GARANTIAS_PLUS;
+}
+
+export function saveStoredGarantiasPlusRecords(records: GarantiaPlusRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.GARANTIAS_PLUS, JSON.stringify(records));
+    window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+    syncBus?.postMessage({ type: 'GARANTIAS_PLUS_UPDATED', payload: records });
+  } catch (e) {
+    console.error('Error al guardar registros de Garantías Plus en localStorage:', e);
+  }
+}
+
+export function saveStoredGarantiaPlusRecord(record: GarantiaPlusRecord) {
+  try {
+    const current = getStoredGarantiasPlusRecords();
+    const idx = current.findIndex((r) => r.id === record.id);
+    let updated: GarantiaPlusRecord[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...record, updatedAt: new Date().toISOString() };
+    } else {
+      updated = [{ ...record, createdAt: record.createdAt || new Date().toISOString() }, ...current];
+    }
+    saveStoredGarantiasPlusRecords(updated);
+  } catch (e) {
+    console.error('Error al guardar registro individual de Garantía Plus:', e);
+  }
+}
+
+export function deleteStoredGarantiaPlusRecord(id: string) {
+  try {
+    const current = getStoredGarantiasPlusRecords();
+    const updated = current.filter((r) => r.id !== id);
+    saveStoredGarantiasPlusRecords(updated);
+  } catch (e) {
+    console.error('Error al eliminar registro de Garantía Plus:', e);
+  }
+}
+
+/**
+ * Helper para verificar si un cliente o moto tiene Garantía Plus activa y vigente
+ */
+export function checkClientGarantiaPlus(
+  term: string,
+  recordsList?: GarantiaPlusRecord[]
+): {
+  hasGarantiaPlus: boolean;
+  record?: GarantiaPlusRecord;
+  isExpired: boolean;
+  daysRemaining: number;
+} {
+  if (!term || !term.trim()) {
+    return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
+  }
+
+  const cleanTerm = term.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const records = recordsList || getStoredGarantiasPlusRecords();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const found = records.find((r) => {
+    const cleanCedula = (r.cedulaRuc || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanPlaca = (r.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanChasis = (r.chasis || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    return (
+      (cleanCedula && cleanCedula === cleanTerm) ||
+      (cleanPlaca && cleanPlaca === cleanTerm) ||
+      (cleanChasis && cleanChasis === cleanTerm) ||
+      (cleanTerm.length >= 6 && cleanCedula.includes(cleanTerm)) ||
+      (cleanTerm.length >= 4 && cleanPlaca.includes(cleanTerm))
+    );
+  });
+
+  if (!found) {
+    return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
+  }
+
+  // Calcular vigencia respecto a fechaVencimiento
+  let isExpired = false;
+  let daysRemaining = 0;
+  if (found.fechaVencimiento) {
+    const [y, m, d] = found.fechaVencimiento.split('-').map(Number);
+    const vencDate = new Date(y, m - 1, d);
+    vencDate.setHours(23, 59, 59, 999);
+    const diffTime = vencDate.getTime() - today.getTime();
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    isExpired = daysRemaining < 0;
+  }
+
+  return {
+    hasGarantiaPlus: !isExpired && found.estado !== 'cancelada',
+    record: found,
+    isExpired,
+    daysRemaining,
+  };
 }
 
 

@@ -33,6 +33,7 @@ import {
   InventoryItem,
   AdminPendiente,
   GpsRecord,
+  GarantiaPlusRecord,
 } from '../../../types/customer';
 import { TalleresDesktop } from './TalleresDesktop';
 import { AlistamientoWizard } from '../../common/AlistamientoWizard';
@@ -42,6 +43,7 @@ import { GarantiasAdminDesktop } from './GarantiasAdminDesktop';
 import { FacturacionDesktop } from './FacturacionDesktop';
 import { AlertasDesktop } from './AlertasDesktop';
 import { GpsMatrizDesktop } from './GpsMatrizDesktop';
+import { GarantiasPlusDesktop } from './GarantiasPlusDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
 
@@ -93,6 +95,9 @@ interface Props {
   gpsRecords?: GpsRecord[];
   onSaveGpsRecord?: (record: GpsRecord) => void;
   onDeleteGpsRecord?: (id: string) => void;
+  garantiasPlusRecords?: GarantiaPlusRecord[];
+  onSaveGarantiaPlusRecord?: (record: GarantiaPlusRecord) => void;
+  onDeleteGarantiaPlusRecord?: (id: string) => void;
 }
 
 export const AdminViewDesktop: React.FC<Props> = ({
@@ -143,6 +148,9 @@ export const AdminViewDesktop: React.FC<Props> = ({
   gpsRecords = [],
   onSaveGpsRecord,
   onDeleteGpsRecord,
+  garantiasPlusRecords = [],
+  onSaveGarantiaPlusRecord,
+  onDeleteGarantiaPlusRecord,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
@@ -165,6 +173,12 @@ export const AdminViewDesktop: React.FC<Props> = ({
       label: 'Alistamiento & PDI',
       icon: <UserCheck className="w-4 h-4" />,
       badge: 'Nuevo',
+    },
+    {
+      id: 'garantias_plus',
+      label: 'Garantías Plus',
+      icon: <Sparkles className="w-4 h-4 text-amber-500" />,
+      badge: 'Plus',
     },
     {
       id: 'gps',
@@ -206,6 +220,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
     talleres: 'Control Operativo de Talleres & Sucursales',
     pendientes: 'Registrar Pendientes & Agendamiento de Tareas',
     alistamiento: 'Alistamiento de Clientes y Motocicletas',
+    garantias_plus: 'Gestión Matriz • Garantías Plus & Mantenimientos Cubiertos',
     gps: 'Módulo GPS Matriz • Compras & Solicitudes de Rastreo',
     clientes_admin: 'Fichero Nacional de Clientes & Flota StarMotos',
     tecnicos: 'Gestión y Despacho del Equipo Técnico',
@@ -427,6 +442,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 onViewModeChange={setAlistamientoViewMode}
                 isMatriz={true}
                 orders={orders}
+                onNavigateSection={setActiveSection}
+              />
+            )}
+            {activeSection === 'garantias_plus' && (
+              <GarantiasPlusDesktop
+                records={garantiasPlusRecords}
+                onSaveRecord={onSaveGarantiaPlusRecord}
+                onDeleteRecord={onDeleteGarantiaPlusRecord}
               />
             )}
             {activeSection === 'gps' && (

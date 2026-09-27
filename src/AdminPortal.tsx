@@ -40,6 +40,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     gpsRecords,
     saveGpsRecord,
     deleteGpsRecord,
+    garantiasPlusRecords,
+    saveGarantiaPlusRecord,
+    deleteGarantiaPlusRecord,
     validateWarrantyByMatriz,
     rejectWarrantyByMatriz,
     sendWarrantyToGarante,
@@ -153,6 +156,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           gpsRecords={gpsRecords}
           onSaveGpsRecord={saveGpsRecord}
           onDeleteGpsRecord={deleteGpsRecord}
+          garantiasPlusRecords={garantiasPlusRecords}
+          onSaveGarantiaPlusRecord={saveGarantiaPlusRecord}
+          onDeleteGarantiaPlusRecord={deleteGarantiaPlusRecord}
         />
       ) : (
         <AdminViewMobile
@@ -203,6 +209,9 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           gpsRecords={gpsRecords}
           onSaveGpsRecord={saveGpsRecord}
           onDeleteGpsRecord={deleteGpsRecord}
+          garantiasPlusRecords={garantiasPlusRecords}
+          onSaveGarantiaPlusRecord={saveGarantiaPlusRecord}
+          onDeleteGarantiaPlusRecord={deleteGarantiaPlusRecord}
         />
       )}
 

@@ -40,9 +40,10 @@ import {
   CreditCard,
   MapPin,
 } from 'lucide-react';
-import { GpsRecord, SystemAlert, Technician, Workshop } from '../../../types/customer';
+import { GpsRecord, SystemAlert, Technician, Workshop, TallerClient } from '../../../types/customer';
 import {
   getStoredClients,
+  saveStoredClients,
   getStoredFullAlistamientos,
   querySriMock,
   saveStoredGpsRecord,
@@ -125,7 +126,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
     fotos: [] as string[],
     observaciones: '',
     // Estado y credenciales
-    estado: 'pendiente' as 'pendiente' | 'activa',
+    estado: 'pendiente' as GpsRecord['estado'],
     gpsUser: '',
     gpsPassword: '',
   };
@@ -135,6 +136,9 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
   const [isSearchingSri, setIsSearchingSri] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
   const [validationAlert, setValidationAlert] = useState<{ title: string; fields: string[] } | null>(null);
+
+  // Marcas registradas para autocomplete
+  const registeredBrands = useMemo(() => getRegisteredBrands(), []);
 
   // Lista oficial de Sedes / Talleres de StarMotos
   const workshopsList = useMemo(() => getStoredWorkshops(), []);
@@ -230,6 +234,53 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
     return Array.from(map.values());
   }, []);
 
+  // Guardar cliente directamente a la base de datos
+  const handleSaveClientToDatabase = () => {
+    if (!formData.cedulaRuc.trim() || !formData.nombres.trim()) {
+      showToast?.('Ingrese al menos cédula y nombres para guardar el cliente.', 'error');
+      return;
+    }
+    const cleanId = formData.cedulaRuc.trim();
+    const cleanNombres = formData.nombres.trim();
+    const cleanApellidos = formData.apellidos.trim();
+    const fullName = `${cleanNombres} ${cleanApellidos}`.trim();
+    const currentClients = getStoredClients();
+    const existingIndex = currentClients.findIndex(
+      (c) => c.idNumber && c.idNumber.trim().toLowerCase() === cleanId.toLowerCase()
+    );
+
+    const clientToSave: TallerClient = {
+      id: existingIndex >= 0 ? currentClients[existingIndex].id : `cli-${Date.now()}`,
+      fullName,
+      idNumber: cleanId,
+      phone: formData.celular1.trim() || (existingIndex >= 0 ? currentClients[existingIndex].phone : ''),
+      email: formData.email.trim() || (existingIndex >= 0 ? currentClients[existingIndex].email : ''),
+      address: formData.direccion.trim() || (existingIndex >= 0 ? currentClients[existingIndex].address : ''),
+      motorcycleBrand: formData.modeloMarca ? formData.modeloMarca.split(' ')[0] : (existingIndex >= 0 ? currentClients[existingIndex].motorcycleBrand : 'Benelli'),
+      motorcycleModel: formData.modeloMarca.trim() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleModel : 'Modelo por definir'),
+      motorcyclePlate: formData.placa.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcyclePlate : 'S/P'),
+      motorcycleVin: formData.chasis.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleVin : undefined),
+      motorNumber: formData.numeroMotor?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorNumber : undefined),
+      color: formData.color?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].color : undefined),
+      motorcycleMileage: Number(formData.kilometraje) || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleMileage : 0),
+      year: Number(formData.year) || (existingIndex >= 0 ? currentClients[existingIndex].year : new Date().getFullYear()),
+      lastVisit: todayStr,
+      totalVisits: existingIndex >= 0 ? (currentClients[existingIndex].totalVisits || 1) + 1 : 1,
+      workshopId: formData.sedeId || 'matriz-la-mana',
+      workshopName: formData.sede || 'StarMotos Matriz La Maná',
+    };
+
+    let updatedClients: TallerClient[];
+    if (existingIndex >= 0) {
+      updatedClients = [...currentClients];
+      updatedClients[existingIndex] = clientToSave;
+    } else {
+      updatedClients = [clientToSave, ...currentClients];
+    }
+    saveStoredClients(updatedClients);
+    showToast?.('✓ Cliente guardado exitosamente en la base de datos.', 'success');
+  };
+
   // Consultar Cédula o RUC
   const handleConsultar = (idOverride?: string) => {
     const idToSearch = (idOverride !== undefined ? idOverride : formData.cedulaRuc).trim();
@@ -268,7 +319,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
         chasis: localMatch.vin || prev.chasis,
         tecnicoResponsable: '',
       }));
-      setSearchFeedback(`✓ Cliente registrado en ${targetSede}: ${localMatch.fullName}`);
+      setSearchFeedback(`✓ Cliente recuperado (${targetSede}): ${localMatch.fullName}`);
       showToast?.(`Cliente recuperado (${targetSede}): ${localMatch.fullName}`, 'info');
       return;
     }
@@ -351,22 +402,24 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       evidenciaTransferencia: record.evidenciaTransferencia || '',
       fotos: record.fotos || [],
       observaciones: record.observaciones || '',
-      estado: record.estado as any,
+      estado: record.estado,
       gpsUser: record.gpsUser || '',
       gpsPassword: record.gpsPassword || '',
     });
     setViewMode('form');
   };
 
-  // Guardar (Nuevo o Actualización)
+  // Enviar formulario (Crear o Editar)
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validar campos obligatorios
+    // Validaciones estrictas
     const missing: string[] = [];
-    if (!formData.cedulaRuc.trim()) missing.push('Cédula/RUC');
-    if (!formData.nombres.trim()) missing.push('Nombres del Propietario');
-    if (!formData.celular1.trim()) missing.push('Celular 1 (Principal)');
+    if (!formData.nombres.trim()) missing.push('Nombres del Cliente');
+    if (!formData.apellidos.trim()) missing.push('Apellidos del Cliente');
+    if (!formData.cedulaRuc.trim()) missing.push('Cédula o RUC');
+    if (!formData.celular1.trim()) missing.push('Celular 1 (Principal WhatsApp)');
+    if (!formData.modeloMarca.trim()) missing.push('Marca / Modelo de Motocicleta');
     if (!formData.chasis.trim()) missing.push('Chasis (VIN)');
     if (!formData.serieGps.trim()) missing.push('Serie de GPS (IMEI)');
     if (!formData.serieChip.trim()) missing.push('Serie de Chip (SIM)');
@@ -487,7 +540,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       particleCount: 80,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#06b6d4', '#0284c7', '#10b981'],
+      colors: ['#2563eb', '#3b82f6', '#10b981'],
     });
 
     showToast?.('¡Solicitud GPS guardada y enviada a GPS Servicios!', 'success');
@@ -498,34 +551,38 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
   // Filtrado de la tabla (igual al estilo de Alistamiento)
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
+      const valor = Number(r.valorServicio) || 0;
+      const pagado = Number(r.montoPagado) || 0;
+      const saldo = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
+
       // Filtro de pago
-      if (filterPayment === 'con_saldo' && Number(r.saldoPendiente || 0) <= 0) return false;
-      if (filterPayment === 'pagados' && Number(r.saldoPendiente || 0) > 0) return false;
+      if (filterPayment === 'con_saldo' && saldo <= 0.01) return false;
+      if (filterPayment === 'pagados' && saldo > 0.01) return false;
 
       // Filtro de estado
-      if (filterStatus !== 'all' && r.estado !== filterStatus) return false;
+      if (filterStatus === 'pendiente' && r.estado !== 'pendiente') return false;
+      if (filterStatus === 'activa' && r.estado !== 'activa') return false;
 
-      // Búsqueda por texto
+      // Búsqueda
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const clientFull = `${r.nombres} ${r.apellidos}`.toLowerCase();
-        const phones = `${r.celular1} ${r.celular2 || ''} ${r.celular3 || ''}`.toLowerCase();
         return (
           clientFull.includes(q) ||
           r.cedulaRuc.toLowerCase().includes(q) ||
           r.placa.toLowerCase().includes(q) ||
-          r.modeloMarca.toLowerCase().includes(q) ||
+          r.chasis.toLowerCase().includes(q) ||
           r.ticketNumber.toLowerCase().includes(q) ||
           r.serieGps.toLowerCase().includes(q) ||
-          r.serieChip.toLowerCase().includes(q) ||
-          phones.includes(q)
+          r.serieChip.toLowerCase().includes(q)
         );
       }
+
       return true;
     });
   }, [records, filterPayment, filterStatus, searchTerm]);
 
-  // Métricas financieras y operativas (igual que Alistamiento)
+  // Métricas financieras y de conteo
   const statsMetrics = useMemo(() => {
     let totalFacturado = 0;
     let totalRecaudado = 0;
@@ -537,15 +594,21 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
     records.forEach((r) => {
       const val = Number(r.valorServicio) || 0;
       const pag = Number(r.montoPagado) || 0;
-      const sal = Number(r.saldoPendiente !== undefined ? r.saldoPendiente : Math.max(0, val - pag));
+      const sal = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, val - pag);
 
       totalFacturado += val;
       totalRecaudado += pag;
       totalPendiente += sal;
 
-      if (sal > 0) countConSaldo++;
-      if (r.estado === 'pendiente') countPendientesGps++;
-      if (r.estado === 'activa') countActivosGps++;
+      if (sal > 0.01) {
+        countConSaldo++;
+      }
+
+      if (r.estado === 'activa') {
+        countActivosGps++;
+      } else {
+        countPendientesGps++;
+      }
     });
 
     return {
@@ -575,8 +638,15 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
 
   return (
     <div className="h-full w-full flex-1 flex flex-col font-sans antialiased animate-fade-in text-zinc-900">
+      {/* Datalist con marcas registradas para modeloMarca */}
+      <datalist id="registered-brands-datalist">
+        {registeredBrands.map((brand) => (
+          <option key={brand} value={brand} />
+        ))}
+      </datalist>
+
       {/* ========================================================================= */}
-      {/* 1. VISTA: TABLA Y LIBRO EXTERIOR DE COMPRAS GPS (IDÉNTICO A ALISTAMIENTO)  */}
+      {/* 1. VISTA: TABLA Y LIBRO EXTERIOR DE GPS (ESTILO IDÉNTICO A ALISTAMIENTO)  */}
       {/* ========================================================================= */}
       {viewMode === 'list' && (
         <div className="h-full w-full flex-1 min-h-0 flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
@@ -585,15 +655,15 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
             {/* Fila 1: Título con Icono y Badges de Métricas */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
                   <Radio className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
-                      Libro de Registro & Compras GPS Matriz
+                      Libro de GPS Matriz & Rastreo Satelital
                     </h2>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-100 text-cyan-800 border border-cyan-200">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
                       Exclusivo Matriz
                     </span>
                   </div>
@@ -604,7 +674,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-1 text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200 rounded-lg whitespace-nowrap shadow-2xs">
+                <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg whitespace-nowrap shadow-2xs">
                   {records.length} GPS Totales
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg whitespace-nowrap shadow-2xs">
@@ -613,16 +683,16 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                 <span className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg whitespace-nowrap shadow-2xs">
                   {statsMetrics.countActivosGps} Activos con Llave
                 </span>
-                <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
+                <span className="px-2.5 py-1 text-xs font-bold bg-zinc-100 text-zinc-800 border border-zinc-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
                   ${statsMetrics.totalFacturado.toFixed(2)} Facturado
                 </span>
               </div>
             </div>
 
-            {/* Fila 2: Barra de Búsqueda LLAMATIVA y Botón "+ Nuevo Registro GPS" */}
+            {/* Fila 2: Barra de Búsqueda LLAMATIVA y Botón "+ Registrar Compra GPS" */}
             <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-2.5 border-t border-zinc-100">
-              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-cyan-200 focus-within:border-cyan-600 focus-within:ring-4 focus-within:ring-cyan-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
-                <Search className="w-5 h-5 text-cyan-600 shrink-0" />
+              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-blue-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
+                <Search className="w-5 h-5 text-blue-600 shrink-0" />
                 <input
                   type="text"
                   value={searchTerm}
@@ -659,7 +729,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         handleStartNewGps(searchTerm.trim());
                       }
                     }}
-                    className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                   >
                     {filteredRecords.length > 0 ? 'Ver Formulario' : 'Consultar C.I.'}
                   </button>
@@ -672,37 +742,37 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={`h-12 sm:h-13 px-4 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs shrink-0 ${
                   isFilterOpen || activeFilterCount > 0
-                    ? 'bg-cyan-50 border-cyan-400 text-cyan-800'
+                    ? 'bg-blue-50 border-blue-400 text-blue-800'
                     : 'bg-white border-zinc-300 hover:border-zinc-400 text-zinc-700'
                 }`}
               >
-                <SlidersHorizontal className="w-4 h-4 text-cyan-600 shrink-0" />
+                <SlidersHorizontal className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>Filtros</span>
                 {activeFilterCount > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-cyan-600 text-white text-[11px] font-black flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">
                     {activeFilterCount}
                   </span>
                 )}
                 <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Botón "+ Nueva Compra GPS" Destacado */}
+              {/* Botón "+ Registrar Compra GPS" Destacado */}
               <button
                 type="button"
                 onClick={() => handleStartNewGps(searchTerm.trim())}
-                className="h-12 sm:h-13 px-6 bg-cyan-600 hover:bg-cyan-700 active:scale-98 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0"
+                className="h-12 sm:h-13 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0"
               >
                 <Plus className="w-4.5 h-4.5" />
-                <span>+ Nueva Compra GPS</span>
+                <span>+ Registrar Compra GPS</span>
               </button>
             </div>
 
             {/* Panel de Filtros Interactivos Desplegable */}
             {isFilterOpen && (
-              <div className="bg-zinc-50/90 border border-cyan-200 rounded-2xl p-4 shadow-xs space-y-4 animate-fade-in">
+              <div className="bg-zinc-50/90 border border-blue-200 rounded-2xl p-4 shadow-xs space-y-4 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200">
                   <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="w-4 h-4 text-cyan-600" />
+                    <SlidersHorizontal className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-black uppercase tracking-wider text-zinc-900">
                       Filtros de GPS & Cobros
                     </span>
@@ -737,7 +807,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         onClick={() => setFilterPayment('all')}
                         className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           filterPayment === 'all'
-                            ? 'bg-cyan-600 text-white border-cyan-600 shadow-2xs'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                             : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                         }`}
                       >
@@ -768,7 +838,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Estado de Aprobación por GPS Servicios */}
+                  {/* Estado de Credenciales por GPS Servicios */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
                       Estado de Credenciales (GPS Servicios)
@@ -779,7 +849,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         onClick={() => setFilterStatus('all')}
                         className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           filterStatus === 'all'
-                            ? 'bg-cyan-600 text-white border-cyan-600 shadow-2xs'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                             : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                         }`}
                       >
@@ -888,28 +958,28 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                 </div>
               </button>
 
-              {/* Tarjeta 4: Unidades GPS */}
+              {/* Tarjeta 4: Dispositivos GPS */}
               <button
                 type="button"
                 onClick={() => setFilterStatus(filterStatus === 'pendiente' ? 'all' : 'pendiente')}
                 className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none ${
                   filterStatus === 'pendiente'
-                    ? 'bg-cyan-100 border-2 border-cyan-500 shadow-md ring-2 ring-cyan-300'
-                    : 'bg-cyan-50/70 border border-cyan-200 shadow-2xs hover:bg-cyan-100/70'
+                    ? 'bg-blue-100 border-2 border-blue-500 shadow-md ring-2 ring-blue-300'
+                    : 'bg-zinc-50 border border-zinc-200 shadow-2xs hover:bg-zinc-100'
                 }`}
                 title="Filtrar por unidades pendientes de credenciales"
               >
-                <div className="flex items-center justify-between text-cyan-800">
+                <div className="flex items-center justify-between text-blue-800">
                   <span className="text-[10px] font-black uppercase tracking-wider">Dispositivos GPS</span>
-                  <div className="w-6 h-6 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-700">
+                  <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700">
                     <Radio className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div className="mt-1">
-                  <div className="text-lg sm:text-xl font-black text-cyan-900 leading-tight">
-                    {records.length} <span className="text-xs font-bold text-cyan-700">unidades</span>
+                  <div className="text-lg sm:text-xl font-black text-zinc-900 leading-tight">
+                    {records.length} <span className="text-xs font-bold text-zinc-600">unidades</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-cyan-700">
+                  <span className="text-[10px] font-semibold text-zinc-600">
                     {statsMetrics.countActivosGps} Activos • {statsMetrics.countPendientesGps} Pendientes
                   </span>
                 </div>
@@ -928,7 +998,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     <th className="px-3 py-2.5">Cliente & 3 Celulares</th>
                     <th className="px-3 py-2.5">Motocicleta</th>
                     <th className="px-3 py-2.5">Series GPS & SIM</th>
-                    <th className="px-3 py-2.5">Vigencia</th>
+                    <th className="px-3 py-2.5">Vigencia & Técnico</th>
                     <th className="px-3 py-2.5 text-right">Valor</th>
                     <th className="px-3 py-2.5 text-right">Pagado</th>
                     <th className="px-3 py-2.5 text-right">Saldo</th>
@@ -944,7 +1014,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         <p className="font-bold text-zinc-700 text-sm">No se encontraron registros de GPS</p>
                         <p className="text-xs text-zinc-400 mt-0.5">
                           {records.length === 0
-                            ? 'Inicia registrando una nueva compra de GPS con el botón "+ Nueva Compra GPS".'
+                            ? 'Inicia registrando una nueva compra de GPS con el botón "+ Registrar Compra GPS".'
                             : 'Prueba cambiando los términos o filtros de búsqueda.'}
                         </p>
                       </td>
@@ -961,7 +1031,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           className={`cursor-pointer transition-colors divide-x divide-zinc-200/70 select-none group ${
                             isApproved
                               ? 'bg-emerald-50/40 hover:bg-emerald-100/60 text-zinc-900'
-                              : 'hover:bg-cyan-50/60 active:bg-cyan-100/70 text-zinc-900'
+                              : 'hover:bg-blue-50/60 active:bg-blue-100/70 text-zinc-900'
                           }`}
                           title={`Haga clic para ver los datos completos de ${record.nombres} ${record.apellidos} en el formato de ingreso`}
                         >
@@ -972,7 +1042,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
 
                           {/* Ticket y Fecha */}
                           <td className="px-3 py-2.5 whitespace-nowrap">
-                            <span className="font-mono font-bold text-xs text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 block w-max">
+                            <span className="font-mono font-bold text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-max">
                               {record.ticketNumber}
                             </span>
                             <span className="text-[10px] text-zinc-400 block mt-0.5">{record.fechaSolicitud}</span>
@@ -981,15 +1051,15 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           {/* Cliente y 3 Celulares */}
                           <td className="px-3 py-2.5 max-w-xs">
                             <div className="flex flex-col">
-                              <span className="font-bold text-xs text-zinc-900 group-hover:text-cyan-700 transition-colors truncate">
+                              <span className="font-bold text-xs text-zinc-900 group-hover:text-blue-700 transition-colors truncate">
                                 {record.nombres} {record.apellidos}
                               </span>
                               <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 <span className="text-[10px] font-mono text-zinc-500">
                                   C.I. {record.cedulaRuc}
                                 </span>
-                                <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-cyan-800 bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200" title={`Sede: ${record.sede || 'Matriz'}`}>
-                                  <MapPin className="w-2.5 h-2.5 text-cyan-600" />
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-blue-800 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200" title={`Sede: ${record.sede || 'Matriz'}`}>
+                                  <MapPin className="w-2.5 h-2.5 text-blue-600" />
                                   <span className="truncate max-w-[110px]">{record.sede || 'Matriz'}</span>
                                 </span>
                               </div>
@@ -1096,7 +1166,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                             )}
                           </td>
 
-                          {/* ACCIONES (LLAVE & ELIMINAR) */}
+                          {/* ACCIONES (LLAVE, VER FICHA & ELIMINAR) */}
                           <td className="px-3 py-2.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1.5">
                               {/* ICONO DE LLAVE */}
@@ -1107,7 +1177,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                                     e.stopPropagation();
                                     setSelectedRecordForCredentials(record);
                                   }}
-                                  className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 transition cursor-pointer active:scale-95 group relative"
+                                  className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white flex items-center justify-center shadow-md shadow-emerald-600/30 transition cursor-pointer active:scale-95 group relative"
                                   title="Ver credenciales (Usuario y Clave) para compartir por WhatsApp"
                                 >
                                   <KeyRound className="w-4 h-4 text-amber-200 group-hover:rotate-12 transition-transform" />
@@ -1154,7 +1224,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. VISTA: FORMULARIO DE INGRESO / EDICIÓN DE GPS (TODOS LOS CAMPOS EN 1 PESTAÑA) */}
+      {/* 2. VISTA: FORMULARIO DE INGRESO / EDICIÓN DE GPS (ESTILO 3 COLUMNAS)      */}
       {/* ========================================================================= */}
       {viewMode === 'form' && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
@@ -1185,7 +1255,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         : 'Registro de Nueva Compra GPS'}
                     </h2>
                     {formData.ticketNumber && (
-                      <span className="font-mono text-xs text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 font-bold">
+                      <span className="font-mono text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
                         {formData.ticketNumber}
                       </span>
                     )}
@@ -1200,7 +1270,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     )}
                   </div>
                   <p className="text-xs text-zinc-500">
-                    Todos los campos de cliente, motocicleta y vigencia integrados en una sola vista.
+                    Registro estructurado en 3 pasos: datos del cliente, motocicleta y hardware GPS satelital con liquidación financiera.
                   </p>
                 </div>
               </div>
@@ -1211,7 +1281,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedRecordForCredentials(selectedRecordForDetail)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition"
                   >
                     <KeyRound className="w-3.5 h-3.5 text-amber-200" />
                     <span>Ver Credenciales & WhatsApp</span>
@@ -1227,6 +1297,17 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     <span>Imprimir</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('list');
+                    setSelectedRecordForDetail(null);
+                    setIsEditing(false);
+                  }}
+                  className="px-4 py-2 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
 
@@ -1254,38 +1335,49 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
             )}
 
             {/* ===================================================================== */}
-            {/* LAYOUT PRINCIPAL: 3 COLUMNAS SIMÉTRICAS EN LA MISMA PESTAÑA           */}
+            {/* LAYOUT PRINCIPAL: 3 COLUMNAS SIMÉTRICAS (IDÉNTICO A ALISTAMIENTO)     */}
             {/* ===================================================================== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
               {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 1: MÓDULO 1 - DATOS DEL CLIENTE & 3 CELULARES             */}
+              {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE & 3 CELULARES               */}
               {/* ----------------------------------------------------------------- */}
               <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 font-black text-xs flex items-center justify-center border border-cyan-200">
+                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
                         1
                       </div>
                       <div>
                         <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
-                        <p className="text-[11px] text-zinc-400">Cédula SRI & 3 Celulares</p>
+                        <p className="text-[11px] text-zinc-400">Verificación SRI & 3 Celulares</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200">
-                      Módulo 1
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                        Paso 1
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSaveClientToDatabase}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        title="Guardar este cliente en la base de datos para futuras consultas"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Guardar</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Sede / Taller de Atención */}
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-cyan-600" />
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
                         <span>Sede / Taller de Atención *</span>
                       </span>
-                      <span className="text-[10px] text-cyan-700 font-semibold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
-                        Cambiar si atiende en otra sede
+                      <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                        Red Matriz
                       </span>
                     </label>
                     <select
@@ -1300,7 +1392,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           tecnicoResponsable: '',
                         }));
                       }}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold text-zinc-800 outline-none focus:border-cyan-600 focus:bg-white cursor-pointer"
+                      className="w-full px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
                       required
                     >
                       {workshopsList.map((ws) => (
@@ -1312,8 +1404,8 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                   </div>
 
                   {/* Cédula o RUC (con botón Consultar SRI) */}
-                  <div className="bg-cyan-50/60 p-2.5 rounded-xl border border-cyan-200 space-y-1.5">
-                    <label className="block text-xs font-black uppercase text-cyan-950">
+                  <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
+                    <label className="block text-xs font-black uppercase text-blue-900">
                       Cédula o RUC del Cliente *
                     </label>
                     <div className="flex gap-2">
@@ -1328,21 +1420,27 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           }
                         }}
                         placeholder="Ejemplo: 1723456789 o RUC..."
-                        className="flex-1 px-3 py-2 bg-white border border-cyan-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-cyan-500"
+                        className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => handleConsultar()}
                         disabled={isSearchingSri || !formData.cedulaRuc.trim()}
-                        className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
                       >
                         <Search className="w-3.5 h-3.5" />
                         <span>{isSearchingSri ? 'Buscando...' : 'Consultar'}</span>
                       </button>
                     </div>
                     {searchFeedback && (
-                      <p className="text-[11px] font-medium leading-tight p-2 rounded-lg bg-white border border-cyan-200 text-cyan-900">
+                      <p
+                        className={`text-xs font-medium leading-tight p-2.5 rounded-xl border ${
+                          searchFeedback.startsWith('✓')
+                            ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                            : 'text-amber-800 bg-amber-50 border-amber-200'
+                        }`}
+                      >
                         {searchFeedback}
                       </p>
                     )}
@@ -1358,7 +1456,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.nombres}
                       onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
                       placeholder="Ejemplo: Carlos Alberto"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-cyan-600 focus:bg-white"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                       required
                     />
                   </div>
@@ -1373,7 +1471,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.apellidos}
                       onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
                       placeholder="Ejemplo: Mendoza Villao"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-cyan-600 focus:bg-white"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                       required
                     />
                   </div>
@@ -1382,7 +1480,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
                       <span>Celular 1 (Principal WhatsApp) *</span>
-                      <span className="text-[10px] text-cyan-700 font-bold bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                      <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
                         Principal
                       </span>
                     </label>
@@ -1391,13 +1489,13 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.celular1}
                       onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
                       placeholder="0998765432"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                       required
                     />
                   </div>
 
-                  {/* Celulares 2 y 3 al lado */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Celulares 2 y 3 en 2 columnas */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Celular 2 (Secundario)
@@ -1407,7 +1505,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         value={formData.celular2}
                         onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
                         placeholder="0987654321"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                       />
                     </div>
                     <div>
@@ -1419,7 +1517,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         value={formData.celular3}
                         onChange={(e) => setFormData({ ...formData, celular3: e.target.value })}
                         placeholder="0976543210"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                       />
                     </div>
                   </div>
@@ -1434,7 +1532,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="cliente@correo.com"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-cyan-600 focus:bg-white"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     />
                   </div>
 
@@ -1447,78 +1545,88 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.direccion}
                       onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
                       placeholder="Av. 19 de Mayo y San Pablo"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-cyan-600 focus:bg-white"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
                     />
                   </div>
                 </div>
               </div>
 
               {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 2: MÓDULO 2 - DATOS DE LA MOTO & HARDWARE GPS             */}
+              {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTO & HARDWARE GPS               */}
               {/* ----------------------------------------------------------------- */}
               <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 font-black text-xs flex items-center justify-center border border-cyan-200">
+                      <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
                         2
                       </div>
                       <div>
-                        <h3 className="text-sm font-black text-zinc-900">Motocicleta & GPS</h3>
-                        <p className="text-[11px] text-zinc-400">Datos vehiculares & hardware</p>
+                        <h3 className="text-sm font-black text-zinc-900">Datos de la Moto & GPS</h3>
+                        <p className="text-[11px] text-zinc-400">Identificación técnica del vehículo & hardware</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200">
-                      Módulo 2
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                      Paso 2
                     </span>
                   </div>
 
-                  {/* Placa y Marca/Modelo */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                        Placa
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.placa}
-                        onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                        placeholder="PBX-8492 o EN TRÁMITE"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                        Marca / Modelo *
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.modeloMarca}
-                        onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                        placeholder="Ej: Benelli TRK 502X"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
-                        required
-                      />
-                    </div>
+                  {/* Modelo y Marca (con datalist de marcas oficiales) */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                      Modelo y Marca *
+                    </label>
+                    <input
+                      type="text"
+                      list="registered-brands-datalist"
+                      value={formData.modeloMarca}
+                      onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                      placeholder="Ejemplo: Thunder 200 / Pulsar NS 200"
+                      className="w-full px-3.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
+                      required
+                    />
                   </div>
 
-                  {/* Chasis (VIN) */}
+                  {/* Placa */}
                   <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                      Número de Chasis (VIN) *
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold uppercase text-zinc-700">
+                        Placa
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                        className="text-xs text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
+                      >
+                        En trámite
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={formData.placa}
+                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                      placeholder="Ejemplo: AB123C o EN TRÁMITE"
+                      className="w-full px-3.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                    />
+                  </div>
+
+                  {/* Serie o Chasis (VIN) */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                      Serie o Chasis (VIN) *
                     </label>
                     <input
                       type="text"
                       value={formData.chasis}
                       onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                      placeholder="17 dígitos alfanuméricos"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                      placeholder="Ejemplo: 3SCBP123456789012"
+                      className="w-full px-3.5 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                       required
                     />
                   </div>
 
-                  {/* Motor, Color, Año, Km */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Motor y Color en 2 columnas */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Número de Motor
@@ -1528,24 +1636,25 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         value={formData.numeroMotor}
                         onChange={(e) => setFormData({ ...formData, numeroMotor: e.target.value.toUpperCase() })}
                         placeholder="Ej: BJ265MN-1"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-cyan-600"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-red-600"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                        Color
+                        Color de la Moto
                       </label>
                       <input
                         type="text"
                         value={formData.color}
                         onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                        placeholder="Ej: Gris / Rojo"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-cyan-600"
+                        placeholder="Ej: Negro Mate"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-red-600"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Año y Kilometraje en 2 columnas */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Año
@@ -1554,99 +1663,124 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         type="number"
                         value={formData.year}
                         onChange={(e) => setFormData({ ...formData, year: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-cyan-600"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-red-600"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Kilometraje
                       </label>
-                      <input
-                        type="number"
-                        value={formData.kilometraje}
-                        onChange={(e) => setFormData({ ...formData, kilometraje: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-cyan-600"
-                      />
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.kilometraje}
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const km = cleanNumberInput(e.target.value);
+                            setFormData((prev) => ({
+                              ...prev,
+                              kilometraje: km === '' ? 0 : Number(km),
+                            }));
+                          }}
+                          placeholder="0"
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-red-600"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                          KM
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Series de Hardware GPS & SIM (sin contenedor externo) */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Hardware GPS & SIM (Series oficiales) */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-100">
                     <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                        Serie de GPS (IMEI) *
+                      <label className="block text-xs font-black uppercase text-zinc-800 mb-1">
+                        Serie GPS (IMEI) *
                       </label>
                       <input
                         type="text"
                         value={formData.serieGps}
                         onChange={(e) => setFormData({ ...formData, serieGps: e.target.value.trim() })}
                         placeholder="Ej: 869402058491823"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-blue-50/50 border border-blue-200 rounded-xl text-xs font-mono font-bold text-blue-950 outline-none focus:border-blue-600 focus:bg-white"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
-                        Serie de Chip (SIM) *
+                      <label className="block text-xs font-black uppercase text-zinc-800 mb-1">
+                        Serie Chip (SIM) *
                       </label>
                       <input
                         type="text"
                         value={formData.serieChip}
                         onChange={(e) => setFormData({ ...formData, serieChip: e.target.value.trim() })}
                         placeholder="Ej: 8959302194820194820"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-blue-50/50 border border-blue-200 rounded-xl text-xs font-mono font-bold text-blue-950 outline-none focus:border-blue-600 focus:bg-white"
                         required
                       />
                     </div>
+                  </div>
+
+                  {/* Resumen decorativo del vehículo */}
+                  <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs space-y-1 text-zinc-600">
+                    <div className="font-bold text-zinc-800 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Auditoría de Hardware GPS:</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500">
+                      Verifique que la serie IMEI física del rastreador coincida con el número registrado en el chip SIM activo.
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 3: MÓDULO 3 - VIGENCIA, TÉCNICO & COBRO                   */}
+              {/* COLUMNA 3: PASO 3 - VIGENCIA, TÉCNICO & COBRO                     */}
               {/* ----------------------------------------------------------------- */}
               <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 font-black text-xs flex items-center justify-center border border-cyan-200">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
                         3
                       </div>
                       <div>
                         <h3 className="text-sm font-black text-zinc-900">Vigencia, Técnico & Cobro</h3>
-                        <p className="text-[11px] text-zinc-400">Fechas, técnico y contabilidad</p>
+                        <p className="text-[11px] text-zinc-400">Fechas, técnico y facturación de Matriz</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                      Módulo 3
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Paso 3
                     </span>
                   </div>
 
-                  {/* FECHA DE INICIO Y FECHA DE VENCIMIENTO AL LADO */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* FECHA DE INICIO Y VENCIMIENTO AL LADO */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-cyan-600" />
-                        <span>Fecha Inicio *</span>
+                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Fecha de Inicio *</span>
                       </label>
                       <input
                         type="date"
                         value={formData.fechaInicio}
                         onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                         required
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Fecha Vence *</span>
+                        <span>Vencimiento *</span>
                       </label>
                       <input
                         type="date"
                         value={formData.fechaVencimiento}
                         onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                         required
                       />
                     </div>
@@ -1657,7 +1791,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Técnico Encargado</span>
+                        <span>Técnico Instalador</span>
                       </span>
                       <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[50%]">
                         Sede: {formData.sede || 'Matriz'}
@@ -1666,7 +1800,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     <select
                       value={formData.tecnicoResponsable}
                       onChange={(e) => setFormData({ ...formData, tecnicoResponsable: e.target.value })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-cyan-600 focus:bg-white cursor-pointer"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
                     >
                       <option value="">
                         {availableTechniciansForSede.length === 0
@@ -1684,8 +1818,8 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     </select>
                   </div>
 
-                  {/* CONTABILIDAD MATRIZ (SIN BLOQUE EXTERNO) & MÉTODO DE PAGO ALADO */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* LIQUIDACIÓN FINANCIERA & COBRO */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Valor del GPS ($) *
@@ -1700,7 +1834,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           const val = cleanNumberInput(e.target.value);
                           setFormData({ ...formData, valorServicio: val === '' ? 0 : Number(val) });
                         }}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                       />
                     </div>
                     <div>
@@ -1716,7 +1850,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                               montoPagado: prev.valorServicio,
                             }));
                           }}
-                          className="text-[10px] text-cyan-700 hover:text-cyan-800 font-bold underline cursor-pointer"
+                          className="text-[10px] text-blue-700 hover:text-blue-800 font-bold underline cursor-pointer"
                         >
                           Total
                         </button>
@@ -1731,13 +1865,13 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                           const ab = cleanNumberInput(e.target.value);
                           setFormData({ ...formData, montoPagado: ab === '' ? 0 : Number(ab) });
                         }}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-cyan-600 focus:bg-white"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Saldo Pendiente alado */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Saldo Pendiente */}
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Saldo Pendiente ($)
@@ -1762,7 +1896,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       </div>
                     </div>
 
-                    {/* Método de pago alado con solo 2 opciones: Efectivo o Transferencia */}
+                    {/* Método de pago */}
                     <div>
                       <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
                         Método de Pago *
@@ -1770,7 +1904,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       <select
                         value={formData.metodoPago}
                         onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value as 'Efectivo' | 'Transferencia' })}
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none focus:border-cyan-600 focus:bg-white cursor-pointer"
+                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white cursor-pointer"
                       >
                         <option value="Efectivo">Efectivo</option>
                         <option value="Transferencia">Transferencia</option>
@@ -1847,7 +1981,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                   <div className="space-y-1.5 pt-1 border-t border-zinc-200/80">
                     <div className="flex items-center justify-between">
                       <label className="block text-[11px] font-black uppercase text-zinc-700 flex items-center gap-1.5">
-                        <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                        <Camera className="w-3.5 h-3.5 text-blue-600" />
                         <span>Fotografías / Evidencias de la Instalación</span>
                       </label>
                       <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full">
@@ -1892,9 +2026,9 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                     )}
 
                     {/* Botón para subir fotos */}
-                    <label className="flex items-center justify-center gap-2 p-2.5 border-2 border-dashed border-cyan-300 hover:border-cyan-500 bg-cyan-50/20 hover:bg-cyan-50/50 rounded-xl cursor-pointer transition-all">
-                      <Upload className="w-4 h-4 text-cyan-600" />
-                      <span className="text-xs font-bold text-cyan-900">
+                    <label className="flex items-center justify-center gap-2 p-2.5 border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/20 hover:bg-blue-50/50 rounded-xl cursor-pointer transition-all">
+                      <Upload className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-bold text-blue-900">
                         {formData.fotos.length > 0 ? '+ Agregar más fotos' : 'Subir fotos del vehículo / GPS instalado'}
                       </span>
                       <input
@@ -1931,7 +2065,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       value={formData.observaciones}
                       onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
                       placeholder="Ej: Incluye 1 año de plataforma satelital"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-cyan-600 focus:bg-white resize-none"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs text-zinc-800 outline-none focus:border-blue-600 focus:bg-white resize-none"
                     />
                   </div>
                 </div>
@@ -1940,7 +2074,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full py-3 px-6 bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition cursor-pointer active:scale-98"
+                    className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>

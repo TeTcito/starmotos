@@ -397,14 +397,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
         {/* CONTENIDO PRINCIPAL */}
         <main
           className={`flex-1 w-full bg-white ${
-            activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus'
+            activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus' || activeSection === 'gps'
               ? 'overflow-hidden flex flex-col p-4'
               : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-5'
           }`}
         >
           <div
             className={`w-full ${
-              activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus'
+              activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus' || activeSection === 'gps'
                 ? 'flex-1 min-h-0 flex flex-col'
                 : ''
             }`}

@@ -18,7 +18,6 @@ import {
   Clock,
   Sparkles,
   ArrowRight,
-  ArrowLeft,
   Smartphone,
   Phone,
   Cpu,
@@ -28,7 +27,6 @@ import {
   Check,
   Copy,
   X,
-  Save,
   TrendingUp,
   SlidersHorizontal,
   ChevronDown,
@@ -651,7 +649,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       {viewMode === 'list' && (
         <div className="h-full w-full flex-1 min-h-0 flex flex-col overflow-y-auto xl:overflow-hidden gap-3">
           {/* Header Superior: Libro de GPS & Búsqueda Destacada */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 shrink-0">
+          <div className="space-y-3.5 shrink-0">
             {/* Fila 1: Título con Icono y Badges de Métricas */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -690,7 +688,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
             </div>
 
             {/* Fila 2: Barra de Búsqueda LLAMATIVA y Botón "+ Registrar Compra GPS" */}
-            <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-2.5 border-t border-zinc-100">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-1">
               <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-blue-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
                 <Search className="w-5 h-5 text-blue-600 shrink-0" />
                 <input
@@ -1227,90 +1225,8 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       {/* 2. VISTA: FORMULARIO DE INGRESO / EDICIÓN DE GPS (ESTILO 3 COLUMNAS)      */}
       {/* ========================================================================= */}
       {viewMode === 'form' && (
-        <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
-          <form onSubmit={handleSubmitForm} className="space-y-4 animate-fade-in bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs">
-            {/* Cabecera del Formulario de Ingreso de GPS */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode('list');
-                    setSelectedRecordForDetail(null);
-                    setIsEditing(false);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
-                >
-                  <ArrowLeft className="w-4 h-4 text-zinc-600" />
-                  <span>Volver al Libro de GPS</span>
-                </button>
-
-                <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
-
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
-                      {isEditing
-                        ? `Ficha Técnica GPS: ${formData.nombres} ${formData.apellidos}`
-                        : 'Registro de Nueva Compra GPS'}
-                    </h2>
-                    {formData.ticketNumber && (
-                      <span className="font-mono text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-bold">
-                        {formData.ticketNumber}
-                      </span>
-                    )}
-                    {isEditing && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        formData.estado === 'activa'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : 'bg-amber-100 text-amber-800 border border-amber-300'
-                      }`}>
-                        {formData.estado === 'activa' ? '✓ Credenciales Activas' : '⏳ Pendiente de Credenciales'}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    Registro estructurado en 3 pasos: datos del cliente, motocicleta y hardware GPS satelital con liquidación financiera.
-                  </p>
-                </div>
-              </div>
-
-              {/* Botones de acción rápida en cabecera */}
-              <div className="flex items-center gap-2">
-                {isEditing && formData.estado === 'activa' && formData.gpsUser && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRecordForCredentials(selectedRecordForDetail)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition"
-                  >
-                    <KeyRound className="w-3.5 h-3.5 text-amber-200" />
-                    <span>Ver Credenciales & WhatsApp</span>
-                  </button>
-                )}
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs shadow-2xs transition cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Imprimir</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewMode('list');
-                    setSelectedRecordForDetail(null);
-                    setIsEditing(false);
-                  }}
-                  className="px-4 py-2 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-
+        <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-4">
+          <form onSubmit={handleSubmitForm} className="space-y-4 animate-fade-in">
             {/* ALERTA DE VALIDACIÓN SI FALTAN CAMPOS */}
             {validationAlert && (
               <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
@@ -1353,20 +1269,9 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                         <p className="text-[11px] text-zinc-400">Verificación SRI & 3 Celulares</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                        Paso 1
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleSaveClientToDatabase}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                        title="Guardar este cliente en la base de datos para futuras consultas"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Guardar</span>
-                      </button>
-                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Paso 1
+                    </span>
                   </div>
 
                   {/* Sede / Taller de Atención */}
@@ -1733,6 +1638,29 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                       Verifique que la serie IMEI física del rastreador coincida con el número registrado en el chip SIM activo.
                     </p>
                   </div>
+
+                  {isEditing && (
+                    <div className="flex items-center gap-2 pt-1">
+                      {formData.estado === 'activa' && formData.gpsUser && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecordForCredentials(selectedRecordForDetail)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-amber-200" />
+                          <span>Credenciales & WhatsApp</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs shadow-2xs transition cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Imprimir</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2071,17 +1999,24 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
                 </div>
 
                 {/* BOTÓN SUBMIT DE GUARDADO */}
-                <div className="pt-2">
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewMode('list');
+                      setSelectedRecordForDetail(null);
+                      setIsEditing(false);
+                    }}
+                    className="py-3 px-4 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-700 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
                   <button
                     type="submit"
-                    className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="flex-1 py-3 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      {isEditing
-                        ? 'Guardar Cambios de la Ficha GPS'
-                        : 'Guardar y Enviar Solicitud a GPS Servicios'}
-                    </span>
+                    <span>Guardar y Enviar</span>
                   </button>
                 </div>
               </div>

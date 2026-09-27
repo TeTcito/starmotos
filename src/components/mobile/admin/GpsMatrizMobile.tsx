@@ -13,13 +13,11 @@ import {
   Trash2,
   CheckCircle2,
   Clock,
-  ArrowLeft,
   Smartphone,
   Phone,
   MessageCircle,
   X,
   AlertCircle,
-  Save,
   TrendingUp,
   UserCheck,
   ChevronRight,
@@ -639,7 +637,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       {viewMode === 'list' && (
         <div className="space-y-3.5">
           {/* Header Superior Destacado: Libro de GPS */}
-          <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
@@ -1027,41 +1025,6 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       {/* ========================================================================= */}
       {viewMode === 'form' && (
         <form onSubmit={handleSubmitForm} className="space-y-3 animate-fade-in">
-          {/* Header Superior del Formulario: Botón Volver, Título y Botón Guardar Icono */}
-          <div className="flex items-center justify-between pb-1">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('list');
-                  setSelectedRecordForDetail(null);
-                  setIsEditing(false);
-                }}
-                className="p-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 active:scale-95 transition cursor-pointer"
-                title="Volver al Listado"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <div>
-                <h3 className="text-sm font-black text-zinc-900 leading-tight">
-                  {isEditing ? `Ficha GPS: ${formData.nombres}` : 'Registrar Compra GPS'}
-                </h3>
-                <p className="text-[10px] text-zinc-400">
-                  {formData.ticketNumber ? `Ticket: ${formData.ticketNumber}` : 'Ingreso estructurado en 3 pasos'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveClientToDatabase}
-              className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer shrink-0"
-              title="Guardar Cliente en Base de Datos"
-            >
-              <Save className="w-4 h-4" />
-            </button>
-          </div>
-
           {/* Alerta de validación */}
           {validationAlert && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl flex items-start justify-between gap-2 animate-slide-in">
@@ -1287,12 +1250,23 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Botón Siguiente */}
-              <div className="pt-2">
+              {/* Botón Siguiente y Cancelar */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('list');
+                    setSelectedRecordForDetail(null);
+                    setIsEditing(false);
+                  }}
+                  className="py-2.5 px-4 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
                 <button
                   type="button"
                   onClick={() => setMobileStep(2)}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Siguiente: Motocicleta & GPS</span>
                   <ChevronRight className="w-4 h-4" />
@@ -1794,11 +1768,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                   className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>
-                    {isEditing
-                      ? 'Guardar Cambios GPS'
-                      : 'Guardar y Enviar a GPS Servicios'}
-                  </span>
+                  <span>Guardar y Enviar</span>
                 </button>
               </div>
             </div>

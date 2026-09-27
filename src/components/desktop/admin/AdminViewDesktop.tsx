@@ -450,6 +450,12 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 records={garantiasPlusRecords}
                 onSaveRecord={onSaveGarantiaPlusRecord}
                 onDeleteRecord={onDeleteGarantiaPlusRecord}
+                workshops={workshops}
+                technicians={technicians}
+                origins={origins}
+                onAddTechnician={onAddTechnician}
+                onAddOrigin={onAddOrigin}
+                onNavigateSection={setActiveSection}
               />
             )}
             {activeSection === 'gps' && (

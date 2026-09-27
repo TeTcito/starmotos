@@ -1226,7 +1226,7 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
       {/* ========================================================================= */}
       {viewMode === 'form' && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-4">
-          <form onSubmit={handleSubmitForm} className="space-y-4 animate-fade-in">
+          <form onSubmit={handleSubmitForm} className="space-y-2 animate-fade-in pt-0">
             {/* ALERTA DE VALIDACIÓN SI FALTAN CAMPOS */}
             {validationAlert && (
               <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
@@ -1253,13 +1253,13 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
             {/* ===================================================================== */}
             {/* LAYOUT PRINCIPAL: 3 COLUMNAS SIMÉTRICAS (IDÉNTICO A ALISTAMIENTO)     */}
             {/* ===================================================================== */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-stretch">
               {/* ----------------------------------------------------------------- */}
               {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE & 3 CELULARES               */}
               {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between space-y-3">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
                         1
@@ -1459,9 +1459,9 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
               {/* ----------------------------------------------------------------- */}
               {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTO & HARDWARE GPS               */}
               {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between space-y-3">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
                         2
@@ -1667,16 +1667,16 @@ export const GpsMatrizDesktop: React.FC<Props> = ({
               {/* ----------------------------------------------------------------- */}
               {/* COLUMNA 3: PASO 3 - VIGENCIA, TÉCNICO & COBRO                     */}
               {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between space-y-3">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
                         3
                       </div>
                       <div>
-                        <h3 className="text-sm font-black text-zinc-900">Vigencia, Técnico & Cobro</h3>
-                        <p className="text-[11px] text-zinc-400">Fechas, técnico y facturación de Matriz</p>
+                        <h3 className="text-sm font-black text-zinc-900">Cobro</h3>
+                        <p className="text-[11px] text-zinc-400">Vigencia, técnico y facturación</p>
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">

@@ -1024,7 +1024,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
       {/* 2. VISTA: FORMULARIO DE INGRESO MÓVIL (DIRECTAMENTE SOBRE EL LIENZO)     */}
       {/* ========================================================================= */}
       {viewMode === 'form' && (
-        <form onSubmit={handleSubmitForm} className="space-y-3 animate-fade-in">
+        <form onSubmit={handleSubmitForm} className="space-y-2 animate-fade-in pt-2">
           {/* Alerta de validación */}
           {validationAlert && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-xl flex items-start justify-between gap-2 animate-slide-in">
@@ -1050,7 +1050,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
             {[
               { s: 1, label: '1. Cliente' },
               { s: 2, label: '2. Moto & GPS' },
-              { s: 3, label: '3. Cobro & Vigencia' },
+              { s: 3, label: '3. Cobro' },
             ].map((tab) => (
               <button
                 key={tab.s}
@@ -1453,7 +1453,7 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                   onClick={() => setMobileStep(3)}
                   className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <span>Siguiente: Cobro & Vigencia</span>
+                  <span>Siguiente: Cobro</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -1461,13 +1461,13 @@ export const GpsMatrizMobile: React.FC<Props> = ({
           )}
 
           {/* ----------------------------------------------------------------- */}
-          {/* PASO 3: VIGENCIA, COBRO & LIQUIDACIÓN (Directamente sobre el Lienzo) */}
+          {/* PASO 3: COBRO & LIQUIDACIÓN (Directamente sobre el Lienzo)         */}
           {/* ----------------------------------------------------------------- */}
           {mobileStep === 3 && (
             <div className="space-y-3 animate-fade-in">
               <div className="flex items-center justify-between pb-0.5">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-black text-zinc-900">Paso 3: Vigencia & Cobro</h3>
+                  <h3 className="text-xs font-black text-zinc-900">Paso 3: Cobro</h3>
                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">3 de 3</span>
                 </div>
               </div>

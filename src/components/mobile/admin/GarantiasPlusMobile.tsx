@@ -1,4 +1,4 @@
-// src/components/mobile/common/AlistamientoWizardMobile.tsx
+// src/components/mobile/admin/GarantiasPlusMobile.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
@@ -2200,7 +2200,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-blue-600" />
-                        <span>Fecha de Servicio</span>
+                        <span>Fecha de Inicio</span>
                       </label>
                       <input
                         type="date"
@@ -2211,14 +2211,14 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-700 mb-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-indigo-600" />
-                        <span>Hora de Servicio</span>
+                        <Calendar className="w-3 h-3 text-amber-600" />
+                        <span>Fecha de Vencimiento</span>
                       </label>
                       <input
-                        type="time"
-                        value={detailFormData.horaServicio || ''}
-                        onChange={(e) => setDetailFormData({ ...detailFormData, horaServicio: e.target.value })}
-                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-blue-600"
+                        type="date"
+                        value={detailFormData.fechaVencimiento || ''}
+                        onChange={(e) => setDetailFormData({ ...detailFormData, fechaVencimiento: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono text-zinc-900 outline-none focus:border-amber-600"
                       />
                     </div>
                   </div>
@@ -2693,7 +2693,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                 <Wrench className="w-4.5 h-4.5" />
               </div>
               <h2 className="text-xl font-black text-zinc-900 tracking-tight leading-tight">
-                Alistamiento
+                Garantías Plus
               </h2>
             </div>
             <span className="px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg font-mono">
@@ -2708,7 +2708,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
               type="button"
               onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
               className="h-11 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1 cursor-pointer transition-all shrink-0"
-              title="Iniciar nuevo alistamiento"
+              title="Iniciar nueva Garantía Plus"
             >
               <Plus className="w-4 h-4" />
               <span>Nuevo</span>
@@ -3052,7 +3052,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                   ? 'bg-blue-50/90 border border-blue-300 shadow-2xs'
                   : 'bg-blue-50/50 border border-blue-200 shadow-2xs opacity-85'
               }`}
-              title="Ver todos los alistamientos"
+              title="Ver todas las pólizas de Garantía Plus"
             >
               <div className="flex items-center justify-between text-blue-800">
                 <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
@@ -3119,7 +3119,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
           {/* Listado Móvil: Tarjetas de 3 módulos compactas */}
           {/* Barra de Leyenda Móvil */}
           <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-zinc-500 select-none">
-            <span>{filteredRecords.length} alistamientos</span>
+            <span>{filteredRecords.length} {filteredRecords.length === 1 ? 'póliza' : 'pólizas'}</span>
             <div className="flex items-center gap-2 text-[10px]">
               <span className="inline-flex items-center gap-1 text-emerald-800">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-2xs"></span>
@@ -3344,7 +3344,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
             <div className="py-10 text-center bg-zinc-50 rounded-xl border border-dashed border-zinc-300">
               <UserCheck className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
               <p className="text-xs font-semibold text-zinc-500">
-                No se encontraron registros de alistamiento
+                No se encontraron pólizas de Garantía Plus registradas
               </p>
             </div>
           )}
@@ -3376,32 +3376,6 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-          )}
-
-          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS MÓVIL */}
-          {onNavigateSection && (
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-2.5 rounded-xl shadow-xs flex items-center justify-between gap-2 text-white">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-[11px] font-bold truncate">Módulos Especiales:</span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onNavigateSection('garantias_plus')}
-                  className="px-2 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 rounded-lg text-[10px] font-black shadow-2xs cursor-pointer active:scale-95"
-                >
-                  Garantía Plus
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigateSection('gps')}
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-2xs cursor-pointer active:scale-95"
-                >
-                  GPS
-                </button>
-              </div>
             </div>
           )}
 
@@ -3909,12 +3883,12 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                 </select>
               </div>
 
-              {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+              {/* Fecha de Inicio y Fecha de Vencimiento */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-blue-600" />
-                    <span>Fecha *</span>
+                    <span>Fecha de Inicio *</span>
                   </label>
                   <input
                     type="date"
@@ -3926,15 +3900,15 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-indigo-600" />
-                    <span>Hora *</span>
+                    <Calendar className="w-3 h-3 text-amber-600" />
+                    <span>Fecha de Vencimiento *</span>
                   </label>
                   <input
-                    type="time"
-                    value={formData.horaServicio || getCurrentTimeStr()}
-                    onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                    type="date"
+                    value={formData.fechaVencimiento || defaultVencimientoStr}
+                    onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
                     required
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white font-mono"
+                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-amber-600 focus:bg-white font-mono"
                   />
                 </div>
               </div>

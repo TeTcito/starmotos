@@ -1,4 +1,4 @@
-// src/components/common/AlistamientoWizard.tsx
+// src/components/desktop/admin/GarantiasPlusDesktop.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
@@ -1567,7 +1567,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     if (onSaveRecord) {
       onSaveRecord(securedDetail);
     }
-    setDetailSuccessToast('✓ Ficha técnica y datos de alistamiento actualizados correctamente.');
+    setDetailSuccessToast('✓ Ficha técnica y póliza de Garantía Plus actualizada correctamente.');
     setTimeout(() => setDetailSuccessToast(null), 3500);
   };
 
@@ -1839,7 +1839,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 1. VISTA: FORMULARIO DE DETALLE DE ALISTAMIENTO PREVIO                    */}
+      {/* 1. VISTA: FORMULARIO DE DETALLE DE GARANTÍA PLUS                         */}
       {/* ========================================================================= */}
       {currentViewMode === 'list' && selectedRecordForDetail && detailFormData && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
@@ -1847,7 +1847,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
             onSubmit={handleSaveRecordDetail}
             className="w-full flex flex-col gap-4 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs mb-4"
           >
-          {/* Cabecera del Formulario de Alistamiento */}
+          {/* Cabecera del Formulario de Garantía Plus */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
             <div className="flex items-center gap-3">
               <button
@@ -1954,14 +1954,14 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm(`¿Está seguro de eliminar permanentemente la ficha de alistamiento de ${detailFormData.nombres} ${detailFormData.apellidos}?`)) {
+                    if (window.confirm(`¿Está seguro de eliminar permanentemente la póliza de Garantía Plus de ${detailFormData.nombres} ${detailFormData.apellidos}?`)) {
                       onDeleteRecord(detailFormData.id);
                       setSelectedRecordForDetail(null);
                       setDetailFormData(null);
                     }
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                  title="Eliminar este alistamiento de la base de datos"
+                  title="Eliminar esta póliza de Garantía Plus de la base de datos"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Eliminar Ficha</span>
@@ -2248,7 +2248,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-blue-600" />
-                      <span>Fecha de Servicio</span>
+                      <span>Fecha de Inicio</span>
                     </label>
                     <input
                       type="date"
@@ -2699,7 +2699,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
-                    Libro de Alistamiento PDI & Mantenimientos
+                    Libro de Garantías Plus & Pólizas
                   </h2>
                   <p className="text-xs text-zinc-500 font-medium">
                     Historial de unidades entregadas, fichas técnicas y servicios mecánicos
@@ -2712,7 +2712,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   {effectiveRecords.length} Registros Totales
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg whitespace-nowrap shadow-2xs">
-                  {effectiveRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
+                  {effectiveRecords.filter((r) => r.estado === 'activa' || !r.estado).length} Pólizas Activas
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
                   ${effectiveRecords.reduce((acc, r) => acc + (isPdiOnlyRecord(r) ? 0 : (Number(r.valorServicio) || 0)), 0).toFixed(2)} Facturado
@@ -2816,12 +2816,12 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 <div className="hidden md:flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => onNavigateSection('garantias_plus')}
-                    className="h-12 sm:h-13 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
-                    title="Crear o gestionar contratos de Garantía Plus"
+                    onClick={() => onNavigateSection('alistamiento')}
+                    className="h-12 sm:h-13 px-4 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
+                    title="Ir al Libro de Alistamientos"
                   >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span>Garantía Plus</span>
+                    <Wrench className="w-4 h-4 text-blue-400" />
+                    <span>Alistamiento</span>
                   </button>
                   <button
                     type="button"
@@ -2853,7 +2853,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div className="flex items-center gap-2">
                     <SlidersHorizontal className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-black uppercase tracking-wider text-zinc-900">
-                      Filtros de Alistamiento & Servicios
+                      Filtros de Garantías Plus & Pólizas
                     </span>
                     <span className="text-[11px] text-zinc-500 font-semibold">
                       ({filteredRecords.length} resultado{filteredRecords.length === 1 ? '' : 's'})
@@ -3089,7 +3089,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     ? 'bg-blue-50/90 border border-blue-300 shadow-2xs hover:bg-blue-100/70'
                     : 'bg-blue-50/50 border border-blue-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-blue-100/60'
                 }`}
-                title="Clic para ver todos los alistamientos facturados"
+                title="Clic para ver todas las pólizas de Garantía Plus facturadas"
               >
                 <div className="flex items-center justify-between text-blue-800">
                   <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
@@ -3139,7 +3139,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-900">
                   <UserCheck className="w-4.5 h-4.5 text-amber-600 shrink-0" />
                   <span>
-                    No hay alistamientos previos registrados con C.I. <strong>"{searchTerm}"</strong>. ¿Desea iniciar un nuevo registro?
+                    No hay pólizas previas de Garantía Plus registradas con C.I. <strong>"{searchTerm}"</strong>. ¿Desea iniciar un nuevo registro?
                   </span>
                 </div>
                 <button
@@ -3157,14 +3157,14 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
             {/* Barra de Leyenda de Estados de Taller y Conteo */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 text-xs shrink-0 select-none">
               <span className="font-semibold text-zinc-500 text-[11px]">
-                {filteredRecords.length} alistamiento{filteredRecords.length === 1 ? '' : 's'} registrado{filteredRecords.length === 1 ? '' : 's'}
+                {filteredRecords.length} {filteredRecords.length === 1 ? 'póliza de Garantía Plus registrada' : 'pólizas de Garantía Plus registradas'}
               </span>
               <div className="flex items-center gap-3 text-[11px] font-semibold">
-                <div className="flex items-center gap-1.5" title="Alistamientos cuya orden de trabajo en taller ya fue completada y entregada">
+                <div className="flex items-center gap-1.5" title="Pólizas cuya orden de trabajo en taller ya fue completada y entregada">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span>
                   <span className="text-emerald-800">Orden Entregada (Fila Verde)</span>
                 </div>
-                <div className="flex items-center gap-1.5" title="Alistamientos con orden de trabajo iniciada o en proceso de mantenimiento en taller">
+                <div className="flex items-center gap-1.5" title="Pólizas con orden de trabajo iniciada o en proceso en taller">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-2xs animate-pulse"></span>
                   <span className="text-amber-800">En Proceso en Taller (Fila Amarilla)</span>
                 </div>
@@ -3435,12 +3435,12 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`¿Está seguro de eliminar el alistamiento de ${record.nombres} ${record.apellidos}?`)) {
+                                    if (window.confirm(`¿Está seguro de eliminar la póliza de Garantía Plus de ${record.nombres} ${record.apellidos}?`)) {
                                       onDeleteRecord(record.id);
                                     }
                                   }}
                                   className="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                  title="Eliminar Alistamiento"
+                                  title="Eliminar Garantía Plus"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -3550,12 +3550,12 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
               <div className="text-center space-y-2 max-w-sm">
                 <Bike className="w-8 h-8 text-zinc-300 mx-auto" />
                 <h3 className="text-sm font-bold text-zinc-800">
-                  No se encontraron alistamientos registrados
+                  No se encontraron pólizas de Garantía Plus registradas
                 </h3>
                 <p className="text-xs text-zinc-500">
                   {searchTerm
                     ? 'Ningún registro coincide con los criterios de búsqueda especificados.'
-                    : 'Aún no hay alistamientos registrados en esta sede. Inicia el primer registro ahora.'}
+                    : 'Aún no hay pólizas de Garantía Plus registradas en esta sede. Inicia el primer registro ahora.'}
                 </p>
                 <button
                   type="button"
@@ -3572,7 +3572,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO (3 COLUMNAS)                         */}
+      {/* 2. VISTA: FORMULARIO DE GARANTÍA PLUS (3 COLUMNAS)                         */}
       {/* ========================================================================= */}
       {currentViewMode === 'form' && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
@@ -3599,43 +3599,6 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
               </button>
             </div>
           )}
-
-          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-3 sm:p-3.5 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 font-black shrink-0 border border-white/15">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs font-bold block text-white">Módulos Especiales de Matriz</span>
-                <span className="text-[11px] text-slate-300 block">¿El cliente desea contratar el plan Garantía Plus o equipar un GPS Satelital?</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {onNavigateSection && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateSection('garantias_plus')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
-                    title="Ir al módulo de Garantías Plus para registrar un nuevo contrato"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Contratar Garantía Plus</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateSection('gps')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
-                    title="Ir al módulo de GPS para registrar una nueva venta"
-                  >
-                    <Radio className="w-3.5 h-3.5 text-blue-200" />
-                    <span>Registrar GPS</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
 
           {/* BANNER DESTACADO: CLIENTE CON GARANTÍA PLUS ACTIVA */}
           {garantiaPlusStatus.hasGarantiaPlus && (
@@ -4181,7 +4144,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Fecha de Servicio *</span>
+                      <span>Fecha de Inicio *</span>
                     </label>
                     <input
                       type="date"
@@ -4587,7 +4550,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                         N° Factura
                       </label>
                       {clientHistoricalRecords.length > 0 && formData.numeroFactura && (
-                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del registro previo, editable">
                           Previo / Editable
                         </span>
                       )}
@@ -4606,7 +4569,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                         N° Ticket Físico
                       </label>
                       {clientHistoricalRecords.length > 0 && formData.numeroTicket && (
-                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del registro previo, editable">
                           Previo / Editable
                         </span>
                       )}

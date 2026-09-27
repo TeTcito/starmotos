@@ -153,6 +153,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   onDeleteGarantiaPlusRecord,
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
+  const [garantiasPlusViewMode, setGarantiasPlusViewMode] = React.useState<'list' | 'form'>('list');
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -274,10 +275,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
               </button>
             )}
 
-            {activeSection === 'alistamiento' && alistamientoViewMode === 'form' && (
+            {((activeSection === 'alistamiento' && alistamientoViewMode === 'form') ||
+              (activeSection === 'garantias_plus' && garantiasPlusViewMode === 'form')) && (
               <button
                 type="button"
-                onClick={() => setAlistamientoViewMode('list')}
+                onClick={() => {
+                  if (activeSection === 'alistamiento') setAlistamientoViewMode('list');
+                  if (activeSection === 'garantias_plus') setGarantiasPlusViewMode('list');
+                }}
                 className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-800 hover:bg-blue-900 border border-blue-400 text-xs text-white font-bold shadow-xs transition-all cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -392,14 +397,14 @@ export const AdminViewDesktop: React.FC<Props> = ({
         {/* CONTENIDO PRINCIPAL */}
         <main
           className={`flex-1 w-full bg-white ${
-            activeSection === 'clientes_admin' || activeSection === 'alistamiento'
+            activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus'
               ? 'overflow-hidden flex flex-col p-4'
               : 'overflow-y-auto px-4 sm:px-6 lg:px-8 py-5'
           }`}
         >
           <div
             className={`w-full ${
-              activeSection === 'clientes_admin' || activeSection === 'alistamiento'
+              activeSection === 'clientes_admin' || activeSection === 'alistamiento' || activeSection === 'garantias_plus'
                 ? 'flex-1 min-h-0 flex flex-col'
                 : ''
             }`}
@@ -447,14 +452,22 @@ export const AdminViewDesktop: React.FC<Props> = ({
             )}
             {activeSection === 'garantias_plus' && (
               <GarantiasPlusDesktop
-                records={garantiasPlusRecords}
-                onSaveRecord={onSaveGarantiaPlusRecord}
-                onDeleteRecord={onDeleteGarantiaPlusRecord}
-                workshops={workshops}
+                defaultAtendidoPor="William Daniel Meza (Gerente)"
+                defaultSede="StarMotos Matriz La Maná"
+                defaultSedeId="matriz-la-mana"
                 technicians={technicians}
                 origins={origins}
+                workshops={workshops}
                 onAddTechnician={onAddTechnician}
                 onAddOrigin={onAddOrigin}
+                onSaveRecord={onSaveGarantiaPlusRecord}
+                onDeleteRecord={onDeleteGarantiaPlusRecord}
+                records={garantiasPlusRecords}
+                recentRecords={garantiasPlusRecords}
+                viewMode={garantiasPlusViewMode}
+                onViewModeChange={setGarantiasPlusViewMode}
+                isMatriz={true}
+                orders={orders}
                 onNavigateSection={setActiveSection}
               />
             )}

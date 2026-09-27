@@ -1,11 +1,10 @@
-// src/components/desktop/admin/GarantiasPlusDesktop.tsx
+// src/components/common/AlistamientoWizard.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Search,
   Plus,
   ArrowRight,
-  ArrowLeft,
   Calendar,
   Camera,
   CheckCircle2,
@@ -22,6 +21,7 @@ import {
   Check,
   Upload,
   Lock,
+  ArrowLeft,
   MessageCircle,
   Save,
   DollarSign,
@@ -31,120 +31,292 @@ import {
   Filter,
   ChevronDown,
   SlidersHorizontal,
+  ArrowUpDown,
   Sparkles,
   Radio,
   ShieldCheck,
-  ShieldAlert,
 } from 'lucide-react';
 import {
   GarantiaPlusRecord,
+  GarantiaPlusFormData,
   Technician,
   ServiceActionType,
   Workshop,
   TallerClient,
-  AbonoRecord,
+  TallerOrder,
 } from '../../../types/customer';
 import {
   querySriMock,
   getStoredClients,
   saveStoredClients,
+  getStoredFullAlistamientos,
   getStoredGarantiasPlusRecords,
   saveStoredGarantiaPlusRecord,
+  saveStoredGarantiasPlusRecords,
   deleteStoredGarantiaPlusRecord,
   getRegisteredBrands,
-  getStoredTechnicians,
-  getStoredWorkshops,
+  getStoredOrders,
   updateClientCedulaCascade,
+  checkClientGarantiaPlus,
 } from '../../../data/mockMultiRoleData';
 import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 import { getMediaFromIndexedDB, uploadWarrantyMedia, isValidMediaUrl } from '../../../services/mediaStorage';
+import { cloudSaveAlistamiento } from '../../../services/supabaseService';
 
 interface Props {
-  records?: GarantiaPlusRecord[];
-  onSaveRecord?: (record: GarantiaPlusRecord) => void;
-  onDeleteRecord?: (id: string) => void;
-  showToast?: (text: string, type?: 'success' | 'info' | 'error') => void;
+  defaultAtendidoPor?: string;
+  defaultSede?: string;
+  defaultSedeId?: string;
   workshops?: Workshop[];
   technicians?: Technician[];
   origins?: string[];
   onAddTechnician?: (tech: Omit<Technician, 'id' | 'activeOrdersCount'>) => void;
   onAddOrigin?: (origin: string) => void;
-  onNavigateSection?: (section: any) => void;
-  defaultAtendidoPor?: string;
-  defaultSede?: string;
-  defaultSedeId?: string;
+  onSaveRecord?: (record: GarantiaPlusRecord) => void;
+  onDeleteRecord?: (id: string) => void;
+  recentRecords?: GarantiaPlusRecord[];
+  records?: GarantiaPlusRecord[];
   viewMode?: 'list' | 'form';
   onViewModeChange?: (mode: 'list' | 'form') => void;
+  isMatriz?: boolean;
+  selectedWorkshopFilter?: string;
+  onSelectWorkshopFilter?: (wsId: string) => void;
+  orders?: TallerOrder[];
+  onNavigateSection?: (section: any) => void;
 }
 
-export type GarantiaPlusFormData = {
-  id: string;
-  numeroTicket: string;
-  atendidoPor: string;
-  sede: string;
-  sedeId: string;
-  fechaServicio: string; // Fecha de inicio
-  fechaVencimiento: string; // Fecha de vencimiento (reemplaza a la hora)
-  nombres: string;
-  apellidos: string;
-  cedulaRuc: string;
-  celular1: string;
-  celular2?: string;
-  celular3?: string;
-  email: string;
-  direccion: string;
-  origen: string;
-  motoPreviaId?: string;
-  chasis: string;
-  numeroMotor?: string;
-  ramv?: string;
-  placa: string;
-  modeloMarca: string;
-  color?: string;
-  year?: number | string;
-  serviciosRealizados: ServiceActionType[];
-  tecnicoResponsable: string;
-  tecnicoId: string;
-  kilometraje: number | string;
-  aceite: 'sin_aceite' | 'con_aceite' | string;
-  nivelAceite?: string;
-  tipoAceite?: string;
-  numeroFactura?: string;
-  valorServicio: number | string;
-  montoPagado: number | string;
-  abono?: number | string;
-  saldoPendiente?: number | string;
-  esCredito?: boolean;
-  mesesCredito?: number | string;
-  metodoPago: string;
-  observaciones: string;
-  proximoMantenimientoKm?: number | string;
-  fotos?: string[];
-  evidenciaTransferencia?: string;
-  comprobantePagoUrl?: string;
-  historialAbonos?: AbonoRecord[];
-  estado: 'activa' | 'vencida' | 'cancelada';
-  createdAt: string;
+export const isPdiOnlyRecord = (record: GarantiaPlusRecord | GarantiaPlusFormData): boolean => {
+  const services = record.serviciosRealizados || [];
+  const hasPdi = services.includes('alistamiento_pdi');
+  const hasOtherPaidServices = services.some((s) => s === 'mantenimiento' || s === 'engrasado');
+  if (hasPdi && !hasOtherPaidServices) return true;
+  return Number(record.valorServicio || 0) === 0 && Number(record.montoPagado || 0) === 0 && hasPdi;
+};
+
+export const matchRecordToWorkshop = (
+  record: GarantiaPlusRecord,
+  targetWsId: string,
+  workshopsList: Workshop[] = []
+): boolean => {
+  if (!targetWsId || targetWsId === 'all') return true;
+  if (!record) return false;
+
+  const targetWs = workshopsList.find((w) => w.id === targetWsId);
+  const targetWsName = targetWs ? targetWs.name.toLowerCase().trim() : '';
+  const recSedeName = (record.sede || '').toLowerCase().trim();
+  const recSedeId = (record.sedeId || '').toLowerCase().trim();
+  const targetId = targetWsId.toLowerCase().trim();
+
+  // Si el objetivo es Matriz, pero el registro indica explícitamente otra sucursal ("StarMotos Sucursal Quevedo", etc.)
+  const isTargetMatriz = targetId === 'matriz-la-mana' || targetWsName.includes('matriz');
+  if (isTargetMatriz) {
+    if (recSedeName && !recSedeName.includes('matriz') && (recSedeName.includes('sucursal') || recSedeName.includes('quevedo') || recSedeName.includes('mocache') || recSedeName.includes('balzar') || recSedeName.includes('buena fe'))) {
+      return false;
+    }
+  }
+
+  // 1. Coincidencia directa por sedeId
+  if (record.sedeId && record.sedeId === targetWsId) return true;
+
+  if (!targetWs) {
+    return record.sede === targetWsId;
+  }
+
+  // 2. Coincidencia exacta por nombre
+  if (record.sede && recSedeName === targetWsName) return true;
+
+  // 3. Coincidencia resiliente por subcadena de ciudad o nombre
+  if (record.sede) {
+    const cleanSede = recSedeName.replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cleanWs = targetWsName.replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+    const cityPart = targetWs.city ? targetWs.city.toLowerCase().split(',')[0].trim() : '';
+    if (cleanSede && cleanWs && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede))) {
+      return true;
+    }
+    if (cleanSede && cityPart && cleanSede.includes(cityPart)) {
+      return true;
+    }
+  }
+
+  // 4. Coincidencia si el sedeId contiene el nombre de la ciudad
+  if (record.sedeId && targetWs.city) {
+    const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
+    if (cityPart && record.sedeId.toLowerCase().includes(cityPart)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const matchOrderToWorkshop = (
+  order: TallerOrder,
+  targetWsId: string,
+  workshopsList: Workshop[] = []
+): boolean => {
+  if (!targetWsId || targetWsId === 'all') return true;
+  if (!order) return false;
+
+  const oWsId = (order.workshopId || (order as any).tallerId || '').trim();
+  if (oWsId && oWsId === targetWsId) return true;
+
+  const targetWs = workshopsList.find(w => w.id === targetWsId);
+  const targetWsName = targetWs ? targetWs.name.toLowerCase().trim() : '';
+  const oWsName = (order.workshopName || (order as any).taller || '').toLowerCase().trim();
+
+  if (targetWsName && oWsName && (targetWsName === oWsName || targetWsName.includes(oWsName) || oWsName.includes(targetWsName))) {
+    return true;
+  }
+
+  if (targetWs) {
+    const cityPart = targetWs.city ? targetWs.city.toLowerCase().split(',')[0].trim() : '';
+    if (cityPart && (oWsId.toLowerCase().includes(cityPart) || oWsName.includes(cityPart))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const calculateWorkshopFinances = (
+  wsAlistamientos: GarantiaPlusRecord[],
+  wsOrders: TallerOrder[]
+) => {
+  let totalFacturado = 0;
+  let totalCobrado = 0;
+  let totalPendiente = 0;
+
+  // 1. Alistamientos del taller (servicios reales registrados)
+  wsAlistamientos.forEach((a) => {
+    const isPdi = isPdiOnlyRecord(a);
+    const val = isPdi ? 0 : (Number(a.valorServicio) || 0);
+    const pag = isPdi ? 0 : (a.abono !== undefined ? Number(a.abono) : (Number(a.montoPagado) || 0));
+    const pend = isPdi ? 0 : (a.saldoPendiente !== undefined ? Number(a.saldoPendiente) : Math.max(0, val - pag));
+
+    totalFacturado += val;
+    totalCobrado += pag;
+    totalPendiente += pend;
+  });
+
+  // 2. Órdenes independientes (excluyendo aquellas creadas automáticamente por un alistamiento ya contabilizado)
+  const independentOrders = wsOrders.filter(
+    (o) => !o.alistamientoId || !wsAlistamientos.some((a) => a.id === o.alistamientoId)
+  );
+
+  independentOrders.forEach((o) => {
+    const cost = Number(o.totalCost) || 0;
+    totalFacturado += cost;
+    if (o.status === 'entregada') {
+      totalCobrado += cost;
+    } else {
+      totalPendiente += cost;
+    }
+  });
+
+  return {
+    totalFacturado,
+    totalCobrado,
+    totalPendiente,
+    independentOrdersCount: independentOrders.length,
+  };
+};
+
+export const getRecordTimestamp = (r: GarantiaPlusRecord): number => {
+  // 1. Si el ID contiene timestamp numérico de Date.now() (ej. als-1727185338000)
+  const idMatch = (r.id || '').match(/(\d{12,14})/);
+  if (idMatch) {
+    const ts = Number(idMatch[1]);
+    if (!isNaN(ts) && ts > 1600000000000) return ts;
+  }
+
+  // 2. Si fechaServicio (YYYY-MM-DD) y horaServicio (HH:mm) están presentes
+  if (r.fechaServicio) {
+    const time = (r as any).horaServicio ? ((r as any).horaServicio.length === 5 ? `${(r as any).horaServicio}:00` : (r as any).horaServicio) : '00:00:00';
+    const parsed = Date.parse(`${r.fechaServicio}T${time}`);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Si createdAt tiene fecha legible estándar o ISO
+  if (r.createdAt) {
+    const parsed = Date.parse(r.createdAt);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  return 0;
+};
+
+export const getRecordOrderStatus = (
+  record: GarantiaPlusRecord,
+  ordersList: TallerOrder[] = []
+): 'completed' | 'in_progress' | null => {
+  if (!ordersList || ordersList.length === 0) return null;
+  // 1. Coincidencia directa por alistamientoId
+  let order = ordersList.find((o) => o.alistamientoId && o.alistamientoId === record.id);
+  // 2. Coincidencia si el ID del alistamiento coincide con el ID de la orden
+  if (!order) {
+    order = ordersList.find((o) => o.id === record.id);
+  }
+  // 3. Coincidencia de respaldo por cédula y placa
+  if (!order && record.cedulaRuc) {
+    const cleanPlate = (record.placa || '').trim().toUpperCase();
+    const hasValidPlate = cleanPlate && cleanPlate !== 'S/P' && cleanPlate !== 'EN TRÁMITE' && cleanPlate !== 'ENTRAMITE';
+    order = ordersList.find((o) => {
+      if (o.clientIdNumber !== record.cedulaRuc) return false;
+      if (hasValidPlate && o.plate) {
+        return o.plate.trim().toUpperCase() === cleanPlate;
+      }
+      return false;
+    });
+  }
+
+  if (!order) return null;
+
+  const st = (order.status || '').toLowerCase().trim();
+  if (st === 'entregado' || st === 'entregada') {
+    return 'completed';
+  }
+  // Cualquier otro estado activo en taller ('inicio', 'en_proceso', 'trabajando', 'listo_para_entregar', 'recepcion', etc.)
+  return 'in_progress';
 };
 
 export const GarantiasPlusDesktop: React.FC<Props> = ({
-  records: propRecords,
-  onSaveRecord: propOnSaveRecord,
-  onDeleteRecord: propOnDeleteRecord,
-  showToast,
-  workshops: propWorkshops,
-  technicians: propTechnicians,
-  origins: propOrigins,
-  onAddTechnician: propOnAddTechnician,
-  onAddOrigin: propOnAddOrigin,
-  onNavigateSection,
   defaultAtendidoPor = 'William Daniel Meza (Gerente)',
   defaultSede = 'StarMotos Matriz La Maná',
   defaultSedeId = 'matriz-la-mana',
+  workshops = [],
+  technicians = [],
+  origins = [],
+  onAddTechnician = () => {},
+  onAddOrigin = () => {},
+  onSaveRecord = () => {},
+  onDeleteRecord = () => {},
+  recentRecords = [],
+  records,
   viewMode: externalViewMode,
   onViewModeChange,
+  isMatriz = true,
+  selectedWorkshopFilter: propSelectedWorkshopFilter,
+  onSelectWorkshopFilter,
+  orders: propOrders,
+  onNavigateSection,
 }) => {
+  const [storedGarantias, setStoredGarantias] = useState<GarantiaPlusRecord[]>(() => getStoredGarantiasPlusRecords());
+  useEffect(() => {
+    const handleGPUpdate = () => {
+      setStoredGarantias(getStoredGarantiasPlusRecords());
+    };
+    window.addEventListener('starmotos_garantias_plus_updated', handleGPUpdate);
+    return () => window.removeEventListener('starmotos_garantias_plus_updated', handleGPUpdate);
+  }, []);
+
+  const hasExplicitRecords = records !== undefined && records.length > 0;
+  const hasExplicitRecent = recentRecords !== undefined && recentRecords['length'] > 0;
+  const effectiveRecords: GarantiaPlusRecord[] = hasExplicitRecords
+    ? (records as GarantiaPlusRecord[])
+    : hasExplicitRecent
+    ? recentRecords
+    : storedGarantias;
   // Manejo de modo de visualización (controlado externamente o interno)
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'form'>('list');
   const currentViewMode = externalViewMode !== undefined ? externalViewMode : internalViewMode;
@@ -154,70 +326,32 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     onViewModeChange?.(mode);
   };
 
-  // Referencia para selector de archivos
+  // Referencia para selector de archivos del computador/dispositivo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Catálogos auxiliares con respaldo de almacenamiento local
-  const workshops = useMemo(() => {
-    if (propWorkshops && propWorkshops.length > 0) return propWorkshops;
-    return getStoredWorkshops();
-  }, [propWorkshops]);
+  // Identificar si la sede actual es Matriz Central de forma resiliente
+  const effectiveIsMatriz = Boolean(
+    isMatriz ||
+    defaultSedeId === 'matriz-la-mana' ||
+    defaultSedeId === 'sede-matriz' ||
+    (defaultSede && defaultSede.toLowerCase().includes('matriz'))
+  );
 
-  const technicians = useMemo(() => {
-    if (propTechnicians && propTechnicians.length > 0) return propTechnicians;
-    return getStoredTechnicians();
-  }, [propTechnicians]);
-
-  const defaultOriginsList = [
-    'Almacén Principal La Maná',
-    'Almacén Quevedo Central',
-    'Almacén Valencia',
-    'Almacén El Empalme',
-    'Almacén Buena Fe',
-  ];
-  const [origins, setOrigins] = useState<string[]>(propOrigins || defaultOriginsList);
-
-  useEffect(() => {
-    if (propOrigins && propOrigins.length > 0) {
-      setOrigins(propOrigins);
-    }
-  }, [propOrigins]);
-
-  // Registros en tiempo real sincronizados con localStorage
-  const [storedRecords, setStoredRecords] = useState<GarantiaPlusRecord[]>(() => getStoredGarantiasPlusRecords());
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setStoredRecords(getStoredGarantiasPlusRecords());
-    };
-    window.addEventListener('starmotos_garantias_plus_updated', handleUpdate);
-    return () => {
-      window.removeEventListener('starmotos_garantias_plus_updated', handleUpdate);
-    };
-  }, []);
-
-  const effectiveRecords = propRecords !== undefined ? propRecords : storedRecords;
-
-  const onSaveRecord = (record: GarantiaPlusRecord) => {
-    saveStoredGarantiaPlusRecord(record);
-    propOnSaveRecord?.(record);
-    setStoredRecords(getStoredGarantiasPlusRecords());
-  };
-
-  const onDeleteRecord = (id: string) => {
-    deleteStoredGarantiaPlusRecord(id);
-    propOnDeleteRecord?.(id);
-    setStoredRecords(getStoredGarantiasPlusRecords());
-  };
-
-  // Marcas registradas
-  const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
-
-  // Búsqueda y Filtros
+  // Búsqueda y Filtro de Sede en el listado
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedWorkshopFilter, setSelectedWorkshopFilter] = useState<string>('all');
+  const [internalWorkshopFilter, setInternalWorkshopFilter] = useState<string>('all');
+  const selectedWorkshopFilter = propSelectedWorkshopFilter !== undefined ? propSelectedWorkshopFilter : internalWorkshopFilter;
+
+  const handleSelectWorkshopFilter = (wsId: string) => {
+    setInternalWorkshopFilter(wsId);
+    onSelectWorkshopFilter?.(wsId);
+  };
+
+  // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
   const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento'>('all');
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'this_year' | 'custom'>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<
     'recientes' | 'antiguos' | 'hoy' | 'por_semana' | 'por_mes' | 'por_ano' | 'cliente_asc' | 'cliente_desc' | 'modelo_asc' | 'modelo_desc' | 'mayor_valor' | 'mayor_saldo'
   >('recientes');
@@ -231,18 +365,53 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     setCurrentPage(1);
   }, [searchTerm, filterPayment, filterDateRange, sortBy, selectedWorkshopFilter]);
 
+  // Marcas registradas en tiempo real de los garantes oficiales
+  const [registeredBrands, setRegisteredBrands] = useState<string[]>(getRegisteredBrands);
+
+  useEffect(() => {
+    const handleBrandsUpdate = () => {
+      setRegisteredBrands(getRegisteredBrands());
+    };
+    window.addEventListener('starmotos_garantes_updated', handleBrandsUpdate);
+    window.addEventListener('starmotos_garante_profile_updated', handleBrandsUpdate);
+    return () => {
+      window.removeEventListener('starmotos_garantes_updated', handleBrandsUpdate);
+      window.removeEventListener('starmotos_garante_profile_updated', handleBrandsUpdate);
+    };
+  }, []);
+
+  // Órdenes de trabajo para colorear filas según estado de taller (verde suave si entregada, amarillo suave si en proceso)
+  const [internalOrders, setInternalOrders] = useState<TallerOrder[]>(() => getStoredOrders());
+
+  useEffect(() => {
+    const handleOrdersUpdate = () => {
+      setInternalOrders(getStoredOrders());
+    };
+    window.addEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    return () => {
+      window.removeEventListener('starmotos_orders_updated', handleOrdersUpdate);
+    };
+  }, []);
+
+  const effectiveOrders = propOrders || internalOrders;
+
   const handleResetFilters = () => {
     setFilterPayment('all');
     setFilterDateRange('all');
+    setCustomStartDate('');
+    setCustomEndDate('');
     setSortBy('recientes');
   };
 
-  // Registro seleccionado para ver detalle en formulario completo (Ficha de Garantía Plus)
+  // Registro seleccionado para ver detalle en formulario
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<GarantiaPlusRecord | null>(null);
   const [detailFormData, setDetailFormData] = useState<GarantiaPlusFormData | null>(null);
   const [detailSuccessToast, setDetailSuccessToast] = useState<string | null>(null);
 
-  // Helper para fechas
+  // Paso para vista móvil (1: Cliente, 2: Moto, 3: Servicio)
+  const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(1);
+
+  // Helper para fecha local en formato YYYY-MM-DD
   const getLocalDateStr = (d = new Date()) => {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -250,65 +419,144 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     return `${year}-${month}-${day}`;
   };
 
-  const getNextYearDateStr = (baseDateStr?: string) => {
-    const d = baseDateStr ? new Date(baseDateStr) : new Date();
+  // Helper para extraer de forma robusta la fecha de cualquier registro sin desfase horario
+  const getRecordLocalDate = (raw?: string): { year: number; month: number; day: number } | null => {
+    if (!raw) return null;
+    const str = String(raw).trim();
+    if (!str) return null;
+
+    // 1. Si es formato ISO con timestamp o indicador horario (ej: 2026-09-26T02:00:00Z)
+    // Se debe interpretar con la zona horaria local del navegador
+    if (str.includes('T') || str.includes('Z')) {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return {
+          year: d.getFullYear(),
+          month: d.getMonth() + 1,
+          day: d.getDate(),
+        };
+      }
+    }
+
+    // 2. YYYY-MM-DD (fecha plana seleccionada en calendario sin hora)
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (ymdMatch) {
+      return {
+        year: parseInt(ymdMatch[1], 10),
+        month: parseInt(ymdMatch[2], 10),
+        day: parseInt(ymdMatch[3], 10),
+      };
+    }
+
+    // 3. DD/MM/YYYY o DD-MM-YYYY
+    const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmyMatch) {
+      return {
+        year: parseInt(dmyMatch[3], 10),
+        month: parseInt(dmyMatch[2], 10),
+        day: parseInt(dmyMatch[1], 10),
+      };
+    }
+
+    // 4. Fallback Date parse
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return {
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        day: d.getDate(),
+      };
+    }
+    return null;
+  };
+
+  // Fecha de hoy por defecto en formato YYYY-MM-DD local
+  const todayStr = getLocalDateStr();
+  const getDefaultVencimientoStr = () => {
+    const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
     return getLocalDateStr(d);
   };
+  const defaultVencimientoStr = getDefaultVencimientoStr();
 
-  const todayStr = getLocalDateStr();
-  const nextYearStr = getNextYearDateStr(todayStr);
+  // Hora actual por defecto en formato HH:mm
+  const getCurrentTimeStr = () => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
 
-  // Formulario de Nuevo Registro
+  // Estado del formulario completo
   const [formData, setFormData] = useState<GarantiaPlusFormData>({
     id: '',
-    numeroTicket: '',
     atendidoPor: defaultAtendidoPor,
     sede: defaultSede,
     sedeId: defaultSedeId,
-    fechaServicio: todayStr, // Fecha de inicio
-    fechaVencimiento: nextYearStr, // Fecha de vencimiento (reemplaza a la hora)
+    fechaServicio: todayStr,
+    fechaVencimiento: defaultVencimientoStr,
+    horaServicio: getCurrentTimeStr(),
+    estado: "activa",
     nombres: '',
     apellidos: '',
     cedulaRuc: '',
     celular1: '',
     celular2: '',
-    celular3: '',
     email: '',
     direccion: '',
-    origen: origins[0] || 'Almacén Principal La Maná',
+    origen:
+      origins.find((o) =>
+        defaultSede &&
+        (o.toLowerCase().includes(defaultSede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim()) ||
+          defaultSede.toLowerCase().includes(o.toLowerCase().replace(/almacén|almacen/gi, '').trim()))
+      ) ||
+      (defaultSede ? `Almacén ${defaultSede.replace(/StarMotos\s*/i, '')}` : origins[0] || 'Almacén Principal'),
     motoPreviaId: '',
     chasis: '',
-    numeroMotor: '',
-    ramv: '',
     placa: '',
     modeloMarca: '',
     color: '',
-    year: new Date().getFullYear(),
-    serviciosRealizados: ['alistamiento_pdi', 'engrasado', 'mantenimiento'],
+    serviciosRealizados: ['alistamiento_pdi'],
     tecnicoResponsable: technicians[0]?.name || '',
     tecnicoId: technicians[0]?.id || '',
     kilometraje: '',
     aceite: 'con_aceite',
-    nivelAceite: 'semisintetico',
-    tipoAceite: '10W-40 Motul',
+    nivelAceite: 'mineral',
+    tipoAceite: '10W-30',
     numeroFactura: '',
-    valorServicio: '180.00',
-    montoPagado: '180.00',
-    abono: '180.00',
-    saldoPendiente: '0.00',
+    numeroTicket: '',
+    valorServicio: '',
+    montoPagado: '',
+    abono: '',
+    saldoPendiente: '',
     esCredito: false,
     mesesCredito: 3,
     metodoPago: 'Efectivo',
-    observaciones: 'Paquete Garantía Plus contratado. Los mantenimientos preventivos y engrasados quedan cubiertos al 100% durante el periodo de vigencia.',
+    observaciones: '',
     proximoMantenimientoKm: '',
     fotos: [],
     evidenciaTransferencia: '',
-    comprobantePagoUrl: '',
-    historialAbonos: [],
-    estado: 'activa',
     createdAt: '',
   });
+
+  // Verificación reactiva de Garantía Plus activa para el cliente o moto ingresados
+  const garantiaPlusStatus = useMemo(() => {
+    const cedula = (formData.cedulaRuc || '').trim();
+    const placa = (formData.placa || '').trim();
+    const chasis = (formData.chasis || '').trim();
+
+    if (cedula) {
+      const res = checkClientGarantiaPlus(cedula);
+      if (res.hasGarantiaPlus) return res;
+    }
+    if (placa) {
+      const res = checkClientGarantiaPlus(placa);
+      if (res.hasGarantiaPlus) return res;
+    }
+    if (chasis) {
+      const res = checkClientGarantiaPlus(chasis);
+      if (res.hasGarantiaPlus) return res;
+    }
+    return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
+  }, [formData.cedulaRuc, formData.placa, formData.chasis]);
 
   const [customOilTypes, setCustomOilTypes] = useState<string[]>([]);
   const [showCustomOilInput, setShowCustomOilInput] = useState(false);
@@ -334,7 +582,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
   const [abonoModalRecord, setAbonoModalRecord] = useState<GarantiaPlusRecord | null>(null);
   const [abonoFormData, setAbonoFormData] = useState<{
     montoAbono: string;
-    metodoPago: string;
+    metodoPago: GarantiaPlusRecord['metodoPago'];
     evidenciaTransferencia: string;
     numeroFactura: string;
     esSuma: boolean;
@@ -346,8 +594,13 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     esSuma: true,
   });
 
+  const [rejectingAbono, setRejectingAbono] = useState<boolean>(false);
+  const [motivoRechazoAbono, setMotivoRechazoAbono] = useState<string>('');
+
   const handleOpenAbonoModal = (record: GarantiaPlusRecord) => {
     setAbonoModalRecord(record);
+    setRejectingAbono(false);
+    setMotivoRechazoAbono('');
     const valServ = Number(record.valorServicio) || 0;
     const currentAbono = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
     const currentPend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - currentAbono);
@@ -368,6 +621,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
     const inputAbono = parseFloat(abonoFormData.montoAbono) || 0;
 
+    // Si está en modo suma (predeterminado), se suma el nuevo abono a lo recaudado previamente
     const nuevoTotalPagado = abonoFormData.esSuma
       ? Math.min(valServ, prevPagado + inputAbono)
       : Math.min(valServ, inputAbono);
@@ -379,20 +633,20 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     const horaAbono = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
     const abonoEfectivo = abonoFormData.esSuma ? inputAbono : Math.max(0, nuevoTotalPagado - prevPagado);
 
-    const nuevoItemAbono: AbonoRecord = {
+    const nuevoItemAbono = {
       id: `abn-${Date.now()}`,
       fecha: fechaAbono,
       hora: horaAbono,
       monto: abonoEfectivo,
-      metodoPago: abonoFormData.metodoPago as any,
+      metodoPago: abonoFormData.metodoPago,
       evidenciaTransferencia: abonoFormData.evidenciaTransferencia || undefined,
       numeroFactura: abonoFormData.numeroFactura || undefined,
       saldoRestante: nuevoSaldo,
-      registradoPor: defaultAtendidoPor || 'Matriz',
+      registradoPor: defaultAtendidoPor || 'Taller',
     };
 
     const updatedHistorial = [...(abonoModalRecord.historialAbonos || []), nuevoItemAbono];
-    const nota = `\n[Abono Garantía Plus ${fechaAbono} ${horaAbono}: +$${abonoEfectivo.toFixed(2)} (${abonoFormData.metodoPago}). Saldo rest.: $${nuevoSaldo.toFixed(2)}]`;
+    const nota = `\n[Abono ${fechaAbono} ${horaAbono}: +$${abonoEfectivo.toFixed(2)} (${abonoFormData.metodoPago}). Saldo rest.: $${nuevoSaldo.toFixed(2)}]`;
     const updatedObservaciones = ((abonoModalRecord.observaciones || '').trim() + nota).trim();
 
     const updatedRecord: GarantiaPlusRecord = {
@@ -416,23 +670,122 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#f59e0b', '#10b981', '#fbbf24', '#059669'],
+        colors: ['#10b981', '#059669', '#34d399', '#f59e0b'],
       });
     }
 
     if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
       setSelectedRecordForDetail(updatedRecord);
-      setDetailFormData(updatedRecord as any);
+      setDetailFormData(updatedRecord);
     }
 
     setAbonoModalRecord(null);
   };
 
-  // Modales rápidos de Técnico y Origen
+  const handleAceptarAbonoCliente = () => {
+    if (!abonoModalRecord || !abonoModalRecord.solicitudAbonoPendiente) return;
+    const sol = abonoModalRecord.solicitudAbonoPendiente;
+    const valServ = Number(abonoModalRecord.valorServicio) || 0;
+    const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+    const montoAbonado = Number(sol.monto) || 0;
+    const nuevoTotalPagado = Math.min(valServ, prevPagado + montoAbonado);
+    const nuevoSaldo = Math.max(0, valServ - nuevoTotalPagado);
+    const isPaidInFull = nuevoSaldo <= 0.01;
+
+    const fechaAbono = new Date().toLocaleDateString('es-EC');
+    const horaAbono = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+
+    const nuevoItemAbono = {
+      id: `abn-cli-${Date.now()}`,
+      fecha: fechaAbono,
+      hora: horaAbono,
+      monto: montoAbonado,
+      metodoPago: 'Transferencia',
+      evidenciaTransferencia: sol.comprobanteUrl,
+      numeroFactura: abonoModalRecord.numeroFactura,
+      saldoRestante: nuevoSaldo,
+      registradoPor: `Cliente (Validado por ${defaultAtendidoPor || 'Taller'})`,
+    };
+
+    const updatedRecord: GarantiaPlusRecord = {
+      ...abonoModalRecord,
+      abono: nuevoTotalPagado,
+      montoPagado: nuevoTotalPagado,
+      saldoPendiente: nuevoSaldo,
+      metodoPago: 'Transferencia',
+      evidenciaTransferencia: sol.comprobanteUrl || abonoModalRecord.evidenciaTransferencia,
+      comprobantePagoUrl: sol.comprobanteUrl || abonoModalRecord.comprobantePagoUrl,
+      historialAbonos: [...(abonoModalRecord.historialAbonos || []), nuevoItemAbono],
+      solicitudAbonoPendiente: {
+        ...sol,
+        estado: 'aprobado',
+        fechaRevision: new Date().toISOString(),
+      },
+      observaciones: (
+        (abonoModalRecord.observaciones || '').trim() +
+        `\n[Abono Aprobado ${fechaAbono} ${horaAbono}: +$${montoAbonado.toFixed(2)} por Transferencia. Ref: ${sol.numeroComprobante || 'S/N'}]`
+      ).trim(),
+    };
+
+    onSaveRecord(updatedRecord);
+    saveStoredGarantiaPlusRecord(updatedRecord);
+    cloudSaveAlistamiento(updatedRecord as any);
+    window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#10b981', '#059669', '#34d399', '#8b5cf6'],
+    });
+
+    if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
+      setSelectedRecordForDetail(updatedRecord);
+      setDetailFormData(updatedRecord);
+    }
+
+    setAbonoModalRecord(null);
+  };
+
+  const handleNegarAbonoCliente = () => {
+    if (!abonoModalRecord || !abonoModalRecord.solicitudAbonoPendiente) return;
+    const sol = abonoModalRecord.solicitudAbonoPendiente;
+    const razon = motivoRechazoAbono.trim() || 'Comprobante no válido o valor no acreditado en cuenta bancaria';
+
+    const updatedRecord: GarantiaPlusRecord = {
+      ...abonoModalRecord,
+      solicitudAbonoPendiente: {
+        ...sol,
+        estado: 'rechazado',
+        motivoRechazo: razon,
+        fechaRevision: new Date().toISOString(),
+      },
+      observaciones: (
+        (abonoModalRecord.observaciones || '').trim() +
+        `\n[Abono Negado ${new Date().toLocaleDateString('es-EC')}: Monto $${Number(sol.monto).toFixed(2)}. Motivo: ${razon}]`
+      ).trim(),
+    };
+
+    onSaveRecord(updatedRecord);
+    saveStoredGarantiaPlusRecord(updatedRecord);
+    cloudSaveAlistamiento(updatedRecord as any);
+    window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+
+    if (selectedRecordForDetail && selectedRecordForDetail.id === updatedRecord.id) {
+      setSelectedRecordForDetail(updatedRecord);
+      setDetailFormData(updatedRecord);
+    }
+
+    setRejectingAbono(false);
+    setMotivoRechazoAbono('');
+    setAbonoModalRecord(null);
+  };
+
+  // Modales rápidos
   const [showAddTechModal, setShowAddTechModal] = useState(false);
   const [newTechData, setNewTechData] = useState({
     name: '',
-    specialty: 'Mecánica Rápida & Garantías',
+    specialty: 'Mecánica Rápida & Mantenimiento',
     phone: '',
     workshopId: defaultSedeId,
   });
@@ -440,52 +793,15 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
   const [showAddOriginModal, setShowAddOriginModal] = useState(false);
   const [newOriginInput, setNewOriginInput] = useState('');
 
-  const handleSaveNewTechnician = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTechData.name.trim()) return;
-
-    if (propOnAddTechnician) {
-      propOnAddTechnician({
-        name: newTechData.name.toUpperCase(),
-        specialty: newTechData.specialty,
-        phone: newTechData.phone || '0990000000',
-        workshopId: newTechData.workshopId || defaultSedeId,
-        workshopName: workshops.find((w) => w.id === newTechData.workshopId)?.name || defaultSede,
-        status: 'activo',
-      });
-    }
-
+  // Sincronizar si cambia defaultSede / defaultAtendidoPor
+  useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      tecnicoResponsable: newTechData.name.toUpperCase(),
+      atendidoPor: prev.atendidoPor || defaultAtendidoPor,
+      sede: prev.sede || defaultSede,
+      sedeId: prev.sedeId || defaultSedeId,
     }));
-
-    setShowAddTechModal(false);
-    setNewTechData({
-      name: '',
-      specialty: 'Mecánica Rápida & Garantías',
-      phone: '',
-      workshopId: defaultSedeId,
-    });
-  };
-
-  const handleSaveNewOrigin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newOriginInput.trim()) return;
-    const clean = newOriginInput.trim();
-    if (!origins.includes(clean)) {
-      setOrigins((prev) => [...prev, clean]);
-    }
-    if (propOnAddOrigin) {
-      propOnAddOrigin(clean);
-    }
-    setFormData((prev) => ({
-      ...prev,
-      origen: clean,
-    }));
-    setShowAddOriginModal(false);
-    setNewOriginInput('');
-  };
+  }, [defaultAtendidoPor, defaultSede, defaultSedeId]);
 
   const getCleanWhatsappUrl = (phone: string, clientName: string) => {
     const cleanDigits = phone.replace(/\D/g, '');
@@ -494,12 +810,12 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       fullNumber = `593${fullNumber.substring(1)}`;
     }
     const message = encodeURIComponent(
-      `Estimado/a ${clientName}, le saludamos de StarMotos Matriz. Le contactamos referente a su póliza de Garantía Plus activa para su motocicleta. Recuerde que sus mantenimientos periódicos y revisiones técnicas están cubiertos al 100%. ¡Estamos para servirle!`
+      `Estimado/a ${clientName}, le saludamos de StarMotos. Quisiéramos saber si ha tenido alguna novedad con su motocicleta. Si tiene alguna inquietud sobre la garantía de su moto, por favor contáctese con nuestro supervisor al número 0939316698. ¡Estamos para servirle!`
     );
     return `https://wa.me/${fullNumber}?text=${message}`;
   };
 
-  // Cantidad de filtros activos
+  // Cantidad de filtros activos (para badge en botón)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filterPayment !== 'all') count++;
@@ -507,133 +823,189 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     return count;
   }, [filterPayment, filterDateRange, sortBy]);
 
-  // Base de registros filtrada por Sede, término y fechas
+  // 1. Registros base filtrados por Sede, término de búsqueda y fechas (para las métricas de los 4 bloques superiores)
   const baseRecords = useMemo(() => {
     return effectiveRecords.filter((r) => {
-      // 1. Sede
-      if (selectedWorkshopFilter !== 'all') {
-        const matchesSede =
-          r.sedeId === selectedWorkshopFilter ||
-          (r.sede || '').toLowerCase().includes(selectedWorkshopFilter.toLowerCase());
+      // 1. Restricción por Sede
+      if (!effectiveIsMatriz && defaultSedeId) {
+        const matchesSede = matchRecordToWorkshop(r, defaultSedeId, workshops);
         if (!matchesSede) return false;
+      } else if (selectedWorkshopFilter !== 'all') {
+        const matchesWs = matchRecordToWorkshop(r, selectedWorkshopFilter, workshops);
+        if (!matchesWs) return false;
       }
 
-      // 2. Búsqueda
+      // 2. Término de búsqueda
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase().trim();
         const fullClient = `${r.nombres} ${r.apellidos}`.toLowerCase();
-        const matchesTerm =
+        const matchesTerm = (
           r.cedulaRuc.toLowerCase().includes(term) ||
           fullClient.includes(term) ||
           r.placa.toLowerCase().includes(term) ||
           r.chasis.toLowerCase().includes(term) ||
           r.modeloMarca.toLowerCase().includes(term) ||
-          (r.numeroTicket || '').toLowerCase().includes(term) ||
           r.sede.toLowerCase().includes(term) ||
           r.origen.toLowerCase().includes(term) ||
-          r.tecnicoResponsable.toLowerCase().includes(term);
+          r.tecnicoResponsable.toLowerCase().includes(term)
+        );
         if (!matchesTerm) return false;
       }
 
-      // 3. Fechas
+      // 3. Filtro por Fechas
       if (filterDateRange !== 'all') {
-        const dateStr = r.fechaServicio || r.createdAt;
-        if (!dateStr) return false;
+        const recDateObj = getRecordLocalDate(r.fechaServicio) || getRecordLocalDate(r.createdAt);
+        if (!recDateObj) return false;
+
         const now = new Date();
-        const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
-        if (!y || !m || !d) return false;
+        const todayYear = now.getFullYear();
+        const todayMonth = now.getMonth() + 1;
+        const todayDay = now.getDate();
 
         if (filterDateRange === 'today') {
-          if (y !== now.getFullYear() || m !== now.getMonth() + 1 || d !== now.getDate()) return false;
+          if (
+            recDateObj.year !== todayYear ||
+            recDateObj.month !== todayMonth ||
+            recDateObj.day !== todayDay
+          ) {
+            return false;
+          }
         } else if (filterDateRange === 'this_week') {
           const dayOfWeek = now.getDay();
           const diffToMonday = (dayOfWeek + 6) % 7;
-          const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0);
-          const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59);
-          const recDate = new Date(y, m - 1, d);
+          const monday = new Date(todayYear, todayMonth - 1, todayDay - diffToMonday, 0, 0, 0, 0);
+          const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59, 999);
+          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day, 12, 0, 0, 0);
           if (recDate < monday || recDate > sunday) return false;
         } else if (filterDateRange === 'this_month') {
-          if (y !== now.getFullYear() || m !== now.getMonth() + 1) return false;
+          if (
+            recDateObj.year !== todayYear ||
+            recDateObj.month !== todayMonth
+          ) {
+            return false;
+          }
         } else if (filterDateRange === 'this_year') {
-          if (y !== now.getFullYear()) return false;
+          if (recDateObj.year !== todayYear) {
+            return false;
+          }
+        } else if (filterDateRange === 'custom') {
+          const recDate = new Date(recDateObj.year, recDateObj.month - 1, recDateObj.day, 12, 0, 0, 0);
+          if (customStartDate) {
+            const cStartObj = getRecordLocalDate(customStartDate);
+            if (cStartObj) {
+              const cStart = new Date(cStartObj.year, cStartObj.month - 1, cStartObj.day, 0, 0, 0, 0);
+              if (recDate < cStart) return false;
+            }
+          }
+          if (customEndDate) {
+            const cEndObj = getRecordLocalDate(customEndDate);
+            if (cEndObj) {
+              const cEnd = new Date(cEndObj.year, cEndObj.month - 1, cEndObj.day, 23, 59, 59, 999);
+              if (recDate > cEnd) return false;
+            }
+          }
         }
       }
 
       return true;
     });
-  }, [effectiveRecords, searchTerm, selectedWorkshopFilter, filterDateRange]);
+  }, [
+    effectiveRecords,
+    searchTerm,
+    selectedWorkshopFilter,
+    defaultSedeId,
+    effectiveIsMatriz,
+    workshops,
+    filterDateRange,
+    customStartDate,
+    customEndDate,
+  ]);
 
-  // Métricas financieras y operativas globales
+  // Métricas financieras y operativas globales del listado (para los 4 bloques superiores)
   const statsMetrics = useMemo(() => {
     let totalRecaudado = 0;
     let totalPendiente = 0;
     let totalFacturado = 0;
-    let countActivas = 0;
+    let countPdi = 0;
+    let countMantenimiento = 0;
     let countConSaldo = 0;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
 
     baseRecords.forEach((r) => {
-      const valor = Number(r.valorServicio) || 0;
-      const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
-      const pendiente = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
+      const isPdi = isPdiOnlyRecord(r);
+      const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
+      const pagado = isPdi ? 0 : (r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined 
+        ? Number(r.saldoPendiente) 
+        : Math.max(0, valor - pagado));
 
       totalFacturado += valor;
       totalRecaudado += pagado;
       totalPendiente += pendiente;
 
       if (pendiente > 0.01) countConSaldo++;
-
-      // Vigencia
-      if (r.fechaVencimiento) {
-        const [vy, vm, vd] = r.fechaVencimiento.split('-').map(Number);
-        const vDate = new Date(vy, vm - 1, vd);
-        vDate.setHours(23, 59, 59, 999);
-        if (vDate >= now && r.estado !== 'cancelada') {
-          countActivas++;
-        }
-      }
+      if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
+      if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
     });
 
     return {
       totalRecaudado,
       totalPendiente,
       totalFacturado,
-      countActivas,
+      countPdi,
+      countMantenimiento,
       countConSaldo,
       totalOperaciones: baseRecords.length,
     };
   }, [baseRecords]);
 
-  // Filtrado final con ordenamiento
+  // Filtrado final aplicando el filtro de estado de pago (controlado por clic en los 4 bloques o menú de filtros)
   const filteredRecords = useMemo(() => {
     const afterPayment = baseRecords.filter((r) => {
       if (filterPayment !== 'all') {
         const valor = Number(r.valorServicio) || 0;
         const pagado = r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0);
         const pendiente = r.saldoPendiente !== undefined ? Number(r.saldoPendiente) : Math.max(0, valor - pagado);
+        const isPdi = isPdiOnlyRecord(r);
 
         if (filterPayment === 'con_saldo') {
           if (pendiente <= 0.01) return false;
         } else if (filterPayment === 'pagados') {
-          if (valor <= 0 || pendiente > 0.01) return false;
+          if (isPdi || valor <= 0 || pendiente > 0.01) return false;
         } else if (filterPayment === 'pdi') {
-          if (!r.serviciosRealizados?.includes('alistamiento_pdi')) return false;
+          const hasPdi =
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'alistamiento_pdi' || s.toLowerCase().includes('pdi')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('pdi') ||
+            (r as any).tipoServicio?.toLowerCase().includes('alistamiento') ||
+            isPdiOnlyRecord(r);
+          if (!hasPdi) return false;
         } else if (filterPayment === 'engrasado') {
-          if (!r.serviciosRealizados?.includes('engrasado')) return false;
+          const hasEngrasado =
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'engrasado' || s.toLowerCase().includes('engrasad')) ||
+            (r as any).tipoServicio?.toLowerCase().includes('engrasad');
+          if (!hasEngrasado) return false;
         } else if (filterPayment === 'mantenimiento') {
-          if (!r.serviciosRealizados?.includes('mantenimiento')) return false;
+          const hasMantenimiento =
+            r.serviciosRealizados?.some((s) => s.toLowerCase() === 'mantenimiento') ||
+            (r as any).tipoServicio?.toLowerCase().includes('mantenimiento');
+          if (!hasMantenimiento) return false;
         }
       }
       return true;
     });
 
+    // 5. Ordenamiento
     return [...afterPayment].sort((a, b) => {
       if (sortBy === 'recientes' || sortBy === 'hoy' || sortBy === 'por_semana' || sortBy === 'por_mes' || sortBy === 'por_ano') {
-        return (b.createdAt || b.fechaServicio || '').localeCompare(a.createdAt || a.fechaServicio || '');
+        const timeA = getRecordTimestamp(a);
+        const timeB = getRecordTimestamp(b);
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || '').localeCompare(a.id || '');
       }
       if (sortBy === 'antiguos') {
-        return (a.createdAt || a.fechaServicio || '').localeCompare(b.createdAt || b.fechaServicio || '');
+        const timeA = getRecordTimestamp(a);
+        const timeB = getRecordTimestamp(b);
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.id || '').localeCompare(b.id || '');
       }
       if (sortBy === 'cliente_asc') {
         const nameA = `${a.nombres} ${a.apellidos}`.trim().toLowerCase();
@@ -646,10 +1018,10 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
         return nameB.localeCompare(nameA);
       }
       if (sortBy === 'modelo_asc') {
-        return (a.modeloMarca || '').localeCompare(b.modeloMarca || '');
+        return (a.modeloMarca || '').trim().toLowerCase().localeCompare((b.modeloMarca || '').trim().toLowerCase());
       }
       if (sortBy === 'modelo_desc') {
-        return (b.modeloMarca || '').localeCompare(a.modeloMarca || '');
+        return (b.modeloMarca || '').trim().toLowerCase().localeCompare((a.modeloMarca || '').trim().toLowerCase());
       }
       if (sortBy === 'mayor_valor') {
         return (Number(b.valorServicio) || 0) - (Number(a.valorServicio) || 0);
@@ -663,56 +1035,208 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     });
   }, [baseRecords, filterPayment, sortBy]);
 
-  // Paginación
+  // Totales para el pie de tabla según los registros visibles
+  const tableFooterMetrics = useMemo(() => {
+    let totalRecaudado = 0;
+    let totalPendiente = 0;
+    let totalFacturado = 0;
+    let countPdi = 0;
+    let countConSaldo = 0;
+    let countMantenimiento = 0;
+
+    filteredRecords.forEach((r) => {
+      const isPdi = isPdiOnlyRecord(r);
+      const valor = isPdi ? 0 : (Number(r.valorServicio) || 0);
+      const pagado = isPdi ? 0 : (r.abono !== undefined ? Number(r.abono) : (Number(r.montoPagado) || 0));
+      const pendiente = isPdi ? 0 : (r.saldoPendiente !== undefined 
+        ? Number(r.saldoPendiente) 
+        : Math.max(0, valor - pagado));
+
+      totalFacturado += valor;
+      totalRecaudado += pagado;
+      totalPendiente += pendiente;
+      if (pendiente > 0.01) countConSaldo++;
+      if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
+      if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
+    });
+
+    return { totalFacturado, totalRecaudado, totalPendiente, countPdi, countConSaldo, countMantenimiento };
+  }, [filteredRecords]);
+
+  // Paginación derivada
   const totalPages = Math.ceil(filteredRecords.length / RECORDS_PER_PAGE);
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * RECORDS_PER_PAGE, currentPage * RECORDS_PER_PAGE);
 
-  // Helper para consultar SRI / clientes previos
-  const handleConsultar = (cedulaInput?: string) => {
-    const cedula = (cedulaInput !== undefined ? cedulaInput : formData.cedulaRuc).trim();
-    if (!cedula) return;
+  // Historial completo conocido (combinando recentRecords con localStorage de alistamientos)
+  const allKnownRecords = useMemo(() => {
+    const stored = getStoredGarantiasPlusRecords();
+    const map = new Map<string, GarantiaPlusRecord>();
+    effectiveRecords.forEach((r) => map.set(r.id, r));
+    stored.forEach((r) => {
+      if (!map.has(r.id)) map.set(r.id, r);
+    });
+    return Array.from(map.values());
+  }, [effectiveRecords]);
+
+  // Historial previo del cliente o motocicleta (según Cédula/RUC o Chasis o Placa)
+  const clientHistoricalRecords = useMemo(() => {
+    const cedula = formData.cedulaRuc.trim().toLowerCase();
+    const chasis = formData.chasis.trim().toLowerCase();
+    const placa = formData.placa.trim().toLowerCase();
+
+    if (!cedula && !chasis && !placa) return [];
+
+    return allKnownRecords.filter((rec) => {
+      if (formData.id && rec.id === formData.id) return false;
+      const matchCedula = !!cedula && rec.cedulaRuc.trim().toLowerCase() === cedula;
+      const matchChasis = !!chasis && rec.chasis.trim().toLowerCase() === chasis;
+      const matchPlaca =
+        !!placa &&
+        placa !== 'en trámite' &&
+        placa !== 's/p' &&
+        rec.placa.trim().toLowerCase() === placa;
+
+      return matchCedula || matchChasis || matchPlaca;
+    });
+  }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, allKnownRecords]);
+
+  // 1. ¿Ya se realizó alistamiento PDI previamente para este cliente/moto?
+  const hasPdiDone = useMemo(() => {
+    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('alistamiento_pdi'));
+  }, [clientHistoricalRecords]);
+
+  // 2. ¿Ya se realizó engrasado previamente para este cliente/moto?
+  const hasEngrasadoDone = useMemo(() => {
+    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('engrasado'));
+  }, [clientHistoricalRecords]);
+
+  // Flujo Secuencial Obligatorio:
+  // Paso 1: Alistamiento PDI (bloqueado si ya se realizó)
+  const isPdiBlocked = hasPdiDone;
+  // Paso 2: Engrasado (bloqueado si ya se realizó)
+  const isEngrasadoBlocked = hasEngrasadoDone;
+  // Paso 3: Mantenimiento (bloqueado si ya se hizo PDI pero aún NO ha realizado el Engrasado)
+  const isMantenimientoBlocked = hasPdiDone && !hasEngrasadoDone;
+
+  // Sincronizar dinámicamente qué servicios pueden estar marcados según la etapa secuencial
+  useEffect(() => {
+    setFormData((prev) => {
+      let updated = [...prev.serviciosRealizados];
+      let changed = false;
+
+      // Etapa B: Ya tiene PDI previo pero NO engrasado -> Paso 2 Engrasado OBLIGATORIO
+      if (hasPdiDone && !hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'engrasado') {
+          updated = ['engrasado'];
+          changed = true;
+        }
+      }
+      // Etapa C: Ya completó Engrasado previo -> Paso 3 Mantenimiento OBLIGATORIO
+      else if (hasEngrasadoDone) {
+        if (updated.length !== 1 || updated[0] !== 'mantenimiento') {
+          updated = ['mantenimiento'];
+          changed = true;
+        }
+      }
+      // Etapa A: Primera vez (sin PDI previo) -> Asegurar al menos alistamiento_pdi
+      else {
+        if (updated.length === 0) {
+          updated = ['alistamiento_pdi'];
+          changed = true;
+        }
+      }
+
+      if (!changed) return prev;
+
+      return {
+        ...prev,
+        serviciosRealizados: updated,
+      };
+    });
+  }, [hasPdiDone, hasEngrasadoDone]);
+
+  // Al crear un nuevo alistamiento para un cliente que ya tiene historial previo,
+  // mantener y precargar el número de factura y ticket que había antes (manteniendo la capacidad de edición)
+  useEffect(() => {
+    if (!formData.id && clientHistoricalRecords.length > 0) {
+      const prevDoc = clientHistoricalRecords.find((r) => r.numeroFactura || r.numeroTicket) || clientHistoricalRecords[0];
+      if (prevDoc) {
+        setFormData((prev) => {
+          let updated = false;
+          const next = { ...prev };
+          if (!prev.numeroFactura && prevDoc.numeroFactura) {
+            next.numeroFactura = prevDoc.numeroFactura;
+            updated = true;
+          }
+          if (!prev.numeroTicket && prevDoc.numeroTicket) {
+            next.numeroTicket = prevDoc.numeroTicket;
+            updated = true;
+          }
+          return updated ? next : prev;
+        });
+      }
+    }
+  }, [formData.id, clientHistoricalRecords]);
+
+  // Consultar Cédula o RUC (busca en registros existentes o clientes guardados)
+  const handleConsultar = (idToSearch?: string) => {
+    const cleanId = (idToSearch || formData.cedulaRuc).trim();
+    if (!cleanId) return;
 
     setIsSearching(true);
     setSearchFeedback(null);
 
-    // 1. Verificar si ya tiene Garantía Plus previa
-    const existingGp = effectiveRecords.find(
-      (r) => (r.cedulaRuc || '').trim().toLowerCase() === cedula.toLowerCase()
+    // 1. Primero verificar si ya existe en el historial local de alistamientos de esta sede
+    const allAlistamientos = effectiveIsMatriz
+      ? [...effectiveRecords, ...getStoredGarantiasPlusRecords()]
+      : effectiveRecords.filter((r) => r.sedeId === defaultSedeId || r.sede === defaultSede);
+    const existingRec = allAlistamientos.find(
+      (r) =>
+        (r.cedulaRuc && r.cedulaRuc.trim().toLowerCase() === cleanId.toLowerCase()) ||
+        (r.chasis && r.chasis.trim().toUpperCase() === cleanId.toUpperCase())
     );
-    if (existingGp) {
-      setSearchFeedback(
-        `👑 El cliente ya posee Garantía Plus registrada (${existingGp.nombres} ${existingGp.apellidos}, Vence: ${existingGp.fechaVencimiento}). Datos precargados.`
-      );
+
+    if (existingRec) {
+      setIsSearching(false);
       setFormData((prev) => ({
         ...prev,
-        cedulaRuc: existingGp.cedulaRuc,
-        nombres: existingGp.nombres,
-        apellidos: existingGp.apellidos,
-        celular1: existingGp.celular1,
-        celular2: existingGp.celular2 || '',
-        email: existingGp.email || '',
-        direccion: existingGp.direccion || '',
-        placa: existingGp.placa || '',
-        chasis: existingGp.chasis || '',
-        modeloMarca: existingGp.modeloMarca || '',
-        color: existingGp.color || '',
-        kilometraje: existingGp.kilometraje || '',
+        cedulaRuc: existingRec.cedulaRuc || cleanId,
+        nombres: existingRec.nombres || prev.nombres,
+        apellidos: existingRec.apellidos || prev.apellidos,
+        celular1: existingRec.celular1 || prev.celular1,
+        celular2: existingRec.celular2 || prev.celular2,
+        email: existingRec.email || prev.email,
+        direccion: existingRec.direccion || prev.direccion,
+        origen: existingRec.origen || prev.origen,
+        motoPreviaId: existingRec.chasis || existingRec.placa || prev.motoPreviaId,
+        chasis: existingRec.chasis || prev.chasis,
+        placa: existingRec.placa || prev.placa,
+        modeloMarca: existingRec.modeloMarca || prev.modeloMarca,
+        color: existingRec.color || prev.color,
+        kilometraje: existingRec.kilometraje || prev.kilometraje,
+        numeroFactura: existingRec.numeroFactura || prev.numeroFactura,
+        numeroTicket: existingRec.numeroTicket || prev.numeroTicket,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingRec.sede || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingRec.sedeId || prev.sedeId),
       }));
-      setIsSearching(false);
+      setSearchFeedback(`✓ Cliente registrado encontrado: ${existingRec.nombres} ${existingRec.apellidos}`);
       return;
     }
 
-    // 2. Buscar en base general de clientes
-    const storedClients = getStoredClients();
-    const foundClient = storedClients.find(
+    // 2. Buscar en base de datos de clientes registrados de esta sede
+    const storedClients = effectiveIsMatriz
+      ? getStoredClients()
+      : getStoredClients().filter((c) => c.workshopId === defaultSedeId || c.workshopName === defaultSede);
+    const existingClient = storedClients.find(
       (c) =>
-        (c.idNumber && c.idNumber.trim().toLowerCase() === cedula.toLowerCase()) ||
-        (c.motorcycleVin && c.motorcycleVin.trim().toUpperCase() === cedula.toUpperCase()) ||
-        (c.motorcyclePlate && c.motorcyclePlate.trim().toUpperCase() === cedula.toUpperCase())
+        (c.idNumber && c.idNumber.trim().toLowerCase() === cleanId.toLowerCase()) ||
+        (c.motorcycleVin && c.motorcycleVin.trim().toUpperCase() === cleanId.toUpperCase()) ||
+        (c.motorcyclePlate && c.motorcyclePlate.trim().toUpperCase() === cleanId.toUpperCase())
     );
-    if (foundClient) {
-      setSearchFeedback(`✓ Cliente registrado encontrado: ${foundClient.fullName}`);
-      const parts = (foundClient.fullName || '').trim().split(' ');
+
+    if (existingClient) {
+      setIsSearching(false);
+      const parts = (existingClient.fullName || '').trim().split(' ');
       let cNombres = '';
       let cApellidos = '';
       if (parts.length >= 4) {
@@ -725,54 +1249,55 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
         cApellidos = parts[0];
         cNombres = parts[1];
       } else {
-        cNombres = foundClient.fullName;
+        cNombres = existingClient.fullName;
       }
+
       setFormData((prev) => ({
         ...prev,
-        cedulaRuc: foundClient.idNumber || cedula,
+        cedulaRuc: existingClient.idNumber || cleanId,
         nombres: cNombres || prev.nombres,
         apellidos: cApellidos || prev.apellidos,
-        celular1: foundClient.phone || prev.celular1,
-        email: foundClient.email || prev.email,
-        direccion: foundClient.address || prev.direccion,
-        chasis: foundClient.motorcycleVin || prev.chasis,
-        placa: foundClient.motorcyclePlate || prev.placa,
-        modeloMarca: foundClient.motorcycleModel || prev.modeloMarca,
-        color: foundClient.color || prev.color,
+        celular1: existingClient.phone || prev.celular1,
+        email: existingClient.email || prev.email,
+        direccion: existingClient.address || prev.direccion,
+        motoPreviaId: existingClient.motorcycleVin || existingClient.motorcyclePlate || prev.motoPreviaId,
+        chasis: existingClient.motorcycleVin || prev.chasis,
+        placa: existingClient.motorcyclePlate || prev.placa,
+        modeloMarca: existingClient.motorcycleModel
+          ? `${existingClient.motorcycleBrand || ''} ${existingClient.motorcycleModel}`.trim()
+          : prev.modeloMarca,
+        numeroMotor: existingClient.motorNumber || prev.numeroMotor,
+        ramv: existingClient.ramvNumber || prev.ramv,
+        color: existingClient.color || prev.color,
+        year: existingClient.year || prev.year,
+        kilometraje: existingClient.motorcycleMileage !== undefined ? existingClient.motorcycleMileage : prev.kilometraje,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (existingClient.workshopName || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (existingClient.workshopId || prev.sedeId),
       }));
-      setIsSearching(false);
+      setSearchFeedback(`✓ Cliente registrado encontrado: ${existingClient.fullName}`);
       return;
     }
 
-    // 3. Consulta SRI Mock
-    const sriResult = querySriMock(cedula);
-    if (sriResult) {
-      setSearchFeedback(`✓ Datos verificados en Registro Oficial / SRI: ${sriResult.razonSocial}`);
-      const parts = (sriResult.razonSocial || '').trim().split(' ');
-      const apellidos = parts.slice(0, Math.min(2, parts.length)).join(' ');
-      const nombres = parts.slice(Math.min(2, parts.length)).join(' ') || parts[0];
-
-      setFormData((prev) => ({
-        ...prev,
-        nombres: nombres || prev.nombres,
-        apellidos: apellidos || prev.apellidos,
-        direccion: sriResult.address || prev.direccion,
-        email: sriResult.email || prev.email,
-        celular1: sriResult.phone || prev.celular1,
-      }));
-    } else {
-      setSearchFeedback('ℹ️ Cédula no registrada previamente. Complete los datos manualmente.');
-    }
-    setIsSearching(false);
+    // 3. No encontrado en la base de datos (y actualmente sin API externa conectada)
+    // NO rellenar ni inventar datos ficticios: el usuario debe poder continuar llenando los datos manualmente
+    setTimeout(() => {
+      setIsSearching(false);
+      setSearchFeedback('ℹ Cédula no registrada en el sistema. Puedes continuar completando los datos manualmente.');
+    }, 250);
   };
 
+  // Guardar datos del cliente ingresado en la base de datos de la red
   const handleSaveClientToDatabase = () => {
     const cleanId = formData.cedulaRuc.trim();
     const cleanNombres = formData.nombres.trim();
     const cleanApellidos = formData.apellidos.trim();
 
-    if (!cleanId || !cleanNombres) {
-      alert('Por favor ingrese al menos Cédula y Nombres del cliente.');
+    if (!cleanId) {
+      setSearchFeedback('⚠️ Ingrese el número de Cédula o RUC para guardar al cliente.');
+      return;
+    }
+    if (!cleanNombres) {
+      setSearchFeedback('⚠️ Ingrese los nombres del cliente para poder registrarlo.');
       return;
     }
 
@@ -786,15 +1311,21 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       id: existingIndex >= 0 ? currentClients[existingIndex].id : `cli-${Date.now()}`,
       fullName,
       idNumber: cleanId,
-      phone: formData.celular1.trim() || (existingIndex >= 0 ? currentClients[existingIndex].phone : ''),
+      phone: formData.celular1.trim() || formData.celular2?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].phone : ''),
       email: formData.email.trim() || (existingIndex >= 0 ? currentClients[existingIndex].email : ''),
       address: formData.direccion.trim() || (existingIndex >= 0 ? currentClients[existingIndex].address : ''),
-      motorcycleBrand: formData.modeloMarca ? formData.modeloMarca.split(' ')[0] : (existingIndex >= 0 ? currentClients[existingIndex].motorcycleBrand : 'StarMotos'),
+      motorcycleBrand: formData.modeloMarca ? formData.modeloMarca.split(' ')[0] : (existingIndex >= 0 ? currentClients[existingIndex].motorcycleBrand : 'Benelli'),
       motorcycleModel: formData.modeloMarca.trim() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleModel : 'Modelo por definir'),
       motorcyclePlate: formData.placa.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcyclePlate : 'S/P'),
       motorcycleVin: formData.chasis.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleVin : undefined),
+      motorNumber: formData.numeroMotor?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorNumber : undefined),
+      ramvNumber: formData.ramv?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].ramvNumber : undefined),
       color: formData.color?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].color : undefined),
-      motorcycleMileage: Number(formData.kilometraje) || 0,
+      motorcycleMileage: Number(formData.kilometraje) > 0
+        ? Number(formData.kilometraje)
+        : (existingIndex >= 0 && currentClients[existingIndex].motorcycleMileage !== undefined
+            ? currentClients[existingIndex].motorcycleMileage
+            : (Number(formData.kilometraje) || 0)),
       lastVisit: todayStr,
       totalVisits: existingIndex >= 0 ? (currentClients[existingIndex].totalVisits || 1) + 1 : 1,
       workshopId: formData.sedeId || defaultSedeId,
@@ -810,67 +1341,72 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     }
 
     saveStoredClients(updatedClients);
-    setSearchFeedback(`✓ Cliente "${fullName}" guardado en la base de datos.`);
+
+    try {
+      confetti({ particleCount: 25, spread: 50, origin: { y: 0.3 } });
+    } catch (_) {}
+
+    setSearchFeedback(`✓ Cliente "${fullName}" guardado exitosamente en la base de datos.`);
   };
 
-  // Iniciar nueva Garantía Plus
-  const handleStartNewGarantiaPlus = (initialCedula?: string) => {
+  // Iniciar nuevo alistamiento con o sin cédula previa
+  const handleStartNewAlistamiento = (initialCedula?: string) => {
     const cedula = initialCedula?.trim() || '';
-    const nowToday = getLocalDateStr();
-    const nowNextYear = getNextYearDateStr(nowToday);
+
+    // Si hay una sede seleccionada en el filtro exterior (distinta de 'all'), pre-seleccionarla automáticamente
+    const preselectedWs =
+      effectiveIsMatriz && selectedWorkshopFilter !== 'all' && workshops && workshops.length > 0
+        ? workshops.find((w) => w.id === selectedWorkshopFilter)
+        : null;
+    const initialSede = preselectedWs ? preselectedWs.name : defaultSede;
+    const initialSedeId = preselectedWs ? preselectedWs.id : defaultSedeId;
 
     setFormData({
       id: '',
-      numeroTicket: `GP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       atendidoPor: defaultAtendidoPor,
-      sede: defaultSede,
-      sedeId: defaultSedeId,
-      fechaServicio: nowToday, // Inicio
-      fechaVencimiento: nowNextYear, // Vencimiento (+1 año)
+      sede: initialSede,
+      sedeId: initialSedeId,
+      fechaServicio: todayStr,
+      fechaVencimiento: defaultVencimientoStr,
+    horaServicio: getCurrentTimeStr(),
+    estado: "activa",
       nombres: '',
       apellidos: '',
       cedulaRuc: cedula,
       celular1: '',
       celular2: '',
-      celular3: '',
       email: '',
       direccion: '',
-      origen: origins[0] || 'Almacén Principal La Maná',
+      origen: origins[0] || 'almacen Tenso santo domingo',
       motoPreviaId: '',
       chasis: '',
-      numeroMotor: '',
-      ramv: '',
       placa: '',
       modeloMarca: '',
       color: '',
-      year: new Date().getFullYear(),
-      serviciosRealizados: ['alistamiento_pdi', 'engrasado', 'mantenimiento'],
+      serviciosRealizados: ['alistamiento_pdi'],
       tecnicoResponsable: technicians[0]?.name || '',
       tecnicoId: technicians[0]?.id || '',
       kilometraje: '',
       aceite: 'con_aceite',
-      nivelAceite: 'semisintetico',
-      tipoAceite: '10W-40 Motul',
+      nivelAceite: 'mineral',
+      tipoAceite: '10W-30',
       numeroFactura: '',
-      valorServicio: '180.00',
-      montoPagado: '180.00',
-      abono: '180.00',
-      saldoPendiente: '0.00',
+      numeroTicket: '',
+      valorServicio: '',
+      montoPagado: '',
+      abono: '',
+      saldoPendiente: '',
       esCredito: false,
       mesesCredito: 3,
       metodoPago: 'Efectivo',
-      observaciones: 'Paquete Garantía Plus contratado. Los mantenimientos preventivos y engrasados quedan cubiertos al 100% durante el periodo de vigencia.',
+      observaciones: '',
       proximoMantenimientoKm: '',
       fotos: [],
-      evidenciaTransferencia: '',
-      comprobantePagoUrl: '',
-      historialAbonos: [],
-      estado: 'activa',
       createdAt: '',
     });
-
     setSearchFeedback(null);
     setValidationAlert(null);
+    setMobileStep(1);
     setEffectiveViewMode('form');
 
     if (cedula && cedula.length >= 10) {
@@ -878,26 +1414,78 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     }
   };
 
-  // Abrir registro existente en detalle de Ficha Técnica
+  // Reusar datos de un cliente existente para nuevo servicio
+  const handleNewServiceForExisting = (record: GarantiaPlusRecord | GarantiaPlusFormData) => {
+    const prevServicios = Array.isArray(record.serviciosRealizados) ? record.serviciosRealizados : [];
+    let nextServicios: ServiceActionType[] = ['engrasado'];
+    if (prevServicios.includes('engrasado')) {
+      nextServicios = ['mantenimiento'];
+    } else if (prevServicios.includes('alistamiento_pdi')) {
+      nextServicios = ['engrasado'];
+    } else {
+      nextServicios = ['mantenimiento'];
+    }
+
+    setFormData({
+      id: '',
+      atendidoPor: defaultAtendidoPor,
+      sede: defaultSede,
+      sedeId: defaultSedeId,
+      fechaServicio: todayStr,
+      fechaVencimiento: defaultVencimientoStr,
+    horaServicio: getCurrentTimeStr(),
+    estado: "activa",
+      nombres: record.nombres,
+      apellidos: record.apellidos,
+      cedulaRuc: record.cedulaRuc,
+      celular1: record.celular1,
+      celular2: record.celular2 || '',
+      email: record.email || '',
+      direccion: record.direccion || '',
+      origen: record.origen,
+      motoPreviaId: record.chasis || record.placa,
+      chasis: record.chasis,
+      placa: record.placa,
+      modeloMarca: record.modeloMarca,
+      color: record.color || '',
+      serviciosRealizados: nextServicios,
+      tecnicoResponsable: (record.tecnicoResponsable && technicians.some((t) => t.name === record.tecnicoResponsable))
+        ? record.tecnicoResponsable
+        : (technicians[0]?.name || ''),
+      tecnicoId: (record.tecnicoId && technicians.some((t) => t.id === record.tecnicoId))
+        ? record.tecnicoId
+        : (technicians[0]?.id || ''),
+      kilometraje: record.kilometraje || '',
+      aceite: record.aceite || 'con_aceite',
+      nivelAceite: record.nivelAceite || 'mineral',
+      tipoAceite: record.tipoAceite || '10W-30',
+      numeroFactura: record.numeroFactura || '',
+      numeroTicket: record.numeroTicket || '',
+      valorServicio: '',
+      montoPagado: '',
+      abono: '',
+      saldoPendiente: '',
+      esCredito: false,
+      mesesCredito: 3,
+      metodoPago: 'Efectivo',
+      observaciones: `Servicio subsecuente. Cliente C.I. ${record.cedulaRuc}.`,
+      proximoMantenimientoKm: '',
+      fotos: [],
+      createdAt: '',
+    });
+    setSearchFeedback(`✓ Datos de ${record.nombres} ${record.apellidos} y moto precargados.`);
+    setValidationAlert(null);
+    setMobileStep(1);
+    setEffectiveViewMode('form');
+  };
+
+  // Abrir registro existente en formulario estructurado
   const handleOpenRecordDetail = (record: GarantiaPlusRecord) => {
     setSelectedRecordForDetail(record);
-    const valServ = Number(record.valorServicio) || 0;
-    const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
-    const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - pag);
-
-    setDetailFormData({
-      ...record,
-      valorServicio: String(valServ),
-      montoPagado: String(pag),
-      abono: String(pag),
-      saldoPendiente: String(pend),
-      kilometraje: record.kilometraje ? String(record.kilometraje) : '',
-      proximoMantenimientoKm: record.proximoMantenimientoKm ? String(record.proximoMantenimientoKm) : '',
-      year: record.year || new Date().getFullYear(),
-    });
+    setDetailFormData({ ...record });
     setDetailSuccessToast(null);
 
-    // Resolver evidencias si vienen con idb:
+    // Resolver evidencias y fotos desde IndexedDB si vienen con idb:
     const evidencia = record.evidenciaTransferencia || record.comprobantePagoUrl || '';
     if (evidencia.startsWith('idb:')) {
       const key = evidencia.replace('idb:', '');
@@ -911,9 +1499,27 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
         }
       });
     }
+
+    if (record.fotos && record.fotos.length > 0) {
+      record.fotos.forEach((f, idx) => {
+        if (typeof f === 'string' && f.startsWith('idb:')) {
+          const key = f.replace('idb:', '');
+          getMediaFromIndexedDB(key).then((data) => {
+            if (data) {
+              setDetailFormData((prev) => {
+                if (!prev) return null;
+                const nextFotos = [...(prev.fotos || [])];
+                nextFotos[idx] = data;
+                return { ...prev, fotos: nextFotos };
+              });
+            }
+          });
+        }
+      });
+    }
   };
 
-  // Guardar modificaciones del formulario de Ficha Técnica
+  // Guardar modificaciones del formulario de alistamiento
   const handleSaveRecordDetail = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!detailFormData) return;
@@ -942,83 +1548,80 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     }
 
     const valServ = Number(detailFormData.valorServicio) || 0;
-    const valAbono = detailFormData.abono !== undefined && detailFormData.abono !== ''
-      ? Number(detailFormData.abono)
-      : (detailFormData.montoPagado !== '' ? Number(detailFormData.montoPagado) : 0);
-    const valSaldo = detailFormData.saldoPendiente !== undefined && detailFormData.saldoPendiente !== ''
-      ? Number(detailFormData.saldoPendiente)
-      : Math.max(0, valServ - valAbono);
-
-    // Calcular estado según fechaVencimiento
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    let estadoCalculado: 'activa' | 'vencida' | 'cancelada' = detailFormData.estado || 'activa';
-    if (detailFormData.fechaVencimiento) {
-      const [vy, vm, vd] = detailFormData.fechaVencimiento.split('-').map(Number);
-      const vDate = new Date(vy, vm - 1, vd);
-      vDate.setHours(23, 59, 59, 999);
-      estadoCalculado = vDate >= now ? 'activa' : 'vencida';
-    }
-
+    const valAbono = detailFormData.abono !== undefined && detailFormData.abono !== '' ? Number(detailFormData.abono) : (detailFormData.montoPagado !== '' ? Number(detailFormData.montoPagado) : 0);
     const securedDetail: GarantiaPlusRecord = {
+      estado: ((detailFormData.estado || 'activa') as 'activa' | 'vencida' | 'cancelada'),
       ...detailFormData,
       cedulaRuc: newCedula,
       kilometraje: Number(detailFormData.kilometraje) || 0,
       valorServicio: valServ,
       montoPagado: valAbono,
       abono: valAbono,
-      saldoPendiente: valSaldo,
+      saldoPendiente: detailFormData.saldoPendiente !== undefined && detailFormData.saldoPendiente !== '' ? Number(detailFormData.saldoPendiente) : Math.max(0, valServ - valAbono),
       proximoMantenimientoKm: Number(detailFormData.proximoMantenimientoKm) || 0,
       year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
       mesesCredito: Number(detailFormData.mesesCredito) || 3,
-      evidenciaTransferencia: detailFormData.evidenciaTransferencia || '',
-      comprobantePagoUrl: detailFormData.evidenciaTransferencia || '',
-      estado: estadoCalculado,
-      updatedAt: new Date().toISOString(),
     };
-
     setSelectedRecordForDetail(securedDetail);
-    setDetailFormData({
-      ...securedDetail,
-      valorServicio: String(valServ),
-      montoPagado: String(valAbono),
-      abono: String(valAbono),
-      saldoPendiente: String(valSaldo),
-      kilometraje: String(securedDetail.kilometraje),
-      proximoMantenimientoKm: String(securedDetail.proximoMantenimientoKm || ''),
-    });
-
-    onSaveRecord(securedDetail);
-    setDetailSuccessToast('✓ Póliza de Garantía Plus y ficha técnica actualizadas correctamente.');
-    setTimeout(() => setDetailSuccessToast(null), 3000);
-  };
-
-  // Toggle servicios en formulario
-  const toggleServicio = (srv: ServiceActionType) => {
-    setFormData((prev) => {
-      const current = prev.serviciosRealizados || [];
-      if (current.includes(srv)) {
-        if (current.length === 1) return prev;
-        return { ...prev, serviciosRealizados: current.filter((s) => s !== srv) };
-      }
-      return { ...prev, serviciosRealizados: [...current, srv] };
-    });
-  };
-
-  const toggleDetailServicio = (srv: ServiceActionType) => {
-    if (!detailFormData) return;
-    const current = detailFormData.serviciosRealizados || [];
-    let updated: ServiceActionType[];
-    if (current.includes(srv)) {
-      if (current.length === 1) return;
-      updated = current.filter((s) => s !== srv);
-    } else {
-      updated = [...current, srv];
+    setDetailFormData(securedDetail);
+    if (onSaveRecord) {
+      onSaveRecord(securedDetail);
     }
-    setDetailFormData({ ...detailFormData, serviciosRealizados: updated });
+    setDetailSuccessToast('✓ Ficha técnica y datos de alistamiento actualizados correctamente.');
+    setTimeout(() => setDetailSuccessToast(null), 3500);
   };
 
-  // Manejo de archivos e imágenes
+  // Servicios toggle (con bloqueo si ya se realizaron previamente o según flujo secuencial)
+  const toggleServicio = (servicio: ServiceActionType) => {
+    if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
+    if (servicio === 'engrasado' && isEngrasadoBlocked) return;
+    if (servicio === 'mantenimiento' && isMantenimientoBlocked) return;
+
+    // Si PDI está completado y engrasado aún no, engrasado es obligatorio (no se puede desmarcar)
+    if (hasPdiDone && !hasEngrasadoDone && servicio === 'engrasado') {
+      return;
+    }
+
+    // Si engrasado ya está completado, mantenimiento es obligatorio (no se puede desmarcar)
+    if (hasEngrasadoDone && servicio === 'mantenimiento') {
+      return;
+    }
+
+    setFormData((prev) => {
+      const exists = prev.serviciosRealizados.includes(servicio);
+      let updatedServicios: ServiceActionType[];
+      if (exists) {
+        if (prev.serviciosRealizados.length === 1) return prev; // Mantener al menos uno seleccionado
+        updatedServicios = prev.serviciosRealizados.filter((s) => s !== servicio);
+      } else {
+        updatedServicios = [...prev.serviciosRealizados, servicio];
+      }
+
+      const isPdiOnly = updatedServicios.length === 1 && updatedServicios[0] === 'alistamiento_pdi';
+      let valor = prev.valorServicio;
+      let pagado = prev.montoPagado;
+      let abono = prev.abono;
+      let saldo = prev.saldoPendiente;
+
+      if (isPdiOnly) {
+        valor = 0;
+        pagado = 0;
+        abono = 0;
+        saldo = 0;
+      }
+
+      return {
+        ...prev,
+        serviciosRealizados: updatedServicios,
+        valorServicio: valor,
+        montoPagado: pagado,
+        abono: abono,
+        saldoPendiente: saldo,
+      };
+    });
+  };
+
+  // Subir archivos reales desde el computador o dispositivo (comprimidas y subidas a Storage)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1032,7 +1635,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
           fotos: [...(prev.fotos || []), compressed],
         }));
 
-        uploadWarrantyMedia(compressed, `gp_foto_${Date.now()}`)
+        uploadWarrantyMedia(compressed, `als_foto_${Date.now()}`)
           .then((cloudUrl) => {
             if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
               setFormData((p) => {
@@ -1049,8 +1652,11 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
           .catch((err) => console.warn('Subida en background de foto:', err));
       }
     }
+
+    // Resetear valor para permitir seleccionar el mismo archivo si se desea
     e.target.value = '';
   };
+
 
   const handleRemovePhoto = (index: number) => {
     setFormData((prev) => ({
@@ -1059,7 +1665,50 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     }));
   };
 
-  // Envío final del registro de nueva Garantía Plus
+  // Guardar Técnico Nuevo
+  const handleSaveNewTechnician = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTechData.name.trim()) return;
+
+    const wsId = (!effectiveIsMatriz || !newTechData.workshopId) ? defaultSedeId : newTechData.workshopId;
+    const targetWorkshop = workshops.find((w) => w.id === wsId) || workshops.find((w) => w.id === defaultSedeId);
+    onAddTechnician({
+      name: newTechData.name.toUpperCase(),
+      specialty: newTechData.specialty,
+      phone: newTechData.phone || '0990000000',
+      workshopId: wsId,
+      workshopName: targetWorkshop?.name || defaultSede,
+      status: 'activo',
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      tecnicoResponsable: newTechData.name.toUpperCase(),
+    }));
+
+    setShowAddTechModal(false);
+    setNewTechData({
+      name: '',
+      specialty: 'Mecánica Rápida & Mantenimiento',
+      phone: '',
+      workshopId: defaultSedeId,
+    });
+  };
+
+  // Guardar Nuevo Origen / Almacén
+  const handleSaveNewOrigin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOriginInput.trim()) return;
+    onAddOrigin(newOriginInput.trim());
+    setFormData((prev) => ({
+      ...prev,
+      origen: newOriginInput.trim(),
+    }));
+    setShowAddOriginModal(false);
+    setNewOriginInput('');
+  };
+
+  // Envío final del registro con validación estricta y retorno automático al listado
   const handleFinalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1075,73 +1724,103 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     if (!formData.modeloMarca.trim()) missingStep2.push('Modelo y Marca');
     if (!formData.placa.trim() && !formData.chasis.trim()) missingStep2.push('Placa o Chasis (VIN)');
 
-    // 3. Validar Paso 3: Servicio & Fechas
+    // 3. Validar Paso 3: Servicio
     const missingStep3: string[] = [];
     if (!formData.tecnicoResponsable.trim()) missingStep3.push('Técnico responsable');
-    if (!formData.fechaServicio.trim()) missingStep3.push('Fecha de Inicio');
-    if (!formData.fechaVencimiento.trim()) missingStep3.push('Fecha de Vencimiento');
-    if (formData.valorServicio === undefined || formData.valorServicio === '' || isNaN(Number(formData.valorServicio))) {
-      missingStep3.push('Valor de la Garantía Plus ($)');
+    if (!formData.serviciosRealizados || formData.serviciosRealizados.length === 0) {
+      missingStep3.push('¿Qué se realizó?');
+    }
+    const isPdiOnly = formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi';
+    const isGarantiaPlusCovered = Boolean(garantiaPlusStatus.hasGarantiaPlus);
+
+    if (!isPdiOnly && !isGarantiaPlusCovered && (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio)))) {
+      missingStep3.push('Valor del servicio ($)');
     }
 
     if (missingStep1.length > 0) {
-      setValidationAlert({ title: 'Faltan datos en Paso 1: Cliente', fields: missingStep1, stepTarget: 1 });
-      return;
-    }
-    if (missingStep2.length > 0) {
-      setValidationAlert({ title: 'Faltan datos en Paso 2: Moto', fields: missingStep2, stepTarget: 2 });
-      return;
-    }
-    if (missingStep3.length > 0) {
-      setValidationAlert({ title: 'Faltan datos en Paso 3: Servicio', fields: missingStep3, stepTarget: 3 });
+      setValidationAlert({
+        title: 'Faltan datos en Paso 1: Cliente',
+        fields: missingStep1,
+        stepTarget: 1,
+      });
+      setMobileStep(1);
       return;
     }
 
+    if (missingStep2.length > 0) {
+      setValidationAlert({
+        title: 'Faltan datos en Paso 2: Moto',
+        fields: missingStep2,
+        stepTarget: 2,
+      });
+      setMobileStep(2);
+      return;
+    }
+
+    if (missingStep3.length > 0) {
+      setValidationAlert({
+        title: 'Faltan datos en Paso 3: Servicio',
+        fields: missingStep3,
+        stepTarget: 3,
+      });
+      setMobileStep(3);
+      return;
+    }
+
+    // Limpiar alerta y procesar guardado
     setValidationAlert(null);
 
-    const isCred = formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || Boolean(formData.esCredito);
-    const numVal = Number(formData.valorServicio) || 0;
-    const numAbono = formData.abono !== undefined && formData.abono !== ''
-      ? Number(formData.abono)
-      : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal);
-    const finalAbono = isCred ? 0 : numAbono;
-    const finalSaldo = isCred ? numVal : Math.max(0, numVal - finalAbono);
+    const isCred = !isGarantiaPlusCovered && (formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito);
+    const numVal = isGarantiaPlusCovered ? 0 : (Number(formData.valorServicio) || 0);
+    const numAbono = isGarantiaPlusCovered ? 0 : (formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal));
+    const finalValor = isPdiOnly || isGarantiaPlusCovered ? 0 : numVal;
+    const finalAbono = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? 0 : numAbono);
+    const finalSaldo = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono)));
 
-    // Calcular estado según fechaVencimiento
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const [vy, vm, vd] = formData.fechaVencimiento.split('-').map(Number);
-    const vDate = new Date(vy, vm - 1, vd);
-    vDate.setHours(23, 59, 59, 999);
-    const estadoInicial = vDate >= now ? 'activa' : 'vencida';
+    const obsText = (formData.observaciones || '').trim();
+    const finalObservaciones = isGarantiaPlusCovered
+      ? (obsText
+          ? `${obsText}\n[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`
+          : `[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`)
+      : formData.observaciones;
 
     const fullRecord: GarantiaPlusRecord = {
+      estado: ((formData.estado || 'activa') as 'activa' | 'vencida' | 'cancelada'),
       ...formData,
-      id: `gp-${Date.now()}`,
-      numeroTicket: formData.numeroTicket || `GP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      numeroFactura: formData.numeroFactura || `FAC-GP-${Math.floor(100000 + Math.random() * 900000)}`,
       kilometraje: Number(formData.kilometraje) || 0,
       proximoMantenimientoKm: Number(formData.proximoMantenimientoKm) || 0,
       year: formData.year !== undefined && formData.year !== '' ? Number(formData.year) : undefined,
       mesesCredito: Number(formData.mesesCredito) || 3,
       esCredito: isCred,
-      valorServicio: numVal,
+      metodoPago: isGarantiaPlusCovered ? 'Garantía Plus' : (isCred ? 'Crédito' : formData.metodoPago),
+      valorServicio: finalValor,
       montoPagado: finalAbono,
       abono: finalAbono,
       saldoPendiente: finalSaldo,
-      estado: estadoInicial,
-      createdAt: new Date().toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' }),
+      observaciones: finalObservaciones,
+      id: `als-${Date.now()}`,
+      createdAt: new Date().toLocaleString('es-EC', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+      numeroFactura:
+        formData.numeroFactura ||
+        `001-002-${Math.floor(1000000 + Math.random() * 9000000)}`,
+      numeroTicket:
+        formData.numeroTicket ||
+        `TCK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
     onSaveRecord(fullRecord);
 
     confetti({
-      particleCount: 130,
-      spread: 80,
+      particleCount: 120,
+      spread: 75,
       origin: { y: 0.6 },
-      colors: ['#f59e0b', '#10b981', '#fbbf24', '#3b82f6'],
+      colors: ['#0f3299', '#d92525', '#10b981', '#f59e0b'],
     });
 
+    // Volver al listado y limpiar formulario
     setEffectiveViewMode('list');
     setSearchTerm('');
     setSearchFeedback(null);
@@ -1149,7 +1828,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
   return (
     <div className="w-full h-full flex-1 min-h-0 flex flex-col overflow-hidden">
-      {/* Input oculto para subir archivos */}
+      {/* Input oculto para subir archivos reales de imágenes */}
       <input
         ref={fileInputRef}
         type="file"
@@ -1160,7 +1839,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 1. VISTA: FORMULARIO DE DETALLE DE GARANTÍA PLUS (FICHA TÉCNICA)          */}
+      {/* 1. VISTA: FORMULARIO DE DETALLE DE ALISTAMIENTO PREVIO                    */}
       {/* ========================================================================= */}
       {currentViewMode === 'list' && selectedRecordForDetail && detailFormData && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
@@ -1168,158 +1847,140 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
             onSubmit={handleSaveRecordDetail}
             className="w-full flex flex-col gap-4 animate-fade-in bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 shadow-2xs mb-4"
           >
-            {/* Cabecera del Formulario de Garantía Plus */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRecordForDetail(null);
-                    setDetailFormData(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                >
-                  <ArrowLeft className="w-4 h-4 text-zinc-600" />
-                  <span>Volver al Libro de Garantías Plus</span>
-                </button>
-                <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
-                      Ficha de Garantía Plus: {detailFormData.nombres} {detailFormData.apellidos}
-                    </h2>
-                    <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
-                      C.I./RUC: {detailFormData.cedulaRuc}
-                    </span>
-                    {(() => {
-                      const now = new Date();
-                      now.setHours(0, 0, 0, 0);
-                      const [vy, vm, vd] = (detailFormData.fechaVencimiento || '').split('-').map(Number);
-                      const vDate = new Date(vy, vm - 1, vd);
-                      vDate.setHours(23, 59, 59, 999);
-                      const diffTime = vDate.getTime() - now.getTime();
-                      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                      const isVigente = days >= 0;
-
-                      return isVigente ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-amber-600" />
-                          <span>👑 VIGENTE ({days} DÍAS RESTANTES)</span>
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs flex items-center gap-1">
-                          <ShieldAlert className="w-3 h-3 text-rose-600" />
-                          <span>VENCIDA</span>
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    Sede: <strong className="text-zinc-700">{detailFormData.sede}</strong> • Inicio:{' '}
-                    <strong className="text-zinc-700">{detailFormData.fechaServicio}</strong> • Vencimiento:{' '}
-                    <strong className="text-amber-800 font-mono font-bold">{detailFormData.fechaVencimiento}</strong> • Atendido por:{' '}
-                    <strong className="text-zinc-700">{detailFormData.atendidoPor || 'Matriz'}</strong>
-                  </p>
+          {/* Cabecera del Formulario de Alistamiento */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRecordForDetail(null);
+                  setDetailFormData(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 active:scale-98 text-zinc-800 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft className="w-4 h-4 text-zinc-600" />
+                <span>Volver al Libro de Garantías Plus</span>
+              </button>
+              <div className="h-6 w-px bg-zinc-200 hidden sm:block" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight">
+                    Ficha Técnica: {detailFormData.nombres} {detailFormData.apellidos}
+                  </h2>
+                  <span className="font-mono text-xs text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-semibold">
+                    C.I./RUC: {detailFormData.cedulaRuc}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    ✓ COMPLETADO
+                  </span>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                  title="Imprimir contrato / ficha técnica"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir Ficha</span>
-                </button>
-
-                {detailFormData.celular1 && (
-                  <a
-                    href={getCleanWhatsappUrl(detailFormData.celular1, `${detailFormData.nombres} ${detailFormData.apellidos}`)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedRecordForDetail) {
-                      handleOpenAbonoModal({
-                        ...selectedRecordForDetail,
-                        ...detailFormData,
-                        valorServicio: Number(detailFormData.valorServicio) || 0,
-                        montoPagado: Number(detailFormData.montoPagado) || 0,
-                        abono: Number(detailFormData.abono) || 0,
-                        saldoPendiente: Number(detailFormData.saldoPendiente) || 0,
-                        kilometraje: Number(detailFormData.kilometraje) || 0,
-                        year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
-                        mesesCredito: Number(detailFormData.mesesCredito) || 3,
-                        proximoMantenimientoKm: Number(detailFormData.proximoMantenimientoKm) || 0,
-                      });
-                    }
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                  title="Registrar abono o pago"
-                >
-                  <DollarSign className="w-3.5 h-3.5" />
-                  <span>Abonar</span>
-                </button>
-
-                {onNavigateSection && (
-                  <button
-                    type="button"
-                    onClick={() => onNavigateSection('alistamiento')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-black text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                    title="Realizar alistamiento o mantenimiento cubierto para este cliente"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Servicio en Alistamiento</span>
-                  </button>
-                )}
-
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Cambios</span>
-                </button>
-
-                {onDeleteRecord && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm(`¿Está seguro de eliminar permanentemente la Garantía Plus de ${detailFormData.nombres} ${detailFormData.apellidos}?`)) {
-                        onDeleteRecord(detailFormData.id);
-                        setSelectedRecordForDetail(null);
-                        setDetailFormData(null);
-                      }
-                    }}
-                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                    title="Eliminar registro"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <p className="text-xs text-zinc-500">
+                  Sede: <strong className="text-zinc-700">{detailFormData.sede}</strong> • Fecha:{' '}
+                  <strong className="text-zinc-700">{detailFormData.fechaServicio}</strong>
+                  {detailFormData.fechaVencimiento ? (
+                    <> • Vence: <strong className="text-amber-700 font-mono font-bold">{detailFormData.fechaVencimiento}</strong></>
+                  ) : null} • Atendido por:{' '}
+                  <strong className="text-zinc-700">{detailFormData.atendidoPor || 'StarMotos'}</strong>
+                </p>
               </div>
             </div>
 
-            {/* Toast de Éxito al Actualizar */}
-            {detailSuccessToast && (
-              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 animate-slide-in shrink-0">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{detailSuccessToast}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                title="Imprimir ficha técnica"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Ficha</span>
+              </button>
 
-            {/* 3 COLUMNAS EXACTAS DE DETALLE */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {detailFormData.celular1 && (
+                <a
+                  href={getCleanWhatsappUrl(
+                    detailFormData.celular1,
+                    `${detailFormData.nombres} ${detailFormData.apellidos}`
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedRecordForDetail) {
+                    handleOpenAbonoModal({
+                      ...selectedRecordForDetail,
+                      ...detailFormData,
+                      year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
+                    } as GarantiaPlusRecord);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                title="Registrar abono o evidencia de pago"
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Abonar</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleNewServiceForExisting(detailFormData);
+                  setSelectedRecordForDetail(null);
+                  setDetailFormData(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-black text-white rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Nuevo Servicio</span>
+              </button>
+
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Cambios</span>
+              </button>
+
+              {onDeleteRecord && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`¿Está seguro de eliminar permanentemente la ficha de alistamiento de ${detailFormData.nombres} ${detailFormData.apellidos}?`)) {
+                      onDeleteRecord(detailFormData.id);
+                      setSelectedRecordForDetail(null);
+                      setDetailFormData(null);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                  title="Eliminar este alistamiento de la base de datos"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar Ficha</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Notificación de éxito al guardar */}
+          {detailSuccessToast && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 animate-slide-in shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{detailSuccessToast}</span>
+            </div>
+          )}
+
+          {/* Formulario en 3 Columnas Simétricas */}
+          <div className="w-full space-y-4 pr-1">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               {/* COLUMNA 1: DATOS DEL CLIENTE */}
               <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
@@ -1327,7 +1988,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     <UserCheck className="w-4 h-4 text-blue-600" />
                     <span>1. Datos del Cliente</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">Titular</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">Propietario</span>
                 </div>
 
                 <div>
@@ -1374,7 +2035,9 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Teléfono / Celular 1 *</label>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Teléfono / Celular 1 *
+                  </label>
                   <input
                     type="tel"
                     value={detailFormData.celular1}
@@ -1397,11 +2060,16 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                           {w.name}
                         </option>
                       ))}
+                      {!workshops.some((w) => w.name === detailFormData.sede) && (
+                        <option value={detailFormData.sede}>{detailFormData.sede}</option>
+                      )}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-600 mb-1">Origen / Procedencia</label>
+                    <label className="block text-[10px] font-bold text-zinc-600 mb-1">
+                      Origen / Procedencia
+                    </label>
                     <input
                       type="text"
                       value={detailFormData.origen}
@@ -1439,7 +2107,9 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <input
                     type="text"
                     value={detailFormData.placa}
-                    onChange={(e) => setDetailFormData({ ...detailFormData, placa: e.target.value.toUpperCase() })}
+                    onChange={(e) =>
+                      setDetailFormData({ ...detailFormData, placa: e.target.value.toUpperCase() })
+                    }
                     className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
                     placeholder="SIN PLACA"
                   />
@@ -1457,11 +2127,15 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Serie o Chasis (VIN) *</label>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                    Serie o Chasis (VIN) *
+                  </label>
                   <input
                     type="text"
                     value={detailFormData.chasis}
-                    onChange={(e) => setDetailFormData({ ...detailFormData, chasis: e.target.value.toUpperCase() })}
+                    onChange={(e) =>
+                      setDetailFormData({ ...detailFormData, chasis: e.target.value.toUpperCase() })
+                    }
                     required
                     className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-medium text-zinc-900 uppercase outline-none transition-all"
                   />
@@ -1469,7 +2143,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1 flex items-center justify-between">
-                    <span>Kilometraje (km)</span>
+                    <span>Kilometraje de Recepción (km) *</span>
                     <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
                       {detailFormData.kilometraje !== '' ? `${detailFormData.kilometraje} km` : '0 km'}
                     </span>
@@ -1481,7 +2155,10 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     onFocus={selectOnFocus}
                     onChange={(e) => {
                       const km = cleanNumberInput(e.target.value);
-                      setDetailFormData({ ...detailFormData, kilometraje: km });
+                      setDetailFormData({
+                        ...detailFormData,
+                        kilometraje: km,
+                      });
                     }}
                     placeholder="0"
                     className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
@@ -1489,91 +2166,49 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* COLUMNA 3: SERVICIO & COBRO (DONDE ESTABA LA HORA, VA FECHA DE VENCIMIENTO) */}
+              {/* COLUMNA 3: SERVICIO & COBRO */}
               <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
                   <div className="flex items-center gap-2 text-zinc-900 font-bold text-xs uppercase tracking-wider">
                     <Wrench className="w-4 h-4 text-blue-600" />
-                    <span>3. Póliza & Cobro</span>
+                    <span>3. Servicio & Cobro</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">Vigencia</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">Técnico</span>
                 </div>
 
-                {/* Servicios Cubiertos Chips */}
+                {/* Servicios Realizados Chips */}
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Servicios Cubiertos por la Póliza:</label>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Servicios Ejecutados:</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: 'alistamiento_pdi', label: 'Alistamiento PDI' },
-                      { id: 'engrasado', label: 'Engrasado' },
-                      { id: 'mantenimiento', label: 'Mantenimiento' },
-                    ].map((srv) => {
-                      const isSelected = detailFormData.serviciosRealizados?.includes(srv.id as any);
-                      return (
-                        <button
-                          key={srv.id}
-                          type="button"
-                          onClick={() => toggleDetailServicio(srv.id as any)}
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-amber-100 text-amber-900 border-amber-300'
-                              : 'bg-zinc-100 text-zinc-400 border-zinc-200 line-through'
-                          }`}
-                        >
-                          {srv.label}
-                        </button>
-                      );
-                    })}
+                    {detailFormData.serviciosRealizados?.map((s) => (
+                      <span
+                        key={s}
+                        className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 uppercase"
+                      >
+                        {s.replace('_', ' ')}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
-                {/* Técnico Responsable */}
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-700 mb-1">Técnico Responsable</label>
-                  <input
-                    type="text"
-                    value={detailFormData.tecnicoResponsable}
-                    onChange={(e) => setDetailFormData({ ...detailFormData, tecnicoResponsable: e.target.value })}
-                    className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                {/* DIFERENCIA CLAVE: FECHA DE INICIO Y FECHA DE VENCIMIENTO (EN LUGAR DE LA HORA) */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Técnico y Aceite */}
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
-                      <span>Fecha de Inicio</span>
-                    </label>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Técnico Responsable</label>
                     <input
-                      type="date"
-                      value={detailFormData.fechaServicio}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })}
+                      type="text"
+                      value={detailFormData.tecnicoResponsable}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, tecnicoResponsable: e.target.value })
+                      }
                       className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-amber-800 mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-amber-600" />
-                      <span>Fecha de Vencimiento *</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={detailFormData.fechaVencimiento}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, fechaVencimiento: e.target.value })}
-                      required
-                      className="w-full px-2 py-1.5 bg-amber-50/70 border border-amber-300 rounded-lg text-xs font-bold text-amber-950 outline-none focus:border-amber-600"
-                    />
-                  </div>
-                </div>
-
-                {/* Aceite y Viscosidad */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1">Tipo de Aceite</label>
                     <select
-                      value={detailFormData.nivelAceite || 'semisintetico'}
+                      value={detailFormData.nivelAceite || 'mineral'}
                       onChange={(e) => setDetailFormData({ ...detailFormData, nivelAceite: e.target.value })}
                       className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
                     >
@@ -1586,167 +2221,510 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1">Viscosidad / Grado</label>
-                    <input
-                      type="text"
-                      value={detailFormData.tipoAceite || '10W-40 Motul'}
+                    <select
+                      value={detailFormData.tipoAceite || '10W-30'}
                       onChange={(e) => setDetailFormData({ ...detailFormData, tipoAceite: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
+                    >
+                      <option value="10W-30">10W-30</option>
+                      <option value="10W-40">10W-40</option>
+                      <option value="15W-40">15W-40</option>
+                      <option value="15W-50">15W-50</option>
+                      <option value="20W-40">20W-40</option>
+                      <option value="20W-50">20W-50</option>
+                      <option value="25W-50">25W-50</option>
+                      <option value="5W-30">5W-30</option>
+                      <option value="5W-40">5W-40</option>
+                      {customOilTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                      <option value="Sin Tipo">N/A</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Fecha y Hora en Detalle */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span>Fecha de Servicio</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={detailFormData.fechaServicio || ''}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, fechaServicio: e.target.value })
+                      }
                       className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600"
                     />
                   </div>
-                </div>
-
-                {/* Factura / Ticket */}
-                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Factura Oficial</label>
+                    <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-amber-600" />
+                      <span>Fecha de Vencimiento</span>
+                    </label>
                     <input
-                      type="text"
-                      value={detailFormData.numeroFactura || ''}
-                      onChange={(e) => setDetailFormData({ ...detailFormData, numeroFactura: e.target.value })}
-                      placeholder="001-001-0001"
-                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium outline-none focus:border-blue-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-700 mb-1">Póliza / Ticket</label>
-                    <input
-                      type="text"
-                      value={detailFormData.numeroTicket || ''}
-                      readOnly
-                      className="w-full px-2 py-1.5 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-600"
+                      type="date"
+                      value={detailFormData.fechaVencimiento || ''}
+                      onChange={(e) =>
+                        setDetailFormData({ ...detailFormData, fechaVencimiento: e.target.value })
+                      }
+                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-amber-600 font-mono"
                     />
                   </div>
                 </div>
 
-                {/* Valores y Cobro */}
-                <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200 space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <span className="block text-[9px] font-bold uppercase text-amber-900">Costo Póliza ($)</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={detailFormData.valorServicio}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const ab = Number(detailFormData.abono) || 0;
-                          setDetailFormData({
-                            ...detailFormData,
-                            valorServicio: val,
-                            saldoPendiente: String(Math.max(0, (Number(val) || 0) - ab)),
-                          });
-                        }}
-                        className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs font-bold font-mono outline-none"
-                      />
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-bold uppercase text-emerald-900">Abonado ($)</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={detailFormData.abono}
-                        onChange={(e) => {
-                          const ab = e.target.value;
-                          const tot = Number(detailFormData.valorServicio) || 0;
-                          setDetailFormData({
-                            ...detailFormData,
-                            abono: ab,
-                            montoPagado: ab,
-                            saldoPendiente: String(Math.max(0, tot - (Number(ab) || 0))),
-                          });
-                        }}
-                        className="w-full px-2 py-1 bg-white border border-emerald-300 rounded text-xs font-bold font-mono text-emerald-700 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <span className="block text-[9px] font-bold uppercase text-zinc-700">Saldo Pendiente</span>
-                      <div className={`text-xs font-bold font-mono pt-1 ${Number(detailFormData.saldoPendiente || 0) > 0.01 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                        ${(Number(detailFormData.saldoPendiente) || 0).toFixed(2)}
+                {/* Si solo es PDI en detalle: Sin cobro */}
+                {detailFormData.serviciosRealizados?.length === 1 && detailFormData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-xs text-blue-900 font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Alistamiento PDI (Cero costo al cliente / Cubierto por Fábrica)</span>
+                  </div>
+                ) : (
+                  /* Cobro y Facturación en Detalle */
+                  <div className="space-y-2 bg-zinc-50/80 p-2.5 rounded-xl border border-zinc-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-700 mb-1">Valor Servicio ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={detailFormData.valorServicio !== undefined && detailFormData.valorServicio !== null ? detailFormData.valorServicio : ''}
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const clean = cleanNumberInput(e.target.value);
+                            const val = clean === '' ? 0 : parseFloat(clean);
+                            const ab = Number(detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado || 0));
+                            setDetailFormData({
+                              ...detailFormData,
+                              valorServicio: clean,
+                              saldoPendiente: Math.max(0, val - ab),
+                            });
+                          }}
+                          placeholder="0.00"
+                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-700 mb-1">Método de Pago</label>
+                        <select
+                          value={detailFormData.metodoPago === 'Crédito Directo' ? 'Crédito' : (detailFormData.metodoPago || 'Efectivo')}
+                          onChange={(e) => {
+                            const met = e.target.value as any;
+                            const isCred = met === 'Crédito';
+                            const valServ = detailFormData.valorServicio || 0;
+                            setDetailFormData({
+                              ...detailFormData,
+                              metodoPago: met,
+                              esCredito: isCred,
+                              abono: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
+                              montoPagado: isCred ? 0 : (detailFormData.abono !== undefined ? detailFormData.abono : valServ),
+                              saldoPendiente: isCred ? valServ : Math.max(0, Number(valServ) - Number(detailFormData.abono || valServ)),
+                            });
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-zinc-300 rounded-lg text-xs font-bold text-zinc-900 outline-none focus:border-blue-600 cursor-pointer"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                          <option value="Crédito">Crédito</option>
+                          <option value="Mixto">Mixto</option>
+                        </select>
                       </div>
                     </div>
+
+                    {/* Fila Dinámica según Método de Pago: Crédito Activo vs Abono y Saldo */}
+                    {detailFormData.metodoPago === 'Crédito' || detailFormData.metodoPago === 'Crédito Directo' || detailFormData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 font-bold">Tiempo:</span>
+                            <select
+                              value={detailFormData.mesesCredito || 3}
+                              onChange={(e) => setDetailFormData({ ...detailFormData, mesesCredito: parseInt(e.target.value) || 3 })}
+                              className="px-2 py-0.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900 outline-none"
+                            >
+                              <option value={1}>1 Mes</option>
+                              <option value={2}>2 Meses</option>
+                              <option value={3}>3 Meses</option>
+                              <option value={6}>6 Meses</option>
+                              <option value={9}>9 Meses</option>
+                              <option value={12}>12 Meses</option>
+                              <option value={18}>18 Meses</option>
+                              <option value={24}>24 Meses</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-blue-900 mb-0.5">Monto a Crédito ($)</label>
+                            <input
+                              type="number"
+                              value={Number(detailFormData.valorServicio || 0).toFixed(2)}
+                              readOnly
+                              className="w-full px-2 py-1 bg-blue-50/70 border border-blue-300 rounded-lg text-xs font-mono font-bold text-blue-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente por Cobrar ($)</label>
+                            <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between items-center">
+                              <span>${Number(detailFormData.valorServicio || 0).toFixed(2)}</span>
+                              <span className="text-[9px] text-amber-700 font-bold">Crédito</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-100">
+                        <div>
+                          <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">Abono ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado ?? '')}
+                            onFocus={selectOnFocus}
+                            onChange={(e) => {
+                              const clean = cleanNumberInput(e.target.value);
+                              const abVal = clean === '' ? 0 : parseFloat(clean);
+                              const valServ = Number(detailFormData.valorServicio || 0);
+                              setDetailFormData({
+                                ...detailFormData,
+                                abono: clean,
+                                montoPagado: clean,
+                                saldoPendiente: Math.max(0, valServ - abVal),
+                              });
+                            }}
+                            placeholder="0.00"
+                            className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente ($)</label>
+                          <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between">
+                            <span>
+                              ${Number(detailFormData.saldoPendiente ?? Math.max(0, Number(detailFormData.valorServicio || 0) - Number(detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
+                            </span>
+                            <span className="text-[9px] text-amber-700">Saldo</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Evidencia de Transferencia en Ficha Técnica / Edición */}
+                    {(detailFormData.metodoPago === 'Transferencia' || (detailFormData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-zinc-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[10px] font-bold text-blue-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3 h-3 text-blue-700" />
+                            Comprobante / Evidencia de Transferencia
+                          </span>
+                          {detailFormData.evidenciaTransferencia && (
+                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Comprobante cargado
+                            </span>
+                          )}
+                        </label>
+                        {detailFormData.evidenciaTransferencia && isValidMediaUrl(detailFormData.evidenciaTransferencia) ? (
+                          <div className="rounded-lg border border-blue-200 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={detailFormData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-12 h-12 rounded overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={detailFormData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold text-zinc-900 truncate">Comprobante de transferencia</p>
+                              <p className="text-[9px] text-zinc-500">Clic para ver en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDetailFormData({ ...detailFormData, evidenciaTransferencia: '' })}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-2.5 border border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-lg cursor-pointer transition-all hover:bg-blue-50/50">
+                            <Camera className="w-4 h-4 text-blue-600 mb-0.5" />
+                            <span className="text-[11px] font-bold text-blue-950">Subir foto del comprobante</span>
+                            <span className="text-[9px] text-zinc-400">JPG, PNG o captura</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setDetailFormData({ ...detailFormData, evidenciaTransferencia: compressed });
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">N° Factura o Ticket</label>
+                  <input
+                    type="text"
+                    value={detailFormData.numeroFactura || detailFormData.numeroTicket || ''}
+                    onChange={(e) => setDetailFormData({ ...detailFormData, numeroFactura: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
+                  />
                 </div>
 
-                {/* Observaciones */}
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-700 mb-1">Observaciones</label>
-                  <textarea
-                    rows={2}
-                    value={detailFormData.observaciones}
-                    onChange={(e) => setDetailFormData({ ...detailFormData, observaciones: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 resize-none"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-zinc-700">
+                      Próximo Mantenimiento Sugerido
+                    </label>
+                    <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={detailFormData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => {
+                        const clean = cleanNumberInput(e.target.value);
+                        setDetailFormData({
+                          ...detailFormData,
+                          proximoMantenimientoKm: clean,
+                        });
+                      }}
+                      placeholder="Ej: 1000"
+                      className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none transition-all"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                      KM
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer del Formulario de Detalle */}
-            <div className="pt-3 border-t border-zinc-200 flex items-center justify-between shrink-0">
+            {/* Observaciones Técnicas */}
+            <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-1.5">
+              <label className="block text-xs font-black uppercase text-zinc-800 tracking-wider">
+                Observaciones Mecánicas del Taller
+              </label>
+              <textarea
+                rows={2}
+                value={detailFormData.observaciones || ''}
+                onChange={(e) => setDetailFormData({ ...detailFormData, observaciones: e.target.value })}
+                className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs text-zinc-900 outline-none transition-all resize-none"
+                placeholder="Sin observaciones mecánicas registradas para esta unidad."
+              />
+            </div>
+
+            {/* Evidencia Fotográfica de Entrega */}
+            {detailFormData.fotos && detailFormData.fotos.filter(isValidMediaUrl).length > 0 && (
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 space-y-2">
+                <h4 className="text-xs font-black uppercase text-zinc-800 tracking-wider flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Inspección Visual & Evidencias Fotográficas ({detailFormData.fotos.filter(isValidMediaUrl).length})</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                  {detailFormData.fotos.filter(isValidMediaUrl).map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="aspect-video rounded-lg overflow-hidden border border-zinc-200 block group relative shadow-2xs"
+                    >
+                      <img
+                        src={url}
+                        alt={`Evidencia ${i + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Evidencia de Transferencia Bancaria (Comprobante de Pago) en Ficha Técnica */}
+            {detailFormData.evidenciaTransferencia && isValidMediaUrl(detailFormData.evidenciaTransferencia) && (
+              <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-emerald-950 tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Evidencia de Abono / Comprobante de Transferencia</span>
+                  </h4>
+                  <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
+                    Abonado: ${(Number(detailFormData.abono ?? detailFormData.montoPagado) || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <a
+                    href={detailFormData.evidenciaTransferencia}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-lg overflow-hidden border border-emerald-300 block group relative shadow-xs bg-white shrink-0"
+                    title="Clic para ver comprobante en tamaño completo"
+                  >
+                    <img
+                      src={detailFormData.evidenciaTransferencia}
+                      alt="Comprobante de Transferencia"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  </a>
+                  <div className="text-xs text-zinc-600 space-y-1">
+                    <p className="font-bold text-zinc-800">Comprobante bancario verificado</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Evidencia registrada para el servicio de {detailFormData.nombres} {detailFormData.apellidos}.
+                    </p>
+                    <p className="text-[11px] text-zinc-600 font-mono">
+                      Método: <strong>{detailFormData.metodoPago}</strong> • Saldo pendiente: <strong className={Number(detailFormData.saldoPendiente || 0) > 0 ? 'text-rose-600' : 'text-emerald-700'}>${(Number(detailFormData.saldoPendiente) || 0).toFixed(2)}</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Historial de Abonos / Pagos Registrados */}
+            {selectedRecordForDetail?.historialAbonos && selectedRecordForDetail.historialAbonos.length > 0 && (
+              <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-200 space-y-2">
+                <h4 className="text-xs font-black uppercase text-blue-950 tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-700" />
+                  <span>Historial de Abonos ({selectedRecordForDetail.historialAbonos.length})</span>
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] text-left">
+                    <thead>
+                      <tr className="border-b border-blue-200 text-blue-800 font-bold">
+                        <th className="py-1.5 px-2">#</th>
+                        <th className="py-1.5 px-2">Fecha</th>
+                        <th className="py-1.5 px-2">Monto</th>
+                        <th className="py-1.5 px-2">Método</th>
+                        <th className="py-1.5 px-2">Saldo Restante</th>
+                        <th className="py-1.5 px-2">Registrado por</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRecordForDetail.historialAbonos.map((ab, idx) => (
+                        <tr key={ab.id || idx} className="border-b border-blue-100 last:border-0 hover:bg-blue-100/50">
+                          <td className="py-1.5 px-2 font-mono text-blue-600">{idx + 1}</td>
+                          <td className="py-1.5 px-2 font-mono">{ab.fecha}{ab.hora ? ` ${ab.hora}` : ''}</td>
+                          <td className="py-1.5 px-2 font-bold text-emerald-700">${Number(ab.monto).toFixed(2)}</td>
+                          <td className="py-1.5 px-2">
+                            <span className="inline-flex items-center gap-1 bg-white/80 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-200">
+                              <CreditCard className="w-2.5 h-2.5" />
+                              {ab.metodoPago}
+                            </span>
+                          </td>
+                          <td className={`py-1.5 px-2 font-bold font-mono ${Number(ab.saldoRestante) > 0.01 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                            ${Number(ab.saldoRestante).toFixed(2)}
+                          </td>
+                          <td className="py-1.5 px-2 text-zinc-500">{ab.registradoPor || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer del Formulario */}
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedRecordForDetail(null);
+                setDetailFormData(null);
+              }}
+              className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              ← Cancelar / Volver a la Lista
+            </button>
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
+                  handleNewServiceForExisting(detailFormData);
                   setSelectedRecordForDetail(null);
                   setDetailFormData(null);
                 }}
-                className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-zinc-800 hover:bg-black text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
               >
-                ← Cancelar / Volver a la Lista
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Iniciar Nuevo Servicio con este Cliente</span>
               </button>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Guardar Cambios</span>
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Cambios</span>
+              </button>
             </div>
-          </form>
+          </div>
+        </form>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 2. VISTA: LIBRO DE GARANTÍAS PLUS (TABLA EXCEL & BLOQUES DE ESTADÍSTICA) */}
-      {/* ========================================================================= */}
+      {/* 2. VISTA: LIBRO DE ALISTAMIENTOS (TABLA EXCEL) */}
       {currentViewMode === 'list' && !selectedRecordForDetail && (
         <div className="h-full w-full flex-1 min-h-0 flex flex-col overflow-y-auto xl:overflow-hidden gap-2.5 animate-fade-in">
-          {/* Header Superior Destacado */}
+          {/* Header Superior Destacado: Libro de Garantías Plus & Búsqueda de Cédula */}
           <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 shrink-0">
             {/* Fila 1: Título con Icono y Badges de Métricas */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 text-slate-950 flex items-center justify-center font-bold shadow-xs shrink-0">
-                  <Sparkles className="w-5 h-5 text-slate-950" />
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                  <Wrench className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-tight">
-                    Libro de Garantías Plus - Matriz
+                    Libro de Alistamiento PDI & Mantenimientos
                   </h2>
                   <p className="text-xs text-zinc-500 font-medium">
-                    Historial de contratos, pólizas activas y clientes con mantenimientos cubiertos sin costo
+                    Historial de unidades entregadas, fichas técnicas y servicios mecánicos
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 rounded-lg whitespace-nowrap shadow-2xs">
-                  {effectiveRecords.length} Contratos Totales
+                <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg whitespace-nowrap shadow-2xs">
+                  {effectiveRecords.length} Registros Totales
                 </span>
                 <span className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg whitespace-nowrap shadow-2xs">
-                  {statsMetrics.countActivas} Garantías Vigentes
+                  {effectiveRecords.filter((r) => r.serviciosRealizados.includes('alistamiento_pdi')).length} PDI Realizados
                 </span>
-                <span className="px-2.5 py-1 text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
-                  ${statsMetrics.totalFacturado.toFixed(2)} Facturado
+                <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-lg font-mono whitespace-nowrap shadow-2xs">
+                  ${effectiveRecords.reduce((acc, r) => acc + (isPdiOnlyRecord(r) ? 0 : (Number(r.valorServicio) || 0)), 0).toFixed(2)} Facturado
                 </span>
               </div>
             </div>
 
-            {/* Fila 2: Barra de Búsqueda LLAMATIVA y GRANDE */}
+            {/* Fila 2: Barra de Búsqueda de Cédula / Cliente LLAMATIVA y GRANDE */}
             <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-2.5 border-t border-zinc-100">
-              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-amber-300 focus-within:border-amber-600 focus-within:ring-4 focus-within:ring-amber-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
-                <Search className="w-5 h-5 text-amber-600 shrink-0" />
+              {/* Contenedor del Buscador Prominente */}
+              <div className="relative flex-1 flex items-center bg-zinc-50 hover:bg-white focus-within:bg-white border-2 border-blue-200 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-100 rounded-xl transition-all shadow-xs h-12 sm:h-13 px-4 gap-3">
+                <Search className="w-5 h-5 text-blue-600 shrink-0" />
                 <input
                   type="text"
                   value={searchTerm}
@@ -1754,7 +2732,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       if (filteredRecords.length === 0 && searchTerm.trim().length >= 8) {
-                        handleStartNewGarantiaPlus(searchTerm.trim());
+                        handleStartNewAlistamiento(searchTerm.trim());
                       } else if (filteredRecords.length > 0) {
                         handleOpenRecordDetail(filteredRecords[0]);
                       }
@@ -1780,10 +2758,10 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       if (filteredRecords.length > 0) {
                         handleOpenRecordDetail(filteredRecords[0]);
                       } else {
-                        handleStartNewGarantiaPlus(searchTerm.trim());
+                        handleStartNewAlistamiento(searchTerm.trim());
                       }
                     }}
-                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                   >
                     {filteredRecords.length > 0 ? 'Ver Formulario' : 'Consultar C.I.'}
                   </button>
@@ -1796,35 +2774,33 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={`h-12 sm:h-13 px-4 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs shrink-0 ${
                   isFilterOpen || activeFilterCount > 0
-                    ? 'bg-amber-50 border-amber-400 text-amber-800'
+                    ? 'bg-blue-50 border-blue-400 text-blue-700'
                     : 'bg-white border-zinc-300 hover:border-zinc-400 text-zinc-700'
                 }`}
                 title="Filtros avanzados por pago, fechas y orden"
               >
-                <SlidersHorizontal className="w-4 h-4 text-amber-600 shrink-0" />
+                <SlidersHorizontal className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>Filtros</span>
                 {activeFilterCount > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-black flex items-center justify-center">
                     {activeFilterCount}
                   </span>
                 )}
                 <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Filtro de Sede / Taller */}
-              {workshops && workshops.length > 0 && (
+              {/* Filtro de Sede / Taller (Solo disponible para Matriz) */}
+              {effectiveIsMatriz && workshops && workshops.length > 0 && (
                 <div className="h-12 sm:h-13 bg-white border border-zinc-300 rounded-xl px-3 flex items-center shrink-0 shadow-2xs">
-                  <Building2 className="w-4 h-4 text-amber-600 mr-2 shrink-0" />
+                  <Building2 className="w-4 h-4 text-blue-600 mr-2 shrink-0" />
                   <select
                     value={selectedWorkshopFilter}
-                    onChange={(e) => setSelectedWorkshopFilter(e.target.value)}
+                    onChange={(e) => handleSelectWorkshopFilter(e.target.value)}
                     className="bg-transparent text-xs sm:text-sm font-bold text-zinc-800 outline-none cursor-pointer"
                   >
                     <option value="all">🏢 Todas las Sedes ({effectiveRecords.length})</option>
                     {workshops.map((w) => {
-                      const count = effectiveRecords.filter(
-                        (r) => r.sedeId === w.id || (r.sede || '').toLowerCase().includes(w.name.toLowerCase())
-                      ).length;
+                      const count = effectiveRecords.filter((r) => matchRecordToWorkshop(r, w.id, workshops)).length;
                       return (
                         <option key={w.id} value={w.id}>
                           {w.name} ({count})
@@ -1835,23 +2811,23 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Accesos directos a Alistamiento y GPS */}
+              {/* Accesos directos a Garantías Plus y GPS */}
               {onNavigateSection && (
                 <div className="hidden md:flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => onNavigateSection('alistamiento')}
-                    className="h-12 sm:h-13 px-4 bg-zinc-800 hover:bg-black text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
-                    title="Ir a Alistamiento PDI y Servicios"
+                    onClick={() => onNavigateSection('garantias_plus')}
+                    className="h-12 sm:h-13 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
+                    title="Crear o gestionar contratos de Garantía Plus"
                   >
-                    <Wrench className="w-4 h-4 text-blue-400" />
-                    <span>Alistamiento</span>
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>Garantía Plus</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onNavigateSection('gps')}
                     className="h-12 sm:h-13 px-4 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
-                    title="Ir a GPS Matriz"
+                    title="Crear o gestionar ventas y solicitudes de GPS"
                   >
                     <Radio className="w-4 h-4 text-blue-400" />
                     <span>GPS Matriz</span>
@@ -1859,25 +2835,25 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Botón "+ Nueva Garantía Plus" Destacado */}
+              {/* Botón "+ Registrar Garantía Plus" Destacado */}
               <button
                 type="button"
-                onClick={() => handleStartNewGarantiaPlus(searchTerm.trim())}
-                className="h-12 sm:h-13 px-6 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-sm sm:text-base rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 shrink-0"
+                onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
+                className="h-12 sm:h-13 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm sm:text-base rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 shrink-0"
               >
                 <Plus className="w-4.5 h-4.5" />
-                <span>+ Nueva Garantía Plus</span>
+                <span>+ Registrar Garantía Plus</span>
               </button>
             </div>
 
             {/* Panel de Filtros Interactivos Desplegable */}
             {isFilterOpen && (
-              <div className="bg-zinc-50/90 border border-amber-200 rounded-2xl p-4 shadow-sm space-y-4 animate-fade-in">
+              <div className="bg-zinc-50/90 border border-blue-200 rounded-2xl p-4 shadow-sm space-y-4 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200">
                   <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                    <SlidersHorizontal className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-black uppercase tracking-wider text-zinc-900">
-                      Filtros de Garantías Plus
+                      Filtros de Alistamiento & Servicios
                     </span>
                     <span className="text-[11px] text-zinc-500 font-semibold">
                       ({filteredRecords.length} resultado{filteredRecords.length === 1 ? '' : 's'})
@@ -1896,10 +2872,10 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* 1. Servicios Cubiertos */}
+                  {/* 1. Servicios Realizados */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
-                      Servicios Cubiertos
+                      Servicios
                     </label>
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
@@ -1914,7 +2890,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                           onClick={() => setFilterPayment(item.id as any)}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border text-center transition-all cursor-pointer truncate ${
                             filterPayment === item.id
-                              ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
                               : 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200'
                           }`}
                         >
@@ -1924,68 +2900,104 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* 2. Ordenar Resultados */}
+                  {/* 2. Ordenar Resultados y Período */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
                       Ordenar Resultados
                     </label>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => {
-                        const val = e.target.value as any;
-                        setSortBy(val);
-                        if (val === 'hoy') setFilterDateRange('today');
-                        else if (val === 'por_semana') setFilterDateRange('this_week');
-                        else if (val === 'por_mes') setFilterDateRange('this_month');
-                        else if (val === 'por_ano') setFilterDateRange('this_year');
-                        else setFilterDateRange('all');
-                      }}
-                      className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none cursor-pointer focus:border-amber-600 focus:ring-2 focus:ring-amber-100"
-                    >
-                      <option value="recientes">📅 Más recientes primero</option>
-                      <option value="antiguos">📅 Más antiguos primero</option>
-                      <option value="hoy">📅 Hoy</option>
-                      <option value="por_semana">📅 Por semana</option>
-                      <option value="por_mes">📅 Por mes</option>
-                      <option value="por_ano">📅 Por año</option>
-                      <option value="cliente_asc">👤 Cliente (A - Z)</option>
-                      <option value="cliente_desc">👤 Cliente (Z - A)</option>
-                      <option value="modelo_asc">🏍️ Modelo / Marca (A - Z)</option>
-                      <option value="modelo_desc">🏍️ Modelo / Marca (Z - A)</option>
-                      <option value="mayor_valor">💰 Mayor valor de contrato</option>
-                      <option value="mayor_saldo">⏳ Mayor saldo pendiente</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => {
+                          const val = e.target.value as any;
+                          setSortBy(val);
+                          if (val === 'hoy') setFilterDateRange('today');
+                          else if (val === 'por_semana') setFilterDateRange('this_week');
+                          else if (val === 'por_mes') setFilterDateRange('this_month');
+                          else if (val === 'por_ano') setFilterDateRange('this_year');
+                          else setFilterDateRange('all');
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-800 outline-none cursor-pointer focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="recientes">📅 Más recientes primero</option>
+                        <option value="antiguos">📅 Más antiguos primero</option>
+                        <option value="hoy">📅 Hoy</option>
+                        <option value="por_semana">📅 Por semana</option>
+                        <option value="por_mes">📅 Por mes</option>
+                        <option value="por_ano">📅 Por año</option>
+                        <option value="cliente_asc">👤 Cliente (A - Z)</option>
+                        <option value="cliente_desc">👤 Cliente (Z - A)</option>
+                        <option value="modelo_asc">🏍️ Modelo / Marca (A - Z)</option>
+                        <option value="modelo_desc">🏍️ Modelo / Marca (Z - A)</option>
+                        <option value="mayor_valor">💰 Mayor valor de servicio</option>
+                        <option value="mayor_saldo">⏳ Mayor saldo pendiente</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Chips de Filtros Activos */}
+            {/* Chips de Filtros Activos cuando el panel está cerrado */}
             {!isFilterOpen && activeFilterCount > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <span className="text-[11px] font-bold text-zinc-500">Filtros aplicados:</span>
                 {filterPayment !== 'all' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
                     <span>
+                      Servicio:{' '}
                       {filterPayment === 'con_saldo'
                         ? 'Con Saldo'
                         : filterPayment === 'pagados'
                         ? 'Pagados'
                         : filterPayment === 'pdi'
-                        ? 'PDI'
+                        ? 'Alistamiento PDI'
                         : filterPayment === 'engrasado'
                         ? 'Engrasado'
                         : 'Mantenimiento'}
                     </span>
-                    <button type="button" onClick={() => setFilterPayment('all')} className="hover:text-amber-950 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => setFilterPayment('all')}
+                      className="hover:text-blue-950 cursor-pointer"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
                 {sortBy !== 'recientes' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold">
-                    <span>{sortBy}</span>
-                    <button type="button" onClick={() => setSortBy('recientes')} className="hover:text-amber-950 cursor-pointer">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
+                    <span>
+                      {sortBy === 'antiguos'
+                        ? 'Antiguos'
+                        : sortBy === 'hoy'
+                        ? 'Hoy'
+                        : sortBy === 'por_semana'
+                        ? 'Por semana'
+                        : sortBy === 'por_mes'
+                        ? 'Por mes'
+                        : sortBy === 'por_ano'
+                        ? 'Por año'
+                        : sortBy === 'cliente_asc'
+                        ? 'Cliente (A-Z)'
+                        : sortBy === 'cliente_desc'
+                        ? 'Cliente (Z-A)'
+                        : sortBy === 'modelo_asc'
+                        ? 'Modelo (A-Z)'
+                        : sortBy === 'modelo_desc'
+                        ? 'Modelo (Z-A)'
+                        : sortBy === 'mayor_valor'
+                        ? 'Mayor valor'
+                        : 'Mayor saldo'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortBy('recientes');
+                        setFilterDateRange('all');
+                      }}
+                      className="hover:text-blue-950 cursor-pointer"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -2000,9 +3012,9 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
               </div>
             )}
 
-            {/* Fila 3: Bloques Estadísticos Reactivos (4 Bloques Idénticos a Alistamiento) */}
+            {/* Fila 3: Bloques Estadísticos Reactivos e Interactivos (Filtros rápidos al hacer clic) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-              {/* Bloque 1: Ingresos Cobrados */}
+              {/* Bloque 1: Ingresos Cobrados (Filtra solo pagados al hacer clic) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment(filterPayment === 'pagados' ? 'all' : 'pagados')}
@@ -2011,7 +3023,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     ? 'bg-emerald-100 border-2 border-emerald-500 shadow-md ring-2 ring-emerald-300 scale-[1.01]'
                     : 'bg-emerald-50/70 border border-emerald-200 shadow-2xs hover:bg-emerald-100/70 hover:border-emerald-300'
                 }`}
-                title="Clic para ver pólizas cobradas"
+                title="Clic para ver solo clientes con pagos cobrados (o desactivar filtro)"
               >
                 <div className="flex items-center justify-between text-emerald-800">
                   <div className="flex items-center gap-1.5">
@@ -2034,7 +3046,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               </button>
 
-              {/* Bloque 2: Pendientes por Cobrar */}
+              {/* Bloque 2: Pendientes por Cobrar (Filtra solo clientes con deuda al hacer clic) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment(filterPayment === 'con_saldo' ? 'all' : 'con_saldo')}
@@ -2043,7 +3055,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     ? 'bg-amber-100 border-2 border-amber-500 shadow-md ring-2 ring-amber-300 scale-[1.01]'
                     : 'bg-amber-50/70 border border-amber-200 shadow-2xs hover:bg-amber-100/70 hover:border-amber-300'
                 }`}
-                title="Clic para ver pólizas con saldo pendiente"
+                title="Clic para ver solo clientes con saldo pendiente por cobrar (o desactivar filtro)"
               >
                 <div className="flex items-center justify-between text-amber-800">
                   <div className="flex items-center gap-1.5">
@@ -2068,7 +3080,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               </button>
 
-              {/* Bloque 3: Total Facturado */}
+              {/* Bloque 3: Total Facturado en Servicios (Muestra todos al hacer clic) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment('all')}
@@ -2077,7 +3089,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     ? 'bg-blue-50/90 border border-blue-300 shadow-2xs hover:bg-blue-100/70'
                     : 'bg-blue-50/50 border border-blue-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-blue-100/60'
                 }`}
-                title="Clic para ver todas las pólizas facturadas"
+                title="Clic para ver todos los alistamientos facturados"
               >
                 <div className="flex items-center justify-between text-blue-800">
                   <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
@@ -2093,7 +3105,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 </div>
               </button>
 
-              {/* Bloque 4: Operaciones / Pólizas */}
+              {/* Bloque 4: Operaciones en Taller (Muestra todas al hacer clic) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment('all')}
@@ -2102,20 +3114,20 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                     ? 'bg-purple-50/90 border border-purple-300 shadow-2xs hover:bg-purple-100/70'
                     : 'bg-purple-50/50 border border-purple-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-purple-100/60'
                 }`}
-                title="Clic para ver todas las pólizas"
+                title="Clic para ver todas las operaciones de taller"
               >
                 <div className="flex items-center justify-between text-purple-800">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Pólizas Registradas</span>
+                  <span className="text-[10px] font-black uppercase tracking-wider">Operaciones</span>
                   <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Wrench className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div className="mt-1">
                   <div className="text-lg sm:text-xl font-black text-purple-900 leading-tight">
-                    {statsMetrics.totalOperaciones} <span className="text-xs font-bold text-purple-700">contratos</span>
+                    {statsMetrics.totalOperaciones} <span className="text-xs font-bold text-purple-700">motos</span>
                   </div>
                   <span className="text-[10px] font-semibold text-purple-700">
-                    {statsMetrics.countActivas} activas • {statsMetrics.totalOperaciones - statsMetrics.countActivas} vencidas
+                    {statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mant. (Ver todas)
                   </span>
                 </div>
               </button>
@@ -2127,86 +3139,71 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-900">
                   <UserCheck className="w-4.5 h-4.5 text-amber-600 shrink-0" />
                   <span>
-                    No hay contratos previos de Garantía Plus registrados con C.I. <strong>"{searchTerm}"</strong>. ¿Desea crear uno nuevo?
+                    No hay alistamientos previos registrados con C.I. <strong>"{searchTerm}"</strong>. ¿Desea iniciar un nuevo registro?
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleStartNewGarantiaPlus(searchTerm.trim())}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  onClick={() => handleStartNewAlistamiento(searchTerm.trim())}
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs cursor-pointer flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Registrar Garantía Plus con C.I. {searchTerm}</span>
+                  <span>Registrar nuevo con C.I. {searchTerm}</span>
                 </button>
               </div>
             )}
           </div>
 
-          {/* Barra de Leyenda de Estados */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 text-xs shrink-0 select-none">
-            <span className="font-semibold text-zinc-500 text-[11px]">
-              {filteredRecords.length} contrato{filteredRecords.length === 1 ? '' : 's'} de Garantía Plus
-            </span>
-            <div className="flex items-center gap-3 text-[11px] font-semibold">
-              <div className="flex items-center gap-1.5" title="Pólizas vigentes con más de 30 días">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span>
-                <span className="text-emerald-800">Vigente (Fila Verde)</span>
-              </div>
-              <div className="flex items-center gap-1.5" title="Pólizas próximas a vencer (menos de 30 días)">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-2xs animate-pulse"></span>
-                <span className="text-amber-800">Por Vencer (Fila Amarilla)</span>
-              </div>
-              <div className="flex items-center gap-1.5" title="Pólizas que ya expiraron">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-2xs"></span>
-                <span className="text-rose-800">Vencida</span>
+            {/* Barra de Leyenda de Estados de Taller y Conteo */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 text-xs shrink-0 select-none">
+              <span className="font-semibold text-zinc-500 text-[11px]">
+                {filteredRecords.length} alistamiento{filteredRecords.length === 1 ? '' : 's'} registrado{filteredRecords.length === 1 ? '' : 's'}
+              </span>
+              <div className="flex items-center gap-3 text-[11px] font-semibold">
+                <div className="flex items-center gap-1.5" title="Alistamientos cuya orden de trabajo en taller ya fue completada y entregada">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-2xs"></span>
+                  <span className="text-emerald-800">Orden Entregada (Fila Verde)</span>
+                </div>
+                <div className="flex items-center gap-1.5" title="Alistamientos con orden de trabajo iniciada o en proceso de mantenimiento en taller">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-2xs animate-pulse"></span>
+                  <span className="text-amber-800">En Proceso en Taller (Fila Amarilla)</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* TABLA EXCEL EXACTA */}
-          {filteredRecords.length > 0 ? (
-            <div className="flex-1 min-h-0 min-h-[260px] w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
-              <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
+            {filteredRecords.length > 0 ? (
+              <div className="flex-1 min-h-0 min-h-[260px] w-full bg-white border border-zinc-200 rounded-xl shadow-2xs overflow-hidden flex flex-col">
+                <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden">
                 <table className="w-full table-fixed text-left text-xs border-collapse">
                   <thead className="sticky top-0 bg-zinc-100 z-10 shadow-2xs">
                     <tr className="text-zinc-700 font-bold uppercase tracking-wider text-[11px] border-b border-zinc-300 divide-x divide-zinc-200 select-none">
                       <th className="w-[3%] px-1 py-2 text-center text-zinc-500 font-mono">#</th>
-                      <th className="w-[14%] px-2.5 py-2 truncate">Cliente</th>
+                      <th className="w-[13%] px-2.5 py-2 truncate">Cliente</th>
                       <th className="w-[10%] px-2 py-2 truncate">Origen</th>
                       <th className="w-[10%] px-2 py-2 truncate">Sede</th>
-                      {/* En Alistamiento era solo Fecha, aquí es Vigencia (Inicio -> Vencimiento) */}
-                      <th className="w-[12%] px-2 py-2 text-center whitespace-nowrap">Vigencia / Fechas</th>
-                      <th className="w-[13%] px-2 py-2 truncate">Motocicleta</th>
-                      <th className="w-[11%] px-2 py-2 truncate">Servicios Cubiertos</th>
+                      <th className="w-[7.5%] px-1.5 py-2 text-center whitespace-nowrap">Fecha</th>
+                      <th className="w-[14%] px-2 py-2 truncate">Motocicleta</th>
+                      <th className="w-[12%] px-2 py-2 truncate">Servicios</th>
                       <th className="w-[8.5%] px-2 py-2 truncate">Técnico</th>
-                      <th className="w-[7%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
-                      <th className="w-[7%] px-2 py-2 truncate">Póliza</th>
+                      <th className="w-[6%] px-2 py-2 text-right whitespace-nowrap">Valor</th>
+                      <th className="w-[7.5%] px-2 py-2 truncate">Factura</th>
                       <th className="w-[10%] px-1.5 py-2 text-center whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 text-zinc-800">
                     {paginatedRecords.map((record, i) => {
                       const idx = (currentPage - 1) * RECORDS_PER_PAGE + i;
+                      const orderStatus = getRecordOrderStatus(record, effectiveOrders);
 
-                      // Calcular estado de vigencia
-                      const now = new Date();
-                      now.setHours(0, 0, 0, 0);
-                      const [vy, vm, vd] = (record.fechaVencimiento || '').split('-').map(Number);
-                      const vDate = new Date(vy, vm - 1, vd);
-                      vDate.setHours(23, 59, 59, 999);
-                      const diffTime = vDate.getTime() - now.getTime();
-                      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                      const isVigente = daysRemaining > 30;
-                      const isPorVencer = daysRemaining >= 0 && daysRemaining <= 30;
-                      const isVencida = daysRemaining < 0;
+                      let rowBgClass = 'even:bg-zinc-50/40 hover:bg-blue-50/70 active:bg-blue-100/70 text-zinc-800';
+                      let statusTooltip = `Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`;
 
-                      let rowBgClass = 'even:bg-zinc-50/40 hover:bg-amber-50/70 active:bg-amber-100/70 text-zinc-800';
-                      if (isVigente) {
-                        rowBgClass = 'bg-emerald-50/50 hover:bg-emerald-100/70 text-emerald-950';
-                      } else if (isPorVencer) {
-                        rowBgClass = 'bg-amber-50/60 hover:bg-amber-100/70 text-amber-950';
-                      } else if (isVencida) {
-                        rowBgClass = 'bg-rose-50/40 hover:bg-rose-100/60 text-zinc-700 opacity-90';
+                      if (orderStatus === 'completed') {
+                        rowBgClass = 'bg-emerald-50/75 hover:bg-emerald-100/80 active:bg-emerald-200/70 text-emerald-950';
+                        statusTooltip = `[ORDEN ENTREGADA / COMPLETADA] Ficha técnica de ${record.nombres} ${record.apellidos}`;
+                      } else if (orderStatus === 'in_progress') {
+                        rowBgClass = 'bg-amber-50/75 hover:bg-amber-100/80 active:bg-amber-200/70 text-amber-950';
+                        statusTooltip = `[MANTENIMIENTO EN PROCESO EN TALLER] Ficha técnica de ${record.nombres} ${record.apellidos}`;
                       }
 
                       return (
@@ -2214,15 +3211,18 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                           key={record.id}
                           onClick={() => handleOpenRecordDetail(record)}
                           className={`cursor-pointer transition-colors divide-x divide-zinc-200/70 select-none group ${rowBgClass}`}
-                          title={`Haga clic para abrir la ficha de Garantía Plus de ${record.nombres} ${record.apellidos}`}
+                          title={statusTooltip}
                         >
                           {/* 1. # */}
-                          <td className="px-1 py-2 text-center font-mono text-[11px] bg-transparent">
+                          <td className={`px-1 py-2 text-center font-mono text-[11px] ${orderStatus ? 'bg-transparent' : 'bg-zinc-50/50'}`}>
                             <div className="flex items-center justify-center gap-1">
-                              {isVigente && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs" />}
-                              {isPorVencer && <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse shadow-2xs" />}
-                              {isVencida && <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />}
-                              <span className={isVigente ? 'text-emerald-700 font-bold' : isPorVencer ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
+                              {orderStatus === 'completed' && (
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs" title="Orden entregada" />
+                              )}
+                              {orderStatus === 'in_progress' && (
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse shadow-2xs" title="En proceso en taller" />
+                              )}
+                              <span className={orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
                                 {idx + 1}
                               </span>
                             </div>
@@ -2232,141 +3232,181 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                           <td className="px-2.5 py-2 truncate" title={`${record.nombres} ${record.apellidos} (C.I. ${record.cedulaRuc})`}>
                             <div className="flex flex-col truncate">
                               <div className="flex items-center gap-1.5 truncate">
-                                <span className="font-bold truncate text-xs text-zinc-900 group-hover:text-amber-600 transition-colors">
+                                <span className="font-bold truncate text-xs text-zinc-900 group-hover:text-blue-600 transition-colors">
                                   {record.nombres} {record.apellidos}
                                 </span>
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 text-[9px] font-black border border-amber-300">
-                                  👑 GP
-                                </span>
+                                {(record.metodoPago === 'Garantía Plus' || record.observaciones?.includes('Garantía Plus')) && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center gap-0.5" title="Cliente cubierto por Garantía Plus">
+                                    <Sparkles className="w-2.5 h-2.5" /> G. Plus
+                                  </span>
+                                )}
                               </div>
-                              <span className="font-mono text-[10px] text-zinc-500 truncate">
+                              <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
                                 C.I. {record.cedulaRuc}
                               </span>
                             </div>
                           </td>
 
                           {/* 3. Origen */}
-                          <td className="px-2 py-2 truncate text-zinc-600 font-medium" title={record.origen}>
-                            {record.origen}
+                          <td className="px-2 py-2 text-zinc-600 truncate" title={record.origen}>
+                            <span className="truncate block text-xs">{record.origen}</span>
                           </td>
 
                           {/* 4. Sede */}
-                          <td className="px-2 py-2 truncate text-zinc-600 font-medium" title={record.sede}>
-                            {record.sede}
+                          <td className="px-2 py-2 text-zinc-700 truncate" title={record.sede}>
+                            <span className="inline-block text-[11px] font-medium bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded border border-zinc-200/80 truncate max-w-full">
+                              {record.sede}
+                            </span>
                           </td>
 
-                          {/* 5. Vigencia / Fechas (DIFERENCIA CLAVE) */}
-                          <td className="px-2 py-2 text-center whitespace-nowrap">
-                            <div className="flex flex-col items-center leading-tight">
-                              <span className="font-mono text-[11px] text-zinc-700 font-bold">
-                                {record.fechaServicio} → <span className="text-amber-900 font-black">{record.fechaVencimiento}</span>
-                              </span>
-                              {isVigente && (
-                                <span className="text-[9px] font-bold text-emerald-700">
-                                  Vigente ({daysRemaining} d)
-                                </span>
-                              )}
-                              {isPorVencer && (
-                                <span className="text-[9px] font-black text-amber-700 animate-pulse">
-                                  ¡Por vencer ({daysRemaining} d)!
-                                </span>
-                              )}
-                              {isVencida && (
-                                <span className="text-[9px] font-bold text-rose-600">
-                                  Vencida
-                                </span>
-                              )}
-                            </div>
+                          {/* 5. Fecha */}
+                          <td className="px-1.5 py-2 text-center whitespace-nowrap font-mono text-zinc-600 text-[11px]" title={record.fechaServicio}>
+                            <div className="font-semibold text-zinc-800">{record.fechaServicio}</div>
+                            {record.fechaVencimiento && (
+                              <div className="text-[10px] text-amber-700 font-bold">Vence: {record.fechaVencimiento}</div>
+                            )}
                           </td>
 
                           {/* 6. Motocicleta */}
-                          <td className="px-2 py-2 truncate" title={`${record.modeloMarca} • Placa: ${record.placa} • Chasis: ${record.chasis}`}>
+                          <td className="px-2 py-2 truncate" title={`${record.modeloMarca} - Placa: ${record.placa || 'S/P'}`}>
                             <div className="flex flex-col truncate">
-                              <span className="font-bold text-zinc-900 truncate">{record.modeloMarca}</span>
-                              <div className="flex items-center gap-1 font-mono text-[10px] text-zinc-500">
-                                <span className="font-bold text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200">
-                                  {record.placa || 'S/P'}
-                                </span>
-                                {record.color && <span>• {record.color}</span>}
+                              <span className="font-semibold text-xs text-zinc-800 truncate">
+                                {record.modeloMarca || 'Modelo no esp.'}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 truncate">
+                                <span className="font-bold text-zinc-700 bg-zinc-100 px-1 rounded">{record.placa || 'S/P'}</span>
+                                <span>• {record.kilometraje || 0} km</span>
                               </div>
                             </div>
                           </td>
 
-                          {/* 7. Servicios Cubiertos */}
+                          {/* 7. Servicios */}
                           <td className="px-2 py-2 truncate">
                             <div className="flex flex-wrap gap-1">
-                              {record.serviciosRealizados?.map((s) => (
+                              {record.serviciosRealizados.map((srv) => (
                                 <span
-                                  key={s}
-                                  className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase"
+                                  key={srv}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    srv === 'alistamiento_pdi'
+                                      ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                      : srv === 'engrasado'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      : 'bg-purple-50 text-purple-800 border border-purple-200'
+                                  }`}
                                 >
-                                  {s === 'alistamiento_pdi' ? 'PDI' : s}
+                                  {srv === 'alistamiento_pdi'
+                                    ? 'PDI'
+                                    : srv === 'engrasado'
+                                    ? 'Engrasado'
+                                    : 'Mantenimiento'}
                                 </span>
                               ))}
                             </div>
                           </td>
 
                           {/* 8. Técnico */}
-                          <td className="px-2 py-2 truncate text-zinc-600 font-medium" title={record.tecnicoResponsable}>
-                            {record.tecnicoResponsable || '—'}
+                          <td className="px-2 py-2 text-zinc-700 truncate" title={record.tecnicoResponsable}>
+                            <span className="truncate block text-xs font-medium">{record.tecnicoResponsable}</span>
                           </td>
 
-                          {/* 9. Valor */}
-                          <td className="px-2 py-2 text-right whitespace-nowrap font-mono">
-                            {(() => {
-                              const val = Number(record.valorServicio) || 0;
-                              const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
-                              const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                          {/* 9. Valor & Estado Contable */}
+                          <td className="px-2 py-2 text-right font-mono whitespace-nowrap text-xs">
+                            {isPdiOnlyRecord(record) ? (
+                              <span className="text-zinc-400 font-bold text-center block">-</span>
+                            ) : (
+                              (() => {
+                                const val = Number(record.valorServicio) || 0;
+                                const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                                const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                                const isGarantiaPlus = record.metodoPago === 'Garantía Plus' || record.observaciones?.includes('Garantía Plus');
 
-                              return (
-                                <div className="flex flex-col items-end leading-tight">
-                                  <span className="font-black text-zinc-900 text-xs">${val.toFixed(2)}</span>
-                                  {pend > 0.01 ? (
-                                    <span className="text-[10px] text-rose-600 font-black">Debe: ${pend.toFixed(2)}</span>
-                                  ) : (
-                                    <span className="text-[10px] text-emerald-700 font-bold">Pagado</span>
-                                  )}
-                                </div>
-                              );
-                            })()}
+                                if (isGarantiaPlus || (val === 0 && pag === 0 && pend === 0 && !isPdiOnlyRecord(record))) {
+                                  return (
+                                    <div className="flex flex-col items-end leading-tight">
+                                      <span className="font-bold text-amber-600 text-xs">$0.00</span>
+                                      <span className="text-[10px] text-amber-700 font-bold inline-flex items-center gap-0.5" title="Cubierto por Garantía Plus">
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                                        G. Plus
+                                      </span>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="flex flex-col items-end leading-tight">
+                                    <span className="font-bold text-zinc-900 text-xs">${val.toFixed(2)}</span>
+                                    {pend > 0.01 ? (
+                                      <span className="text-[10px] text-rose-600 font-black" title={`Pendiente: $${pend.toFixed(2)} (Abonado: $${pag.toFixed(2)})`}>
+                                        Debe: ${pend.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-emerald-700 font-bold" title={`Pagado al 100% ($${pag.toFixed(2)})`}>
+                                        Pagado
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            )}
                           </td>
 
-                          {/* 10. Factura / Póliza */}
-                          <td className="px-2 py-2 font-mono text-zinc-700 truncate text-[11px]" title={record.numeroTicket || record.numeroFactura}>
-                            <span className="truncate block font-bold text-amber-900">{record.numeroTicket || record.numeroFactura || 'GP'}</span>
+                          {/* 10. Factura */}
+                          <td className="px-2 py-2 font-mono text-zinc-700 truncate text-[11px]" title={record.numeroFactura || record.numeroTicket || 'Ticket'}>
+                            <span className="truncate block">{record.numeroFactura || record.numeroTicket || 'Ticket'}</span>
                           </td>
 
                           {/* 11. Acciones */}
                           <td className="px-1.5 py-2 text-center whitespace-nowrap">
                             <div className="inline-flex items-center justify-center gap-1">
-                              {/* Botón de Dinero / Abono */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenAbonoModal(record);
-                                }}
-                                className="p-1 rounded-lg border text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 transition-all cursor-pointer shadow-2xs"
-                                title="Gestionar abonos o pagos"
-                              >
-                                <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
-                              </button>
+                              {/* Botón de Dinero / Abono (Morado = Abono por validar / Verde = Pagado o Aprobado / Rojo = Falta abonar) */}
+                              {(() => {
+                                const val = Number(record.valorServicio) || 0;
+                                const pag = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                                const pend = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, val - pag);
+                                const isPdi = isPdiOnlyRecord(record);
+                                const isPaid = isPdi || val <= 0 || pend <= 0.01;
+                                const hasPendingAbono = record.solicitudAbonoPendiente?.estado === 'pendiente';
+                                const isApprovedAbono = record.solicitudAbonoPendiente?.estado === 'aprobado';
 
-                              {/* Ver Ficha */}
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenAbonoModal(record);
+                                    }}
+                                    className={`p-1 rounded-lg border transition-all cursor-pointer shadow-2xs ${
+                                      hasPendingAbono
+                                        ? 'text-purple-700 bg-purple-100 hover:bg-purple-200 border-purple-400 ring-2 ring-purple-300 ring-offset-1 animate-pulse'
+                                        : (isApprovedAbono || isPaid)
+                                          ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
+                                          : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-300 animate-pulse'
+                                    }`}
+                                    title={
+                                      hasPendingAbono
+                                        ? `¡Abono por transferencia de $${Number(record.solicitudAbonoPendiente?.monto).toFixed(2)} pendiente de validación! Clic para revisar.`
+                                        : (isApprovedAbono || isPaid)
+                                          ? `Todo abonado / aprobado ($${pag.toFixed(2)}). Clic para gestionar pagos o evidencias.`
+                                          : `Falta abonar: $${pend.toFixed(2)} pendientes. Clic para registrar abono.`
+                                    }
+                                  >
+                                    <DollarSign className="w-3.5 h-3.5 stroke-[2.5]" />
+                                  </button>
+                                );
+                              })()}
+
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleOpenRecordDetail(record);
                                 }}
-                                className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-amber-500 hover:text-slate-950 text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
-                                title="Ver Ficha de Garantía Plus"
+                                className="px-1.5 py-0.5 text-[10px] font-bold bg-zinc-100 hover:bg-blue-600 hover:text-white text-zinc-700 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                                title="Ver Ficha Técnica"
                               >
                                 <Eye className="w-3 h-3" />
                                 <span>Ficha</span>
                               </button>
-
-                              {/* WhatsApp */}
                               {record.celular1 && (
                                 <a
                                   href={getCleanWhatsappUrl(record.celular1, `${record.nombres} ${record.apellidos}`)}
@@ -2379,34 +3419,28 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                                   <MessageCircle className="w-3.5 h-3.5" />
                                 </a>
                               )}
-
-                              {/* Ir a Alistamiento con este cliente */}
-                              {onNavigateSection && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onNavigateSection('alistamiento');
-                                  }}
-                                  className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                                  title="Registrar servicio cubierto en Alistamiento"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {/* Eliminar */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNewServiceForExisting(record);
+                                }}
+                                className="p-0.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                title="Nuevo Servicio subsecuente"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
                               {onDeleteRecord && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`¿Está seguro de eliminar la Garantía Plus de ${record.nombres} ${record.apellidos}?`)) {
+                                    if (window.confirm(`¿Está seguro de eliminar el alistamiento de ${record.nombres} ${record.apellidos}?`)) {
                                       onDeleteRecord(record.id);
                                     }
                                   }}
                                   className="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                  title="Eliminar registro"
+                                  title="Eliminar Alistamiento"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -2420,25 +3454,27 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <tfoot className="sticky bottom-0 bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-800 text-[11px] shadow-xs z-10">
                     <tr className="divide-x divide-zinc-200">
                       <td colSpan={8} className="px-3 py-2 text-right font-mono uppercase tracking-wider text-[11px]">
-                        Totales ({filteredRecords.length} pólizas):
+                        Totales ({filteredRecords.length} registros):
                       </td>
                       <td className="px-2 py-2 text-right font-mono whitespace-nowrap">
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="text-zinc-900 font-black text-xs">${statsMetrics.totalFacturado.toFixed(2)}</span>
-                          <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${statsMetrics.totalRecaudado.toFixed(2)}</span>
-                          {statsMetrics.totalPendiente > 0.01 && (
-                            <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${statsMetrics.totalPendiente.toFixed(2)}</span>
+                          <span className="text-zinc-900 font-black text-xs">${tableFooterMetrics.totalFacturado.toFixed(2)}</span>
+                          <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${tableFooterMetrics.totalRecaudado.toFixed(2)}</span>
+                          {tableFooterMetrics.totalPendiente > 0.01 && (
+                            <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${tableFooterMetrics.totalPendiente.toFixed(2)}</span>
                           )}
                         </div>
                       </td>
                       <td colSpan={2} className="px-3 py-2 text-zinc-600 font-normal text-[11px] truncate">
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-1.5 font-bold">
-                            <span className="text-amber-800">{statsMetrics.countActivas} Pólizas Vigentes</span>
+                            <span className="text-blue-700">{tableFooterMetrics.countPdi} PDI OK</span>
+                            <span>•</span>
+                            <span className="text-purple-700">{tableFooterMetrics.countMantenimiento} Mantenimientos</span>
                           </div>
-                          {statsMetrics.countConSaldo > 0 ? (
+                          {tableFooterMetrics.countConSaldo > 0 ? (
                             <span className="text-[10px] font-bold text-rose-600">
-                              ⚠️ {statsMetrics.countConSaldo} cliente(s) con saldo por cobrar
+                              ⚠️ {tableFooterMetrics.countConSaldo} cliente(s) con saldo por cobrar
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-emerald-700">
@@ -2451,8 +3487,8 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   </tfoot>
                 </table>
               </div>
-
-              {/* Paginación */}
+              
+              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="bg-white border-t border-zinc-200 p-3 flex items-center justify-between shadow-sm z-10 shrink-0">
                   <div className="text-xs font-semibold text-zinc-600">
@@ -2461,33 +3497,47 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs flex items-center"
                     >
                       Anterior
                     </button>
                     <div className="flex items-center gap-1 hidden sm:flex px-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${
-                            currentPage === page
-                              ? 'bg-amber-500 text-slate-950 font-black shadow-2xs'
-                              : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
+                      {(() => {
+                        const maxVisible = 5;
+                        let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                        let end = Math.min(totalPages, start + maxVisible - 1);
+                        if (end - start + 1 < maxVisible) {
+                          start = Math.max(1, end - maxVisible + 1);
+                        }
+                        
+                        const pages = [];
+                        if (start > 1) {
+                          pages.push(
+                            <button key="1" type="button" onClick={() => setCurrentPage(1)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === 1 ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>1</button>
+                          );
+                          if (start > 2) pages.push(<span key="ellipsis1" className="text-zinc-400 text-xs font-bold tracking-wider px-0.5">...</span>);
+                        }
+                        for (let i = start; i <= end; i++) {
+                          pages.push(
+                            <button key={i} type="button" onClick={() => setCurrentPage(i)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === i ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>{i}</button>
+                          );
+                        }
+                        if (end < totalPages) {
+                          if (end < totalPages - 1) pages.push(<span key="ellipsis2" className="text-zinc-400 text-xs font-bold tracking-wider px-0.5">...</span>);
+                          pages.push(
+                            <button key={totalPages} type="button" onClick={() => setCurrentPage(totalPages)} className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold cursor-pointer transition-colors ${currentPage === totalPages ? 'bg-blue-600 text-white shadow-2xs' : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'}`}>{totalPages}</button>
+                          );
+                        }
+                        return pages;
+                      })()}
                     </div>
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                      className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs flex items-center"
                     >
                       Siguiente
                     </button>
@@ -2498,19 +3548,19 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
           ) : (
             <div className="flex-1 min-h-0 flex items-center justify-center p-8 bg-white border border-zinc-200 rounded-xl">
               <div className="text-center space-y-2 max-w-sm">
-                <Sparkles className="w-8 h-8 text-amber-300 mx-auto" />
+                <Bike className="w-8 h-8 text-zinc-300 mx-auto" />
                 <h3 className="text-sm font-bold text-zinc-800">
-                  No se encontraron contratos de Garantía Plus
+                  No se encontraron alistamientos registrados
                 </h3>
                 <p className="text-xs text-zinc-500">
                   {searchTerm
                     ? 'Ningún registro coincide con los criterios de búsqueda especificados.'
-                    : 'Aún no hay pólizas de Garantía Plus registradas en esta sede. Inicie la primera ahora.'}
+                    : 'Aún no hay alistamientos registrados en esta sede. Inicia el primer registro ahora.'}
                 </p>
                 <button
                   type="button"
-                  onClick={() => handleStartNewGarantiaPlus(searchTerm)}
-                  className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg cursor-pointer inline-flex items-center gap-1.5 shadow-2xs font-black"
+                  onClick={() => handleStartNewAlistamiento(searchTerm)}
+                  className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Registrar Nueva Garantía Plus</span>
@@ -2522,221 +3572,288 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. VISTA: FORMULARIO DE REGISTRO NUEVO (3 COLUMNAS SIMÉTRICAS)             */}
+      {/* 2. VISTA: FORMULARIO DE ALISTAMIENTO (3 COLUMNAS)                         */}
       {/* ========================================================================= */}
       {currentViewMode === 'form' && (
         <div className="flex-1 min-h-0 w-full overflow-y-auto pr-1 pb-8">
           <form onSubmit={handleFinalSubmit} className="space-y-4 animate-fade-in">
-            {/* ALERTA DE VALIDACIÓN */}
-            {validationAlert && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
-                <div className="flex items-start gap-2.5">
-                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-xs font-bold text-red-900">{validationAlert.title}</h4>
-                    <p className="text-[11px] text-red-700 mt-0.5">
-                      Por favor complete los campos requeridos:{' '}
-                      <span className="font-bold underline">{validationAlert.fields.join(', ')}</span>.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setValidationAlert(null)}
-                  className="text-red-400 hover:text-red-700 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* BANNER SUPERIOR: NUEVA GARANTÍA PLUS MATRIZ */}
-            <div className="p-4 bg-gradient-to-r from-amber-500/20 via-yellow-400/25 to-amber-500/20 border-2 border-amber-400 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
-                  <Sparkles className="w-6 h-6 text-slate-950" />
-                </div>
+          {/* ALERTA DE VALIDACIÓN (SI FALTAN CAMPOS) */}
+          {validationAlert && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-3.5 rounded-xl shadow-xs flex items-start justify-between gap-3 animate-slide-in">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-sm sm:text-base font-black text-amber-950">
-                    👑 Nuevo Contrato de Garantía Plus - Matriz
-                  </h3>
-                  <p className="text-xs text-amber-900 font-medium leading-relaxed">
-                    Al ingresar a este cliente, todos sus siguientes mantenimientos y engrasados en Alistamiento saldrán automáticamente como <strong>Pagados ($0.00)</strong> sin costo durante su vigencia.
+                  <h4 className="text-xs font-bold text-red-900">{validationAlert.title}</h4>
+                  <p className="text-[11px] text-red-700 mt-0.5">
+                    Por favor complete los campos requeridos:{' '}
+                    <span className="font-bold underline">{validationAlert.fields.join(', ')}</span>.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setEffectiveViewMode('list')}
-                className="px-3.5 py-1.5 bg-white/90 hover:bg-white text-zinc-800 border border-zinc-300 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer shrink-0"
+                onClick={() => setValidationAlert(null)}
+                className="text-red-400 hover:text-red-700 cursor-pointer"
               >
-                ← Volver al Libro
+                <X className="w-4 h-4" />
               </button>
             </div>
+          )}
 
-            {/* 3 COLUMNAS SIMÉTRICAS DESKTOP */}
-            <div className="hidden lg:grid lg:grid-cols-3 gap-5 items-stretch">
-              {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE                             */}
-              {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
-                        1
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
-                        <p className="text-[11px] text-zinc-400">Verificación y contacto</p>
-                      </div>
+          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-3 sm:p-3.5 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 font-black shrink-0 border border-white/15">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold block text-white">Módulos Especiales de Matriz</span>
+                <span className="text-[11px] text-slate-300 block">¿El cliente desea contratar el plan Garantía Plus o equipar un GPS Satelital?</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {onNavigateSection && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateSection('garantias_plus')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
+                    title="Ir al módulo de Garantías Plus para registrar un nuevo contrato"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Contratar Garantía Plus</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateSection('gps')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
+                    title="Ir al módulo de GPS para registrar una nueva venta"
+                  >
+                    <Radio className="w-3.5 h-3.5 text-blue-200" />
+                    <span>Registrar GPS</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* BANNER DESTACADO: CLIENTE CON GARANTÍA PLUS ACTIVA */}
+          {garantiaPlusStatus.hasGarantiaPlus && (
+            <div className="p-4 bg-gradient-to-r from-amber-500/15 via-yellow-400/20 to-amber-500/15 border-2 border-amber-400 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-slide-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shadow-md shrink-0">
+                  <Sparkles className="w-5 h-5 text-yellow-100 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-xs">
+                      👑 Garantía Plus Activa
+                    </span>
+                    <span className="text-xs font-black text-amber-950">
+                      {garantiaPlusStatus.record?.nombres} {garantiaPlusStatus.record?.apellidos} (Placa: {garantiaPlusStatus.record?.placa || 'S/P'})
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900 mt-1 font-medium leading-relaxed">
+                    Vigente hasta el <strong className="font-mono font-bold text-amber-950">{garantiaPlusStatus.record?.fechaVencimiento}</strong> ({garantiaPlusStatus.daysRemaining} días restantes). 
+                    <strong className="text-emerald-800 ml-1">✓ Mantenimientos y servicios cubiertos al 100% sin costo para el cliente ($0.00 - Pagado).</strong>
+                  </p>
+                </div>
+              </div>
+              {onNavigateSection && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateSection('garantias_plus')}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <span>Ver en Garantías Plus</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ===================================================================== */}
+          {/* LAYOUT ESCRITORIO: 3 COLUMNAS SIMÉTRICAS                              */}
+          {/* ===================================================================== */}
+          <div className="hidden lg:grid lg:grid-cols-3 gap-5 items-stretch">
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 1: PASO 1 - DATOS DEL CLIENTE                             */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 font-black text-xs flex items-center justify-center border border-blue-200">
+                      1
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                        Paso 1
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleSaveClientToDatabase}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                        title="Guardar cliente en la base de datos"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Guardar</span>
-                      </button>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Datos del Cliente</h3>
+                      <p className="text-[11px] text-zinc-400">Verificación y contacto</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Paso 1
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSaveClientToDatabase}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      title="Guardar este cliente en la base de datos para futuras consultas"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Guardar</span>
+                    </button>
+                  </div>
+                </div>
 
-                  {/* Cédula o RUC con Consulta */}
-                  <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
-                    <label className="block text-xs font-black uppercase text-blue-900">
-                      Cédula o RUC del Cliente *
+                {/* Cédula o RUC (Primerito) */}
+                <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
+                  <label className="block text-xs font-black uppercase text-blue-900">
+                    Cédula o RUC del Cliente *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={formData.cedulaRuc}
+                      onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleConsultar();
+                        }
+                      }}
+                      placeholder="Ejemplo: 1723456789 o RUC..."
+                      className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleConsultar()}
+                      disabled={isSearching || !formData.cedulaRuc.trim()}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                      title="Consultar número de Cédula o RUC"
+                    >
+                      <Search className="w-3.5 h-3.5" />
+                      <span>{isSearching ? 'Consultando...' : 'Consultar'}</span>
+                    </button>
+                  </div>
+                  {searchFeedback && (
+                    <p
+                      className={`text-xs font-medium leading-tight p-2.5 rounded-xl border ${
+                        searchFeedback.startsWith('✓')
+                          ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      {searchFeedback}
+                    </p>
+                  )}
+                </div>
+
+                {/* Nombres (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Nombres *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nombres}
+                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                    placeholder="Ejemplo: Juan Carlos"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                    required
+                  />
+                </div>
+
+                {/* Apellidos (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Apellidos *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.apellidos}
+                    onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                    placeholder="Ejemplo: Mendoza Zambrano"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                    required
+                  />
+                </div>
+
+                {/* Celulares en 2 columnas para optimizar espacio */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Celular Principal *
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={formData.cedulaRuc}
-                        onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleConsultar();
-                          }
-                        }}
-                        placeholder="Ejemplo: 1723456789 o RUC..."
-                        className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleConsultar()}
-                        disabled={isSearching || !formData.cedulaRuc.trim()}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        <span>{isSearching ? 'Consultando...' : 'Consultar'}</span>
-                      </button>
-                    </div>
-                    {searchFeedback && (
-                      <p
-                        className={`text-xs font-medium leading-tight p-2.5 rounded-xl border ${
-                          searchFeedback.startsWith('✓') || searchFeedback.startsWith('👑')
-                            ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
-                            : 'text-amber-800 bg-amber-50 border-amber-200'
-                        }`}
-                      >
-                        {searchFeedback}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Nombres */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Nombres *</label>
                     <input
                       type="text"
-                      value={formData.nombres}
-                      onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                      placeholder="Ejemplo: Juan Carlos"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                      value={formData.celular1}
+                      onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                      placeholder="Ejemplo: 0987654321"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                       required
                     />
                   </div>
-
-                  {/* Apellidos */}
                   <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Apellidos *</label>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Celular Opcional
+                    </label>
                     <input
                       type="text"
-                      value={formData.apellidos}
-                      onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
-                      placeholder="Ejemplo: Mendoza Zambrano"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
-                      required
+                      value={formData.celular2}
+                      onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
+                      placeholder="Ejemplo: 0991234567"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
                     />
                   </div>
+                </div>
 
-                  {/* Celulares */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Celular Principal *</label>
-                      <input
-                        type="text"
-                        value={formData.celular1}
-                        onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                        placeholder="Ejemplo: 0987654321"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Celular Opcional</label>
-                      <input
-                        type="text"
-                        value={formData.celular2}
-                        onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
-                        placeholder="Ejemplo: 0991234567"
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-medium outline-none focus:border-blue-600 focus:bg-white"
-                      />
-                    </div>
-                  </div>
+                {/* Correo Electrónico (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="Ejemplo: usuario.cliente99@gmail.com"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                </div>
 
-                  {/* Email */}
+                {/* Dirección Domiciliaria (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Dirección Domiciliaria
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.direccion}
+                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                    placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  />
+                </div>
+
+                {/* Sede / Taller (Arriba de Origen / Almacén) */}
+                {effectiveIsMatriz && workshops && workshops.length > 0 && (
                   <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Correo Electrónico</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="usuario@ejemplo.com"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-
-                  {/* Dirección */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Dirección Domiciliaria</label>
-                    <input
-                      type="text"
-                      value={formData.direccion}
-                      onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                      placeholder="Av. Principal y Secundaria"
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-
-                  {/* Sede */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">Sede de Emisión *</label>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                      <span>Sede de Atención / Taller *</span>
+                      <span className="text-[10px] text-blue-600 font-semibold normal-case">Red Matriz</span>
+                    </label>
                     <select
-                      value={formData.sedeId || defaultSedeId}
+                      value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
                       onChange={(e) => {
                         const chosenId = e.target.value;
-                        const ws = workshops.find((w) => w.id === chosenId);
+                        const chosenWs = workshops.find((w) => w.id === chosenId);
                         setFormData({
                           ...formData,
                           sedeId: chosenId,
-                          sede: ws ? ws.name : formData.sede,
+                          sede: chosenWs ? chosenWs.name : formData.sede,
                         });
                       }}
                       className="w-full px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-xl text-sm font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
@@ -2748,375 +3865,479 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       ))}
                     </select>
                   </div>
+                )}
 
-                  {/* Origen */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold uppercase text-zinc-700">Origen / Almacén *</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddOriginModal(true)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Nuevo Almacén</span>
-                      </button>
-                    </div>
-                    <select
-                      value={formData.origen}
-                      onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                {/* Origen / Almacén (Abajo de Sede / Taller) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Origen / Almacén *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddOriginModal(true)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
                     >
-                      {origins.map((orig) => (
-                        <option key={orig} value={orig}>
-                          {orig}
-                        </option>
-                      ))}
-                    </select>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Nuevo Almacén</span>
+                    </button>
                   </div>
+                  <select
+                    value={formData.origen}
+                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:bg-white"
+                  >
+                    {origins.map((orig) => (
+                      <option key={orig} value={orig}>
+                        {orig}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
+            </div>
 
-              {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTO                             */}
-              {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
-                        2
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-black text-zinc-900">Datos de la Moto</h3>
-                        <p className="text-[11px] text-zinc-400">Identificación técnica del vehículo</p>
-                      </div>
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 2: PASO 2 - DATOS DE LA MOTO (SOLO DATOS DE LA MOTO)     */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 font-black text-xs flex items-center justify-center border border-red-200">
+                      2
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
-                      Paso 2
-                    </span>
-                  </div>
-
-                  {/* Modelo y Marca */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">Modelo y Marca *</label>
-                    <input
-                      type="text"
-                      list="registered-brands-datalist"
-                      value={formData.modeloMarca}
-                      onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                      placeholder="Ejemplo: Thunder 200 / Pulsar NS 200"
-                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
-                      required
-                    />
-                    <datalist id="registered-brands-datalist">
-                      {registeredBrands.map((b) => (
-                        <option key={b} value={b} />
-                      ))}
-                    </datalist>
-                  </div>
-
-                  {/* Placa */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-bold uppercase text-zinc-700">Placa</label>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
-                        className="text-xs text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
-                      >
-                        En trámite
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                      placeholder="Ejemplo: AB123C o EN TRÁMITE"
-                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
-                    />
-                  </div>
-
-                  {/* Color */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">Color de la Moto</label>
-                    <input
-                      type="text"
-                      value={formData.color || ''}
-                      onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                      placeholder="Ejemplo: Negro Mate / Rojo Racing"
-                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
-                    />
-                  </div>
-
-                  {/* Serie o Chasis */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">Serie o Chasis (VIN) *</label>
-                    <input
-                      type="text"
-                      value={formData.chasis}
-                      onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                      placeholder="Ejemplo: 3SCBP123456789012"
-                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
-                      required
-                    />
-                  </div>
-
-                  {/* Kilometraje */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5 flex items-center justify-between">
-                      <span>Kilometraje de Recepción (Odómetro)</span>
-                      <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                        {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        value={formData.kilometraje}
-                        onFocus={selectOnFocus}
-                        onChange={(e) => {
-                          const km = cleanNumberInput(e.target.value);
-                          setFormData((prev) => ({ ...prev, kilometraje: km }));
-                        }}
-                        placeholder="Ejemplo: 0 km"
-                        className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
-                        KM
-                      </span>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Datos de la Moto</h3>
+                      <p className="text-[11px] text-zinc-400">Identificación técnica del vehículo</p>
                     </div>
                   </div>
-
-                  {/* Resumen de Cobertura */}
-                  <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs space-y-1 text-amber-900">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-950">
-                      <Sparkles className="w-4 h-4 text-amber-600" />
-                      <span>Cobertura Garantía Plus:</span>
-                    </div>
-                    <p className="text-[11px] text-amber-800 leading-relaxed">
-                      El chasis y la placa quedarán asociados a la póliza activa. Al llegar a taller, el sistema reconocerá automáticamente la motocicleta para exonerar el pago de mano de obra y servicios cubiertos.
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                    Paso 2
+                  </span>
                 </div>
-              </div>
 
-              {/* ----------------------------------------------------------------- */}
-              {/* COLUMNA 3: PASO 3 - SERVICIO, FECHAS & COBRO                      */}
-              {/* (LA DIFERENCIA CLAVE: FECHA DE VENCIMIENTO DONDE ESTABA LA HORA) */}
-              {/* ----------------------------------------------------------------- */}
-              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
-                        3
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
-                        <p className="text-[11px] text-zinc-400">Vigencia, póliza y facturación</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Paso 3
-                    </span>
-                  </div>
+                {/* Modelo y Marca (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Modelo y Marca *
+                  </label>
+                  <input
+                    type="text"
+                    list="registered-brands-datalist"
+                    value={formData.modeloMarca}
+                    onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                    placeholder="Ejemplo: Thunder 200 / Pulsar NS 200"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
+                    required
+                  />
+                </div>
 
-                  {/* Servicios que cubre la Garantía Plus */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
-                      ¿Qué servicios cubre la Garantía Plus? *
+                {/* Placa (1 por fila) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Placa
                     </label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'alistamiento_pdi' as ServiceActionType, label: 'Alistamiento PDI' },
-                        { id: 'engrasado' as ServiceActionType, label: 'Engrasado' },
-                        { id: 'mantenimiento' as ServiceActionType, label: 'Mantenimiento' },
-                      ].map((srv) => {
-                        const isSelected = formData.serviciosRealizados.includes(srv.id);
-                        return (
-                          <button
-                            key={srv.id}
-                            type="button"
-                            onClick={() => toggleServicio(srv.id)}
-                            className={`px-2 py-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
-                              isSelected
-                                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs font-black'
-                                : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                            }`}
-                          >
-                            <span className="truncate">{srv.label}</span>
-                            <span className="text-[9px] font-bold text-amber-900">✓ Incluido</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Técnico Responsable */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold uppercase text-zinc-700">Técnico Responsable *</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddTechModal(true)}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Nuevo Técnico</span>
-                      </button>
-                    </div>
-                    <select
-                      value={formData.tecnicoResponsable}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        const t = technicians.find((tech) => tech.name === name);
-                        setFormData({
-                          ...formData,
-                          tecnicoResponsable: name,
-                          tecnicoId: t?.id || '',
-                        });
-                      }}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-emerald-600 focus:bg-white"
-                      required
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                      className="text-xs text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
                     >
-                      <option value="">Seleccione un técnico responsable...</option>
-                      {technicians.map((t) => (
-                        <option key={t.id} value={t.name}>
-                          {t.name} ({t.workshopName || 'Taller'})
-                        </option>
-                      ))}
-                    </select>
+                      En trámite
+                    </button>
                   </div>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    placeholder="Ejemplo: AB123C o EN TRÁMITE"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                  />
+                </div>
 
-                  {/* DIFERENCIA CLAVE SOLICITADA POR EL USUARIO:
-                      EN EL SERVICIO, DONDE ESTABA LA HORA, VA LA FECHA DE VENCIMIENTO */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Fecha de Inicio *</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.fechaServicio || todayStr}
-                        onChange={(e) => {
-                          const newInicio = e.target.value;
-                          setFormData({
-                            ...formData,
-                            fechaServicio: newInicio,
-                            fechaVencimiento: getNextYearDateStr(newInicio),
-                          });
-                        }}
-                        required
-                        className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold text-zinc-900 outline-none focus:border-emerald-600 focus:bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase text-amber-900 mb-1 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Fecha de Vencimiento *</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.fechaVencimiento || nextYearStr}
-                        onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 bg-amber-50/70 border border-amber-300 rounded-xl text-sm font-black text-amber-950 outline-none focus:border-amber-600 focus:bg-white"
-                      />
-                    </div>
-                  </div>
+                {/* Color de la Moto (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Color de la Moto
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.color || ''}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    placeholder="Ejemplo: Negro Mate / Rojo Racing"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold outline-none focus:border-red-600 focus:bg-white"
+                  />
+                </div>
 
-                  {/* Control de Aceite */}
+                {/* Serie o Chasis (VIN) (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5">
+                    Serie o Chasis (VIN)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.chasis}
+                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                    placeholder="Ejemplo: 3SCBP123456789012"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
+                  />
+                </div>
+
+                {/* Kilometraje de Recepción (1 por fila) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1.5 flex items-center justify-between">
+                    <span>Kilometraje de Recepción (Odómetro) *</span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
+                    </span>
+                  </label>
                   <div className="relative">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold uppercase text-zinc-700">Control de Aceite</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.kilometraje}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => {
+                        const km = cleanNumberInput(e.target.value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          kilometraje: km,
+                        }));
+                      }}
+                      placeholder="Ejemplo: 0 km"
+                      className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-bold outline-none focus:border-red-600 focus:bg-white"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                      KM
+                    </span>
+                  </div>
+                </div>
+
+                {/* Resumen decorativo del vehículo */}
+                <div className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs space-y-1 text-zinc-600">
+                  <div className="font-bold text-zinc-800">Estado de Identificación:</div>
+                  <p className="text-[11px] text-zinc-500">
+                    Asegúrese de verificar que el Chasis (VIN) coincida con la plaqueta física de la motocicleta.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* COLUMNA 3: PASO 3 - SERVICIO, ACEITE, COBRO & INSPECCIÓN          */}
+            {/* ----------------------------------------------------------------- */}
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3.5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs flex items-center justify-center border border-emerald-200">
+                      3
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
+                      <p className="text-[11px] text-zinc-400">Trabajos, aceite y facturación</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Paso 3
+                  </span>
+                </div>
+
+                {/* ¿Qué se realizó? (Alistamiento PDI, Engrasado, Mantenimiento con bloqueo secuencial estricto) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      ¿Qué se realizó? *
+                    </label>
+                    {hasPdiDone && !hasEngrasadoDone && (
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        Paso 2 Obligatorio: Engrasado
+                      </span>
+                    )}
+                    {hasEngrasadoDone && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Paso 3 Obligatorio: Mantenimiento
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      {
+                        id: 'alistamiento_pdi' as ServiceActionType,
+                        label: 'Alistamiento PDI',
+                        stepBadge: 'Paso 1',
+                        isBlocked: isPdiBlocked,
+                        blockReason: 'Ya realizado',
+                      },
+                      {
+                        id: 'engrasado' as ServiceActionType,
+                        label: 'Engrasado',
+                        stepBadge: 'Paso 2',
+                        isBlocked: isEngrasadoBlocked,
+                        blockReason: 'Ya realizado',
+                      },
+                      {
+                        id: 'mantenimiento' as ServiceActionType,
+                        label: 'Mantenimiento',
+                        stepBadge: 'Paso 3',
+                        isBlocked: isMantenimientoBlocked,
+                        blockReason: 'Requiere Engrasado',
+                      },
+                    ].map((srv) => {
+                      const isSelected = formData.serviciosRealizados.includes(srv.id);
+
+                      if (srv.isBlocked) {
+                        return (
+                          <div
+                            key={srv.id}
+                            title={`Opción bloqueada: ${srv.blockReason}`}
+                            className="px-2 py-2 rounded-xl text-[11px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Lock className="w-3 h-3 text-zinc-400" />
+                              <span className="line-through opacity-70 truncate">{srv.label}</span>
+                            </div>
+                            <span className="text-[9px] font-semibold text-zinc-400">{srv.blockReason}</span>
+                          </div>
+                        );
+                      }
+
+                      const isMandatory =
+                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                        (hasEngrasadoDone && srv.id === 'mantenimiento');
+
+                      return (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => toggleServicio(srv.id)}
+                          className={`px-2 py-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          <span className="truncate">{srv.label}</span>
+                          {isMandatory ? (
+                            <span className={`text-[9px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                              {srv.stepBadge} Obligatorio
+                            </span>
+                          ) : (
+                            <span className={`text-[9px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                              {srv.stepBadge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Técnico Responsable */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Técnico Responsable *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTechModal(true)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Nuevo Técnico</span>
+                    </button>
+                  </div>
+                  <select
+                    value={formData.tecnicoResponsable}
+                    onChange={(e) => {
+                      const techName = e.target.value;
+                      const techObj = technicians.find((t) => t.name === techName);
+                      setFormData({
+                        ...formData,
+                        tecnicoResponsable: techName,
+                        tecnicoId: techObj?.id || '',
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    required
+                  >
+                    <option value="">
+                      {technicians.length === 0
+                        ? '⚠️ Sin técnicos en este taller (Cree uno con + Nuevo Técnico)'
+                        : 'Seleccione un técnico responsable...'}
+                    </option>
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} ({t.workshopName || 'Taller'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Fecha de Servicio *</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fechaServicio || todayStr}
+                      onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold text-zinc-900 outline-none focus:border-emerald-600 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Fecha de Vencimiento *</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fechaVencimiento || defaultVencimientoStr}
+                      onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-semibold text-zinc-900 outline-none focus:border-amber-600 focus:bg-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Aceite: 3 datos seguidos en una fila (Estado | Nivel | Tipo) */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Control de Aceite
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomOilInput(!showCustomOilInput)}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar Aceite</span>
+                    </button>
+                  </div>
+
+                  {showCustomOilInput && (
+                    <div className="flex gap-2 mb-2 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                      <input
+                        type="text"
+                        value={newCustomOil}
+                        onChange={(e) => setNewCustomOil(e.target.value)}
+                        placeholder="Nueva Viscosidad..."
+                        className="flex-1 px-2 py-1 text-xs border border-emerald-200 rounded outline-none focus:border-emerald-500"
+                      />
                       <button
                         type="button"
-                        onClick={() => setShowCustomOilInput(!showCustomOilInput)}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5"
+                        onClick={handleAddCustomOil}
+                        className="px-2 py-1 text-xs bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Agregar Aceite</span>
+                        Añadir
                       </button>
                     </div>
+                  )}
 
-                    {showCustomOilInput && (
-                      <div className="flex gap-2 mb-2 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                        <input
-                          type="text"
-                          value={newCustomOil}
-                          onChange={(e) => setNewCustomOil(e.target.value)}
-                          placeholder="Nueva Viscosidad..."
-                          className="flex-1 px-2 py-1 text-xs border border-emerald-200 rounded outline-none focus:border-emerald-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCustomOil}
-                          className="px-2 py-1 text-xs bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700"
-                        >
-                          Añadir
-                        </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Estado</label>
+                      <select
+                        value={formData.aceite}
+                        onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                      >
+                        <option value="con_aceite">Con Aceite</option>
+                        <option value="sin_aceite">Sin Aceite</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Tipo de Aceite</label>
+                      <select
+                        value={formData.nivelAceite || 'mineral'}
+                        onChange={(e) => setFormData({ ...formData, nivelAceite: e.target.value })}
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                      >
+                        <option value="mineral">Mineral</option>
+                        <option value="semisintetico">Semisintético</option>
+                        <option value="sintetico">Sintético</option>
+                        <option value="full_sintetico">Full Sintético</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-500 mb-1">Viscosidad / Grado</label>
+                      <select
+                        value={formData.tipoAceite || '10W-30'}
+                        onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
+                        className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
+                      >
+                        <option value="10W-30">10W-30</option>
+                        <option value="10W-40">10W-40</option>
+                        <option value="15W-40">15W-40</option>
+                        <option value="15W-50">15W-50</option>
+                        <option value="20W-40">20W-40</option>
+                        <option value="20W-50">20W-50</option>
+                        <option value="25W-50">25W-50</option>
+                        <option value="5W-30">5W-30</option>
+                        <option value="5W-40">5W-40</option>
+                        {customOilTypes.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                        <option value="Sin Tipo">N/A</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Si el cliente tiene Garantía Plus activa: Todos los servicios salen Pagados $0.00 */}
+                {garantiaPlusStatus.hasGarantiaPlus ? (
+                  <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl p-3.5 space-y-2.5 shadow-2xs animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4.5 h-4.5 text-amber-600" />
+                        <span className="text-xs font-black uppercase text-amber-900 tracking-wider">
+                          Garantía Plus - Cobertura 100%
+                        </span>
                       </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-500 mb-1">Estado</label>
-                        <select
-                          value={formData.aceite}
-                          onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
-                          className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
-                        >
-                          <option value="con_aceite">Con Aceite</option>
-                          <option value="sin_aceite">Sin Aceite</option>
-                        </select>
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-600 text-white uppercase shadow-2xs">
+                        ✓ Pagado ($0.00)
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-950 font-medium">
+                      Este cliente cuenta con <strong>Garantía Plus Vigente</strong> hasta el <strong>{garantiaPlusStatus.record?.fechaVencimiento}</strong>. Todos los mantenimientos o servicios que realice no generan cobro alguno.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="p-2 bg-white/90 rounded-lg border border-amber-200">
+                        <span className="block text-[10px] uppercase font-bold text-zinc-500">Valor Cobrado</span>
+                        <span className="text-sm font-mono font-black text-emerald-600">$0.00</span>
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-500 mb-1">Tipo de Aceite</label>
-                        <select
-                          value={formData.nivelAceite || 'semisintetico'}
-                          onChange={(e) => setFormData({ ...formData, nivelAceite: e.target.value })}
-                          className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
-                        >
-                          <option value="mineral">Mineral</option>
-                          <option value="semisintetico">Semisintético</option>
-                          <option value="sintetico">Sintético</option>
-                          <option value="full_sintetico">Full Sintético</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-500 mb-1">Viscosidad / Grado</label>
-                        <select
-                          value={formData.tipoAceite || '10W-40 Motul'}
-                          onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
-                          className="w-full px-2 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600 focus:bg-white"
-                        >
-                          <option value="10W-30">10W-30</option>
-                          <option value="10W-40 Motul">10W-40 Motul</option>
-                          <option value="15W-40">15W-40</option>
-                          <option value="15W-50">15W-50</option>
-                          <option value="20W-40">20W-40</option>
-                          <option value="20W-50">20W-50</option>
-                          {customOilTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="p-2 bg-white/90 rounded-lg border border-amber-200">
+                        <span className="block text-[10px] uppercase font-bold text-zinc-500">Estado Contable</span>
+                        <span className="text-xs font-black text-emerald-700">✓ 100% CUBIERTO</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Bloque de Cobro de la Garantía Plus */}
-                  <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200 space-y-2.5 shadow-2xs">
+                ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-xl flex items-center gap-2.5 text-xs text-blue-900 font-semibold shadow-2xs">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                    <div>
+                      <span className="font-bold block">Alistamiento PDI de Fábrica / Concesionario</span>
+                      <span className="text-[11px] text-blue-700 font-normal">
+                        Servicio oficial de cortesía sin cobro al cliente (Cubierto por Garantía PDI de Entrega).
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Bloque de Cobro: Valor, Método de Pago, Abono y Crédito */
+                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2.5 shadow-2xs">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[11px] font-black uppercase text-amber-900 mb-1">
-                          Valor Garantía Plus ($) *
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Valor Servicio ($) *
                         </label>
                         <input
                           type="number"
@@ -3130,34 +4351,34 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                             setFormData({
                               ...formData,
                               valorServicio: clean,
-                              saldoPendiente: String(Math.max(0, val - abonoVal)),
+                              saldoPendiente: Math.max(0, val - abonoVal),
                             });
                           }}
-                          placeholder="180.00"
-                          className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="0.00"
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
                           required
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-black uppercase text-amber-900 mb-1">
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
                           Método de Pago
                         </label>
                         <select
-                          value={formData.metodoPago}
+                          value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
                           onChange={(e) => {
-                            const newMetodo = e.target.value;
+                            const newMetodo = e.target.value as GarantiaPlusRecord['metodoPago'];
                             const isCred = newMetodo === 'Crédito';
                             setFormData({
                               ...formData,
                               metodoPago: newMetodo,
                               esCredito: isCred,
-                              abono: isCred ? '0' : formData.valorServicio,
-                              montoPagado: isCred ? '0' : formData.valorServicio,
-                              saldoPendiente: isCred ? String(formData.valorServicio) : '0',
+                              abono: isCred ? 0 : formData.valorServicio,
+                              montoPagado: isCred ? 0 : formData.valorServicio,
+                              saldoPendiente: isCred ? formData.valorServicio : 0,
                             });
                           }}
-                          className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                          className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                         >
                           <option value="Efectivo">Efectivo</option>
                           <option value="Transferencia">Transferencia</option>
@@ -3168,64 +4389,553 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       </div>
                     </div>
 
-                    {/* Si es transferencia: Comprobante */}
-                    {formData.metodoPago === 'Transferencia' && (
-                      <div className="p-2 bg-white/90 rounded-lg border border-amber-300 space-y-1.5">
-                        <label className="block text-[10px] font-black uppercase text-amber-900 flex items-center gap-1">
-                          <Upload className="w-3 h-3 text-amber-700" />
-                          <span>Subir Comprobante de Transferencia</span>
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const b64 = await compressImageBase64(file);
-                              if (b64) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  evidenciaTransferencia: b64,
-                                  comprobantePagoUrl: b64,
-                                }));
-                              }
-                            }
-                          }}
-                          className="w-full text-xs text-zinc-600 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200"
-                        />
+                    {/* Fila Dinámica: Abono vs Crédito con Tiempo en Meses */}
+                    {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                            Financiamiento Directo
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Monto a Crédito ($)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.valorServicio !== '' ? Number(formData.valorServicio).toFixed(2) : '0.00'}
+                              readOnly
+                              className="w-full px-3 py-1.5 bg-blue-50/60 border border-blue-300 rounded-xl text-sm font-mono font-bold text-blue-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Tiempo (Meses)
+                            </label>
+                            <select
+                              value={formData.mesesCredito || 3}
+                              onChange={(e) => setFormData({ ...formData, mesesCredito: parseInt(e.target.value) || 3 })}
+                              className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                              <option value={1}>1 Mes</option>
+                              <option value={2}>2 Meses</option>
+                              <option value={3}>3 Meses</option>
+                              <option value={6}>6 Meses</option>
+                              <option value={9}>9 Meses</option>
+                              <option value={12}>12 Meses</option>
+                              <option value={18}>18 Meses</option>
+                              <option value={24}>24 Meses</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+                          <span className="font-bold text-amber-900">Total Pendiente por Cobrar:</span>
+                          <span className="font-mono font-black text-amber-700 text-sm">
+                            ${Number(formData.valorServicio || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Si NO es crédito: Abono y Saldo Pendiente */
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-black uppercase text-emerald-900">
+                              Abono ($)
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  abono: formData.valorServicio,
+                                  montoPagado: formData.valorServicio,
+                                  saldoPendiente: 0,
+                                });
+                              }}
+                              className="text-[10px] text-emerald-700 underline font-semibold cursor-pointer"
+                            >
+                              Total
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formData.abono !== undefined ? formData.abono : formData.montoPagado}
+                            onFocus={selectOnFocus}
+                            onChange={(e) => {
+                              const clean = cleanNumberInput(e.target.value);
+                              const abonoVal = clean === '' ? 0 : parseFloat(clean);
+                              const valServ = Number(formData.valorServicio || 0);
+                              const pendiente = Math.max(0, valServ - abonoVal);
+                              setFormData({
+                                ...formData,
+                                abono: clean,
+                                montoPagado: clean,
+                                saldoPendiente: pendiente,
+                              });
+                            }}
+                            placeholder="0.00"
+                            className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-amber-900 mb-1">
+                            Saldo Pendiente ($)
+                          </label>
+                          <div
+                            className={`w-full px-3 py-1.5 rounded-xl border text-sm font-mono font-bold flex items-center justify-between ${
+                              Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))) > 0
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            }`}
+                          >
+                            <span>
+                              ${Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))).toFixed(2)}
+                            </span>
+                            {Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number((formData.abono ?? formData.montoPagado) || 0))) > 0 ? (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-sans">
+                                Pendiente
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-900 font-sans">
+                                Pagado
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    {/* Factura */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                        Número de Factura Oficial
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.numeroFactura || ''}
-                        onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
-                        placeholder="Ej: 001-002-0004567"
-                        className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-medium outline-none focus:border-amber-600"
-                      />
-                    </div>
+                    {/* Evidencia de Transferencia Bancaria (Solo visible si es Transferencia) */}
+                    {(formData.metodoPago === 'Transferencia' || (formData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-emerald-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                            Comprobante / Evidencia de Transferencia Bancaria
+                          </span>
+                          {formData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Comprobante cargado
+                            </span>
+                          )}
+                        </label>
+                        {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
+                          <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={formData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-14 h-14 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={formData.evidenciaTransferencia}
+                                alt="Comprobante de transferencia"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante bancario registrado</p>
+                              <p className="text-[10px] text-zinc-500">Clic en la imagen para abrir en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-emerald-50/50">
+                            <Camera className="w-5 h-5 text-emerald-600 mb-1" />
+                            <span className="text-xs font-bold text-emerald-900">Subir foto o captura del comprobante</span>
+                            <span className="text-[10px] text-zinc-500">JPG, PNG o foto del comprobante de transferencia</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                    {/* Observaciones */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                        Observaciones / Términos del Contrato
+                {/* Factura y Ticket (2 datos seguidos en una fila) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase text-zinc-700">
+                        N° Factura
                       </label>
-                      <textarea
-                        rows={2}
-                        value={formData.observaciones}
-                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                        className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-xl text-xs font-medium outline-none focus:border-amber-600 resize-none"
-                      />
+                      {clientHistoricalRecords.length > 0 && formData.numeroFactura && (
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                          Previo / Editable
+                        </span>
+                      )}
                     </div>
+                    <input
+                      type="text"
+                      value={formData.numeroFactura}
+                      onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
+                      placeholder="001-002-..."
+                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase text-zinc-700">
+                        N° Ticket Físico
+                      </label>
+                      {clientHistoricalRecords.length > 0 && formData.numeroTicket && (
+                        <span className="text-[10px] text-blue-600 font-bold" title="Heredado del alistamiento previo, editable">
+                          Previo / Editable
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={formData.numeroTicket}
+                      onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
+                      placeholder="TCK-2026-..."
+                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                    />
                   </div>
                 </div>
 
-                {/* Botón de envío */}
+                {/* Próximo Mantenimiento Sugerido */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Próximo Mantenimiento Sugerido
+                    </label>
+                    <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => {
+                        const clean = cleanNumberInput(e.target.value);
+                        setFormData({
+                          ...formData,
+                          proximoMantenimientoKm: clean,
+                        });
+                      }}
+                      placeholder="Ej: 1000"
+                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-bold outline-none focus:border-emerald-600 focus:bg-white font-mono"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                      KM
+                    </span>
+                  </div>
+                </div>
+
+                {/* Observaciones */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Observaciones / Novedades
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                    placeholder="Detalles sobre entrega, torque de pernos, novedades..."
+                    className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-medium outline-none focus:border-emerald-600 focus:bg-white resize-none"
+                  />
+                </div>
+
+                {/* Inspección Visual (Fotos reales de Evidencia de Entrega) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Inspección Visual (Fotos de Entrega)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Subir Fotos</span>
+                    </button>
+                  </div>
+
+                  {(formData.fotos || []).filter(isValidMediaUrl).length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {(formData.fotos || []).filter(isValidMediaUrl).map((fUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="relative aspect-video rounded-lg overflow-hidden border border-zinc-200 group bg-black/5"
+                          >
+                            <img src={fUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(idx)}
+                              className="absolute top-1 right-1 bg-black/70 hover:bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                              title="Eliminar foto"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-1.5 border border-dashed border-emerald-400 hover:bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar más fotos desde este dispositivo</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border border-dashed border-zinc-300 hover:border-emerald-500 rounded-xl p-3 text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-emerald-50/50"
+                    >
+                      <Camera className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+                      <span className="text-xs text-zinc-700 font-bold block">
+                        Subir fotos desde este dispositivo o computadora
+                      </span>
+                      <span className="text-[10px] text-zinc-400 block mt-0.5">
+                        PNG, JPG, JPEG, WEBP o cualquier formato
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ===================================================================== */}
+          {/* BOTONES INFERIORES EN ESCRITORIO: SOLO CANCELAR O GUARDAR             */}
+          {/* ===================================================================== */}
+          <div className="hidden lg:flex items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setValidationAlert(null);
+                setEffectiveViewMode('list');
+              }}
+              className="px-6 py-2.5 border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-xl text-sm font-bold transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            >
+              Guardar
+            </button>
+          </div>
+
+          {/* ===================================================================== */}
+          {/* LAYOUT MÓVIL: WIZARD SECUENCIAL EN 3 PASOS CON TABS                   */}
+          {/* ===================================================================== */}
+          <div className="block lg:hidden space-y-4">
+            {/* Tabs de Navegación Móvil */}
+            <div className="grid grid-cols-3 gap-1 bg-zinc-100 p-1 rounded-xl">
+              {[
+                { s: 1, label: '1. Cliente' },
+                { s: 2, label: '2. Moto' },
+                { s: 3, label: '3. Servicio' },
+              ].map((tab) => (
+                <button
+                  key={tab.s}
+                  type="button"
+                  onClick={() => setMobileStep(tab.s as 1 | 2 | 3)}
+                  className={`py-2 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    mobileStep === tab.s
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Contenido Paso 1 Móvil */}
+            {mobileStep === 1 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-black text-zinc-900">Paso 1: Datos del Cliente</h3>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">1 de 3</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveClientToDatabase}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    title="Guardar este cliente en la base de datos para futuras consultas"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Guardar Cliente</span>
+                  </button>
+                </div>
+
+                <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-200 space-y-1.5">
+                  <label className="block text-xs font-black uppercase text-blue-900">
+                    Cédula o RUC *
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={formData.cedulaRuc}
+                      onChange={(e) => setFormData({ ...formData, cedulaRuc: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleConsultar();
+                        }
+                      }}
+                      placeholder="Ej: 2350999252 o RUC"
+                      className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleConsultar()}
+                      disabled={isSearching || !formData.cedulaRuc.trim()}
+                      className="px-3.5 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                      title="Consultar número de Cédula o RUC"
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>{isSearching ? '...' : 'Consultar'}</span>
+                    </button>
+                  </div>
+                  {searchFeedback && (
+                    <p
+                      className={`text-xs font-medium leading-tight p-2 rounded-lg border ${
+                        searchFeedback.startsWith('✓')
+                          ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+                          : 'text-amber-800 bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      {searchFeedback}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Nombres *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nombres}
+                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                    placeholder="Ej: Felix Rafael"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Apellidos *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.apellidos}
+                    onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                    placeholder="Ej: Gracia Guato"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Celular Principal *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.celular1}
+                      onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium"
+                      placeholder="0982852456"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                      Celular Opcional
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.celular2}
+                      onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-medium"
+                      placeholder="0991234567"
+                    />
+                  </div>
+                </div>
+
+                {effectiveIsMatriz && workshops && workshops.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                      <span>Sede de Atención / Taller *</span>
+                      <span className="text-[10px] text-blue-600 font-semibold normal-case">Red Matriz</span>
+                    </label>
+                    <select
+                      value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
+                      onChange={(e) => {
+                        const chosenId = e.target.value;
+                        const chosenWs = workshops.find((w) => w.id === chosenId);
+                        setFormData({
+                          ...formData,
+                          sedeId: chosenId,
+                          sede: chosenWs ? chosenWs.name : formData.sede,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
+                    >
+                      {workshops.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Origen / Almacén *
+                  </label>
+                  <select
+                    value={formData.origen}
+                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium"
+                  >
+                    {origins.map((orig) => (
+                      <option key={orig} value={orig}>
+                        {orig}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="pt-2 flex gap-2">
                   <button
                     type="button"
@@ -3233,23 +4943,636 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       setValidationAlert(null);
                       setEffectiveViewMode('list');
                     }}
-                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-zinc-50"
+                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(2)}
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Siguiente</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Paso 2 Móvil */}
+            {mobileStep === 2 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <h3 className="text-sm font-black text-zinc-900">Paso 2: Datos de la Moto</h3>
+                  <span className="text-[10px] font-bold text-red-600">2 de 3</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Modelo y Marca *
+                  </label>
+                  <input
+                    type="text"
+                    list="registered-brands-datalist"
+                    value={formData.modeloMarca}
+                    onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Tundra r200"
+                  />
+                </div>
+
+                {/* Placa Vehicular (Bloque independiente) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Placa
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                      className="text-[10px] text-zinc-500 hover:text-zinc-800 underline cursor-pointer"
+                    >
+                      En trámite
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                    placeholder="Ej: KX284T"
+                  />
+                </div>
+
+                {/* Color de la Moto (Bloque independiente) */}
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Color de la Moto
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.color || ''}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                    placeholder="Ej: Negro / Rojo / Azul / Blanco"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Serie o Chasis (VIN)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.chasis}
+                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
+                    placeholder="LBBP57008..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center justify-between">
+                    <span>Kilometraje de Recepción (Odómetro) *</span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                      {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.kilometraje}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const km = cleanNumberInput(e.target.value);
+                      setFormData((prev) => ({
+                        ...prev,
+                        kilometraje: km,
+                      }));
+                    }}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-bold"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(1)}
+                    className="flex-1 py-2.5 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
+                  >
+                    Anterior
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileStep(3)}
+                    className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>Siguiente</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Paso 3 Móvil */}
+            {mobileStep === 3 && (
+              <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                  <h3 className="text-sm font-black text-zinc-900">Paso 3: Póliza & Cobro</h3>
+                  <span className="text-[10px] font-bold text-emerald-600">3 de 3</span>
+                </div>
+
+                {/* ¿Qué se realizó? Móvil (Flujo Secuencial) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      ¿Qué se realizó? *
+                    </label>
+                    {hasPdiDone && !hasEngrasadoDone && (
+                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-200">
+                        Paso 2: Engrasado
+                      </span>
+                    )}
+                    {hasEngrasadoDone && (
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
+                        Paso 3: Mantenimiento
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      {
+                        id: 'alistamiento_pdi' as ServiceActionType,
+                        label: 'Alistamiento PDI',
+                        stepBadge: 'Paso 1',
+                        isBlocked: isPdiBlocked,
+                        blockReason: 'Ya realizado',
+                      },
+                      {
+                        id: 'engrasado' as ServiceActionType,
+                        label: 'Engrasado',
+                        stepBadge: 'Paso 2',
+                        isBlocked: isEngrasadoBlocked,
+                        blockReason: 'Ya realizado',
+                      },
+                      {
+                        id: 'mantenimiento' as ServiceActionType,
+                        label: 'Mantenimiento',
+                        stepBadge: 'Paso 3',
+                        isBlocked: isMantenimientoBlocked,
+                        blockReason: 'Requiere Engrasado',
+                      },
+                    ].map((srv) => {
+                      const isSelected = formData.serviciosRealizados.includes(srv.id);
+
+                      if (srv.isBlocked) {
+                        return (
+                          <div
+                            key={srv.id}
+                            title={`Opción bloqueada: ${srv.blockReason}`}
+                            className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
+                          >
+                            <div className="flex items-center gap-1">
+                              <Lock className="w-3 h-3 text-zinc-400" />
+                              <span className="line-through opacity-70 truncate">{srv.label}</span>
+                            </div>
+                            <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
+                          </div>
+                        );
+                      }
+
+                      const isMandatory =
+                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                        (hasEngrasadoDone && srv.id === 'mantenimiento');
+
+                      return (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => toggleServicio(srv.id)}
+                          className={`px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          <span className="truncate">{srv.label}</span>
+                          {isMandatory ? (
+                            <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                              {srv.stepBadge} Obligatorio
+                            </span>
+                          ) : (
+                            <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                              {srv.stepBadge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Técnico Responsable *
+                  </label>
+                  <select
+                    value={formData.tecnicoResponsable}
+                    onChange={(e) => {
+                      const techName = e.target.value;
+                      const techObj = technicians.find((t) => t.name === techName);
+                      setFormData({
+                        ...formData,
+                        tecnicoResponsable: techName,
+                        tecnicoId: techObj?.id || '',
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold"
+                  >
+                    <option value="">
+                      {technicians.length === 0
+                        ? '⚠️ Sin técnicos registrados'
+                        : 'Seleccione un técnico responsable...'}
+                    </option>
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fecha y Hora de Servicio (Debajo de Técnico Responsable) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      <span>Fecha *</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fechaServicio || todayStr}
+                      onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-600" />
+                      <span>Hora *</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.horaServicio || getCurrentTimeStr()}
+                      onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                      required
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                {garantiaPlusStatus.hasGarantiaPlus ? (
+                  <div className="p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl space-y-1.5 shadow-2xs animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span className="text-xs font-black uppercase text-amber-900">Garantía Plus Activa</span>
+                      </div>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase">
+                        ✓ Pagado ($0.00)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-950 font-medium">
+                      Mantenimientos y servicios cubiertos al 100% sin costo para el cliente (Vence: {garantiaPlusStatus.record?.fechaVencimiento}).
+                    </p>
+                  </div>
+                ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                    <span className="text-xs text-blue-900 font-bold">
+                      Alistamiento PDI es un servicio oficial previo a la venta. No genera cobro directo al cliente ($0.00).
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Valor ($) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.valorServicio}
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const clean = cleanNumberInput(e.target.value);
+                            const val = clean === '' ? 0 : parseFloat(clean);
+                            setFormData((prev) => ({
+                              ...prev,
+                              valorServicio: clean,
+                              abono: prev.esCredito ? 0 : (Number(prev.abono ?? 0) > val ? clean : prev.abono),
+                            }));
+                          }}
+                          placeholder="0.00"
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                          Método
+                        </label>
+                        <select
+                          value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
+                          onChange={(e) => {
+                            const newMetodo = e.target.value as GarantiaPlusRecord['metodoPago'];
+                            const isCred = newMetodo === 'Crédito';
+                            setFormData((prev) => ({
+                              ...prev,
+                              metodoPago: newMetodo,
+                              esCredito: isCred,
+                              abono: isCred ? 0 : prev.valorServicio,
+                              montoPagado: isCred ? 0 : prev.valorServicio,
+                              saldoPendiente: isCred ? prev.valorServicio : 0,
+                            }));
+                          }}
+                          className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                          <option value="Crédito">Crédito</option>
+                          <option value="Mixto">Mixto</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Fila Dinámica: Abono vs Crédito con Tiempo en Meses (Móvil) */}
+                    {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
+                      <div className="pt-2 space-y-2 border-t border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                            Crédito Activo
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 font-bold">Plazo:</span>
+                            <select
+                              value={formData.mesesCredito || 3}
+                              onChange={(e) =>
+                                setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) || 3 }))
+                              }
+                              className="h-7 px-2 bg-white border border-blue-300 rounded-lg text-xs font-bold text-blue-900 outline-none"
+                            >
+                              <option value={1}>1 mes</option>
+                              <option value={2}>2 meses</option>
+                              <option value={3}>3 meses</option>
+                              <option value={6}>6 meses</option>
+                              <option value={9}>9 meses</option>
+                              <option value={12}>12 meses</option>
+                              <option value={18}>18 meses</option>
+                              <option value={24}>24 meses</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
+                              Monto a Crédito ($)
+                            </label>
+                            <div className="h-8 px-2.5 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-between text-blue-900 text-xs font-black">
+                              <span>Total</span>
+                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-amber-800 mb-1">
+                              Pendiente ($)
+                            </label>
+                            <div className="h-8 px-2.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
+                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
+                              <span className="text-[9px] text-amber-700">Crédito</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                            Abono ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={Number(formData.valorServicio || 0)}
+                            value={formData.abono ?? ''}
+                            onFocus={selectOnFocus}
+                            onChange={(e) => {
+                              const clean = cleanNumberInput(e.target.value);
+                              const val = clean === '' ? 0 : parseFloat(clean);
+                              setFormData((prev) => ({
+                                ...prev,
+                                abono: clean,
+                                montoPagado: clean,
+                                saldoPendiente: Math.max(0, Number(prev.valorServicio || 0) - val),
+                              }));
+                            }}
+                            placeholder="0.00"
+                            className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-black uppercase text-zinc-500 mb-1">
+                            Pendiente por Cobrar
+                          </label>
+                          <div className="h-8 px-2.5 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
+                            <span
+                              className={
+                                Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)) > 0
+                                  ? 'text-amber-600'
+                                  : 'text-emerald-600'
+                              }
+                            >
+                              ${Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Evidencia de Transferencia Bancaria Móvil (Solo visible si es Transferencia) */}
+                    {(formData.metodoPago === 'Transferencia' || (formData.metodoPago as string)?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="pt-2 border-t border-emerald-200 space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-emerald-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                            Comprobante de Transferencia
+                          </span>
+                          {formData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Cargado
+                            </span>
+                          )}
+                        </label>
+                        {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
+                          <div className="relative rounded-xl border border-emerald-300 bg-white p-2 flex items-center gap-2">
+                            <a
+                              href={formData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-12 h-12 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block"
+                            >
+                              <img
+                                src={formData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante registrado</p>
+                              <p className="text-[10px] text-zinc-500">Clic para ver</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded-lg cursor-pointer"
+                              title="Eliminar comprobante"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-emerald-50/50">
+                            <Camera className="w-5 h-5 text-emerald-600 mb-1" />
+                            <span className="text-xs font-bold text-emerald-900">Subir comprobante de transferencia</span>
+                            <span className="text-[10px] text-zinc-500">Foto o captura bancaria</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Fotos de Entrega
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs font-bold text-emerald-600 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>+ Subir Foto</span>
+                    </button>
+                  </div>
+                  {(formData.fotos || []).filter(isValidMediaUrl).length > 0 && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(formData.fotos || []).filter(isValidMediaUrl).map((url, i) => (
+                        <div key={i} className="relative aspect-video rounded-lg overflow-hidden border">
+                          <img src={url} alt="Foto" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(i)}
+                            className="absolute top-0.5 right-0.5 bg-black/70 text-white p-0.5 rounded"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Próximo Mantenimiento Sugerido */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase text-zinc-700">
+                      Próximo Mantenimiento Sugerido
+                    </label>
+                    <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.proximoMantenimientoKm || ''}
+                      onFocus={selectOnFocus}
+                      onChange={(e) => {
+                        const clean = cleanNumberInput(e.target.value);
+                        setFormData({
+                          ...formData,
+                          proximoMantenimientoKm: clean,
+                        });
+                      }}
+                      placeholder="Ej: 1000"
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-blue-600 focus:bg-white"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                      KM
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
+                    Observaciones
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                    placeholder="Notas mecánicas..."
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium resize-none"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValidationAlert(null);
+                      setEffectiveViewMode('list');
+                    }}
+                    className="py-2.5 px-4 border border-zinc-300 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Guardar Registro de Garantía Plus</span>
+                    <span>Guardar</span>
                   </button>
                 </div>
               </div>
-            </div>
-          </form>
+            )}
+          </div>
+        </form>
         </div>
       )}
+
+
 
       {/* ========================================================================= */}
       {/* 4. MODAL: AGREGAR NUEVO TÉCNICO AL TALLER                                 */}
@@ -3269,7 +5592,9 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
             <form onSubmit={handleSaveNewTechnician} className="space-y-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">Nombre Completo *</label>
+                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
+                  Nombre Completo *
+                </label>
                 <input
                   type="text"
                   value={newTechData.name}
@@ -3281,18 +5606,22 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">Especialidad</label>
+                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
+                  Especialidad
+                </label>
                 <input
                   type="text"
                   value={newTechData.specialty}
                   onChange={(e) => setNewTechData({ ...newTechData, specialty: e.target.value })}
-                  placeholder="Ej: Mecánica Rápida & Garantías"
+                  placeholder="Ej: Mecánica Rápida & Mantenimiento"
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl outline-none focus:border-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">Teléfono / Celular</label>
+                <label className="block text-[11px] font-bold uppercase text-zinc-600 mb-1">
+                  Teléfono / Celular
+                </label>
                 <input
                   type="text"
                   value={newTechData.phone}
@@ -3324,7 +5653,6 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
       {/* ========================================================================= */}
       {/* 5. MODAL: AGREGAR NUEVO ORIGEN / ALMACÉN                                   */}
-      {/* ========================================================================= */}
       {showAddOriginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in">
@@ -3379,13 +5707,16 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       {abonoModalRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 border border-zinc-200 animate-slide-in max-h-[90vh] overflow-y-auto">
+            {/* Cabecera */}
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <DollarSign className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-zinc-900">Registrar Abono / Pago</h3>
+                  <h3 className="text-sm font-black text-zinc-900">
+                    Registrar Abono / Pago
+                  </h3>
                   <p className="text-[11px] text-zinc-500 font-medium">
                     {abonoModalRecord.nombres} {abonoModalRecord.apellidos} • {abonoModalRecord.placa || abonoModalRecord.modeloMarca}
                   </p>
@@ -3400,74 +5731,407 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveAbono} className="space-y-3.5 text-xs">
-              <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-1.5">
-                <div className="flex justify-between text-zinc-600">
-                  <span>Valor de la Póliza:</span>
-                  <span className="font-bold font-mono text-zinc-900">${(Number(abonoModalRecord.valorServicio) || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-emerald-700">
-                  <span>Abonado Previamente:</span>
-                  <span className="font-bold font-mono">
-                    ${(abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0)).toFixed(2)}
+            {/* Si el cliente envió una solicitud de abono por transferencia */}
+            {abonoModalRecord.solicitudAbonoPendiente?.estado === 'pendiente' && (
+              <div className="p-4 bg-gradient-to-br from-purple-50 via-indigo-50/40 to-white rounded-2xl border-2 border-purple-300 shadow-md space-y-3">
+                <div className="flex items-center justify-between border-b border-purple-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold">
+                      <Clock className="w-4 h-4 animate-spin" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-purple-950 uppercase tracking-wide">
+                        Abono Enviado por el Cliente
+                      </h4>
+                      <p className="text-[10px] text-purple-700 font-medium">
+                        Transferencia bancaria con comprobante
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] bg-purple-200 text-purple-900 font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+                    Pendiente
                   </span>
                 </div>
-                <div className="flex justify-between text-rose-600 border-t border-zinc-200 pt-1 font-bold">
-                  <span>Saldo Pendiente:</span>
-                  <span className="font-mono">
-                    ${(abonoModalRecord.saldoPendiente !== undefined ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, (Number(abonoModalRecord.valorServicio) || 0) - (Number(abonoModalRecord.abono ?? abonoModalRecord.montoPagado) || 0))).toFixed(2)}
-                  </span>
+
+                {/* Datos del abono */}
+                <div className="grid grid-cols-2 gap-2 text-[11px] bg-white/95 p-3 rounded-xl border border-purple-200/80">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Monto Transferido:</span>
+                    <span className="font-mono text-base font-black text-purple-900">
+                      ${Number(abonoModalRecord.solicitudAbonoPendiente.monto).toFixed(2)} <span className="text-xs font-normal text-zinc-500">USD</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Fecha / Hora:</span>
+                    <span className="text-zinc-800 font-medium">
+                      {abonoModalRecord.solicitudAbonoPendiente.fechaSolicitud
+                        ? new Date(abonoModalRecord.solicitudAbonoPendiente.fechaSolicitud).toLocaleString('es-EC')
+                        : (abonoModalRecord.solicitudAbonoPendiente.fecha || 'Reciente')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Banco Origen:</span>
+                    <span className="text-zinc-800 font-medium">
+                      {abonoModalRecord.solicitudAbonoPendiente.bancoOrigen || 'No especificado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 block uppercase font-bold">Nº Comprobante / Ref:</span>
+                    <span className="font-mono text-zinc-800 font-semibold">
+                      {abonoModalRecord.solicitudAbonoPendiente.numeroComprobante || 'S/N'}
+                    </span>
+                  </div>
+                  {abonoModalRecord.solicitudAbonoPendiente.observacionesCliente && (
+                    <div className="col-span-2 pt-1 border-t border-purple-100">
+                      <span className="text-[10px] text-zinc-500 block uppercase font-bold">Nota del Cliente:</span>
+                      <span className="text-zinc-700 italic">"{abonoModalRecord.solicitudAbonoPendiente.observacionesCliente}"</span>
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Monto a Abonar ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={abonoFormData.montoAbono}
-                  onChange={(e) => setAbonoFormData({ ...abonoFormData, montoAbono: e.target.value })}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-base font-bold font-mono text-zinc-900 outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
-                  autoFocus
-                />
-              </div>
+                {/* Evidencia Fotográfica / Captura */}
+                {abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl && isValidMediaUrl(abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl) && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-zinc-600 block">Comprobante de Transferencia:</span>
+                    <a
+                      href={abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block relative rounded-xl overflow-hidden border border-purple-200 group max-h-48 bg-zinc-950 flex items-center justify-center cursor-pointer"
+                    >
+                      <img
+                        src={abonoModalRecord.solicitudAbonoPendiente.comprobanteUrl}
+                        alt="Comprobante Transferencia"
+                        className="w-full max-h-48 object-contain group-hover:scale-105 transition"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1.5">
+                        <Eye className="w-4 h-4" />
+                        <span>Clic para ver comprobante completo</span>
+                      </div>
+                    </a>
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Método de Pago</label>
-                <select
-                  value={abonoFormData.metodoPago}
-                  onChange={(e) => setAbonoFormData({ ...abonoFormData, metodoPago: e.target.value })}
-                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-emerald-600"
-                >
-                  <option value="Efectivo">Efectivo</option>
-                  <option value="Transferencia">Transferencia Bancaria</option>
-                  <option value="Tarjeta">Tarjeta Débito/Crédito</option>
-                  <option value="Crédito">Crédito Directo</option>
-                </select>
-              </div>
+                {/* Sección de Rechazo o Botones de Acción */}
+                {rejectingAbono ? (
+                  <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl space-y-2 animate-fade-in">
+                    <label className="text-[11px] font-bold text-rose-900 block">
+                      Indica la razón del rechazo del abono (se mostrará al cliente):
+                    </label>
+                    <input
+                      type="text"
+                      value={motivoRechazoAbono}
+                      onChange={(e) => setMotivoRechazoAbono(e.target.value)}
+                      placeholder="Ej. Valor no se refleja en la cuenta de StarMotos, imagen no legible..."
+                      className="w-full px-3 py-2 bg-white border border-rose-300 rounded-lg text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      autoFocus
+                    />
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleNegarAbonoCliente}
+                        className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer"
+                      >
+                        Confirmar Negación
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRejectingAbono(false)}
+                        className="px-3 py-1.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 font-semibold text-xs rounded-lg transition cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAceptarAbonoCliente}
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Aceptar Abono (${Number(abonoModalRecord.solicitudAbonoPendiente.monto).toFixed(2)})</span>
+                    </button>
 
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAbonoModalRecord(null)}
-                  className="flex-1 py-2.5 border border-zinc-300 rounded-xl font-bold text-zinc-700 cursor-pointer hover:bg-zinc-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Guardar Abono</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectingAbono(true)}
+                      className="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Negar Abono</span>
+                    </button>
+                  </div>
+                )}
               </div>
-            </form>
+            )}
+
+            {/* Resumen Financiero del Servicio */}
+            {(() => {
+              const valServ = Number(abonoModalRecord.valorServicio) || 0;
+              const prevPagado = abonoModalRecord.abono !== undefined ? Number(abonoModalRecord.abono) : (Number(abonoModalRecord.montoPagado) || 0);
+              const saldoActual = abonoModalRecord.saldoPendiente !== undefined ? Number(abonoModalRecord.saldoPendiente) : Math.max(0, valServ - prevPagado);
+              const inputVal = parseFloat(abonoFormData.montoAbono) || 0;
+              
+              // Si es modo suma, el total pagado es prevPagado + inputVal; sino, es inputVal directo
+              const nuevoTotalPagado = abonoFormData.esSuma
+                ? Math.min(valServ, prevPagado + inputVal)
+                : Math.min(valServ, inputVal);
+              const nuevoSaldo = Math.max(0, valServ - nuevoTotalPagado);
+
+              return (
+                <div className="space-y-3 text-xs">
+                  <div className="grid grid-cols-3 gap-2 p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center font-mono">
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Valor Total</span>
+                      <span className="text-sm font-black text-zinc-900">${valServ.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Cobrado Previo</span>
+                      <span className="text-sm font-black text-emerald-700">${prevPagado.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-500 uppercase font-sans font-bold">Saldo Actual</span>
+                      <span className={`text-sm font-black ${saldoActual > 0.01 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        ${saldoActual.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Selector de Modo: Sumar Abono (Recomendado) vs Ajustar Total Acumulado */}
+                  <div className="flex items-center justify-between p-2 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs">
+                    <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                      {abonoFormData.esSuma ? 'Modo: Sumar nuevo abono a lo ya cobrado' : 'Modo: Corregir total acumulado'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAbonoFormData((prev) => ({
+                        ...prev,
+                        esSuma: !prev.esSuma,
+                        montoAbono: prev.esSuma ? String(nuevoTotalPagado) : (saldoActual > 0 ? String(saldoActual) : ''),
+                      }))}
+                      className="text-[10px] text-emerald-800 underline font-semibold hover:text-emerald-950 cursor-pointer"
+                    >
+                      {abonoFormData.esSuma ? 'Editar total directo' : 'Volver a modo suma'}
+                    </button>
+                  </div>
+
+                  {/* Formulario de Abono */}
+                  <form onSubmit={handleSaveAbono} className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-black uppercase text-zinc-700">
+                          {abonoFormData.esSuma ? 'Monto a abonar hoy ($) *' : 'Total acumulado cobrado ($) *'}
+                        </label>
+                        {saldoActual > 0.01 && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAbonoFormData((prev) => ({
+                                  ...prev,
+                                  esSuma: true,
+                                  montoAbono: String(saldoActual),
+                                }));
+                              }}
+                              className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold hover:bg-emerald-200 cursor-pointer"
+                            >
+                              Liquidar Saldo (${saldoActual.toFixed(2)})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAbonoFormData((prev) => ({
+                                  ...prev,
+                                  esSuma: true,
+                                  montoAbono: String((saldoActual / 2).toFixed(2)),
+                                }));
+                              }}
+                              className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-bold hover:bg-blue-200 cursor-pointer"
+                            >
+                              50% (${(saldoActual / 2).toFixed(2)})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <DollarSign className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={valServ > 0 ? valServ * 1.5 : 99999}
+                          value={abonoFormData.montoAbono}
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const val = cleanNumberInput(e.target.value);
+                            setAbonoFormData((prev) => ({ ...prev, montoAbono: val }));
+                          }}
+                          placeholder="0.00"
+                          required
+                          className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-300 rounded-xl font-mono text-base font-bold text-zinc-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                        />
+                      </div>
+
+                      {/* Desglose Contable en Tiempo Real */}
+                      <div className="mt-2 p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1 font-mono text-[11px]">
+                        <div className="flex items-center justify-between text-zinc-600 font-sans">
+                          <span>Ya cobrado previamente:</span>
+                          <span className="font-mono font-bold text-zinc-800">${prevPagado.toFixed(2)}</span>
+                        </div>
+                        {abonoFormData.esSuma && inputVal > 0 && (
+                          <div className="flex items-center justify-between text-emerald-700 font-sans">
+                            <span className="flex items-center gap-1 font-bold">
+                              <Plus className="w-3 h-3" /> Este nuevo abono a sumar:
+                            </span>
+                            <span className="font-mono font-black text-emerald-800">+${inputVal.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="border-t border-zinc-200 pt-1 flex items-center justify-between font-bold">
+                          <span className="font-sans text-zinc-800">Nuevo Total Cobrado:</span>
+                          <span className="text-emerald-700 font-black text-xs">${nuevoTotalPagado.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="font-sans text-zinc-800">Saldo Pendiente Restante:</span>
+                          <span className={`font-black text-xs ${nuevoSaldo <= 0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            ${nuevoSaldo.toFixed(2)} {nuevoSaldo <= 0.01 ? '(¡100% Liquidado!)' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Método de Pago */}
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-zinc-700 mb-1">
+                        Método / Tipo de Pago *
+                      </label>
+                      <select
+                        value={abonoFormData.metodoPago}
+                        onChange={(e) => {
+                          const met = e.target.value as GarantiaPlusRecord['metodoPago'];
+                          setAbonoFormData((prev) => ({ ...prev, metodoPago: met }));
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 cursor-pointer"
+                      >
+                        <option value="Efectivo">💵 Efectivo</option>
+                        <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                        <option value="Tarjeta">💳 Tarjeta Débito / Crédito</option>
+                        <option value="Crédito">📋 Crédito Directo</option>
+                        <option value="Mixto">🔄 Mixto</option>
+                      </select>
+                    </div>
+
+                    {/* Subida de Evidencia Fotográfica (SOLO SI ES TRANSFERENCIA) */}
+                    {(abonoFormData.metodoPago === 'Transferencia' || abonoFormData.metodoPago?.toLowerCase?.().includes('transferencia')) && (
+                      <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-blue-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-blue-700" />
+                            Comprobante / Evidencia de Transferencia *
+                          </span>
+                          {abonoFormData.evidenciaTransferencia && (
+                            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.2 rounded">
+                              ✓ Foto cargada
+                            </span>
+                          )}
+                        </label>
+
+                        {abonoFormData.evidenciaTransferencia && isValidMediaUrl(abonoFormData.evidenciaTransferencia) ? (
+                          <div className="relative rounded-xl border border-blue-300 bg-white p-2 flex items-center gap-3">
+                            <a
+                              href={abonoFormData.evidenciaTransferencia}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-16 h-16 rounded-lg overflow-hidden border border-zinc-200 shrink-0 block relative"
+                            >
+                              <img
+                                src={abonoFormData.evidenciaTransferencia}
+                                alt="Comprobante"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-zinc-900 truncate">Comprobante guardado</p>
+                              <p className="text-[10px] text-zinc-500">Clic en la imagen para ver en tamaño completo</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setAbonoFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              title="Cambiar o eliminar imagen"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-xl cursor-pointer transition-all hover:bg-blue-50/50">
+                            <Camera className="w-6 h-6 text-blue-600 mb-1" />
+                            <span className="text-xs font-bold text-blue-950">Subir foto o captura del comprobante</span>
+                            <span className="text-[10px] text-zinc-500">JPG, PNG o foto desde el móvil</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const compressed = await compressImageBase64(file, 1000, 0.7);
+                                  setAbonoFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+
+                    {/* N° Factura / Ticket Opcional */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                        N° Factura o Comprobante (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={abonoFormData.numeroFactura}
+                        onChange={(e) => setAbonoFormData((prev) => ({ ...prev, numeroFactura: e.target.value }))}
+                        placeholder="Ej: 001-002-0004523"
+                        className="w-full px-3 py-1.5 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-emerald-600"
+                      />
+                    </div>
+
+                    {/* Botones de Acción */}
+                    <div className="pt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAbonoModalRecord(null)}
+                        className="flex-1 py-2.5 border border-zinc-300 rounded-xl font-bold text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Guardar Abono</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
+
+      {/* Lista de sugerencias de marcas registradas */}
+      <datalist id="registered-brands-datalist">
+        {registeredBrands.map((b) => (
+          <option key={b} value={b} />
+        ))}
+      </datalist>
     </div>
   );
 };

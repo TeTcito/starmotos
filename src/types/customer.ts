@@ -945,3 +945,29 @@ export interface GarantiaPlusRecord {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type GarantiaPlusFormData = Omit<
+  GarantiaPlusRecord,
+  | 'kilometraje'
+  | 'valorServicio'
+  | 'montoPagado'
+  | 'abono'
+  | 'saldoPendiente'
+  | 'proximoMantenimientoKm'
+  | 'year'
+  | 'estado'
+  | 'numeroFactura'
+  | 'fotos'
+> & {
+  kilometraje: number | string;
+  valorServicio: number | string;
+  montoPagado: number | string;
+  abono?: number | string;
+  saldoPendiente?: number | string;
+  proximoMantenimientoKm?: number | string;
+  year?: number | string;
+  horaServicio?: string;
+  estado?: 'activa' | 'vencida' | 'cancelada';
+  numeroFactura?: string;
+  fotos?: string[];
+};

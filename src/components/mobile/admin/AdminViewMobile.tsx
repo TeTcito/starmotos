@@ -337,14 +337,20 @@ export const AdminViewMobile: React.FC<Props> = ({
         )}
         {activeSection === 'garantias_plus' && (
           <GarantiasPlusMobile
-            records={garantiasPlusRecords}
-            onSaveRecord={onSaveGarantiaPlusRecord}
-            onDeleteRecord={onDeleteGarantiaPlusRecord}
-            workshops={workshops}
+            defaultAtendidoPor="William Daniel Meza (Gerente)"
+            defaultSede="StarMotos Matriz La Maná"
+            defaultSedeId="matriz-la-mana"
             technicians={technicians}
             origins={origins}
+            workshops={workshops}
             onAddTechnician={onAddTechnician}
             onAddOrigin={onAddOrigin}
+            onSaveRecord={onSaveGarantiaPlusRecord}
+            onDeleteRecord={onDeleteGarantiaPlusRecord}
+            records={garantiasPlusRecords}
+            recentRecords={garantiasPlusRecords}
+            isMatriz={true}
+            orders={orders}
             onNavigateSection={setActiveSection}
           />
         )}

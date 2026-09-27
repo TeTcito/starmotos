@@ -3408,11 +3408,11 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Contenido Paso 1 Móvil: Cliente */}
+          {/* Contenido Paso 1 Móvil: Cliente (Directamente sobre el Lienzo) */}
           {mobileStep === 1 && (
-            <div className="space-y-2.5 animate-fade-in">
-              {/* Bloque: Cabecera con Botón Icono Guardar */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs flex items-center justify-between">
+            <div className="space-y-3 animate-fade-in">
+              {/* Cabecera con Botón Icono Guardar */}
+              <div className="flex items-center justify-between pb-0.5">
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-xs font-black text-zinc-900">Paso 1: Datos del Cliente</h3>
                   <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">1 de 3</span>
@@ -3427,9 +3427,9 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </button>
               </div>
 
-              {/* Bloque: Cédula o RUC con Botón Lupa Compacto */}
-              <div className="bg-white border border-blue-200 rounded-xl p-3 shadow-2xs space-y-1.5">
-                <label className="block text-[11px] font-black uppercase text-blue-900">
+              {/* Cédula o RUC con Botón Lupa */}
+              <div>
+                <label className="block text-[11px] font-black uppercase text-blue-900 mb-1">
                   Cédula o RUC *
                 </label>
                 <div className="flex items-center gap-1.5">
@@ -3444,7 +3444,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       }
                     }}
                     placeholder="Ejemplo: 1723456789"
-                    className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
+                    className="flex-1 px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 shadow-2xs"
                     required
                   />
                   <button
@@ -3459,7 +3459,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </div>
                 {searchFeedback && (
                   <p
-                    className={`text-[10.5px] font-medium leading-tight p-2 rounded-lg border ${
+                    className={`mt-1 text-[10.5px] font-medium leading-tight p-2 rounded-lg border ${
                       searchFeedback.startsWith('✓')
                         ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
                         : 'text-amber-800 bg-amber-50 border-amber-200'
@@ -3470,155 +3470,143 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Bloque: Datos Personales */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Datos Personales</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Nombres *</label>
-                    <input
-                      type="text"
-                      value={formData.nombres}
-                      onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
-                      placeholder="Ejemplo: Juan Carlos"
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Apellidos *</label>
-                    <input
-                      type="text"
-                      value={formData.apellidos}
-                      onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
-                      placeholder="Ejemplo: Mendoza Zambrano"
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Celular 1 *</label>
-                    <input
-                      type="tel"
-                      value={formData.celular1}
-                      onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
-                      placeholder="Ejemplo: 0987654321"
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Celular 2 (Opcional)</label>
-                    <input
-                      type="tel"
-                      value={formData.celular2 || ''}
-                      onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
-                      placeholder="Ejemplo: 0991234567"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                </div>
-
+              {/* Nombres y Apellidos */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Correo Electrónico</label>
-                  <input
-                    type="email"
-                    value={formData.email || ''}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Ejemplo: usuario.cliente99@gmail.com"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Dirección Domiciliaria</label>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Nombres *</label>
                   <input
                     type="text"
-                    value={formData.direccion}
-                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600 focus:bg-white"
+                    value={formData.nombres}
+                    onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
+                    placeholder="Ejemplo: Juan Carlos"
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Apellidos *</label>
+                  <input
+                    type="text"
+                    value={formData.apellidos}
+                    onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
+                    placeholder="Ejemplo: Mendoza Zambrano"
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600 shadow-2xs"
                   />
                 </div>
               </div>
 
-              {/* Bloque: Sede & Origen */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <Building2 className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Sede & Origen</span>
-                </div>
-
-                {/* Sede / Taller */}
+              {/* Celulares */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center justify-between">
-                    <span>Sede / Taller *</span>
-                    {effectiveIsMatriz && (
-                      <span className="text-[9px] text-blue-600 font-semibold normal-case">Red Matriz</span>
-                    )}
-                  </label>
-                  {effectiveIsMatriz && workshops && workshops.length > 0 ? (
-                    <select
-                      value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
-                      onChange={(e) => {
-                        const chosenId = e.target.value;
-                        const sObj = workshops.find((w) => w.id === chosenId);
-                        setFormData({
-                          ...formData,
-                          sedeId: chosenId,
-                          sede: sObj ? sObj.name : formData.sede,
-                        });
-                      }}
-                      className="w-full px-2.5 py-1.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs font-bold text-blue-900 outline-none focus:border-blue-600 focus:bg-white"
-                    >
-                      {workshops.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="w-full px-2.5 py-1.5 bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-800 truncate">
-                      {formData.sede || defaultSede}
-                    </div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Celular 1 *</label>
+                  <input
+                    type="tel"
+                    value={formData.celular1}
+                    onChange={(e) => setFormData({ ...formData, celular1: e.target.value })}
+                    placeholder="Ejemplo: 0987654321"
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-semibold outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Celular 2 (Opcional)</label>
+                  <input
+                    type="tel"
+                    value={formData.celular2 || ''}
+                    onChange={(e) => setFormData({ ...formData, celular2: e.target.value })}
+                    placeholder="Ejemplo: 0991234567"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* Correo Electrónico */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Correo Electrónico</label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Ejemplo: usuario.cliente99@gmail.com"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+
+              {/* Dirección Domiciliaria */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Dirección Domiciliaria</label>
+                <input
+                  type="text"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                  placeholder="Ejemplo: Av. 10 de Agosto y Calle Bolivar #45"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+
+              {/* Sede / Taller */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1 flex items-center justify-between">
+                  <span>Sede / Taller *</span>
+                  {effectiveIsMatriz && (
+                    <span className="text-[9px] text-blue-600 font-semibold normal-case">Red Matriz</span>
                   )}
-                </div>
-
-                {/* Origen / Almacén */}
-                <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <label className="block text-[11px] font-bold text-zinc-700">Origen / Almacén *</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddOriginModal(true)}
-                      className="text-[10px] text-blue-600 font-bold"
-                    >
-                      + Nuevo Almacén
-                    </button>
-                  </div>
+                </label>
+                {effectiveIsMatriz && workshops && workshops.length > 0 ? (
                   <select
-                    value={formData.origen}
-                    onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium outline-none focus:border-blue-600 focus:bg-white"
+                    value={formData.sedeId || workshops.find((w) => w.name === formData.sede)?.id || defaultSedeId}
+                    onChange={(e) => {
+                      const chosenId = e.target.value;
+                      const sObj = workshops.find((w) => w.id === chosenId);
+                      setFormData({
+                        ...formData,
+                        sedeId: chosenId,
+                        sede: sObj ? sObj.name : formData.sede,
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 rounded-xl text-xs font-bold text-blue-900 outline-none focus:border-blue-600 shadow-2xs"
                   >
-                    {origins.map((orig) => (
-                      <option key={orig} value={orig}>
-                        {orig}
+                    {workshops.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
                       </option>
                     ))}
                   </select>
+                ) : (
+                  <div className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-bold text-zinc-800 truncate shadow-2xs">
+                    {formData.sede || defaultSede}
+                  </div>
+                )}
+              </div>
+
+              {/* Origen / Almacén */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-zinc-700">Origen / Almacén *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddOriginModal(true)}
+                    className="text-[10px] text-blue-600 font-bold"
+                  >
+                    + Nuevo Almacén
+                  </button>
                 </div>
+                <select
+                  value={formData.origen}
+                  onChange={(e) => setFormData({ ...formData, origen: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-medium outline-none focus:border-blue-600 shadow-2xs"
+                >
+                  {origins.map((orig) => (
+                    <option key={orig} value={orig}>
+                      {orig}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Botones de Navegación Paso 1 */}
-              <div className="pt-1 flex gap-2">
+              <div className="pt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -3641,108 +3629,102 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Contenido Paso 2 Móvil: Moto */}
+          {/* Contenido Paso 2 Móvil: Moto (Directamente sobre el Lienzo) */}
           {mobileStep === 2 && (
-            <div className="space-y-2.5 animate-fade-in">
-              {/* Bloque Cabecera */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-black text-zinc-900">Paso 2: Datos de la Moto</h3>
-                  <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">2 de 3</span>
+            <div className="space-y-3 animate-fade-in">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between pb-0.5">
+                <h3 className="text-xs font-black text-zinc-900">Paso 2: Datos de la Moto</h3>
+                <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">2 de 3</span>
+              </div>
+
+              {/* Modelo y Marca & Placa */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Modelo y Marca *</label>
+                  <input
+                    type="text"
+                    list="registered-brands-datalist"
+                    value={formData.modeloMarca}
+                    onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
+                    placeholder="Ejemplo: Thunder 200, Daytona 250..."
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-zinc-700">Placa</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
+                      className="text-[10px] text-blue-600 underline"
+                    >
+                      En trámite
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    placeholder="Ejemplo: AB123C o EN TRÁMITE"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 shadow-2xs"
+                  />
                 </div>
               </div>
 
-              {/* Bloque: Identificación de la Motocicleta */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <Bike className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Identificación de la Motocicleta</span>
-                </div>
+              {/* Color */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Color</label>
+                <input
+                  type="text"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  placeholder="Ejemplo: Negro Mate / Rojo Racing"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs outline-none focus:border-blue-600 shadow-2xs"
+                />
+              </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Modelo y Marca *</label>
-                    <input
-                      type="text"
-                      list="registered-brands-datalist"
-                      value={formData.modeloMarca}
-                      onChange={(e) => setFormData({ ...formData, modeloMarca: e.target.value })}
-                      placeholder="Ejemplo: Thunder 200, Daytona 250..."
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <label className="block text-[11px] font-bold text-zinc-700">Placa</label>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, placa: 'EN TRÁMITE' })}
-                        className="text-[10px] text-blue-600 underline"
-                      >
-                        En trámite
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={formData.placa}
-                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
-                      placeholder="Ejemplo: AB123C o EN TRÁMITE"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                </div>
+              {/* Kilometraje de Recepción */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1 flex items-center justify-between">
+                  <span>Kilometraje de Recepción (Odómetro) *</span>
+                  <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.kilometraje}
+                  onFocus={selectOnFocus}
+                  onChange={(e) => {
+                    const km = cleanNumberInput(e.target.value);
+                    setFormData((prev) => ({
+                      ...prev,
+                      kilometraje: km,
+                    }));
+                  }}
+                  placeholder="Ejemplo: 0 km"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold outline-none focus:border-blue-600 shadow-2xs"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Color</label>
-                  <input
-                    type="text"
-                    value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                    placeholder="Ejemplo: Negro Mate / Rojo Racing"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs outline-none focus:border-blue-600 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5 flex items-center justify-between">
-                    <span>Kilometraje de Recepción (Odómetro) *</span>
-                    <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                      {formData.kilometraje !== '' ? `${formData.kilometraje} KM` : '0 KM'}
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.kilometraje}
-                    onFocus={selectOnFocus}
-                    onChange={(e) => {
-                      const km = cleanNumberInput(e.target.value);
-                      setFormData((prev) => ({
-                        ...prev,
-                        kilometraje: km,
-                      }));
-                    }}
-                    placeholder="Ejemplo: 0 km"
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold outline-none focus:border-blue-600 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-0.5">Serie o Chasis (VIN) *</label>
-                  <input
-                    type="text"
-                    value={formData.chasis}
-                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
-                    placeholder="Ejemplo: 3SCBP123456789012"
-                    required
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 focus:bg-white"
-                  />
-                </div>
+              {/* Serie o Chasis (VIN) */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">Serie o Chasis (VIN) *</label>
+                <input
+                  type="text"
+                  value={formData.chasis}
+                  onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                  placeholder="Ejemplo: 3SCBP123456789012"
+                  required
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 shadow-2xs"
+                />
               </div>
 
               {/* Botones de Navegación Paso 2 */}
-              <div className="pt-1 flex gap-2">
+              <div className="pt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => setMobileStep(1)}
@@ -3762,188 +3744,178 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Contenido Paso 3 Móvil: Servicio */}
+          {/* Contenido Paso 3 Móvil: Servicio (Directamente sobre el Lienzo) */}
           {mobileStep === 3 && (
-            <div className="space-y-2.5 animate-fade-in">
-              {/* Bloque Cabecera */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-black text-zinc-900">Paso 3: Servicio & Cobro</h3>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">3 de 3</span>
-                </div>
+            <div className="space-y-3 animate-fade-in">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between pb-0.5">
+                <h3 className="text-xs font-black text-zinc-900">Paso 3: Servicio & Cobro</h3>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">3 de 3</span>
               </div>
 
-              {/* Bloque: Servicio & Responsable */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <Wrench className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Servicio & Técnico</span>
+              {/* ¿Qué se realizó? */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                    ¿Qué se realizó? *
+                  </label>
+                  {hasPdiDone && !hasEngrasadoDone && (
+                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                      Paso 2: Engrasado
+                    </span>
+                  )}
+                  {hasEngrasadoDone && (
+                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Paso 3: Mantenimiento
+                    </span>
+                  )}
                 </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    {
+                      id: 'alistamiento_pdi' as ServiceActionType,
+                      label: 'Alistamiento PDI',
+                      stepBadge: 'Paso 1',
+                      isBlocked: isPdiBlocked,
+                      blockReason: 'Ya realizado',
+                    },
+                    {
+                      id: 'engrasado' as ServiceActionType,
+                      label: 'Engrasado',
+                      stepBadge: 'Paso 2',
+                      isBlocked: isEngrasadoBlocked,
+                      blockReason: 'Ya realizado',
+                    },
+                    {
+                      id: 'mantenimiento' as ServiceActionType,
+                      label: 'Mantenimiento',
+                      stepBadge: 'Paso 3',
+                      isBlocked: isMantenimientoBlocked,
+                      blockReason: 'Req. Engrasado',
+                    },
+                  ].map((srv) => {
+                    const isSelected = formData.serviciosRealizados.includes(srv.id);
 
-                {/* ¿Qué se realizó? */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                      ¿Qué se realizó? *
-                    </label>
-                    {hasPdiDone && !hasEngrasadoDone && (
-                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                        Paso 2: Engrasado
-                      </span>
-                    )}
-                    {hasEngrasadoDone && (
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                        Paso 3: Mantenimiento
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      {
-                        id: 'alistamiento_pdi' as ServiceActionType,
-                        label: 'Alistamiento PDI',
-                        stepBadge: 'Paso 1',
-                        isBlocked: isPdiBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'engrasado' as ServiceActionType,
-                        label: 'Engrasado',
-                        stepBadge: 'Paso 2',
-                        isBlocked: isEngrasadoBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'mantenimiento' as ServiceActionType,
-                        label: 'Mantenimiento',
-                        stepBadge: 'Paso 3',
-                        isBlocked: isMantenimientoBlocked,
-                        blockReason: 'Req. Engrasado',
-                      },
-                    ].map((srv) => {
-                      const isSelected = formData.serviciosRealizados.includes(srv.id);
-
-                      if (srv.isBlocked) {
-                        return (
-                          <div
-                            key={srv.id}
-                            className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Lock className="w-3 h-3 text-zinc-400" />
-                              <span className="line-through opacity-70 truncate">{srv.label}</span>
-                            </div>
-                            <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
-                          </div>
-                        );
-                      }
-
-                      const isMandatory =
-                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
-                        (hasEngrasadoDone && srv.id === 'mantenimiento');
-
+                    if (srv.isBlocked) {
                       return (
-                        <button
+                        <div
                           key={srv.id}
-                          type="button"
-                          onClick={() => toggleServicio(srv.id)}
-                          className={`px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                          }`}
+                          className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
                         >
-                          <span className="truncate">{srv.label}</span>
-                          {isMandatory ? (
-                            <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
-                              {srv.stepBadge} Oblig.
-                            </span>
-                          ) : (
-                            <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
-                              {srv.stepBadge}
-                            </span>
-                          )}
-                        </button>
+                          <div className="flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-zinc-400" />
+                            <span className="line-through opacity-70 truncate">{srv.label}</span>
+                          </div>
+                          <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
+                        </div>
                       );
-                    })}
-                  </div>
-                </div>
+                    }
 
-                {/* Técnico Responsable */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                      Técnico Responsable *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddTechModal(true)}
-                      className="text-[10px] text-emerald-600 font-bold"
-                    >
-                      + Nuevo Técnico
-                    </button>
-                  </div>
-                  <select
-                    value={formData.tecnicoResponsable}
-                    onChange={(e) => {
-                      const techName = e.target.value;
-                      const techObj = technicians.find((t) => t.name === techName);
-                      setFormData({
-                        ...formData,
-                        tecnicoResponsable: techName,
-                        tecnicoId: techObj?.id || '',
-                      });
-                    }}
-                    className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600 focus:bg-white"
-                  >
-                    <option value="">
-                      {technicians.length === 0
-                        ? '⚠️ Sin técnicos en este taller (Cree uno con + Nuevo Técnico)'
-                        : 'Seleccione un técnico responsable...'}
-                    </option>
-                    {technicians.map((t) => (
-                      <option key={t.id} value={t.name}>
-                        {t.name} ({t.workshopName || 'Taller'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    const isMandatory =
+                      (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
+                      (hasEngrasadoDone && srv.id === 'mantenimiento');
 
-                {/* Fecha y Hora de Servicio */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-blue-600" />
-                      <span>Fecha *</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fechaServicio || todayStr}
-                      onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-indigo-600" />
-                      <span>Hora *</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={formData.horaServicio || getCurrentTimeStr()}
-                      onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
-                      required
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white font-mono"
-                    />
-                  </div>
+                    return (
+                      <button
+                        key={srv.id}
+                        type="button"
+                        onClick={() => toggleServicio(srv.id)}
+                        className={`px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-300 shadow-2xs'
+                        }`}
+                      >
+                        <span className="truncate">{srv.label}</span>
+                        {isMandatory ? (
+                          <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
+                            {srv.stepBadge} Oblig.
+                          </span>
+                        ) : (
+                          <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
+                            {srv.stepBadge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Bloque: Control de Aceite */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between pb-1 border-b border-zinc-100">
-                  <label className="block text-[11px] font-bold uppercase text-zinc-800">
+              {/* Técnico Responsable */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                    Técnico Responsable *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTechModal(true)}
+                    className="text-[10px] text-emerald-600 font-bold"
+                  >
+                    + Nuevo Técnico
+                  </button>
+                </div>
+                <select
+                  value={formData.tecnicoResponsable}
+                  onChange={(e) => {
+                    const techName = e.target.value;
+                    const techObj = technicians.find((t) => t.name === techName);
+                    setFormData({
+                      ...formData,
+                      tecnicoResponsable: techName,
+                      tecnicoId: techObj?.id || '',
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold outline-none focus:border-blue-600 shadow-2xs"
+                >
+                  <option value="">
+                    {technicians.length === 0
+                      ? '⚠️ Sin técnicos en este taller (Cree uno con + Nuevo Técnico)'
+                      : 'Seleccione un técnico responsable...'}
+                  </option>
+                  {technicians.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} ({t.workshopName || 'Taller'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fecha y Hora de Servicio */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-blue-600" />
+                    <span>Fecha *</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fechaServicio || todayStr}
+                    onChange={(e) => setFormData({ ...formData, fechaServicio: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-indigo-600" />
+                    <span>Hora *</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.horaServicio || getCurrentTimeStr()}
+                    onChange={(e) => setFormData({ ...formData, horaServicio: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-semibold text-zinc-900 outline-none focus:border-blue-600 shadow-2xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Control de Aceite */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
                     Control de Aceite
                   </label>
                   <button
@@ -3981,7 +3953,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     <select
                       value={formData.aceite}
                       onChange={(e) => setFormData({ ...formData, aceite: e.target.value })}
-                      className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-bold outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full px-2 py-2 bg-white border border-zinc-300 rounded-xl text-[11px] font-bold outline-none focus:border-blue-600 shadow-2xs"
                     >
                       <option value="con_aceite">Con Aceite</option>
                       <option value="sin_aceite">Sin Aceite</option>
@@ -3993,7 +3965,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     <select
                       value={formData.nivelAceite || 'mineral'}
                       onChange={(e) => setFormData({ ...formData, nivelAceite: e.target.value })}
-                      className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full px-2 py-2 bg-white border border-zinc-300 rounded-xl text-[11px] font-semibold outline-none focus:border-blue-600 shadow-2xs"
                     >
                       <option value="mineral">Mineral</option>
                       <option value="semisintetico">Semisintético</option>
@@ -4007,7 +3979,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     <select
                       value={formData.tipoAceite || '10W-30'}
                       onChange={(e) => setFormData({ ...formData, tipoAceite: e.target.value })}
-                      className="w-full px-1.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-[11px] font-semibold outline-none focus:border-blue-600 focus:bg-white"
+                      className="w-full px-2 py-2 bg-white border border-zinc-300 rounded-xl text-[11px] font-semibold outline-none focus:border-blue-600 shadow-2xs"
                     >
                       <option value="10W-30">10W-30</option>
                       <option value="10W-40">10W-40</option>
@@ -4027,346 +3999,332 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* Bloque: Liquidación Financiera & Cobro */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Liquidación Financiera & Cobro</span>
-                </div>
-
-                {garantiaPlusStatus.hasGarantiaPlus ? (
-                  <div className="p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl space-y-1.5 shadow-2xs animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-amber-600" />
-                        <span className="text-xs font-black uppercase text-amber-900">Garantía Plus Activa</span>
-                      </div>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase">
-                        ✓ Pagado ($0.00)
-                      </span>
+              {/* Liquidación Financiera & Cobro */}
+              {garantiaPlusStatus.hasGarantiaPlus ? (
+                <div className="p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl space-y-1.5 shadow-2xs animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-black uppercase text-amber-900">Garantía Plus Activa</span>
                     </div>
-                    <p className="text-[11px] text-amber-950 font-medium">
-                      Servicios y mantenimientos cubiertos al 100% sin costo para el cliente (Vence: {garantiaPlusStatus.record?.fechaVencimiento}).
-                    </p>
-                  </div>
-                ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
-                  <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span className="text-xs text-blue-900 font-bold">
-                      Alistamiento PDI previo a la venta: $0.00 al cliente.
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase">
+                      ✓ Pagado ($0.00)
                     </span>
                   </div>
-                ) : (
-                  <div className="space-y-2 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-200">
-                    <div className="grid grid-cols-2 gap-2">
+                  <p className="text-[11px] text-amber-950 font-medium">
+                    Servicios y mantenimientos cubiertos al 100% sin costo para el cliente (Vence: {garantiaPlusStatus.record?.fechaVencimiento}).
+                  </p>
+                </div>
+              ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-xs text-blue-900 font-bold">
+                    Alistamiento PDI previo a la venta: $0.00 al cliente.
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2 bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-emerald-900 mb-0.5">
+                        Valor ($) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.valorServicio}
+                        onFocus={selectOnFocus}
+                        onChange={(e) => {
+                          const clean = cleanNumberInput(e.target.value);
+                          const val = clean === '' ? 0 : parseFloat(clean);
+                          setFormData((prev) => ({
+                            ...prev,
+                            valorServicio: clean,
+                            abono: prev.esCredito ? 0 : (Number(prev.abono ?? 0) > val ? clean : prev.abono),
+                          }));
+                        }}
+                        placeholder="0.00"
+                        className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-emerald-900 mb-0.5">
+                        Método
+                      </label>
+                      <select
+                        value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
+                        onChange={(e) => {
+                          const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
+                          const isCred = newMetodo === 'Crédito';
+                          setFormData((prev) => ({
+                            ...prev,
+                            metodoPago: newMetodo,
+                            esCredito: isCred,
+                            abono: isCred ? 0 : prev.valorServicio,
+                            montoPagado: isCred ? 0 : prev.valorServicio,
+                            saldoPendiente: isCred ? prev.valorServicio : 0,
+                          }));
+                        }}
+                        className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                      >
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                        <option value="Crédito">Crédito</option>
+                        <option value="Mixto">Mixto</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
+                    <div className="pt-1.5 space-y-1.5 border-t border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-blue-900">
+                          Crédito Activo
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-zinc-500 font-bold">Plazo:</span>
+                          <select
+                            value={formData.mesesCredito || 3}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) || 3 }))
+                            }
+                            className="h-6 px-1.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900"
+                          >
+                            <option value={1}>1 mes</option>
+                            <option value={2}>2 meses</option>
+                            <option value={3}>3 meses</option>
+                            <option value={6}>6 meses</option>
+                            <option value={9}>9 meses</option>
+                            <option value={12}>12 meses</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-black uppercase text-blue-900 mb-0.5">
+                            Monto a Crédito
+                          </label>
+                          <div className="h-7 px-2 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-between text-blue-900 text-xs font-black">
+                            <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black uppercase text-amber-800 mb-0.5">
+                            Pendiente
+                          </label>
+                          <div className="h-7 px-2 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
+                            <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
                       <div>
-                        <label className="block text-[10px] font-black uppercase text-emerald-900 mb-0.5">
-                          Valor ($) *
-                        </label>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="block text-[10px] font-black uppercase text-emerald-900">
+                            Abono ($)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                abono: prev.valorServicio,
+                                montoPagado: prev.valorServicio,
+                                saldoPendiente: 0,
+                              }));
+                            }}
+                            className="text-[10px] text-emerald-700 underline font-bold"
+                          >
+                            Total
+                          </button>
+                        </div>
                         <input
                           type="number"
                           step="0.01"
-                          value={formData.valorServicio}
+                          min="0"
+                          max={Number(formData.valorServicio || 0)}
+                          value={formData.abono ?? ''}
                           onFocus={selectOnFocus}
                           onChange={(e) => {
                             const clean = cleanNumberInput(e.target.value);
                             const val = clean === '' ? 0 : parseFloat(clean);
                             setFormData((prev) => ({
                               ...prev,
-                              valorServicio: clean,
-                              abono: prev.esCredito ? 0 : (Number(prev.abono ?? 0) > val ? clean : prev.abono),
+                              abono: clean,
+                              montoPagado: clean,
+                              saldoPendiente: Math.max(0, Number(prev.valorServicio || 0) - val),
                             }));
                           }}
                           placeholder="0.00"
-                          className="w-full px-2.5 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold"
+                          className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800"
                         />
                       </div>
+
                       <div>
-                        <label className="block text-[10px] font-black uppercase text-emerald-900 mb-0.5">
-                          Método
+                        <label className="block text-[10px] font-black uppercase text-zinc-500 mb-0.5">
+                          Pendiente
                         </label>
-                        <select
-                          value={formData.metodoPago === 'Crédito Directo' ? 'Crédito' : formData.metodoPago}
-                          onChange={(e) => {
-                            const newMetodo = e.target.value as AlistamientoFullRecord['metodoPago'];
-                            const isCred = newMetodo === 'Crédito';
-                            setFormData((prev) => ({
-                              ...prev,
-                              metodoPago: newMetodo,
-                              esCredito: isCred,
-                              abono: isCred ? 0 : prev.valorServicio,
-                              montoPagado: isCred ? 0 : prev.valorServicio,
-                              saldoPendiente: isCred ? prev.valorServicio : 0,
-                            }));
-                          }}
-                          className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
-                        >
-                          <option value="Efectivo">Efectivo</option>
-                          <option value="Transferencia">Transferencia</option>
-                          <option value="Tarjeta">Tarjeta</option>
-                          <option value="Crédito">Crédito</option>
-                          <option value="Mixto">Mixto</option>
-                        </select>
+                        <div className="h-7 px-2 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
+                          <span
+                            className={
+                              Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)) > 0
+                                ? 'text-amber-600'
+                                : 'text-emerald-600'
+                            }
+                          >
+                            ${Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    {formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || formData.esCredito ? (
-                      <div className="pt-1.5 space-y-1.5 border-t border-blue-200">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-blue-900">
-                            Crédito Activo
+                  {/* Subida de Evidencia Fotográfica (SOLO SI ES TRANSFERENCIA) */}
+                  {(formData.metodoPago === 'Transferencia' || formData.metodoPago?.toLowerCase?.().includes('transferencia')) && (
+                    <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1.5 animate-fade-in mt-2">
+                      <label className="block text-[10px] font-black uppercase text-blue-900 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Upload className="w-3.5 h-3.5 text-blue-700" />
+                          Comprobante / Evidencia de Transferencia *
+                        </span>
+                        {formData.evidenciaTransferencia && (
+                          <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1 py-0.2 rounded">
+                            ✓ Foto cargada
                           </span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-zinc-500 font-bold">Plazo:</span>
-                            <select
-                              value={formData.mesesCredito || 3}
-                              onChange={(e) =>
-                                setFormData((prev) => ({ ...prev, mesesCredito: Number(e.target.value) || 3 }))
-                              }
-                              className="h-6 px-1.5 bg-white border border-blue-300 rounded text-[11px] font-bold text-blue-900"
-                            >
-                              <option value={1}>1 mes</option>
-                              <option value={2}>2 meses</option>
-                              <option value={3}>3 meses</option>
-                              <option value={6}>6 meses</option>
-                              <option value={9}>9 meses</option>
-                              <option value={12}>12 meses</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[10px] font-black uppercase text-blue-900 mb-0.5">
-                              Monto a Crédito
-                            </label>
-                            <div className="h-7 px-2 bg-blue-50 border border-blue-300 rounded-lg flex items-center justify-between text-blue-900 text-xs font-black">
-                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-black uppercase text-amber-800 mb-0.5">
-                              Pendiente
-                            </label>
-                            <div className="h-7 px-2 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between text-amber-900 text-xs font-black">
-                              <span>${Number(formData.valorServicio || 0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-emerald-100">
-                        <div>
-                          <div className="flex items-center justify-between mb-0.5">
-                            <label className="block text-[10px] font-black uppercase text-emerald-900">
-                              Abono ($)
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  abono: prev.valorServicio,
-                                  montoPagado: prev.valorServicio,
-                                  saldoPendiente: 0,
-                                }));
-                              }}
-                              className="text-[10px] text-emerald-700 underline font-bold"
-                            >
-                              Total
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={Number(formData.valorServicio || 0)}
-                            value={formData.abono ?? ''}
-                            onFocus={selectOnFocus}
-                            onChange={(e) => {
-                              const clean = cleanNumberInput(e.target.value);
-                              const val = clean === '' ? 0 : parseFloat(clean);
-                              setFormData((prev) => ({
-                                ...prev,
-                                abono: clean,
-                                montoPagado: clean,
-                                saldoPendiente: Math.max(0, Number(prev.valorServicio || 0) - val),
-                              }));
-                            }}
-                            placeholder="0.00"
-                            className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-black uppercase text-zinc-500 mb-0.5">
-                            Pendiente
-                          </label>
-                          <div className="h-7 px-2 bg-white border border-zinc-200 rounded-lg flex items-center justify-between text-xs font-mono font-black">
-                            <span
-                              className={
-                                Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)) > 0
-                                  ? 'text-amber-600'
-                                  : 'text-emerald-600'
-                              }
-                            >
-                              ${Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono ?? 0)).toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Subida de Evidencia Fotográfica (SOLO SI ES TRANSFERENCIA) */}
-                    {(formData.metodoPago === 'Transferencia' || formData.metodoPago?.toLowerCase?.().includes('transferencia')) && (
-                      <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1.5 animate-fade-in mt-2">
-                        <label className="block text-[10px] font-black uppercase text-blue-900 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <Upload className="w-3.5 h-3.5 text-blue-700" />
-                            Comprobante / Evidencia de Transferencia *
-                          </span>
-                          {formData.evidenciaTransferencia && (
-                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100 px-1 py-0.2 rounded">
-                              ✓ Foto cargada
-                            </span>
-                          )}
-                        </label>
-
-                        {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
-                          <div className="relative rounded-lg border border-blue-300 bg-white p-2 flex items-center gap-2">
-                            <a
-                              href={formData.evidenciaTransferencia}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="w-12 h-12 rounded overflow-hidden border border-zinc-200 shrink-0 block relative"
-                            >
-                              <img
-                                src={formData.evidenciaTransferencia}
-                                alt="Comprobante"
-                                className="w-full h-full object-cover"
-                              />
-                            </a>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-bold text-zinc-900 truncate">Comprobante guardado</p>
-                              <p className="text-[9px] text-zinc-500">Toca para ampliar</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
-                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
-                              title="Eliminar imagen"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center p-2.5 border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-lg cursor-pointer transition-all hover:bg-blue-50/50">
-                            <Camera className="w-5 h-5 text-blue-600 mb-0.5" />
-                            <span className="text-[11px] font-bold text-blue-950">Subir foto del comprobante</span>
-                            <span className="text-[9px] text-zinc-500">JPG, PNG o foto de cámara</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const compressed = await compressImageBase64(file, 1000, 0.7);
-                                  setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
-                                }
-                              }}
-                            />
-                          </label>
                         )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Bloque: Facturación & Próximo Mantenimiento */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-                <div className="flex items-center gap-1.5 pb-1 border-b border-zinc-100 text-xs font-bold text-zinc-800 uppercase tracking-wider">
-                  <FileText className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Facturación & Registro</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                        N° Factura
                       </label>
-                      {clientHistoricalRecords.length > 0 && formData.numeroFactura && (
-                        <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
-                          Previo / Editable
-                        </span>
+
+                      {formData.evidenciaTransferencia && isValidMediaUrl(formData.evidenciaTransferencia) ? (
+                        <div className="relative rounded-lg border border-blue-300 bg-white p-2 flex items-center gap-2">
+                          <a
+                            href={formData.evidenciaTransferencia}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-12 h-12 rounded overflow-hidden border border-zinc-200 shrink-0 block relative"
+                          >
+                            <img
+                              src={formData.evidenciaTransferencia}
+                              alt="Comprobante"
+                              className="w-full h-full object-cover"
+                            />
+                          </a>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-zinc-900 truncate">Comprobante guardado</p>
+                            <p className="text-[9px] text-zinc-500">Toca para ampliar</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, evidenciaTransferencia: '' }))}
+                            className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
+                            title="Eliminar imagen"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center p-2.5 border-2 border-dashed border-blue-300 hover:border-blue-500 bg-white rounded-lg cursor-pointer transition-all hover:bg-blue-50/50">
+                          <Camera className="w-5 h-5 text-blue-600 mb-0.5" />
+                          <span className="text-[11px] font-bold text-blue-950">Subir foto del comprobante</span>
+                          <span className="text-[9px] text-zinc-500">JPG, PNG o foto de cámara</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const compressed = await compressImageBase64(file, 1000, 0.7);
+                                setFormData((prev) => ({ ...prev, evidenciaTransferencia: compressed }));
+                              }
+                            }}
+                          />
+                        </label>
                       )}
                     </div>
-                    <input
-                      type="text"
-                      value={formData.numeroFactura}
-                      onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
-                      placeholder="001-002-..."
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                        N° Ticket
-                      </label>
-                      {clientHistoricalRecords.length > 0 && formData.numeroTicket && (
-                        <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
-                          Previo / Editable
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      value={formData.numeroTicket}
-                      onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
-                      placeholder="TCK-2026-..."
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                  </div>
+                  )}
                 </div>
+              )}
 
-                {/* Próximo Mantenimiento Sugerido */}
+              {/* Facturación: Factura y Ticket */}
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-bold uppercase text-zinc-700">
-                      Próximo Mantenimiento Sugerido
+                      N° Factura
                     </label>
-                    <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                    {clientHistoricalRecords.length > 0 && formData.numeroFactura && (
+                      <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                        Previo / Editable
+                      </span>
+                    )}
                   </div>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.proximoMantenimientoKm || ''}
-                      onFocus={selectOnFocus}
-                      onChange={(e) => {
-                        const clean = cleanNumberInput(e.target.value);
-                        setFormData({
-                          ...formData,
-                          proximoMantenimientoKm: clean,
-                        });
-                      }}
-                      placeholder="Ej: 1000"
-                      className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 focus:bg-white"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
-                      KM
-                    </span>
+                  <input
+                    type="text"
+                    value={formData.numeroFactura}
+                    onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
+                    placeholder="001-002-..."
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                      N° Ticket
+                    </label>
+                    {clientHistoricalRecords.length > 0 && formData.numeroTicket && (
+                      <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                        Previo / Editable
+                      </span>
+                    )}
                   </div>
+                  <input
+                    type="text"
+                    value={formData.numeroTicket}
+                    onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
+                    placeholder="TCK-2026-..."
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600 shadow-2xs"
+                  />
                 </div>
               </div>
 
-              {/* Bloque: Fotos de Entrega / Servicio */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between pb-1 border-b border-zinc-100">
-                  <label className="block text-[11px] font-bold uppercase text-zinc-800">
+              {/* Próximo Mantenimiento Sugerido */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
+                    Próximo Mantenimiento Sugerido
+                  </label>
+                  <span className="text-[10px] text-blue-600 font-bold">Editable</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.proximoMantenimientoKm || ''}
+                    onFocus={selectOnFocus}
+                    onChange={(e) => {
+                      const clean = cleanNumberInput(e.target.value);
+                      setFormData({
+                        ...formData,
+                        proximoMantenimientoKm: clean,
+                      });
+                    }}
+                    placeholder="Ej: 1000"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-blue-600 shadow-2xs"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">
+                    KM
+                  </span>
+                </div>
+              </div>
+
+              {/* Fotos de Entrega / Servicio */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-zinc-700">
                     Fotos de Entrega / Servicio ({(formData.fotos || []).length})
                   </label>
                   <button
@@ -4397,7 +4355,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2 border border-dashed border-zinc-300 hover:border-emerald-500 rounded-xl text-center cursor-pointer transition-colors bg-zinc-50 hover:bg-emerald-50/50 flex items-center justify-center gap-1.5 text-zinc-600"
+                    className="w-full py-2.5 border border-dashed border-zinc-300 hover:border-emerald-500 rounded-xl text-center cursor-pointer transition-colors bg-white hover:bg-emerald-50/50 flex items-center justify-center gap-1.5 text-zinc-600 shadow-2xs"
                   >
                     <Camera className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold">Subir fotos de inspección o entrega</span>
@@ -4405,9 +4363,9 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Bloque: Observaciones */}
-              <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
-                <label className="block text-[11px] font-bold uppercase text-zinc-800 mb-0.5">
+              {/* Observaciones */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-zinc-700 mb-1">
                   Observaciones
                 </label>
                 <textarea
@@ -4415,12 +4373,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   value={formData.observaciones}
                   onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
                   placeholder="Notas mecánicas..."
-                  className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-medium resize-none outline-none focus:border-blue-600 focus:bg-white"
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-medium resize-none outline-none focus:border-blue-600 shadow-2xs"
                 />
               </div>
 
               {/* Botones de Acción Finales */}
-              <div className="pt-1 flex gap-2">
+              <div className="pt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => {

@@ -2262,7 +2262,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-700 mb-1 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-amber-600" />
-                      <span>Fecha de Vencimiento</span>
+                      <span>Vencimiento</span>
                     </label>
                     <input
                       type="date"
@@ -4157,7 +4157,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <div>
                     <label className="block text-xs font-bold uppercase text-zinc-700 mb-1 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Fecha de Vencimiento *</span>
+                      <span>Vencimiento *</span>
                     </label>
                     <input
                       type="date"

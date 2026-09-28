@@ -39,7 +39,7 @@ export const HistoryDesktop: React.FC<Props> = ({ history, warranties = [], moto
           <div className="flex items-center gap-2.5">
             <History className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
-              Historial de Servicios y Garantía de Pólizas
+              Historial
             </h2>
           </div>
           <p className="text-xs text-zinc-500 mt-1">

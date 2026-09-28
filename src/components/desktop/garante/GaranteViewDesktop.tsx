@@ -132,8 +132,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
     clientes_garante: 'Clientes y Unidades con Cobertura de Garantía',
     historial_garantias: 'Historial Consolidado de Garantías Emitidas',
     reportes_garante: 'Indicadores Técnicos & Tasa de Reclamos',
-    perfil_garante: 'Mi Perfil de Garante y Respaldo de Marca',
-    alertas_garante: 'Auditoría de Alertas & Eventos del Garante',
+    perfil_garante: 'Mi Perfil de Garantía y Respaldo de Marca',
+    alertas_garante: 'Auditoría de Alertas & Eventos de Garantía',
   };
 
   return (
@@ -149,13 +149,13 @@ export const GaranteViewDesktop: React.FC<Props> = ({
             />
           </div>
           <span className="text-[10px] text-purple-200 font-mono tracking-widest uppercase font-bold">
-            Garante Oficial
+            Garantía de Marca
           </span>
         </div>
 
         <div className="flex-1 flex items-center justify-between pl-6 border-l border-blue-600/60 min-w-0">
           <div className="flex items-center gap-2 truncate">
-            <span className="text-xs text-blue-200 font-mono font-medium">Garante /</span>
+            <span className="text-xs text-blue-200 font-mono font-medium">Garantía /</span>
             <h1 className="text-sm lg:text-base font-bold text-white tracking-tight truncate">
               {sectionTitles[activeSection]}
             </h1>
@@ -210,11 +210,11 @@ export const GaranteViewDesktop: React.FC<Props> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-xs font-bold text-zinc-900 truncate" title={profile.contactName || profile.companyName}>
-                  {profile.contactName || profile.companyName || 'Garante Autorizado'}
+                  {profile.contactName || profile.companyName || 'Garantía Oficial'}
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
-                  <span className="text-[10px] text-purple-900 font-bold truncate">Garante Autorizado</span>
+                  <span className="text-[10px] text-purple-900 font-bold truncate">Garantía de Marca</span>
                 </div>
               </div>
             </div>
@@ -223,7 +223,7 @@ export const GaranteViewDesktop: React.FC<Props> = ({
           {/* Menú */}
           <nav className="flex-1 overflow-y-auto p-3 space-y-1.5">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-950/70 px-3 py-1 block">
-              Módulos del Garante
+              Módulos de Garantía de Marca
             </span>
             {menuItems.map((item) => {
               const active = activeSection === item.id;

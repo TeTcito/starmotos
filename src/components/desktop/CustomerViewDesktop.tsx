@@ -115,13 +115,13 @@ export const CustomerViewDesktop: React.FC<Props> = ({
     },
     {
       id: 'eventos',
-      label: 'Evento de Facturas',
+      label: 'Eventos y Recibos',
       icon: <Receipt className="w-4 h-4" />,
-      badge: 'SRI',
+      badge: 'Recibos',
     },
     {
       id: 'historial',
-      label: 'Historial de Servicios y Garantía de Pólizas',
+      label: 'Historial',
       icon: <History className="w-4 h-4" />,
     },
   ];
@@ -130,11 +130,11 @@ export const CustomerViewDesktop: React.FC<Props> = ({
     perfil: 'Perfil del Cliente',
     orden_activa: 'Orden de Trabajo Activa',
     agendar_cita: 'Agendar Cita Técnica en Taller',
-    eventos: 'Eventos y Facturas',
-    historial: 'Historial de Servicios y Garantía de Pólizas',
+    eventos: 'Eventos y Recibos',
+    historial: 'Historial',
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita Técnica',
-    garantias: 'Historial de Servicios y Garantía de Pólizas',
+    garantias: 'Historial',
   };
 
   const handleWhatsAppAdvisor = () => {

@@ -31,6 +31,13 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     workshopId: 'matriz-la-mana',
     name: 'Administración Matriz Central (Google)',
   },
+  'sede.matriz@starmotos.com': {
+    email: 'sede.matriz@starmotos.com',
+    role: 'admin',
+    passwords: ['StarMotos@Admin2026', 'StarMotos@2026'],
+    workshopId: 'matriz-la-mana',
+    name: 'Administración Matriz Central',
+  },
 
   // 2. Garante de Marca Oficial
   'garante@starmotos.com': {
@@ -52,13 +59,13 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     name: 'Garantías Oficial Benelli Ecuador',
   },
 
-  // 3. Talleres y Sedes Oficiales (11 Ubicaciones de la Red Oficial)
+  // 3. Talleres y Sedes Oficiales (12 Ubicaciones de la Red Oficial)
   'sede.la-mana@starmotos.com': {
     email: 'sede.la-mana@starmotos.com',
     role: 'taller',
-    workshopId: 'matriz-la-mana',
+    workshopId: 'taller-la-mana',
     passwords: ['TallerLaMana@2026', 'StarMotos@2026'],
-    name: 'StarMotos Matriz La Maná',
+    name: 'StarMotos Sucursal La Maná',
   },
   'sede.quevedo@starmotos.com': {
     email: 'sede.quevedo@starmotos.com',
@@ -73,6 +80,13 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     workshopId: 'taller-buena-fe',
     passwords: ['TallerBuenaFe@2026', 'StarMotos@2026'],
     name: 'StarMotos Sucursal Buena Fe',
+  },
+  'sede.buena-fe-2@starmotos.com': {
+    email: 'sede.buena-fe-2@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-buena-fe-2',
+    passwords: ['TallerBuenaFe2@2026', 'StarMotos@2026'],
+    name: 'StarMotos Sucursal Buena Fe 2',
   },
   'sede.balzar@starmotos.com': {
     email: 'sede.balzar@starmotos.com',

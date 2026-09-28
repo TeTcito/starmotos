@@ -234,7 +234,7 @@ const ROLE_PWA_CONFIGS: Record<UserRole, RoleConfig> = {
   },
   garante: {
     title: 'Instalar StarMotos Garantías',
-    subtitle: 'Garante Oficial de Marca',
+    subtitle: 'Garantía Oficial de Marca',
     badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
     mobileDesc:
       'Instala la app en tu celular para auditar reclamos técnicos, emitir dictámenes oficiales y gestionar despachos de repuestos.',

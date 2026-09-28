@@ -42,7 +42,7 @@ import { isValidMediaUrl } from '../services/mediaStorage';
 // Sucursales Oficiales StarMotos
 export const BRANCH_MATRIZ: Branch = {
   id: 'matriz-la-mana',
-  name: 'StarMotos Matriz La Maná',
+  name: 'StarMotos Matriz Central',
   code: 'MAT-01',
   address: 'Calle Jaime Roldós #1 y Gonzalo Albarracín',
   city: 'La Maná, Cotopaxi',
@@ -52,7 +52,24 @@ export const BRANCH_MATRIZ: Branch = {
   reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
   phone: '0939316698 / 0939317809',
   whatsapp: '593939316698',
-  email: 'starsmotor17@gmail.com',
+  email: 'admin@starmotos.com',
+  schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 14:00',
+  googleMapsUrl: 'https://maps.google.com/?q=La+Mana+Cotopaxi+Ecuador',
+};
+
+export const BRANCH_LA_MANA: Branch = {
+  id: 'taller-la-mana',
+  name: 'StarMotos Sucursal La Maná',
+  code: 'SUC-01',
+  address: 'Calle Jaime Roldós #1 y Gonzalo Albarracín',
+  city: 'La Maná, Cotopaxi',
+  province: 'Cotopaxi',
+  canton: 'La Maná',
+  parroquia: 'La Maná',
+  reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
+  phone: '0939316698 / 0939317809',
+  whatsapp: '593939316698',
+  email: 'sede.la-mana@starmotos.com',
   schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 14:00',
   googleMapsUrl: 'https://maps.google.com/?q=La+Mana+Cotopaxi+Ecuador',
 };
@@ -123,6 +140,7 @@ export const BRANCH_PORTOVIEJO: Branch = {
 
 export const ALL_BRANCHES = [
   BRANCH_MATRIZ,
+  BRANCH_LA_MANA,
   BRANCH_QUEVEDO,
   BRANCH_BUENAFE,
   BRANCH_ELCARMEN,
@@ -654,21 +672,39 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
   // Alistamientos que corresponden a este cliente
   const clientAlistamientos = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
 
-  // IDs y tickets de órdenes que están actualmente ACTIVAS (no entregadas)
+  // IDs y tickets de órdenes que están actualmente ACTIVAS (no entregadas ni canceladas)
   const activeAlistamientoIds = new Set<string>();
   const activeOtNumbers = new Set<string>();
+  const activeOrderIds = new Set<string>();
+
   clientOrders.forEach((o) => {
-    if (o.status !== 'entregado' && o.status !== 'entregada') {
-      if (o.alistamientoId) activeAlistamientoIds.add(o.alistamientoId);
-      if (o.id) activeAlistamientoIds.add(o.id);
-      if (o.otNumber) activeOtNumbers.add(o.otNumber);
+    if (o.status !== 'entregado' && o.status !== 'entregada' && o.status !== 'cancelada') {
+      if (o.alistamientoId) activeAlistamientoIds.add(norm(o.alistamientoId));
+      if (o.id) {
+        activeAlistamientoIds.add(norm(o.id));
+        activeOrderIds.add(norm(o.id));
+      }
+      if (o.otNumber) activeOtNumbers.add(norm(o.otNumber));
     }
   });
 
-  // Alistamientos entregados (excluye los que están activos en taller)
+  // Alistamientos entregados (excluye estrictamente los que están activos en taller)
   const matched = clientAlistamientos.filter((a) => {
-    if (activeAlistamientoIds.has(a.id)) return false;
-    if (a.numeroTicket && activeOtNumbers.has(a.numeroTicket)) return false;
+    if (activeAlistamientoIds.has(norm(a.id))) return false;
+    if (a.numeroTicket && activeOtNumbers.has(norm(a.numeroTicket))) return false;
+    
+    // Verificar si existe una orden activa asociada
+    const linkedActiveOrder = clientOrders.find(
+      (o) =>
+        o.status !== 'entregada' &&
+        o.status !== 'entregado' &&
+        o.status !== 'cancelada' &&
+        ((o.alistamientoId && norm(o.alistamientoId) === norm(a.id)) ||
+          norm(o.id) === norm(a.id) ||
+          (o.otNumber && a.numeroTicket && norm(o.otNumber) === norm(a.numeroTicket)))
+    );
+    if (linkedActiveOrder) return false;
+
     return true;
   });
 
@@ -955,66 +991,26 @@ export const getClientActiveOrders = (
     return false;
   });
 
-  // 2. Órdenes con estado activo (NO entregadas)
+  // 2. Órdenes con estado activo (ESTRICTAMENTE NO entregadas ni canceladas)
   const activeTallerOrders = clientOrders.filter(
-    (o) => o.status !== 'entregada' && o.status !== 'entregado'
+    (o) => o.status !== 'entregada' && o.status !== 'entregado' && o.status !== 'cancelada'
   );
 
-  // 3. Revisar si hay alistamientos del cliente que no tengan aún TallerOrder registrado
-  const clientAlistamientos = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
-  const missingAlistamientos = clientAlistamientos.filter((a) => {
-    // Si ya existe una orden para este alistamiento, ya fue evaluada en clientOrders
-    const matchingOrder = clientOrders.find(
-      (o) =>
-        (o.alistamientoId && o.alistamientoId === a.id) ||
-        o.id === a.id ||
-        (o.otNumber && a.numeroTicket && o.otNumber === a.numeroTicket)
-    );
-    if (matchingOrder) {
-      return false;
-    }
-    // Si no tiene orden, se considera un nuevo alistamiento activo en taller
-    return true;
-  });
-
-  // Convertir alistamientos faltantes en TallerOrders sintéticas activas
-  const synthesizedOrders: TallerOrder[] = missingAlistamientos.map((a) => {
-    const otNumber = a.numeroTicket || `OT-${a.id.slice(-6).toUpperCase()}`;
-    return {
-      id: a.id,
-      otNumber,
-      clientName: `${a.nombres} ${a.apellidos}`.trim(),
-      clientIdNumber: a.cedulaRuc,
-      motorcycleInfo: a.modeloMarca,
-      plate: a.placa,
-      entryDate: a.fechaServicio || new Date().toISOString().split('T')[0],
-      status: 'inicio',
-      mechanicName: a.tecnicoResponsable || 'Sin asignar',
-      estimatedDelivery: '',
-      totalCost: a.valorServicio || 0,
-      workshopId: a.sedeId || branch.id,
-      workshopName: a.sede || branch.name,
-      alistamientoId: a.id,
-      servicesSummary: (a.serviciosRealizados || []).join(', ') || 'Alistamiento / Mantenimiento',
-    };
-  });
-
-  const combinedOrders = [...activeTallerOrders, ...synthesizedOrders];
-
   // Ordenar por fecha más reciente
-  combinedOrders.sort((a, b) => {
+  activeTallerOrders.sort((a, b) => {
     const dateA = new Date(a.entryDate || 0).getTime();
     const dateB = new Date(b.entryDate || 0).getTime();
     return dateB - dateA;
   });
 
-  if (combinedOrders.length > 0) {
-    return combinedOrders.map((o) =>
+  if (activeTallerOrders.length > 0) {
+    return activeTallerOrders.map((o) =>
       buildWorkOrderFromTallerOrder(o, p, m, branch, allAlistamientos)
     );
   }
 
-  // Fallback demo Fernando Vaca: SOLO si no tiene órdenes creadas en taller
+  // Fallback demo Fernando Vaca: SOLO si no tiene órdenes (ni activas ni entregadas) ni alistamientos en el sistema
+  const clientAlistamientos = allAlistamientos.filter((a) => isMatchingClientAlistamiento(a, p, m));
   if (p.idNumber === '1724890123' && clientOrders.length === 0 && clientAlistamientos.length === 0) {
     return [INITIAL_WORK_ORDER];
   }

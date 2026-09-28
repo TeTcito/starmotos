@@ -76,6 +76,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectionInput, setRejectionInput] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Estado del formulario editable
   const [formData, setFormData] = useState({
@@ -617,40 +618,16 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           )}
 
           {/* Eliminar (Solo Admin con bloqueo de 30 días si está aceptada) */}
-          {viewerRole === 'admin' && onDelete && (() => {
-            const deleteCheck = canDeleteWarranty(warranty);
-            if (!deleteCheck.canDelete) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => alert(deleteCheck.reason)}
-                  className="w-8 h-8 rounded-lg bg-zinc-100 text-zinc-400 border border-zinc-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs opacity-70"
-                  title={deleteCheck.reason}
-                >
-                  <Trash2 className="w-4 h-4 text-zinc-400" />
-                </button>
-              );
-            }
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `¿Está seguro de eliminar permanentemente la solicitud de garantía ${warranty.requestNumber}?`
-                    )
-                  ) {
-                    onDelete(warranty.id);
-                    onBack();
-                  }
-                }}
-                className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white active:scale-95 text-red-600 border border-red-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                title="Eliminar Solicitud"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            );
-          })()}
+          {viewerRole === 'admin' && onDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-600 hover:text-white active:scale-95 text-red-600 border border-red-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              title="Eliminar Solicitud"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
 
           <div className="h-5 w-px bg-zinc-200 mx-0.5" />
 
@@ -1928,6 +1905,52 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           }}
         />
       </div>
+
+      {/* Modal Emergente de Confirmación de Eliminación (Móvil) */}
+      {showDeleteModal && onDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full overflow-hidden p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900">Confirmar Eliminación</h3>
+                <p className="text-[11px] text-zinc-500">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-600 leading-relaxed">
+              ¿Está seguro de eliminar permanentemente la solicitud de garantía{' '}
+              <strong className="text-zinc-900 font-mono">{warranty.requestNumber}</strong>{' '}
+              de <strong>{warranty.clientName}</strong>?
+            </p>
+            <div className="bg-zinc-50 rounded-xl p-2.5 text-[11px] space-y-1 text-zinc-600 border border-zinc-200">
+              <div><strong>Vehículo:</strong> {warranty.motorcycleBrand} {warranty.motorcycleModel}</div>
+              <div><strong>Sede Origen:</strong> {warranty.tallerOrigin}</div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-3.5 py-2 rounded-xl text-zinc-700 hover:bg-zinc-100 font-bold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(warranty.id);
+                  setShowDeleteModal(false);
+                  onBack();
+                }}
+                className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

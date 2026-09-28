@@ -88,11 +88,11 @@ export const CustomerViewMobile: React.FC<Props> = ({
     perfil: 'Perfil del Cliente',
     orden_activa: 'Orden de Trabajo Activa',
     agendar_cita: 'Agendar Cita',
-    eventos: 'Eventos y Facturas',
-    historial: 'Historial y Garantías',
+    eventos: 'Eventos y Recibos',
+    historial: 'Historial',
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita',
-    garantias: 'Historial y Garantías',
+    garantias: 'Historial',
   };
 
   return (

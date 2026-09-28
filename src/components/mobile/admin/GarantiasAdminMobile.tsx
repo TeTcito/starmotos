@@ -72,6 +72,9 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
   // Ficha de detalle de garantía seleccionada
   const [selectedWarrantyForDetail, setSelectedWarrantyForDetail] = useState<WarrantyRequest | null>(null);
 
+  // Modal de confirmación para eliminar garantía
+  const [warrantyToDelete, setWarrantyToDelete] = useState<WarrantyRequest | null>(null);
+
   const getCleanWhatsappUrl = (phoneStr: string, clientName: string) => {
     const cleanDigits = phoneStr.replace(/\D/g, '');
     let fullNumber = cleanDigits;
@@ -408,9 +411,7 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm(`¿Está seguro de eliminar permanentemente la solicitud de garantía ${w.requestNumber} de ${w.clientName}?`)) {
-                                onDeleteWarranty(w.id);
-                              }
+                              setWarrantyToDelete(w);
                             }}
                             className="p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Eliminar Solicitud de Garantía"
@@ -505,6 +506,51 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Emergente de Confirmación de Eliminación (Móvil) */}
+      {warrantyToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-2xl max-w-sm w-full overflow-hidden p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900">Confirmar Eliminación</h3>
+                <p className="text-[11px] text-zinc-500">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-600 leading-relaxed">
+              ¿Está seguro de eliminar permanentemente la solicitud de garantía{' '}
+              <strong className="text-zinc-900 font-mono">{warrantyToDelete.requestNumber}</strong>{' '}
+              de <strong>{warrantyToDelete.clientName}</strong>?
+            </p>
+            <div className="bg-zinc-50 rounded-xl p-2.5 text-[11px] space-y-1 text-zinc-600 border border-zinc-200">
+              <div><strong>Vehículo:</strong> {warrantyToDelete.motorcycleBrand} {warrantyToDelete.motorcycleModel}</div>
+              <div><strong>Sede Origen:</strong> {warrantyToDelete.tallerOrigin}</div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setWarrantyToDelete(null)}
+                className="px-3.5 py-2 rounded-xl text-zinc-700 hover:bg-zinc-100 font-bold text-xs transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteWarranty) onDeleteWarranty(warrantyToDelete.id);
+                  setWarrantyToDelete(null);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

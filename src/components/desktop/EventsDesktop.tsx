@@ -95,7 +95,7 @@ export const EventsDesktop: React.FC<Props> = ({
             </div>
             <div>
               <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
-                Eventos y Facturas
+                Eventos y Recibos
               </h2>
               <p className="text-xs text-zinc-500 mt-0.5">
                 Historial técnico certificado, kilometraje oficial y comprobantes electrónicos emitidos
@@ -251,151 +251,130 @@ export const EventsDesktop: React.FC<Props> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {displayedRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className="bg-white border border-zinc-200 hover:border-blue-400 rounded-2xl p-5 sm:p-6 transition-all shadow-xs hover:shadow-md group space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-100 px-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+            {displayedRecords.map((record) => {
+              const pend = record.saldoPendiente || 0;
+              const hasDebt = pend > 0.01;
+
+              return (
+                <div
+                  key={record.id}
+                  className="bg-white border border-zinc-200 hover:border-blue-400 rounded-xl p-3.5 transition-all shadow-xs hover:shadow-md group flex flex-col justify-between space-y-2.5"
+                >
+                  {/* Fila Superior: OT, Fecha, Monto / Estado de pago */}
+                  <div>
+                    <div className="flex items-start justify-between gap-2 pb-2 border-b border-zinc-100">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                             {record.otNumber}
                           </span>
-                          <span className="text-xs text-zinc-500 font-medium flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5" />
+                          <span className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-zinc-400" />
                             {record.date}
                           </span>
                         </div>
-                        <h4 className="text-sm font-bold text-zinc-900 mt-1.5">
-                          {record.workSummary[0]}
+                        <h4 className="text-xs font-bold text-zinc-900 mt-1.5 line-clamp-1" title={record.workSummary[0]}>
+                          {record.workSummary[0] || 'Servicio Técnico Autorizado'}
                         </h4>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-sm font-extrabold text-zinc-900 font-mono">
+                        <span className="text-xs font-extrabold text-zinc-900 font-mono">
                           ${record.totalPaid.toFixed(2)}
                         </span>
-                        {(record.saldoPendiente || 0) > 0.01 ? (
+                        {hasDebt ? (
                           <div className="flex flex-col items-end mt-0.5">
-                            <span className="block text-[10px] text-rose-600 font-black">
-                              Debe: ${(record.saldoPendiente || 0).toFixed(2)}
+                            <span className="block text-[9px] text-rose-600 font-black">
+                              Debe: ${pend.toFixed(2)}
                             </span>
                             <button
                               type="button"
                               onClick={() => setIsAbonoModalOpen(true)}
-                              className="mt-1 px-2 py-0.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer transition"
+                              className="mt-0.5 px-1.5 py-0.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded text-[9px] font-bold flex items-center gap-0.5 cursor-pointer transition"
                             >
                               <DollarSign className="w-2.5 h-2.5" />
                               <span>Abonar</span>
                             </button>
                           </div>
                         ) : (
-                          <span className="block text-[10px] text-emerald-700 font-bold">
+                          <span className="block text-[9px] text-emerald-700 font-bold">
                             Pagado
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Banner de Estado de Abono Solicitado */}
+                    {/* Banner de Estado de Abono Solicitado si aplica */}
                     {record.solicitudAbonoPendiente?.estado === 'pendiente' && (
-                      <div className="px-3 py-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 flex items-center justify-between text-xs font-medium">
+                      <div className="mt-2 px-2.5 py-1.5 bg-purple-50 rounded-lg border border-purple-200 text-purple-900 flex items-center justify-between text-[11px] font-medium">
                         <div className="flex items-center gap-1.5 font-bold">
-                          <Clock className="w-3.5 h-3.5 text-purple-600 animate-spin" />
-                          <span>Abono de ${Number(record.solicitudAbonoPendiente.monto).toFixed(2)} USD enviado por transferencia</span>
+                          <Clock className="w-3 h-3 text-purple-600 animate-spin" />
+                          <span>Abono de ${Number(record.solicitudAbonoPendiente.monto).toFixed(2)} USD</span>
                         </div>
-                        <span className="text-[10px] font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-md">
-                          En revisión por taller
+                        <span className="text-[9px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">
+                          En revisión
                         </span>
                       </div>
                     )}
                     {record.solicitudAbonoPendiente?.estado === 'rechazado' && (
-                      <div className="px-3 py-2 bg-rose-50 rounded-xl border border-rose-200 text-rose-900 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 font-bold">
-                          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Abono rechazado: {record.solicitudAbonoPendiente.motivoRechazo || 'Revisar comprobante'}</span>
-                        </div>
+                      <div className="mt-2 px-2.5 py-1.5 bg-rose-50 rounded-lg border border-rose-200 text-rose-900 flex items-center justify-between text-[11px]">
+                        <span className="truncate max-w-[170px] text-[10px]">Abono rechazado</span>
                         <button
                           type="button"
                           onClick={() => setIsAbonoModalOpen(true)}
-                          className="text-[10px] font-bold bg-rose-200 hover:bg-rose-300 text-rose-800 px-2 py-0.5 rounded-md cursor-pointer"
+                          className="text-[9px] font-bold bg-rose-200 text-rose-800 px-1.5 py-0.5 rounded cursor-pointer"
                         >
-                          Reenviar comprobante
+                          Reenviar
                         </button>
                       </div>
                     )}
 
-                    {/* Detalles del servicio compactados con espacio interior */}
-                    <div className="grid grid-cols-2 gap-4 px-4 py-3 bg-zinc-50/80 rounded-xl border border-zinc-200/60 text-xs text-zinc-600">
-                      <div>
-                        <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Kilometraje</span>
-                        <span className="font-mono font-bold text-zinc-800">{record.mileage.toLocaleString()} km</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Taller Autorizado</span>
-                        <span className="font-medium text-zinc-800 truncate block">{record.branchName}</span>
-                      </div>
-                    </div>
-
-                    {/* Lista de trabajos con margen seguro */}
-                    <div className="px-1 space-y-1.5">
-                      <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">
-                        Trabajos Ejecutados:
+                    {/* Barra compacta: Kilometraje y Sede */}
+                    <div className="mt-2 flex items-center justify-between text-[11px] bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-100 text-zinc-600">
+                      <span className="font-mono font-semibold text-zinc-800">
+                        {record.mileage.toLocaleString()} km
                       </span>
-                      <ul className="space-y-1">
-                        {record.workSummary.map((task, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-xs text-zinc-700">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>{task}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <span className="truncate max-w-[150px] text-zinc-500 font-medium" title={record.branchName}>
+                        {record.branchName}
+                      </span>
                     </div>
 
-                    {/* Repuestos */}
-                    {record.partsReplaced && record.partsReplaced.length > 0 && (
-                      <div className="px-1 pt-2.5 border-t border-zinc-100 flex flex-wrap gap-1.5 items-center">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase">Repuestos:</span>
-                        {record.partsReplaced.map((part, pIdx) => (
-                          <span
-                            key={pIdx}
-                            className="text-[10px] bg-zinc-100 text-zinc-700 font-medium px-2 py-0.5 rounded-md border border-zinc-200"
-                          >
-                            {part}
-                          </span>
-                        ))}
-                      </div>
+                    {/* Resumen secundario de tareas si hay más de 1 */}
+                    {record.workSummary.length > 1 && (
+                      <p className="mt-1.5 text-[10px] text-zinc-500 truncate italic">
+                        +{record.workSummary.length - 1} más: {record.workSummary.slice(1).join(', ')}
+                      </p>
                     )}
+                  </div>
 
-                    <div className="px-1 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-500">
-                      <span className="flex items-center gap-1.5">
-                        <UserCheck className="w-3.5 h-3.5 text-zinc-400" />
-                        Técnico: <strong className="text-zinc-700">{record.technicianName}</strong>
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrderRecord(record)}
-                          className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer hover:underline"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Ver Orden
-                        </button>
-                        <span className="text-zinc-300">•</span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedInvoice(record)}
-                          className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer hover:underline"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          Ver Factura
-                        </button>
-                      </div>
+                  {/* Fila Inferior: Técnico y Botones Compactos */}
+                  <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
+                    <span className="truncate max-w-[130px] text-[10px] text-zinc-500" title={record.technicianName}>
+                      Téc: <strong className="text-zinc-700">{record.technicianName?.split(' ')[0] || 'Oficial'}</strong>
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderRecord(record)}
+                        className="px-2 py-1 rounded-md bg-zinc-50 hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 font-bold text-[10px] flex items-center gap-1 border border-zinc-200 hover:border-emerald-300 transition cursor-pointer"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Ver Orden</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoice(record)}
+                        className="px-2 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 font-bold text-[10px] flex items-center gap-1 border border-blue-200 hover:border-blue-300 transition cursor-pointer"
+                      >
+                        <Receipt className="w-3 h-3" />
+                        <span>Ver Recibo</span>
+                      </button>
                     </div>
                   </div>
-                ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

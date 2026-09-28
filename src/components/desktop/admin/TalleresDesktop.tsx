@@ -2,11 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, ArrowLeft, Wrench, ShieldCheck, Users, Package, Clock, 
   CheckCircle2, AlertTriangle, MapPin, Phone, TrendingUp, DollarSign, 
-  FileText, ChevronRight, User, Search, ChevronDown, Star, MessageSquare
+  FileText, ChevronRight, User, Search, ChevronDown, Star, MessageSquare,
+  Key, Eye, EyeOff, Edit2, Lock, Unlock, X, ShieldAlert
 } from 'lucide-react';
 import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Technician, TallerOrder, InventoryItem, AdminInvoice, OrderRating } from '../../../types/customer';
 import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp, matchOrderToWorkshop, calculateWorkshopFinances } from '../../common/AlistamientoWizard';
-import { saveStoredOrders, getStoredOrders, getStoredRatings } from '../../../data/mockMultiRoleData';
+import { saveStoredOrders, getStoredOrders, getStoredRatings, saveStoredWorkshops, getStoredWorkshops, getStoredWorkshopManagers, saveStoredWorkshopManagers } from '../../../data/mockMultiRoleData';
+import { ModalPortal } from '../../common/ModalPortal';
 
 interface Props {
   workshops: Workshop[];
@@ -153,21 +155,91 @@ export const TalleresDesktop: React.FC<Props> = ({
   // Helpers and Memos
   const getWorkshopOrders = (wsId: string) => orders.filter(o => matchOrderToWorkshop(o, wsId, workshops));
   
-  const provinces = useMemo(() => {
-    const provs = Array.from(new Set(workshops.map(w => w.province).filter(Boolean) as string[]));
-    return ['Todas', ...provs.sort()];
+  const [localWorkshops, setLocalWorkshops] = useState<Workshop[]>(workshops);
+
+  useEffect(() => {
+    setLocalWorkshops(workshops);
   }, [workshops]);
+
+  useEffect(() => {
+    const handleWsUpdate = () => {
+      setLocalWorkshops(getStoredWorkshops());
+    };
+    window.addEventListener('starmotos_workshops_updated', handleWsUpdate);
+    window.addEventListener('storage', handleWsUpdate);
+    return () => {
+      window.removeEventListener('starmotos_workshops_updated', handleWsUpdate);
+      window.removeEventListener('storage', handleWsUpdate);
+    };
+  }, []);
+
+  // Modal para Bloqueo / Inoperativización y Reactivación
+  const [statusModalWs, setStatusModalWs] = useState<Workshop | null>(null);
+  const [inoperativoReason, setInoperativoReason] = useState<string>('');
+
+  // Contraseña de sede (ver / editar)
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isEditingPassword, setIsEditingPassword] = useState<boolean>(false);
+  const [newPassword, setNewPassword] = useState<string>('');
+
+  const handleOpenStatusModal = (ws: Workshop) => {
+    setStatusModalWs(ws);
+    setInoperativoReason(ws.inoperativoMotivo || '');
+  };
+
+  const handleConfirmStatusChange = () => {
+    if (!statusModalWs) return;
+    const isGoingInoperativo = statusModalWs.status !== 'inoperativo';
+    const updated = localWorkshops.map((w) => {
+      if (w.id === statusModalWs.id) {
+        return {
+          ...w,
+          status: isGoingInoperativo ? 'inoperativo' : 'operativo',
+          inoperativoMotivo: isGoingInoperativo
+            ? (inoperativoReason.trim() || 'Acceso a la sede restringido por disposición de la administración central de Matriz.')
+            : undefined,
+          inoperativoFecha: isGoingInoperativo ? new Date().toISOString() : undefined,
+        };
+      }
+      return w;
+    });
+    setLocalWorkshops(updated);
+    saveStoredWorkshops(updated);
+    setStatusModalWs(null);
+    setInoperativoReason('');
+  };
+
+  const handleSavePassword = (wsId: string, pwd: string) => {
+    if (!pwd.trim()) return;
+    const cleanPwd = pwd.trim();
+    const updated = localWorkshops.map((w) => (w.id === wsId ? { ...w, password: cleanPwd } : w));
+    setLocalWorkshops(updated);
+    saveStoredWorkshops(updated);
+
+    try {
+      const managers = getStoredWorkshopManagers();
+      const updatedMgrs = managers.map((m) => (m.workshopId === wsId ? { ...m, password: cleanPwd } : m));
+      saveStoredWorkshopManagers(updatedMgrs);
+    } catch (_) {}
+
+    setIsEditingPassword(false);
+  };
+
+  const provinces = useMemo(() => {
+    const provs = Array.from(new Set(localWorkshops.map((w) => w.province).filter(Boolean) as string[]));
+    return ['Todas', ...provs.sort()];
+  }, [localWorkshops]);
 
   const getWorkshopLatestActivity = (wsId: string): number => {
     let latest = 0;
     // 1. Alistamientos del taller
-    const wsAls = fullAlistamientos.filter(a => matchRecordToWorkshop(a, wsId, workshops));
+    const wsAls = fullAlistamientos.filter((a) => matchRecordToWorkshop(a, wsId, localWorkshops));
     for (const a of wsAls) {
       const ts = getRecordTimestamp(a);
       if (ts > latest) latest = ts;
     }
     // 2. Órdenes del taller
-    const wsOrds = orders.filter(o => (o as any).workshopId === wsId || (o as any).tallerId === wsId);
+    const wsOrds = orders.filter((o) => (o as any).workshopId === wsId || (o as any).tallerId === wsId);
     for (const o of wsOrds) {
       const dateStr = o.createdAt || o.entryDate;
       if (dateStr) {
@@ -176,7 +248,7 @@ export const TalleresDesktop: React.FC<Props> = ({
       }
     }
     // 3. Garantías del taller
-    const wsWarrs = warranties.filter(w => w.tallerOriginId === wsId || (w as any).tallerOrigin === wsId);
+    const wsWarrs = warranties.filter((w) => w.tallerOriginId === wsId || (w as any).tallerOrigin === wsId);
     for (const w of wsWarrs) {
       if (w.createdAt) {
         const ts = new Date(w.createdAt).getTime();
@@ -187,17 +259,18 @@ export const TalleresDesktop: React.FC<Props> = ({
   };
 
   const filteredWorkshops = useMemo(() => {
-    let result = workshops;
+    let result = localWorkshops;
     if (selectedProvince !== 'Todas') {
-      result = result.filter(w => w.province === selectedProvince);
+      result = result.filter((w) => w.province === selectedProvince);
     }
     if (searchWorkshop.trim() !== '') {
       const q = searchWorkshop.toLowerCase();
-      result = result.filter(w => 
-        w.name.toLowerCase().includes(q) || 
-        w.city.toLowerCase().includes(q) || 
-        w.code.toLowerCase().includes(q) || 
-        w.manager.toLowerCase().includes(q)
+      result = result.filter(
+        (w) =>
+          w.name.toLowerCase().includes(q) ||
+          w.city.toLowerCase().includes(q) ||
+          w.code.toLowerCase().includes(q) ||
+          w.manager.toLowerCase().includes(q)
       );
     }
     // Siempre poner el más reciente primero que tenga algún cambio o actividad
@@ -207,31 +280,239 @@ export const TalleresDesktop: React.FC<Props> = ({
       if (actA !== actB) return actB - actA;
       return a.name.localeCompare(b.name);
     });
-  }, [workshops, selectedProvince, searchWorkshop, fullAlistamientos, orders, warranties]);
+  }, [localWorkshops, selectedProvince, searchWorkshop, fullAlistamientos, orders, warranties]);
 
+  // 6 Métricas Globales Solicitadas
+  const globalPdi = useMemo(() => {
+    return fullAlistamientos.filter(
+      (a) => a.serviciosRealizados?.includes('alistamiento_pdi') || isPdiOnlyRecord(a)
+    ).length;
+  }, [fullAlistamientos]);
 
-  // Global Metrics
-  const globalActiveOrders = useMemo(() => {
-    const activeFromOrders = orders.filter(o => o.status !== 'entregada').length;
-    return activeFromOrders > 0 ? activeFromOrders : workshops.reduce((acc, ws) => acc + ws.activeOrders, 0);
-  }, [orders, workshops]);
+  const globalEngrasados = useMemo(() => {
+    return fullAlistamientos.filter((a) => a.serviciosRealizados?.includes('engrasado')).length;
+  }, [fullAlistamientos]);
 
-  const globalWarrantiesInProcess = useMemo(() => {
-    return warranties.filter(w => !['completada', 'denegada', 'rechazada'].includes(w.status)).length;
+  const globalMantenimientos = useMemo(() => {
+    return fullAlistamientos.filter((a) => a.serviciosRealizados?.includes('mantenimiento')).length;
+  }, [fullAlistamientos]);
+
+  const globalClientesTotales = useMemo(() => {
+    return clients.length;
+  }, [clients]);
+
+  const globalOrdenesActivas = useMemo(() => {
+    const active = orders.filter(
+      (o) => o.status !== 'entregada' && o.status !== 'entregado' && o.status !== 'cancelada'
+    ).length;
+    return active > 0 ? active : localWorkshops.reduce((acc, ws) => acc + ws.activeOrders, 0);
+  }, [orders, localWorkshops]);
+
+  const globalGarantias = useMemo(() => {
+    const inProcess = warranties.filter(
+      (w) => !['completada', 'denegada', 'rechazada'].includes(w.status)
+    ).length;
+    return inProcess || warranties.length;
   }, [warranties]);
 
-  const globalMechanics = technicians.length || workshops.reduce((acc, ws) => acc + ws.mechanics, 0);
-  const globalAlistamientos = fullAlistamientos.length;
+  const renderSixKpiCards = (metrics: {
+    pdi: number;
+    engrasados: number;
+    mantenimientos: number;
+    clientesTotales: number;
+    ordenesActivas: number;
+    garantias: number;
+  }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* 1. PDI */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-blue-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800">PDI</span>
+          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.pdi}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">Pre-Entrega</div>
+      </div>
+
+      {/* 2. ENGRASADOS */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-indigo-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800">ENGRASADOS</span>
+          <TrendingUp className="w-4 h-4 text-indigo-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.engrasados}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">Lubricación</div>
+      </div>
+
+      {/* 3. MANTENIMIENTOS */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-emerald-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">MANTENIMIENTOS</span>
+          <Wrench className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.mantenimientos}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">Preventivos</div>
+      </div>
+
+      {/* 4. CLIENTES TOTALES */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-purple-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-800">CLIENTES TOTALES</span>
+          <Users className="w-4 h-4 text-purple-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.clientesTotales}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">Registrados</div>
+      </div>
+
+      {/* 5. ORDENES ACTIVAS */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-amber-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">ORDENES ACTIVAS</span>
+          <Clock className="w-4 h-4 text-amber-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.ordenesActivas}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">En Proceso</div>
+      </div>
+
+      {/* 6. GARANTIAS */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs hover:border-rose-300 transition-all">
+        <div className="flex items-center justify-between text-zinc-500 mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800">GARANTIAS</span>
+          <ShieldCheck className="w-4 h-4 text-rose-600" />
+        </div>
+        <div className="text-2xl font-black text-zinc-900 font-mono">{metrics.garantias}</div>
+        <div className="text-[10px] text-zinc-400 mt-0.5">Casos Gestión</div>
+      </div>
+    </div>
+  );
+
+  const statusModalElement = statusModalWs && (
+    <ModalPortal
+      isOpen={Boolean(statusModalWs)}
+      onClose={() => {
+        setStatusModalWs(null);
+        setInoperativoReason('');
+      }}
+      maxWidth="max-w-md"
+    >
+      {/* Header */}
+      <div className={`p-4 flex items-center justify-between text-white ${
+        statusModalWs.status === 'inoperativo' ? 'bg-emerald-600' : 'bg-rose-600'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-white/20 rounded-xl">
+            {statusModalWs.status === 'inoperativo' ? <Unlock className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />}
+          </div>
+          <div>
+            <h3 className="font-bold text-sm leading-tight">
+              {statusModalWs.status === 'inoperativo' ? 'Reactivar Sede Operativa' : 'Suspender Operatividad de Sede'}
+            </h3>
+            <p className="text-[11px] text-white/80">{statusModalWs.name} ({statusModalWs.code})</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusModalWs(null);
+            setInoperativoReason('');
+          }}
+          className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="p-5 flex flex-col gap-4 text-xs text-zinc-600">
+        {statusModalWs.status === 'inoperativo' ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-emerald-900 flex flex-col gap-2">
+            <div className="flex items-center gap-2 font-bold text-sm text-emerald-800">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>¿Desea reactivar esta sede autorizada?</span>
+            </div>
+            <p className="text-[11.5px] text-emerald-700 leading-relaxed">
+              Al marcar la sede como <strong>Operativo</strong>, el Jefe de Taller podrá ingresar nuevamente a su portal de trabajo con total normalidad.
+            </p>
+            {statusModalWs.inoperativoMotivo && (
+              <div className="mt-1 p-2 bg-white/80 rounded border border-emerald-200/60 text-[11px]">
+                <span className="font-semibold text-emerald-800">Motivo previo de suspensión:</span> {statusModalWs.inoperativoMotivo}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-rose-900 flex items-start gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-[11.5px] leading-relaxed">
+                <strong className="font-bold text-rose-800">Bloqueo de acceso al Jefe de Taller:</strong> Al marcar como <strong>Inoperativo</strong>, el acceso al portal de esta sucursal quedará restringido de inmediato hasta nueva disposición de Matriz.
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-1.5">
+                Motivo / Comentario de la suspensión:
+              </label>
+              <textarea
+                value={inoperativoReason}
+                onChange={(e) => setInoperativoReason(e.target.value)}
+                placeholder="Ej: Sede temporalmente fuera de servicio por mantenimiento preventivo general. Comunicarse con Matriz para más detalles."
+                rows={3}
+                className="w-full text-xs p-2.5 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-rose-500 focus:outline-none placeholder:text-zinc-400 bg-zinc-50 focus:bg-white resize-none"
+              />
+              <p className="text-[10px] text-zinc-400 mt-1">
+                Este comentario se le mostrará al jefe de taller al momento de intentar acceder a su portal.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="p-3.5 bg-zinc-50 border-t border-zinc-100 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusModalWs(null);
+            setInoperativoReason('');
+          }}
+          className="px-3.5 py-1.5 text-xs font-semibold text-zinc-600 hover:text-zinc-800 hover:bg-zinc-200/60 rounded-xl transition cursor-pointer"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirmStatusChange}
+          className={`px-4 py-1.5 text-xs font-bold text-white rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
+            statusModalWs.status === 'inoperativo'
+              ? 'bg-emerald-600 hover:bg-emerald-700'
+              : 'bg-rose-600 hover:bg-rose-700'
+          }`}
+        >
+          {statusModalWs.status === 'inoperativo' ? (
+            <>
+              <Unlock className="w-3.5 h-3.5" />
+              <span>Reactivar Sede</span>
+            </>
+          ) : (
+            <>
+              <Lock className="w-3.5 h-3.5" />
+              <span>Suspender y Bloquear Sede</span>
+            </>
+          )}
+        </button>
+      </div>
+    </ModalPortal>
+  );
 
   if (selectedWorkshopId) {
-    const ws = workshops.find(w => w.id === selectedWorkshopId);
+    const ws = localWorkshops.find(w => w.id === selectedWorkshopId);
     if (!ws) {
       setSelectedWorkshopId(null);
       return null;
     }
 
     const wsOrders = getWorkshopOrders(ws.id);
-    const activeWsOrders = wsOrders.length > 0 ? wsOrders.filter(o => o.status !== 'entregada').length : ws.activeOrders;
+    const activeWsOrders = wsOrders.length > 0 ? wsOrders.filter(o => o.status !== 'entregada' && o.status !== 'entregado').length : ws.activeOrders;
     
     let filteredWsOrders = wsOrders;
     if (orderStatusFilter !== 'all') {
@@ -255,7 +536,7 @@ export const TalleresDesktop: React.FC<Props> = ({
     const wsWarranties = warranties.filter(w => w.tallerOriginId === ws.id || w.tallerOrigin === ws.name || (w as any).tallerOrigin === ws.id);
     const warrantiesInProcess = wsWarranties.filter(w => !['completada', 'denegada', 'rechazada'].includes(w.status)).length;
     
-    const wsAlistamientos = fullAlistamientos.filter(a => matchRecordToWorkshop(a, ws.id, workshops));
+    const wsAlistamientos = fullAlistamientos.filter(a => matchRecordToWorkshop(a, ws.id, localWorkshops));
     const sortedWsAlistamientos = [...wsAlistamientos].sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
     const wsClients = clients.filter(c => c.workshopId === ws.id || c.workshopName === ws.name);
     const wsTechnicians = technicians.filter(t => t.workshopId === ws.id || t.workshopName === ws.name);
@@ -287,10 +568,21 @@ export const TalleresDesktop: React.FC<Props> = ({
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h2 className="text-xl font-bold text-zinc-800">{ws.name}</h2>
               <span className="px-2 py-1 bg-zinc-100 text-zinc-600 rounded text-xs font-mono">{ws.code}</span>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-zinc-200">
-                <span className={`w-2 h-2 rounded-full ${ws.status === 'operativo' ? 'bg-emerald-500' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
-                <span className="capitalize">{ws.status}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleOpenStatusModal(ws)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition cursor-pointer ${
+                  ws.status === 'inoperativo'
+                    ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                    : ws.status === 'mantenimiento'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                }`}
+                title={ws.status === 'inoperativo' ? 'Sede Inoperativa - Click para reactivar' : 'Sede Operativa - Click para inoperativizar'}
+              >
+                <span className={`w-2 h-2 rounded-full ${ws.status === 'inoperativo' ? 'bg-rose-500 animate-pulse' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span className="capitalize">{ws.status === 'inoperativo' ? 'Inoperativo' : 'Operativo'}</span>
+              </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -302,6 +594,70 @@ export const TalleresDesktop: React.FC<Props> = ({
                     <p className="text-xs text-zinc-500">{[ws.city, ws.parroquia, ws.canton, ws.province].filter(Boolean).join(', ')}</p>
                     {ws.reference && <p className="text-xs text-zinc-400 italic mt-0.5">Ref: {ws.reference}</p>}
                   </div>
+                </div>
+
+                {/* Contraseña de la sede: Ver y Editar justo abajo de la dirección */}
+                <div className="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-700 font-semibold">
+                      <Key className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Contraseña de la Sede:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-zinc-500 hover:text-zinc-800 text-xs flex items-center gap-1 cursor-pointer p-0.5 rounded hover:bg-zinc-100 transition"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span className="text-[11px] font-medium">{showPassword ? 'Ocultar' : 'Ver'}</span>
+                      </button>
+                      {!isEditingPassword && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewPassword(ws.password || 'taller123');
+                            setIsEditingPassword(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 cursor-pointer p-0.5 rounded hover:bg-blue-50 transition"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span className="text-[11px] font-medium">Editar</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditingPassword ? (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <input
+                        type="text"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="px-2.5 py-1 text-xs border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono flex-1 max-w-[200px]"
+                        placeholder="Nueva contraseña"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSavePassword(ws.id, newPassword)}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg cursor-pointer transition shadow-2xs"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPassword(false)}
+                        className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-xs font-medium rounded-lg cursor-pointer transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="font-mono text-xs bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-lg w-fit text-zinc-800 select-all font-semibold">
+                      {showPassword ? (ws.password || 'taller123') : '••••••••••••'}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-2">
@@ -323,7 +679,7 @@ export const TalleresDesktop: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Bloque derecho: Calificación promedio en la esquina y contenedor de hasta 4 comentarios con scroll */}
+          {/* Bloque derecho: Calificación promedio y contenedor de hasta 3 comentarios con scroll si hay más */}
           <div className="w-full lg:w-96 shrink-0 bg-slate-50/80 border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
             {/* Esquina superior derecha: Estrellas de calificación y promedio */}
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -365,7 +721,7 @@ export const TalleresDesktop: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Abajo: Bloque contenedor de hasta 4 comentarios (con scroll si hay más en el espacio de 4) */}
+            {/* Abajo: Bloque contenedor de hasta 3 comentarios (con scroll si hay más en el espacio de 3) */}
             <div className="flex flex-col">
               <div className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-1">
@@ -383,8 +739,8 @@ export const TalleresDesktop: React.FC<Props> = ({
                 </div>
               ) : (
                 <div 
-                  className="space-y-2 overflow-y-auto pr-1 max-h-[280px]"
-                  style={{ maxHeight: '280px' }}
+                  className="space-y-2 overflow-y-auto pr-1 max-h-[215px] scrollbar-thin"
+                  style={{ maxHeight: '215px' }}
                 >
                   {wsRatingsWithComments.map((r) => (
                     <div
@@ -429,71 +785,15 @@ export const TalleresDesktop: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* KPI Dashboard */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <Wrench className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Órdenes Activas</span>
-            </div>
-            <span className="text-2xl font-bold text-zinc-800">{activeWsOrders}</span>
-          </div>
-          
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <ShieldCheck className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Garantías Proceso</span>
-            </div>
-            <span className="text-2xl font-bold text-zinc-800">{warrantiesInProcess}</span>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <CheckCircle2 className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Alistamientos</span>
-            </div>
-            <span className="text-2xl font-bold text-zinc-800">{wsAlistamientos.length}</span>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <Users className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Clientes & Técnicos</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-zinc-800">{wsClients.length}</span>
-              <span className="text-xs text-zinc-500">/ {wsTechnicians.length || ws.mechanics} téc.</span>
-            </div>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <Package className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Inventario</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-zinc-800">{wsInventoryCount}</span>
-              {wsLowStockCount > 0 && (
-                <span className="flex items-center gap-1 text-[10px] font-medium bg-red-50 text-red-600 px-1.5 py-0.5 rounded">
-                  <AlertTriangle className="w-3 h-3" />
-                  {wsLowStockCount}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-zinc-500">
-              <DollarSign className="w-4 h-4" />
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Ingresos Tot.</span>
-            </div>
-            <span className="text-2xl font-bold text-zinc-800">USD {totalIngresos.toFixed(2)}</span>
-            <div className="flex justify-between items-center mt-2 text-[10px]">
-               <span className="text-emerald-600 font-medium">Cobrado: ${totalCobrado.toFixed(2)}</span>
-               <span className="text-rose-600 font-medium">Pendiente: ${totalPendiente.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
+        {/* Segunda Sección: 6 Cuadros de la Sede Solicitados */}
+        {renderSixKpiCards({
+          pdi: wsAlistamientos.filter((a) => a.serviciosRealizados?.includes('alistamiento_pdi') || isPdiOnlyRecord(a)).length,
+          engrasados: wsAlistamientos.filter((a) => a.serviciosRealizados?.includes('engrasado')).length,
+          mantenimientos: wsAlistamientos.filter((a) => a.serviciosRealizados?.includes('mantenimiento')).length,
+          clientesTotales: wsClients.length,
+          ordenesActivas: activeWsOrders,
+          garantias: warrantiesInProcess,
+        })}
 
         {/* Data Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -736,6 +1036,8 @@ export const TalleresDesktop: React.FC<Props> = ({
             </div>
           </div>
         </div>
+
+        {statusModalElement}
       </div>
     );
   }
@@ -776,48 +1078,15 @@ export const TalleresDesktop: React.FC<Props> = ({
         ))}
       </div>
 
-      {/* Summary Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-            <Wrench className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-0.5">Órdenes Activas</div>
-            <div className="text-2xl font-bold text-zinc-800">{globalActiveOrders}</div>
-          </div>
-        </div>
-        
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-0.5">Garantías Proceso</div>
-            <div className="text-2xl font-bold text-zinc-800">{globalWarrantiesInProcess}</div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-0.5">Mecánicos Act.</div>
-            <div className="text-2xl font-bold text-zinc-800">{globalMechanics}</div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <div className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-0.5">Alistamientos</div>
-            <div className="text-2xl font-bold text-zinc-800">{globalAlistamientos}</div>
-          </div>
-        </div>
-      </div>
+      {/* 6 Métricas Globales Solicitadas */}
+      {renderSixKpiCards({
+        pdi: globalPdi,
+        engrasados: globalEngrasados,
+        mantenimientos: globalMantenimientos,
+        clientesTotales: globalClientesTotales,
+        ordenesActivas: globalOrdenesActivas,
+        garantias: globalGarantias,
+      })}
 
       {/* Grid of Compact Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -850,10 +1119,24 @@ export const TalleresDesktop: React.FC<Props> = ({
                   <span className="px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[9px] font-mono tracking-wider font-semibold">
                     {ws.code}
                   </span>
-                  <div className="flex items-center gap-1.5" title={ws.status}>
-                    <span className={`w-2 h-2 rounded-full ${ws.status === 'operativo' ? 'bg-emerald-500' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
-                    <span className="text-[10px] capitalize text-zinc-500 font-medium">{ws.status}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenStatusModal(ws);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer ${
+                      ws.status === 'inoperativo'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        : ws.status === 'mantenimiento'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                    title={ws.status === 'inoperativo' ? 'Sede Inoperativa - Click para reactivar' : 'Sede Operativa - Click para inoperativizar'}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${ws.status === 'inoperativo' ? 'bg-rose-500 animate-pulse' : ws.status === 'mantenimiento' ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                    <span className="capitalize">{ws.status === 'inoperativo' ? 'Inoperativo' : 'Operativo'}</span>
+                  </button>
                 </div>
                 
                 <h3 className="text-[13px] font-bold text-zinc-800 line-clamp-1">{ws.name}</h3>
@@ -932,6 +1215,8 @@ export const TalleresDesktop: React.FC<Props> = ({
           <p className="text-zinc-500 text-sm">No se encontraron talleres en esta provincia.</p>
         </div>
       )}
+
+      {statusModalElement}
     </div>
   );
 };

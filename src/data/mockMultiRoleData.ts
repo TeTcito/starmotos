@@ -45,6 +45,8 @@ import {
   cloudSaveRating,
   cloudSaveAgendamiento,
   cloudDeleteAgendamiento,
+  cloudSaveGpsRecord,
+  cloudDeleteGpsRecord,
   getDeletedTombstones,
   addDeletedTombstone,
   removeDeletedTombstone,
@@ -65,11 +67,11 @@ export {
 };
 
 
-// --- Talleres y Sucursales Oficiales de StarMotos (11 Ubicaciones Oficiales) ---
+// --- Talleres y Sucursales Oficiales de StarMotos (13 Ubicaciones Oficiales) ---
 export const INITIAL_WORKSHOPS: Workshop[] = [
   {
     id: 'matriz-la-mana',
-    name: 'StarMotos Matriz La Maná',
+    name: 'StarMotos Matriz Central',
     code: 'MAT-01',
     address: 'Calle Jaime Roldós #1 y Gonzalo Albarracín',
     city: 'La Maná, Cotopaxi',
@@ -78,7 +80,26 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     parroquia: 'La Maná',
     reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
     phone: '0939316698 / 0939317809',
-    manager: 'William Daniel Meza Chicaiza (Gerente)',
+    manager: 'William Daniel Meza Chicaiza (Gerente Matriz)',
+    email: 'admin@starmotos.com',
+    status: 'operativo',
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
+    mechanics: 6,
+  },
+  {
+    id: 'taller-la-mana',
+    name: 'StarMotos Sucursal La Maná',
+    code: 'SUC-01',
+    address: 'Calle Jaime Roldós #1 y Gonzalo Albarracín',
+    city: 'La Maná, Cotopaxi',
+    province: 'Cotopaxi',
+    canton: 'La Maná',
+    parroquia: 'La Maná',
+    reference: 'Atrás de la Unidad Educativa La Maná, casa color rojo y blanco',
+    phone: '0939316698 / 0939317809',
+    manager: 'William Meza',
     email: 'sede.la-mana@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
@@ -99,6 +120,25 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     phone: '0939316698',
     manager: 'Jefe de Taller Buena Fe',
     email: 'sede.buena-fe@starmotos.com',
+    status: 'operativo',
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
+    mechanics: 3,
+  },
+  {
+    id: 'taller-buena-fe-2',
+    name: 'StarMotos Sucursal Buena Fe 2',
+    code: 'SUC-02B',
+    address: 'Av. 7 de Agosto y Calle Los Álamos (Sector Norte)',
+    city: 'Buena Fe, Los Ríos',
+    province: 'Los Ríos',
+    canton: 'Buena Fe',
+    parroquia: 'San Jacinto de Buena Fe',
+    reference: 'Entrada Norte / Frente a Gasolinera Primax Buena Fe',
+    phone: '0939316698',
+    manager: 'Jefe de Taller Buena Fe 2',
+    email: 'sede.buena-fe-2@starmotos.com',
     status: 'operativo',
     activeOrders: 0,
     completedToday: 0,
@@ -567,61 +607,18 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
 /**
  * Evalúa si una solicitud de garantía puede ser eliminada.
  * Regla de negocio: Las garantías que ya han sido ACEPTADAS / APROBADAS solo pueden
- * ser eliminadas una vez transcurridos 30 días desde su resolución oficial.
- * Las demás solicitudes (en revisión, en proceso, rechazadas) se pueden eliminar inmediatamente.
+ * Eliminación de garantías: Ahora se confirma mediante ventana emergente directa
+ * sin requerir el periodo de espera de 30 días.
  */
 export function canDeleteWarranty(warranty?: WarrantyRequest | null): {
   canDelete: boolean;
   reason?: string;
   daysRemaining?: number;
 } {
-  if (!warranty) return { canDelete: true };
-
-  const isAccepted =
-    warranty.status === 'aceptada' ||
-    warranty.status === 'aprobada' ||
-    warranty.status === 'en_proceso_aceptacion_2';
-
-  if (!isAccepted) {
-    return { canDelete: true };
-  }
-
-  // Extraer fecha base (aprobación o creación)
-  let baseDate: Date | null = null;
-  if (warranty.approvedAt) {
-    const parsed = Date.parse(warranty.approvedAt);
-    if (!isNaN(parsed)) {
-      baseDate = new Date(parsed);
-    }
-  }
-
-  if (!baseDate && warranty.createdAt) {
-    const parsed = Date.parse(warranty.createdAt);
-    if (!isNaN(parsed)) {
-      baseDate = new Date(parsed);
-    }
-  }
-
-  if (!baseDate) {
-    baseDate = new Date();
-  }
-
-  const diffMs = Date.now() - baseDate.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-  if (diffDays < 30) {
-    const daysRemaining = Math.max(1, Math.ceil(30 - diffDays));
-    return {
-      canDelete: false,
-      reason: `Las garantías aceptadas solo se pueden eliminar después de 30 días de su resolución oficial. Faltan ${daysRemaining} día(s) para habilitar su eliminación.`,
-      daysRemaining,
-    };
-  }
-
   return { canDelete: true };
 }
 
-export function deleteStoredWarranty(id: string, force: boolean = false): boolean {
+export function deleteStoredWarranty(id: string, _force: boolean = false): boolean {
   try {
     const cleanId = id.trim();
     const stored = getStoredWarranties();
@@ -631,14 +628,6 @@ export function deleteStoredWarranty(id: string, force: boolean = false): boolea
         w.requestNumber === cleanId ||
         (w.requestNumber && w.requestNumber.toLowerCase() === cleanId.toLowerCase())
     );
-
-    if (target && !force) {
-      const deleteCheck = canDeleteWarranty(target);
-      if (!deleteCheck.canDelete) {
-        alert(deleteCheck.reason || 'Las garantías aceptadas solo se pueden eliminar después de 30 días de su resolución oficial.');
-        return false;
-      }
-    }
 
     const idsToTombstone = [cleanId];
     if (target?.id && !idsToTombstone.includes(target.id)) idsToTombstone.push(target.id);
@@ -824,18 +813,289 @@ export function filterAlertsForRole(
   });
 }
 
-// Talleres (11 Ubicaciones Oficiales)
+let isCloningInProgress = false;
+
+/**
+ * Clona e independiza los datos operativos de La Maná para la nueva Sede La Maná (taller-la-mana),
+ * asegurando que la Matriz conserve todos sus datos actuales intactos.
+ */
+export function ensureSedeLaManaCloned(): void {
+  if (typeof window === 'undefined') return;
+  if (isCloningInProgress) return;
+  isCloningInProgress = true;
+
+  try {
+    // 1. Clientes
+    const rawClients = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+    if (rawClients) {
+      try {
+        const clients: TallerClient[] = JSON.parse(rawClients);
+        if (Array.isArray(clients) && clients.length > 0) {
+          let clientsChanged = false;
+          const newClones: TallerClient[] = [];
+          clients.forEach((c) => {
+            const isMatrizOrLaMana =
+              c.workshopId === 'matriz-la-mana' ||
+              (c.workshopName && (c.workshopName.toLowerCase().includes('matriz') || c.workshopName.toLowerCase().includes('la maná')));
+            if (isMatrizOrLaMana) {
+              const cloneId = c.id && c.id.endsWith('-lm') ? c.id : `${c.id}-lm`;
+              const alreadyExists = clients.some(
+                (existing) => existing.id === cloneId || (existing.workshopId === 'taller-la-mana' && existing.idNumber === c.idNumber)
+              );
+              if (!alreadyExists) {
+                newClones.push({
+                  ...c,
+                  id: cloneId,
+                  workshopId: 'taller-la-mana',
+                  workshopName: 'StarMotos Sucursal La Maná',
+                });
+                clientsChanged = true;
+              }
+            }
+          });
+          if (clientsChanged && newClones.length > 0) {
+            const updatedClients = [...clients, ...newClones];
+            localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(updatedClients));
+            newClones.forEach((nc) => cloudSaveClient(nc));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando clientes para Sede La Maná:', err);
+      }
+    }
+
+    // 2. Alistamientos
+    const rawAls = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
+    if (rawAls) {
+      try {
+        const alistamientos: AlistamientoFullRecord[] = JSON.parse(rawAls);
+        if (Array.isArray(alistamientos) && alistamientos.length > 0) {
+          let alsChanged = false;
+          const newAlsClones: AlistamientoFullRecord[] = [];
+          alistamientos.forEach((a) => {
+            const isMatrizOrLaMana =
+              a.sedeId === 'matriz-la-mana' ||
+              (a.sede && (a.sede.toLowerCase().includes('matriz') || a.sede.toLowerCase().includes('la maná')));
+            if (isMatrizOrLaMana) {
+              const cloneId = a.id && a.id.endsWith('-lm') ? a.id : `${a.id}-lm`;
+              const alreadyExists = alistamientos.some(
+                (existing) => existing.id === cloneId || (existing.sedeId === 'taller-la-mana' && existing.chasis && existing.chasis === a.chasis)
+              );
+              if (!alreadyExists) {
+                newAlsClones.push({
+                  ...a,
+                  id: cloneId,
+                  sedeId: 'taller-la-mana',
+                  sede: 'StarMotos Sucursal La Maná',
+                  atendidoPor: a.atendidoPor || 'William Meza',
+                });
+                alsChanged = true;
+              }
+            }
+          });
+          if (alsChanged && newAlsClones.length > 0) {
+            const updatedAls = [...alistamientos, ...newAlsClones];
+            localStorage.setItem(STORAGE_KEYS.ALISTAMIENTOS, JSON.stringify(updatedAls));
+            newAlsClones.forEach((na) => cloudSaveAlistamiento(na));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando alistamientos para Sede La Maná:', err);
+      }
+    }
+
+    // 3. Técnicos
+    const rawTechs = localStorage.getItem(STORAGE_KEYS.TECHNICIANS);
+    if (rawTechs) {
+      try {
+        const techs: Technician[] = JSON.parse(rawTechs);
+        if (Array.isArray(techs) && techs.length > 0) {
+          let techsChanged = false;
+          const newTechClones: Technician[] = [];
+          techs.forEach((t) => {
+            const isMatrizOrLaMana =
+              t.workshopId === 'matriz-la-mana' ||
+              (t.workshopName && (t.workshopName.toLowerCase().includes('matriz') || t.workshopName.toLowerCase().includes('la maná')));
+            if (isMatrizOrLaMana) {
+              const cloneId = t.id && t.id.endsWith('-lm') ? t.id : `${t.id}-lm`;
+              const alreadyExists = techs.some(
+                (existing) => existing.id === cloneId || (existing.workshopId === 'taller-la-mana' && existing.name === t.name)
+              );
+              if (!alreadyExists) {
+                newTechClones.push({
+                  ...t,
+                  id: cloneId,
+                  workshopId: 'taller-la-mana',
+                  workshopName: 'StarMotos Sucursal La Maná',
+                });
+                techsChanged = true;
+              }
+            }
+          });
+          if (techsChanged && newTechClones.length > 0) {
+            const updatedTechs = [...techs, ...newTechClones];
+            localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(updatedTechs));
+            newTechClones.forEach((nt) => cloudSaveTechnician(nt));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando técnicos para Sede La Maná:', err);
+      }
+    }
+
+    // 4. Órdenes de taller
+    const rawOrders = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    if (rawOrders) {
+      try {
+        const orders: TallerOrder[] = JSON.parse(rawOrders);
+        if (Array.isArray(orders) && orders.length > 0) {
+          let ordersChanged = false;
+          const newOrderClones: TallerOrder[] = [];
+          orders.forEach((o) => {
+            if (o.workshopId === 'matriz-la-mana') {
+              const cloneId = o.id && o.id.endsWith('-lm') ? o.id : `${o.id}-lm`;
+              const alreadyExists = orders.some(
+                (existing) => existing.id === cloneId || (existing.workshopId === 'taller-la-mana' && existing.otNumber === o.otNumber)
+              );
+              if (!alreadyExists) {
+                newOrderClones.push({
+                  ...o,
+                  id: cloneId,
+                  workshopId: 'taller-la-mana',
+                });
+                ordersChanged = true;
+              }
+            }
+          });
+          if (ordersChanged && newOrderClones.length > 0) {
+            const updatedOrders = [...orders, ...newOrderClones];
+            localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(updatedOrders));
+            newOrderClones.forEach((no) => cloudSaveOrder(no));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando órdenes para Sede La Maná:', err);
+      }
+    }
+
+    // 5. Garantías
+    const rawWarranties = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+    if (rawWarranties) {
+      try {
+        const warranties: WarrantyRequest[] = JSON.parse(rawWarranties);
+        if (Array.isArray(warranties) && warranties.length > 0) {
+          let warChanged = false;
+          const newWarClones: WarrantyRequest[] = [];
+          warranties.forEach((w) => {
+            if (w.tallerOriginId === 'matriz-la-mana') {
+              const cloneId = w.id && w.id.endsWith('-lm') ? w.id : `${w.id}-lm`;
+              const alreadyExists = warranties.some(
+                (existing) => existing.id === cloneId || (existing.tallerOriginId === 'taller-la-mana' && existing.requestNumber === w.requestNumber)
+              );
+              if (!alreadyExists) {
+                newWarClones.push({
+                  ...w,
+                  id: cloneId,
+                  tallerOriginId: 'taller-la-mana',
+                  tallerOrigin: 'StarMotos Sucursal La Maná',
+                });
+                warChanged = true;
+              }
+            }
+          });
+          if (warChanged && newWarClones.length > 0) {
+            const updatedWar = [...warranties, ...newWarClones];
+            localStorage.setItem(STORAGE_KEYS.WARRANTIES, JSON.stringify(updatedWar));
+            newWarClones.forEach((nw) => cloudSaveWarranty(nw));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando garantías para Sede La Maná:', err);
+      }
+    }
+
+    // 6. Agendamientos
+    const rawAgendamientos = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+    if (rawAgendamientos) {
+      try {
+        const agendamientos: AgendamientoTicket[] = JSON.parse(rawAgendamientos);
+        if (Array.isArray(agendamientos) && agendamientos.length > 0) {
+          let agChanged = false;
+          const newAgClones: AgendamientoTicket[] = [];
+          agendamientos.forEach((ag) => {
+            const isMatrizOrLaMana =
+              ag.workshopId === 'matriz-la-mana' ||
+              (ag.workshopName && (ag.workshopName.toLowerCase().includes('matriz') || ag.workshopName.toLowerCase().includes('la maná')));
+            if (isMatrizOrLaMana) {
+              const cloneId = ag.id && ag.id.endsWith('-lm') ? ag.id : `${ag.id}-lm`;
+              const alreadyExists = agendamientos.some(
+                (existing) => existing.id === cloneId || (existing.workshopId === 'taller-la-mana' && existing.ticketNumber === ag.ticketNumber)
+              );
+              if (!alreadyExists) {
+                newAgClones.push({
+                  ...ag,
+                  id: cloneId,
+                  workshopId: 'taller-la-mana',
+                  workshopName: 'StarMotos Sucursal La Maná',
+                });
+                agChanged = true;
+              }
+            }
+          });
+          if (agChanged && newAgClones.length > 0) {
+            const updatedAg = [...agendamientos, ...newAgClones];
+            localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(updatedAg));
+            newAgClones.forEach((nag) => cloudSaveAgendamiento(nag));
+          }
+        }
+      } catch (err) {
+        console.error('Error clonando agendamientos para Sede La Maná:', err);
+      }
+    }
+  } catch (e) {
+    console.error('Error general en ensureSedeLaManaCloned:', e);
+  } finally {
+    isCloningInProgress = false;
+  }
+}
+
+// Talleres (13 Ubicaciones Oficiales)
 export function getStoredWorkshops(): Workshop[] {
   try {
+    ensureSedeLaManaCloned();
     const stored = localStorage.getItem(STORAGE_KEYS.WORKSHOPS);
     if (stored) {
       const parsed: Workshop[] = JSON.parse(stored);
-      if (parsed.length >= 11 && parsed.some((w) => w.id === 'matriz-la-mana')) {
-        // Sincronizar correos corporativos oficiales actualizados
-        return parsed.map((ws) => {
+      if (parsed.length > 0 && parsed.some((w) => w.id === 'matriz-la-mana')) {
+        let changed = false;
+        // Sincronizar correos corporativos oficiales actualizados y asegurar nuevas sedes oficiales
+        const merged = parsed.map((ws) => {
           const initWs = INITIAL_WORKSHOPS.find((i) => i.id === ws.id);
-          return initWs ? { ...ws, email: initWs.email } : ws;
+          if (initWs) {
+            if (ws.id === 'matriz-la-mana') {
+              if (ws.email !== initWs.email) changed = true;
+              return { ...ws, email: initWs.email, name: ws.name || initWs.name };
+            }
+            if (ws.id === 'taller-la-mana') {
+              if (ws.manager !== 'William Meza' || ws.email !== initWs.email) changed = true;
+              return { ...ws, manager: 'William Meza', email: initWs.email, name: initWs.name };
+            }
+            return { ...ws, email: initWs.email };
+          }
+          return ws;
         });
+        for (const initWs of INITIAL_WORKSHOPS) {
+          if (!merged.some((w) => w.id === initWs.id)) {
+            merged.push(initWs);
+            changed = true;
+          }
+        }
+        if (changed) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.WORKSHOPS, JSON.stringify(merged));
+          } catch (_) {}
+        }
+        return merged;
       }
     }
   } catch (e) {
@@ -1047,9 +1307,9 @@ export function saveStoredDictamen(dictamen: DictamenRecord) {
 export const INITIAL_WORKSHOP_MANAGERS: WorkshopManagerAccount[] = [
   {
     id: 'mgr-la-mana',
-    name: 'William Daniel Meza Chicaiza',
-    workshopId: 'matriz-la-mana',
-    workshopName: 'StarMotos Matriz La Maná',
+    name: 'William Meza',
+    workshopId: 'taller-la-mana',
+    workshopName: 'StarMotos Sucursal La Maná',
     email: 'sede.la-mana@starmotos.com',
     phone: '0939316698',
   },
@@ -1069,7 +1329,31 @@ export function getStoredWorkshopManagers(): WorkshopManagerAccount[] {
     if (raw) {
       const parsed: WorkshopManagerAccount[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        let changed = false;
+        const updated = parsed.map((m) => {
+          if (m.id === 'mgr-la-mana' || m.email === 'sede.la-mana@starmotos.com') {
+            if (m.name !== 'William Meza' || m.workshopId !== 'taller-la-mana') {
+              changed = true;
+              return {
+                ...m,
+                name: 'William Meza',
+                workshopId: 'taller-la-mana',
+                workshopName: 'StarMotos Sucursal La Maná',
+              };
+            }
+          }
+          return m;
+        });
+        if (!updated.some((m) => m.workshopId === 'taller-la-mana')) {
+          updated.unshift(INITIAL_WORKSHOP_MANAGERS[0]);
+          changed = true;
+        }
+        if (changed) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(updated));
+          } catch (_) {}
+        }
+        return updated;
       }
     }
   } catch (e) {
@@ -1150,6 +1434,7 @@ export function saveStoredOrders(orders: TallerOrder[]) {
 // Clientes Taller
 export function getStoredClients(): TallerClient[] {
   try {
+    ensureSedeLaManaCloned();
     const stored = localStorage.getItem(STORAGE_KEYS.CLIENTS);
     if (stored) {
       const parsed: TallerClient[] = JSON.parse(stored);
@@ -1353,6 +1638,7 @@ export const INITIAL_ORIGINS: string[] = [
   'Almacén Matriz La Maná',
   'Almacén Quevedo',
   'Almacén Buena Fe',
+  'Almacén Buena Fe 2',
   'Almacén El Carmen',
   'Almacén Portoviejo',
   'Almacén El Empalme',
@@ -1370,7 +1656,17 @@ export const INITIAL_ORIGINS: string[] = [
 export function getStoredOrigins(): string[] {
   try {
     const stored = localStorage.getItem('starmotos_shared_origins_v2');
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed: string[] = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        for (const init of INITIAL_ORIGINS) {
+          if (!parsed.includes(init)) {
+            parsed.push(init);
+          }
+        }
+        return parsed;
+      }
+    }
   } catch (e) {
     console.error('Error reading origins from localStorage', e);
   }
@@ -1391,6 +1687,7 @@ export const INITIAL_FULL_ALISTAMIENTOS: AlistamientoFullRecord[] = [];
 
 export function getStoredFullAlistamientos(): AlistamientoFullRecord[] {
   try {
+    ensureSedeLaManaCloned();
     const stored = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
     if (stored) {
       const parsed: AlistamientoFullRecord[] = JSON.parse(stored);
@@ -2087,6 +2384,7 @@ export function saveStoredGpsRecord(record: GpsRecord) {
       updated = [{ ...record, createdAt: record.createdAt || new Date().toISOString() }, ...current];
     }
     saveStoredGpsRecords(updated);
+    cloudSaveGpsRecord(record);
   } catch (e) {
     console.error('Error al guardar registro GPS individual:', e);
   }
@@ -2097,6 +2395,7 @@ export function deleteStoredGpsRecord(id: string) {
     const current = getStoredGpsRecords();
     const updated = current.filter((r) => r.id !== id);
     saveStoredGpsRecords(updated);
+    cloudDeleteGpsRecord(id);
   } catch (e) {
     console.error('Error al eliminar registro GPS:', e);
   }
@@ -2293,13 +2592,76 @@ export function checkClientGarantiaPlus(
     return (
       (cleanCedula && cleanCedula === cleanTerm) ||
       (cleanPlaca && cleanPlaca === cleanTerm) ||
-      (cleanChasis && cleanChasis === cleanTerm) ||
-      (cleanTerm.length >= 6 && cleanCedula.includes(cleanTerm)) ||
-      (cleanTerm.length >= 4 && cleanPlaca.includes(cleanTerm))
+      (cleanChasis && cleanChasis === cleanTerm)
     );
   });
 
   if (!found) {
+    try {
+      const fullAlistamientos = getStoredFullAlistamientos();
+      const alsFound = fullAlistamientos.find((a) => {
+        const cleanCedula = (a.cedulaRuc || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanPlaca = (a.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanChasis = (a.chasis || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const hasGp =
+          a.metodoPago === 'Garantía Plus' ||
+          (typeof a.observaciones === 'string' && a.observaciones.toLowerCase().includes('garantía plus'));
+        return Boolean(hasGp && (
+          (cleanCedula && cleanCedula === cleanTerm) ||
+          (cleanPlaca && cleanPlaca === cleanTerm) ||
+          (cleanChasis && cleanChasis === cleanTerm)
+        ));
+      });
+
+      if (alsFound) {
+        return {
+          hasGarantiaPlus: true,
+          record: {
+            id: alsFound.id,
+            numeroTicket: alsFound.numeroTicket || 'GP-ALIS',
+            atendidoPor: alsFound.atendidoPor,
+            sede: alsFound.sede,
+            sedeId: alsFound.sedeId,
+            fechaServicio: alsFound.fechaServicio,
+            fechaVencimiento: '2027-12-31',
+            nombres: alsFound.nombres,
+            apellidos: alsFound.apellidos,
+            cedulaRuc: alsFound.cedulaRuc,
+            celular1: alsFound.celular1,
+            email: alsFound.email,
+            direccion: alsFound.direccion,
+            origen: alsFound.origen,
+            chasis: alsFound.chasis,
+            numeroMotor: alsFound.numeroMotor,
+            placa: alsFound.placa,
+            modeloMarca: alsFound.modeloMarca,
+            color: alsFound.color,
+            year: alsFound.year,
+            serviciosRealizados: alsFound.serviciosRealizados,
+            tecnicoResponsable: alsFound.tecnicoResponsable,
+            tecnicoId: alsFound.tecnicoId,
+            kilometraje: alsFound.kilometraje,
+            aceite: alsFound.aceite,
+            nivelAceite: alsFound.nivelAceite,
+            tipoAceite: alsFound.tipoAceite,
+            numeroFactura: alsFound.numeroFactura,
+            valorServicio: alsFound.valorServicio,
+            montoPagado: alsFound.montoPagado,
+            abono: alsFound.abono,
+            saldoPendiente: alsFound.saldoPendiente,
+            esCredito: false,
+            metodoPago: 'Garantía Plus',
+            observaciones: alsFound.observaciones,
+            proximoMantenimientoKm: alsFound.proximoMantenimientoKm,
+            fotos: alsFound.fotos,
+            estado: 'activa',
+            createdAt: alsFound.createdAt,
+          },
+          isExpired: false,
+          daysRemaining: 365,
+        };
+      }
+    } catch (_) {}
     return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
   }
 

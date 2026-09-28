@@ -78,7 +78,7 @@ export const EventsMobile: React.FC<Props> = ({
           <Receipt className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-zinc-900">Eventos y Facturas</h2>
+          <h2 className="text-base font-bold text-zinc-900">Eventos y Recibos</h2>
           <p className="text-[11px] text-zinc-500">Historial técnico, pagos y comprobantes electrónicos</p>
         </div>
       </div>
@@ -183,21 +183,24 @@ export const EventsMobile: React.FC<Props> = ({
               return (
                 <div
                   key={record.id}
-                  className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-xs space-y-2.5"
+                  className="bg-white border border-zinc-200 rounded-xl p-3 shadow-xs space-y-2"
                 >
                   <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2">
-                    <div>
-                      <span className="font-mono text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                        {record.otNumber}
-                      </span>
-                      <h4 className="text-xs font-bold text-zinc-900 mt-1">
-                        {record.workSummary[0]}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          {record.otNumber}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-medium flex items-center gap-1">
+                          <Calendar className="w-2.5 h-2.5 text-zinc-400" />
+                          {record.date}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-zinc-900 mt-1 truncate" title={record.workSummary[0]}>
+                        {record.workSummary[0] || 'Servicio Técnico'}
                       </h4>
-                      <span className="text-[10px] text-zinc-500 flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3" />
-                        {record.date} • {record.mileage.toLocaleString()} km
-                      </span>
                     </div>
+
                     <div className="text-right shrink-0">
                       <span className="text-xs font-extrabold text-zinc-900 font-mono">
                         ${record.totalPaid.toFixed(2)}
@@ -210,7 +213,7 @@ export const EventsMobile: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => setIsAbonoModalOpen(true)}
-                            className="mt-1 px-1.5 py-0.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded text-[9px] font-bold flex items-center gap-0.5 cursor-pointer"
+                            className="mt-0.5 px-1.5 py-0.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded text-[9px] font-bold flex items-center gap-0.5 cursor-pointer"
                           >
                             <DollarSign className="w-2.5 h-2.5" />
                             <span>Abonar</span>
@@ -224,22 +227,19 @@ export const EventsMobile: React.FC<Props> = ({
 
                   {/* Banner de Estado de Abono en Revisión o Rechazado */}
                   {record.solicitudAbonoPendiente?.estado === 'pendiente' && (
-                    <div className="p-2 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 flex items-center justify-between text-[11px]">
+                    <div className="p-1.5 bg-purple-50 rounded-lg border border-purple-200 text-purple-900 flex items-center justify-between text-[10px]">
                       <div className="flex items-center gap-1 font-bold">
                         <Clock className="w-3 h-3 text-purple-600 animate-spin" />
                         <span>Abono de ${Number(record.solicitudAbonoPendiente.monto).toFixed(2)} en revisión</span>
                       </div>
-                      <span className="text-[9px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.2 rounded-md">
+                      <span className="text-[9px] font-bold bg-purple-200 text-purple-800 px-1 py-0.2 rounded">
                         Taller
                       </span>
                     </div>
                   )}
                   {record.solicitudAbonoPendiente?.estado === 'rechazado' && (
-                    <div className="p-2 bg-rose-50 rounded-xl border border-rose-200 text-rose-900 flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-1 font-bold">
-                        <AlertCircle className="w-3 h-3 text-rose-600" />
-                        <span className="truncate max-w-[170px]">Abono negado: {record.solicitudAbonoPendiente.motivoRechazo || 'Revisar datos'}</span>
-                      </div>
+                    <div className="p-1.5 bg-rose-50 rounded-lg border border-rose-200 text-rose-900 flex items-center justify-between text-[10px]">
+                      <span className="truncate max-w-[170px]">Abono negado</span>
                       <button
                         type="button"
                         onClick={() => setIsAbonoModalOpen(true)}
@@ -250,39 +250,33 @@ export const EventsMobile: React.FC<Props> = ({
                     </div>
                   )}
 
-                  {/* Tareas */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase">Trabajos:</span>
-                    <ul className="space-y-1">
-                      {record.workSummary.map((task, idx) => (
-                        <li key={idx} className="flex items-center gap-1.5 text-[11px] text-zinc-700">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>{task}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Barra compacta: Km y Sede */}
+                  <div className="flex items-center justify-between text-[10px] bg-zinc-50 px-2 py-1 rounded-lg border border-zinc-100 text-zinc-600">
+                    <span className="font-mono font-bold text-zinc-800">{record.mileage.toLocaleString()} km</span>
+                    <span className="truncate max-w-[160px] text-zinc-500 font-medium">{record.branchName}</span>
                   </div>
 
-                  {/* Botón ver orden y factura vinculada */}
-                  <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-500 truncate max-w-[130px]">{record.branchName}</span>
-                    <div className="flex items-center gap-2.5">
+                  {/* Botón ver orden y recibo vinculado */}
+                  <div className="pt-1.5 border-t border-zinc-100 flex items-center justify-between text-[10px]">
+                    <span className="text-zinc-500 truncate max-w-[120px] text-[10px]">
+                      Téc: <strong className="text-zinc-700">{record.technicianName?.split(' ')[0] || 'Oficial'}</strong>
+                    </span>
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setSelectedOrderRecord(record)}
-                        className="text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-0.5 rounded bg-zinc-50 hover:bg-emerald-50 text-emerald-700 font-bold flex items-center gap-1 border border-zinc-200 cursor-pointer"
                       >
-                        <Eye className="w-3 h-3" />
-                        <span>Ver Orden</span>
+                        <Eye className="w-2.5 h-2.5" />
+                        <span>Orden</span>
                       </button>
-                      <span className="text-zinc-300">•</span>
                       <button
                         type="button"
                         onClick={() => setSelectedInvoice(record)}
-                        className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold flex items-center gap-1 border border-blue-200 cursor-pointer"
                       >
-                        <Receipt className="w-3 h-3" />
-                        <span>Factura</span>
+                        <Receipt className="w-2.5 h-2.5" />
+                        <span>Recibo</span>
                       </button>
                     </div>
                   </div>

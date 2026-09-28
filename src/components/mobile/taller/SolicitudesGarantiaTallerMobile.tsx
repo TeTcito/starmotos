@@ -107,7 +107,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
       case 'en_proceso':
       case 'en_proceso_aceptacion_2':
       case 'enviada_garante':
-        return { label: 'En Garante', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: 'En Garantía', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
       case 'enviada_matriz':
       case 'en_revision':
       case 'creada':
@@ -428,7 +428,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               >
                 <option value="all">Todos los Estados</option>
                 <option value="pendientes">⏳ Pendientes de Revisión</option>
-                <option value="validadas">✓ Validadas / En Garante</option>
+                <option value="validadas">✓ Validadas / En Garantía</option>
                 <option value="completadas">🛠 Completadas</option>
               </select>
             </div>

@@ -14,6 +14,8 @@ import {
   AdminPendiente,
   OrderRating,
   AgendamientoTicket,
+  GpsRecord,
+  GarantiaPlusRecord,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { uploadWarrantyMedia, saveMediaToIndexedDB, isValidDataUrl, isValidMediaUrl, cleanCorruptedMediaFromLocalStorage } from './mediaStorage';
@@ -72,6 +74,16 @@ if (syncBus) {
           localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(filtered));
           window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
         }
+      } catch (_) {}
+    } else if (event.data?.type === 'GPS_UPDATED' && Array.isArray(event.data.payload)) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(event.data.payload));
+        window.dispatchEvent(new Event('starmotos_gps_updated'));
+      } catch (_) {}
+    } else if (event.data?.type === 'GARANTIAS_PLUS_UPDATED' && Array.isArray(event.data.payload)) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.GARANTIAS_PLUS, JSON.stringify(event.data.payload));
+        window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
       } catch (_) {}
     }
   };
@@ -740,6 +752,38 @@ export async function syncAllFromSupabase(): Promise<{
       console.warn('Error sincronizando agendamientos:', e);
     }
 
+    // 11. Registros de Solicitudes GPS (Matriz <-> Portal Oficial GPS)
+    try {
+      const { data: gpsData, error: gpsErr } = await supabase
+        .from('gps_records')
+        .select('data')
+        .order('updated_at', { ascending: false });
+
+      if (!gpsErr && Array.isArray(gpsData)) {
+        const cloudGps: GpsRecord[] = gpsData.map((row: any) => row.data as GpsRecord).filter(Boolean);
+        const rawLocal = localStorage.getItem(STORAGE_KEYS.GPS_RECORDS);
+        let localList: GpsRecord[] = rawLocal ? JSON.parse(rawLocal) : [];
+        const cloudMap = new Map<string, GpsRecord>();
+        cloudGps.forEach((r) => {
+          if (r && r.id) cloudMap.set(r.id, r);
+        });
+
+        // Si hay registros locales que no estén en la nube, subirlos a Supabase
+        for (const loc of localList) {
+          if (loc && loc.id && !cloudMap.has(loc.id)) {
+            cloudSaveGpsRecord(loc);
+            cloudMap.set(loc.id, loc);
+          }
+        }
+
+        const mergedGps = Array.from(cloudMap.values());
+        localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(mergedGps));
+        window.dispatchEvent(new Event('starmotos_gps_updated'));
+      }
+    } catch (e) {
+      console.warn('Error sincronizando registros GPS de Supabase:', e);
+    }
+
     return {
       warrantiesCount,
       alistamientosCount,
@@ -1346,6 +1390,39 @@ export async function cloudDeleteAgendamiento(id: string) {
     if (error) console.error('[Supabase] Error eliminando agendamiento:', error);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando agendamiento:', err);
+  }
+}
+
+export async function cloudSaveGpsRecord(record: GpsRecord) {
+  try {
+    const payload = {
+      id: record.id,
+      ticket_number: record.ticketNumber,
+      cedula_ruc: record.cedulaRuc,
+      nombres: record.nombres,
+      apellidos: record.apellidos,
+      placa: record.placa,
+      chasis: record.chasis,
+      serie_gps: record.serieGps,
+      serie_chip: record.serieChip,
+      estado: record.estado,
+      data: record,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('gps_records').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando registro GPS:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando registro GPS:', err);
+  }
+}
+
+export async function cloudDeleteGpsRecord(id: string) {
+  if (!id) return;
+  try {
+    const { error } = await supabase.from('gps_records').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando registro GPS:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando registro GPS:', err);
   }
 }
 
@@ -1981,6 +2058,39 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
         } catch (e) {
           console.error('Error procesando realtime agendamientos:', e);
+        }
+      }
+    )
+    // Registros GPS (Matriz <-> Portal Oficial GPS)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'gps_records' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.GPS_RECORDS);
+          let current: GpsRecord[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as GpsRecord;
+            if (newDoc && !current.some((r) => r.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as GpsRecord;
+            if (updatedDoc) {
+              current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              current = current.filter((r) => r.id !== deletedId);
+            }
+          }
+
+          localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_gps_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime gps_records:', e);
         }
       }
     )

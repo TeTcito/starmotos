@@ -15,6 +15,7 @@ import {
   Users,
   CalendarClock,
   Radio,
+  Power,
 } from 'lucide-react';
 import {
   AdminSection,
@@ -154,6 +155,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
 }) => {
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
   const [garantiasPlusViewMode, setGarantiasPlusViewMode] = React.useState<'list' | 'form'>('list');
+  const [isPrivacyLocked, setIsPrivacyLocked] = React.useState(false);
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -319,18 +321,30 @@ export const AdminViewDesktop: React.FC<Props> = ({
         <aside className="w-72 shrink-0 h-full bg-[#dce8f5] border-r border-[#b8d1ea] flex flex-col justify-between z-20 select-none shadow-xs">
           {/* Tarjeta de Usuario Matriz */}
           <div className="shrink-0 p-4 border-b border-[#b8d1ea] bg-white/40">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-blue-700 text-white font-black text-sm flex items-center justify-center border-2 border-blue-600 shadow-xs shrink-0">
-                ADM
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-xs font-bold text-zinc-900 truncate">William Daniel Meza Chicaiza</h3>
-                <p className="text-[10px] text-zinc-600 font-mono">Gerente General StarMotos</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                  <span className="text-[10px] text-blue-900 font-bold">Admin Matriz</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-full bg-blue-700 text-white font-black text-sm flex items-center justify-center border-2 border-blue-600 shadow-xs shrink-0">
+                  ADM
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xs font-bold text-zinc-900 truncate">William Daniel Meza Chicaiza</h3>
+                  <p className="text-[10px] text-zinc-600 font-mono">Gerente General StarMotos</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span className="text-[10px] text-blue-900 font-bold">Admin Matriz</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Botón de encendido/apagado (Modo Privacidad) */}
+              <button
+                type="button"
+                onClick={() => setIsPrivacyLocked(true)}
+                className="p-2 rounded-xl bg-white/80 hover:bg-amber-50 hover:text-amber-600 text-zinc-600 border border-blue-200 shadow-2xs transition-all cursor-pointer shrink-0"
+                title="Activar pantalla de privacidad (Bloquear)"
+              >
+                <Power className="w-4 h-4 text-amber-500" />
+              </button>
             </div>
           </div>
 
@@ -383,6 +397,17 @@ export const AdminViewDesktop: React.FC<Props> = ({
               </div>
               <p className="truncate text-zinc-600 text-[11px] mt-0.5">Jaime Roldós #1 y G. Albarracín</p>
             </div>
+
+            {/* Botón de Bloqueo de Pantalla (Encendido/Apagado) */}
+            <button
+              type="button"
+              onClick={() => setIsPrivacyLocked(true)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition active:scale-98 cursor-pointer shadow-xs"
+              title="Ocultar pantalla mientras te ausentas (Modo Privacidad)"
+            >
+              <Power className="w-3.5 h-3.5 text-amber-400" />
+              <span>Bloquear Pantalla</span>
+            </button>
 
             <button
               onClick={onLogout}
@@ -530,6 +555,57 @@ export const AdminViewDesktop: React.FC<Props> = ({
           </div>
         </main>
       </div>
+
+      {/* ========================================================================= */}
+      {/* PANTALLA DE PRIVACIDAD / BLOQUEO MATRIZ CENTRAL (ON / OFF)                */}
+      {/* ========================================================================= */}
+      {isPrivacyLocked && (
+        <div
+          className="fixed inset-0 z-[99999] bg-slate-950/95 backdrop-blur-2xl flex flex-col items-center justify-center select-none cursor-pointer transition-all duration-300"
+          onClick={() => setIsPrivacyLocked(false)}
+        >
+          <div
+            className="flex flex-col items-center justify-center gap-6 p-8 max-w-md text-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPrivacyLocked(false);
+            }}
+          >
+            {/* Logo de la empresa con Glow animado */}
+            <div className="relative group cursor-pointer" title="Haz clic para desbloquear">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-600 via-amber-500 to-red-600 rounded-3xl blur-xl opacity-40 group-hover:opacity-85 transition duration-500 animate-pulse" />
+              <div className="relative bg-white px-8 py-5 rounded-2xl shadow-2xl border border-white/30 transition-transform duration-300 group-hover:scale-105 active:scale-95">
+                <img
+                  src="/logoheader.webp"
+                  alt="StarMotos"
+                  className="h-16 w-auto object-contain drop-shadow-md select-none pointer-events-none"
+                />
+              </div>
+            </div>
+
+            {/* Animación de carga y estado */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-zinc-300 text-xs font-mono tracking-widest font-bold">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="animate-pulse">SISTEMA EN ESPERA • MODO PRIVACIDAD ACTIVO</span>
+              </div>
+              <p className="text-zinc-400 text-xs font-medium">
+                Haz clic sobre el logotipo de la empresa para reanudar el trabajo
+              </p>
+            </div>
+
+            {/* Botón de desbloqueo rápido */}
+            <button
+              type="button"
+              onClick={() => setIsPrivacyLocked(false)}
+              className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-lg transition-all cursor-pointer"
+            >
+              <Power className="w-3.5 h-3.5 text-amber-300" />
+              <span>Desbloquear y Continuar</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

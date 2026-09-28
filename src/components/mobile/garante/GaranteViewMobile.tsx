@@ -136,7 +136,7 @@ export const GaranteViewMobile: React.FC<Props> = ({
               className="h-5 w-auto object-contain"
             />
           </div>
-          <span className="text-[9px] text-purple-200 uppercase font-mono font-bold hidden sm:inline">Garante</span>
+          <span className="text-[9px] text-purple-200 uppercase font-mono font-bold hidden sm:inline">Garantía</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -170,11 +170,11 @@ export const GaranteViewMobile: React.FC<Props> = ({
               <div className="flex items-center justify-between pb-3 border-b border-[#b8d1ea]">
                 <div className="min-w-0 flex-1 pr-2">
                   <span className="text-xs font-bold text-zinc-900 truncate block">
-                    {profile.contactName || profile.companyName || 'Garante Autorizado'}
+                    {profile.contactName || profile.companyName || 'Garantía Oficial'}
                   </span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0" />
-                    <span className="text-[10px] text-purple-900 font-bold truncate">Garante Autorizado</span>
+                    <span className="text-[10px] text-purple-900 font-bold truncate">Garantía de Marca</span>
                   </div>
                 </div>
                 <button onClick={() => setDrawerOpen(false)} className="p-1 rounded-lg bg-white text-zinc-600 shrink-0">

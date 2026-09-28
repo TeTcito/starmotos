@@ -1578,10 +1578,10 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
     if (!formData.serviciosRealizados || formData.serviciosRealizados.length === 0) {
       missingStep3.push('¿Qué se realizó?');
     }
-    const isPdiOnly = formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi';
-    const isGarantiaPlusCovered = Boolean(garantiaPlusStatus.hasGarantiaPlus);
+    const isPdiOnly = false;
+    const isGarantiaPlusCovered = false;
 
-    if (!isPdiOnly && !isGarantiaPlusCovered && (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio)))) {
+    if (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio))) {
       missingStep3.push('Valor del servicio ($)');
     }
 
@@ -1617,19 +1617,14 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
 
     setValidationAlert(null);
 
-    const isCred = !isGarantiaPlusCovered && (formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito);
-    const numVal = isGarantiaPlusCovered ? 0 : (Number(formData.valorServicio) || 0);
-    const numAbono = isGarantiaPlusCovered ? 0 : (formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal));
-    const finalValor = isPdiOnly || isGarantiaPlusCovered ? 0 : numVal;
-    const finalAbono = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? 0 : numAbono);
-    const finalSaldo = isPdiOnly || isGarantiaPlusCovered ? 0 : (isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono)));
+    const isCred = formData.metodoPago === 'Crédito' || formData.metodoPago === 'Crédito Directo' || !!formData.esCredito;
+    const numVal = Number(formData.valorServicio) || 0;
+    const numAbono = formData.abono !== undefined && formData.abono !== '' ? Number(formData.abono) : (formData.montoPagado !== '' ? Number(formData.montoPagado) : numVal);
+    const finalValor = numVal;
+    const finalAbono = isCred ? 0 : numAbono;
+    const finalSaldo = isCred ? finalValor : (formData.saldoPendiente !== undefined && formData.saldoPendiente !== '' ? Number(formData.saldoPendiente) : Math.max(0, finalValor - finalAbono));
 
-    const obsText = (formData.observaciones || '').trim();
-    const finalObservaciones = isGarantiaPlusCovered
-      ? (obsText
-          ? `${obsText}\n[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`
-          : `[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`)
-      : formData.observaciones;
+    const finalObservaciones = formData.observaciones || '';
 
     const fullRecord: GarantiaPlusRecord = {
       estado: ((formData.estado || 'activa') as 'activa' | 'vencida' | 'cancelada'),
@@ -1639,7 +1634,7 @@ export const GarantiasPlusMobile: React.FC<Props> = ({
       year: formData.year !== undefined && formData.year !== '' ? Number(formData.year) : undefined,
       mesesCredito: Number(formData.mesesCredito) || 3,
       esCredito: isCred,
-      metodoPago: isGarantiaPlusCovered ? 'Garantía Plus' : (isCred ? 'Crédito' : formData.metodoPago),
+      metodoPago: isCred ? 'Crédito' : formData.metodoPago,
       evidenciaTransferencia: formData.evidenciaTransferencia || '',
       comprobantePagoUrl: formData.evidenciaTransferencia || '',
       valorServicio: finalValor,

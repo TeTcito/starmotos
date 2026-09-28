@@ -414,6 +414,10 @@ export const GpsViewDesktop: React.FC<Props> = ({
               <GpsFormView
                 record={selectedRecordForReview}
                 onBack={() => setSelectedRecordForReview(null)}
+                onAssignCredentials={(id, u, p) => {
+                  onAssignCredentials(id, u, p);
+                  setSelectedRecordForReview(null);
+                }}
                 onSendWhatsApp={handleSendWhatsApp}
                 showToast={showToast}
               />

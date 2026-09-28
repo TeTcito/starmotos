@@ -73,9 +73,11 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       // 1. Cuentas oficiales de sede/taller
       const corporateAccount = OFFICIAL_CORPORATE_ACCOUNTS[cleanUser];
       if (corporateAccount && corporateAccount.role === 'taller') {
+        const storedWs = workshops.find((w) => w.id === corporateAccount.workshopId);
         const isPasswordValid =
           corporateAccount.passwords.includes(cleanPassword) ||
-          cleanPassword === customPwd;
+          cleanPassword === customPwd ||
+          (storedWs?.password && cleanPassword === storedWs.password);
 
         if (!isPasswordValid) {
           setErrorMessage('Contraseña incorrecta para la sede oficial. Verifique su clave.');
@@ -93,6 +95,28 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         return;
       }
 
+      // 1.1 Coincidencia por código de taller o ID
+      const matchedWorkshop = workshops.find(
+        (w) => w.code.toLowerCase() === cleanUser || w.id.toLowerCase() === cleanUser
+      );
+      if (matchedWorkshop) {
+        const isPwdValid = matchedWorkshop.password
+          ? cleanPassword === matchedWorkshop.password
+          : cleanPassword === 'taller123' || cleanPassword === 'Taller2026' || cleanPassword === 'StarMotos@2026';
+
+        if (!isPwdValid) {
+          setErrorMessage('Contraseña incorrecta para el taller. Verifique su clave.');
+          return;
+        }
+
+        localStorage.setItem('starmotos_taller_active_ws', matchedWorkshop.id);
+        setSuccessMessage(`¡Bienvenido! Ingresando a ${matchedWorkshop.name}...`);
+        setTimeout(() => {
+          onLoginSuccess('taller');
+        }, 400);
+        return;
+      }
+
       // 2. Jefes de taller registrados dinámicamente
       const storedManagers = getStoredWorkshopManagers();
       const matchedManager = storedManagers.find(
@@ -100,14 +124,15 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       );
 
       if (matchedManager) {
+        const wsOfManager = workshops.find((w) => w.id === matchedManager.workshopId);
         const savedPwd =
           matchedManager.password ||
           localStorage.getItem(`starmotos_mgr_pwd_${cleanUser}`) ||
           customPwd;
 
         const isPwdValid = savedPwd
-          ? cleanPassword === savedPwd
-          : cleanPassword === 'StarMotos@2026' || cleanPassword === 'Taller2026';
+          ? cleanPassword === savedPwd || (wsOfManager?.password && cleanPassword === wsOfManager.password)
+          : cleanPassword === 'StarMotos@2026' || cleanPassword === 'Taller2026' || (wsOfManager?.password && cleanPassword === wsOfManager.password);
 
         if (!isPwdValid) {
           setErrorMessage('Contraseña incorrecta para el jefe de taller. Verifique sus datos.');

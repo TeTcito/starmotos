@@ -63,7 +63,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
     const cleanPassword = loginPassword.trim();
 
     if (!cleanUser || !cleanPassword) {
-      setErrorMessage('Por favor ingrese su correo de marca/garante y su contraseña.');
+      setErrorMessage('Por favor ingrese su correo de garantía de marca y su contraseña.');
       return;
     }
 
@@ -81,7 +81,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           cleanPassword === customPwd;
 
         if (!isPasswordValid) {
-          setErrorMessage('Contraseña incorrecta para el garante oficial. Verifique su clave autorizada.');
+          setErrorMessage('Contraseña incorrecta para la garantía de marca. Verifique su clave autorizada.');
           return;
         }
 
@@ -94,7 +94,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           window.dispatchEvent(new Event('starmotos_garante_profile_updated'));
         } catch (_) {}
 
-        setSuccessMessage('¡Ingreso autorizado de Garante Oficial! Accediendo al panel...');
+        setSuccessMessage('¡Ingreso autorizado de Garantía de Marca! Accediendo al panel...');
         setTimeout(() => {
           onLoginSuccess('garante');
         }, 400);
@@ -137,7 +137,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
       }
 
       setErrorMessage(
-        `No se encontró ninguna marca o garante registrado con "${loginEmail}". Por favor regístrese en el formulario oficial.`
+        `No se encontró ninguna garantía de marca registrada con "${loginEmail}". Por favor regístrese en el formulario oficial.`
       );
     }, 400);
   };
@@ -278,7 +278,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         <form onSubmit={handleLoginSubmit} className="space-y-3.5">
           <div>
             <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1 sm:mb-1.5">
-              Correo Electrónico de la Marca / Garante
+              Correo Electrónico de Garantía de Marca
             </label>
             <div className="relative">
               <input
@@ -296,7 +296,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
           <div>
             <label className="block text-[11px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1 sm:mb-1.5">
-              Contraseña de Acceso Garante
+              Contraseña de Acceso Garantía
             </label>
             <div className="relative">
               <input
@@ -328,7 +328,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
               />
               <span>Recordar sesión</span>
             </label>
-            <span className="text-[11px] text-zinc-400 font-mono">Garante Oficial</span>
+            <span className="text-[11px] text-zinc-400 font-mono">Garantía Oficial</span>
           </div>
 
           <button
@@ -339,7 +339,7 @@ export const GaranteLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
             {isLoading ? (
               <>
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Verificando Garante...</span>
+                <span>Verificando Garantía...</span>
               </>
             ) : (
               'Ingresar al Panel de Garantías'

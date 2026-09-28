@@ -121,7 +121,8 @@ export type WorkOrderStatus =
   | 'en_proceso'
   | 'trabajando'
   | 'listo_para_entregar'
-  | 'entregado';
+  | 'entregado'
+  | 'cancelada';
 
 export interface ProgressStep {
   id: WorkOrderStatus;
@@ -428,7 +429,7 @@ export interface Workshop {
   city: string;
   phone: string;
   manager: string;
-  status: 'operativo' | 'mantenimiento' | 'inactivo';
+  status: 'operativo' | 'mantenimiento' | 'inactivo' | 'inoperativo' | string;
   activeOrders: number;
   completedToday: number;
   pendingWarranties: number;
@@ -441,6 +442,9 @@ export interface Workshop {
   intersection?: string;
   number?: string;
   email?: string;
+  password?: string;
+  inoperativoMotivo?: string;
+  inoperativoFecha?: string;
 }
 
 // --- Alistamiento (Wizard 3 Pasos Profesional) ---

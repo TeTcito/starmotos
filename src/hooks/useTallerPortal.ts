@@ -69,7 +69,12 @@ export function useTallerPortal() {
 
   // Sede activa fijada desde la autenticación
   const [activeWorkshopId] = useState<string>(() => {
-    return localStorage.getItem('starmotos_taller_active_ws') || 'matriz-la-mana';
+    const saved = localStorage.getItem('starmotos_taller_active_ws');
+    if (!saved || saved === 'matriz-la-mana') {
+      localStorage.setItem('starmotos_taller_active_ws', 'taller-la-mana');
+      return 'taller-la-mana';
+    }
+    return saved;
   });
 
   const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
@@ -88,7 +93,7 @@ export function useTallerPortal() {
   const currentWorkshop = useMemo(() => {
     return (
       workshops.find((w) => w.id === activeWorkshopId) ||
-      workshops.find((w) => w.id === 'matriz-la-mana') ||
+      workshops.find((w) => w.id === 'taller-la-mana') ||
       workshops[0]
     );
   }, [workshops, activeWorkshopId]);
@@ -96,9 +101,9 @@ export function useTallerPortal() {
   // Identificar si la sede actual es Matriz Central
   const isMatriz = useMemo(() => {
     const wsId = currentWorkshop?.id || activeWorkshopId;
-    if (wsId === 'matriz-la-mana' || wsId === 'sede-matriz') return true;
+    if (wsId === 'sede-matriz' || wsId === 'matriz-central') return true;
     const name = (currentWorkshop?.name || '').toLowerCase();
-    return name.includes('matriz');
+    return name.includes('matriz') && !name.includes('sucursal');
   }, [currentWorkshop, activeWorkshopId]);
 
   // Filtro de sede para Matriz (permite supervisar toda la red nacional o enfocar una sede específica)
@@ -154,10 +159,17 @@ export function useTallerPortal() {
       }
       // 2. Si no tiene sedeId, comparar estrictamente por nombre específico o ciudad
       if (a.sede && targetWs) {
-        const cleanSede = a.sede.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
+        const cleanSede = a.sede.toLowerCase();
+        if (!targetWs.name.toLowerCase().includes('matriz') && cleanSede.includes('matriz')) {
+          return false;
+        }
+        if (targetWs.name.toLowerCase().includes('matriz') && cleanSede.includes('sucursal')) {
+          return false;
+        }
+        const cleanSedePart = cleanSede.replace(/starmotos|sucursal|sede|taller/gi, '').trim();
         const cleanWs = targetWs.name.toLowerCase().replace(/starmotos|sucursal|sede|taller/gi, '').trim();
         const cityPart = targetWs.city.toLowerCase().split(',')[0].trim();
-        return cleanSede && (cleanSede.includes(cleanWs) || cleanWs.includes(cleanSede) || (cityPart && cleanSede.includes(cityPart)));
+        return cleanSedePart && (cleanSedePart.includes(cleanWs) || cleanWs.includes(cleanSedePart) || (cityPart && cleanSedePart.includes(cityPart)));
       }
       return false;
     });

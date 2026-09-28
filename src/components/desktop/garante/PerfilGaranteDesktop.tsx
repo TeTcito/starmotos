@@ -100,7 +100,7 @@ export const PerfilGaranteDesktop: React.FC<Props> = ({ profile, onUpdateProfile
             <div className="p-2 rounded-xl bg-purple-100 text-purple-700">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <span>Mi Perfil de Garante y Respaldo de Marca</span>
+            <span>Mi Perfil de Garantía y Respaldo de Marca</span>
           </h2>
           <p className="text-xs text-zinc-500 mt-1">
             Gestione y edite sus datos de contacto, representación oficial, marcas respaldadas y parámetros de auditoría técnica.
@@ -133,7 +133,7 @@ export const PerfilGaranteDesktop: React.FC<Props> = ({ profile, onUpdateProfile
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-3 animate-slide-in shadow-xs">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-emerald-900 font-bold">¡Perfil de Garante Actualizado y Sincronizado!</p>
+            <p className="text-emerald-900 font-bold">¡Perfil de Garantía de Marca Actualizado y Sincronizado!</p>
             <p className="text-emerald-700 text-[11px] font-normal">
               Los cambios han sido guardados y se reflejan en tiempo real en la barra lateral, dictámenes de garantías y catálogo de marcas del sistema.
             </p>
@@ -162,7 +162,7 @@ export const PerfilGaranteDesktop: React.FC<Props> = ({ profile, onUpdateProfile
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Garante Oficial Activo
+                  Garantía Oficial de Marca
                 </span>
                 <span className="text-[11px] text-purple-200 font-mono">
                   RUC: {formData.ruc || 'Sin RUC'}
@@ -273,7 +273,7 @@ export const PerfilGaranteDesktop: React.FC<Props> = ({ profile, onUpdateProfile
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-zinc-700">
-                Razón Social / Marca Garante *
+                Razón Social / Garantía de Marca *
               </label>
               <div className="relative">
                 <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-purple-600" />

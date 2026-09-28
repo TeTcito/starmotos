@@ -93,7 +93,7 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
           </div>
         </div>
         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-          Garante Oficial
+          Garantía Oficial
         </span>
       </div>
 
@@ -202,7 +202,7 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
         <div className="bg-white border border-zinc-200 rounded-xl p-3 shadow-2xs space-y-1.5">
           <label className="text-[11px] font-bold text-zinc-700 flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-purple-600" />
-            <span>Razón Social / Marca Garante *</span>
+            <span>Razón Social / Garantía de Marca *</span>
           </label>
           <input
             type="text"
@@ -255,7 +255,7 @@ export const PerfilGaranteMobile: React.FC<Props> = ({ profile, onUpdateProfile 
         {isSaved && (
           <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-slide-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>¡Perfil de garante actualizado y sincronizado con éxito!</span>
+            <span>¡Perfil de garantía de marca actualizado y sincronizado con éxito!</span>
           </div>
         )}
 

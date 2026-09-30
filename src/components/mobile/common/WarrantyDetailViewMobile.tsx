@@ -39,8 +39,10 @@ import {
   saveStoredWarranties,
   getStoredWarranties,
   canDeleteWarranty,
+  getRegisteredBrands,
 } from '../../../data/mockMultiRoleData';
 import { getWarrantyStatusInfo } from '../../common/WarrantyModule';
+import { cloudSaveWarranty } from '../../../services/supabaseService';
 import { isVideoUrl } from './NewWarrantyFormMobile';
 import { PrintableWarrantySheet } from '../../common/PrintableWarrantySheet';
 import { isValidMediaUrl } from '../../../services/mediaStorage';
@@ -50,6 +52,7 @@ interface Props {
   onBack: () => void;
   viewerRole?: 'admin' | 'taller' | 'garante';
   onSave?: (updated: WarrantyRequest) => void;
+  onUpdateWarranty?: (updated: WarrantyRequest) => void;
   onDelete?: (id: string) => void;
   onValidateWarranty?: (id: string, notes: string) => void;
   onSendToGarante?: (id: string, notes?: string) => void;
@@ -63,6 +66,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   onBack,
   viewerRole = 'admin',
   onSave,
+  onUpdateWarranty,
   onDelete,
   onValidateWarranty,
   onSendToGarante,
@@ -127,21 +131,31 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     return formData.partsTags.reduce((acc, tag) => acc + (Number(partsBudgetMap[tag]) || 0), 0);
   }, [formData.partsTags, partsBudgetMap]);
 
+  // Info canónica de estado según módulo común de garantías
+  const statusInfo = useMemo(() => {
+    return getWarrantyStatusInfo(formData.status);
+  }, [formData.status]);
+
   // Denegada oficialmente por Garante o Matriz
   const isDenied = useMemo(() => {
     const s1 = (formData.status || '').toLowerCase();
     const s2 = (warranty.status || '').toLowerCase();
-    return ['denegada', 'rechazada'].includes(s1) || ['denegada', 'rechazada'].includes(s2);
-  }, [formData.status, warranty.status]);
+    return (
+      ['denegada', 'rechazada'].includes(s1) ||
+      ['denegada', 'rechazada'].includes(s2) ||
+      statusInfo.canonical === 'denegada'
+    );
+  }, [formData.status, warranty.status, statusInfo.canonical]);
 
   // Bloqueo total si la garantía ya fue denegada, rechazada, aceptada, aprobada o completada
   const isLocked = useMemo(() => {
     return (
       isDenied ||
       ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(formData.status) ||
-      ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(warranty.status)
+      ['aceptada', 'aprobada', 'completada', 'denegada', 'rechazada'].includes(warranty.status) ||
+      ['aceptada', 'denegada'].includes(statusInfo.canonical)
     );
-  }, [isDenied, formData.status, warranty.status]);
+  }, [isDenied, formData.status, warranty.status, statusInfo.canonical]);
 
   // Seguimiento de cambios en presupuesto para mostrar/ocultar botones en Matriz
   const isBudgetModified = useMemo(() => {
@@ -174,7 +188,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [backupFormData, setBackupFormData] = useState<typeof formData | null>(null);
 
-  const canAdminOrTallerEdit = !isLocked && (viewerRole === 'admin' || viewerRole === 'taller');
+  const canAdminOrTallerEdit = !isLocked && !isDenied && (viewerRole === 'admin' || viewerRole === 'taller');
   const isFieldEditable = canAdminOrTallerEdit && isEditing;
 
   const isForMatriz =
@@ -201,46 +215,156 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   };
 
   const handleMatrizDirectApprove = () => {
+    const finalMatrizNotes =
+      formData.matrizNotes.trim() ||
+      'Garantía aprobada directamente por Sede Matriz y Almacén.';
+    const grandTotal = partsTotal + laborCost;
     const updated: WarrantyRequest = {
       ...warranty,
       ...formData,
+      motorcycleVin: (formData.motorcycleVin || '').toUpperCase(),
+      motorcyclePlate: (formData.motorcyclePlate || '').toUpperCase(),
+      motorNumber: formData.motorNumber?.toUpperCase(),
+      ramvNumber: formData.ramvNumber?.toUpperCase(),
       motorcycleMileage: Number(formData.motorcycleMileage) || 0,
-      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+      partsRequired:
+        formData.partsTags && formData.partsTags.length > 0
+          ? formData.partsTags.join(', ')
+          : warranty.partsRequired,
+      partsTags: formData.partsTags,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotal,
+      estimatedCost: grandTotal,
       status: 'aceptada',
-      matrizNotes: formData.matrizNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén.',
+      matrizNotes: finalMatrizNotes,
       approvedAt: 'Hoy, Autorización Directa Matriz',
     };
-    if (onSave) onSave(updated);
+
+    setFormData((prev) => ({
+      ...prev,
+      status: 'aceptada',
+      matrizNotes: finalMatrizNotes,
+    }));
+
+    if (onApproveWarranty) {
+      onApproveWarranty(warranty.id, finalMatrizNotes, formData.resolutionType || 'envio_repuesto');
+    }
+    if (onSave) {
+      onSave(updated);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+
     try {
       const allStored = getStoredWarranties();
       saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+      cloudSaveWarranty(updated);
     } catch {}
-    setFormData({ ...formData, status: 'aceptada' });
+
     setToastMessage('✓ Garantía aprobada exitosamente por Matriz.');
-    confetti({ particleCount: 40, spread: 55, origin: { y: 0.7 } });
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
   };
 
-  const handleMatrizReject = () => {
-    const reason = window.prompt('Ingrese el motivo de denegación en Matriz Central:');
-    if (!reason || !reason.trim()) return;
+  const handleMatrizApprove = () => {
+    const finalMatrizNotes =
+      formData.matrizNotes.trim() ||
+      'Inspección técnica de Matriz aprobada. Aplica cobertura de fábrica.';
+    const grandTotal = partsTotal + laborCost;
+    const updated: WarrantyRequest = {
+      ...warranty,
+      ...formData,
+      motorcycleVin: (formData.motorcycleVin || '').toUpperCase(),
+      motorcyclePlate: (formData.motorcyclePlate || '').toUpperCase(),
+      motorNumber: formData.motorNumber?.toUpperCase(),
+      ramvNumber: formData.ramvNumber?.toUpperCase(),
+      motorcycleMileage: Number(formData.motorcycleMileage) || 0,
+      partsRequired:
+        formData.partsTags && formData.partsTags.length > 0
+          ? formData.partsTags.join(', ')
+          : warranty.partsRequired,
+      partsTags: formData.partsTags,
+      partsBudget: partsBudgetMap,
+      laborTime,
+      laborCost,
+      totalBudget: grandTotal,
+      estimatedCost: grandTotal,
+      matrizNotes: finalMatrizNotes,
+      status: 'en_proceso',
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      status: 'en_proceso',
+      matrizNotes: finalMatrizNotes,
+    }));
+
+    if (onValidateWarranty) {
+      onValidateWarranty(warranty.id, finalMatrizNotes);
+    }
+    if (onSendToGarante) {
+      onSendToGarante(warranty.id, finalMatrizNotes);
+    }
+    if (onSave) {
+      onSave(updated);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+
+    try {
+      const allStored = getStoredWarranties();
+      saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+      cloudSaveWarranty(updated);
+    } catch {}
+
+    setToastMessage('✓ Solicitud aceptada por Matriz. Puesta EN PROCESO hacia la Garantía de Marca.');
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+  };
+
+  const handleMatrizReject = (reasonArg?: string) => {
+    const reason = (reasonArg || rejectionInput).trim();
+    if (!reason) {
+      setActiveTab('dictamen');
+      setShowRejectBox(true);
+      return;
+    }
+    const grandTotal = partsTotal + laborCost;
     const updated: WarrantyRequest = {
       ...warranty,
       ...formData,
       motorcycleMileage: Number(formData.motorcycleMileage) || 0,
-      estimatedCost: parseFloat(formData.estimatedCost) || warranty.estimatedCost || 0,
+      estimatedCost: grandTotal,
       status: 'denegada',
-      rejectionReason: reason.trim(),
+      rejectionReason: reason,
       rejectedAt: 'Hoy, Matriz Central',
     };
-    if (onSave) onSave(updated);
+
+    setFormData((prev) => ({
+      ...prev,
+      status: 'denegada',
+      rejectionReason: reason,
+    }));
+
+    if (onRejectWarranty) {
+      onRejectWarranty(warranty.id, reason);
+    }
+    if (onSave) {
+      onSave(updated);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
+    }
+
     try {
       const allStored = getStoredWarranties();
       saveStoredWarranties(allStored.map((w) => (w.id === updated.id ? updated : w)));
+      cloudSaveWarranty(updated);
     } catch {}
-    if (onRejectWarranty) {
-      onRejectWarranty(warranty.id, reason.trim());
-    }
-    setFormData({ ...formData, status: 'denegada' });
+
+    setShowRejectBox(false);
     setToastMessage('✕ Solicitud rechazada por Matriz.');
   };
 
@@ -319,11 +443,6 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
   // Input temporal para agregar tags de repuestos
   const [tagInput, setTagInput] = useState('');
-
-  // Info canónica de estado según módulo común de garantías
-  const statusInfo = useMemo(() => {
-    return getWarrantyStatusInfo(formData.status);
-  }, [formData.status]);
 
   // URL limpia de WhatsApp
   const cleanWhatsappUrl = useMemo(() => {
@@ -423,14 +542,19 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
     if (onApproveWarranty) {
       onApproveWarranty(warranty.id, finalNotes, finalResolution);
-    } else if (onSave) {
+    }
+    if (onSave) {
       onSave(updated);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
     }
 
     try {
       const allStored = getStoredWarranties();
       const updatedList = allStored.map((w) => (w.id === updated.id ? updated : w));
       saveStoredWarranties(updatedList);
+      cloudSaveWarranty(updated);
     } catch {
       // Ignorar
     }
@@ -469,14 +593,19 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
 
     if (onRejectWarranty) {
       onRejectWarranty(warranty.id, reason);
-    } else if (onSave) {
+    }
+    if (onSave) {
       onSave(updated);
+    }
+    if (onUpdateWarranty) {
+      onUpdateWarranty(updated);
     }
 
     try {
       const allStored = getStoredWarranties();
       const updatedList = allStored.map((w) => (w.id === updated.id ? updated : w));
       saveStoredWarranties(updatedList);
+      cloudSaveWarranty(updated);
     } catch {
       // Ignorar
     }
@@ -604,19 +733,6 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </>
             )}
 
-          {/* Botón rápido "+ Nueva" si la solicitud está denegada */}
-          {isDenied && onCreateNewRequest && (
-            <button
-              type="button"
-              onClick={onCreateNewRequest}
-              className="h-8 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition cursor-pointer"
-              title="Crear Nueva Solicitud"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span className="text-[11px] font-bold">Nueva</span>
-            </button>
-          )}
-
           {/* Eliminar (Solo Admin con bloqueo de 30 días si está aceptada) */}
           {viewerRole === 'admin' && onDelete && (
             <button
@@ -643,9 +759,9 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Banner de Solicitud Denegada / Bloqueada con botón de Nueva Solicitud */}
+      {/* Banner de Solicitud Denegada / Bloqueada */}
       {isDenied && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-3.5 space-y-2.5 animate-fade-in shadow-2xs">
+        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-3.5 space-y-2 animate-fade-in shadow-2xs">
           <div className="flex items-start gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
               <XCircle className="w-4 h-4" />
@@ -664,16 +780,6 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </p>
             </div>
           </div>
-          {onCreateNewRequest && (
-            <button
-              type="button"
-              onClick={onCreateNewRequest}
-              className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>+ Crear Nueva Solicitud de Garantía</span>
-            </button>
-          )}
         </div>
       )}
 
@@ -686,7 +792,120 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. SELECTOR DE PESTAÑAS (COLOR TRAZABILIDAD: CLIENTE, MOTO, RECLAMO, DICTAMEN) */}
+      {/* 2. LÍNEA DE TIEMPO DE TRAZABILIDAD (PASO 1: TALLER, PASO 2: MATRIZ, PASO 3: GARANTE) */}
+      {/* ========================================================================= */}
+      <div className="bg-white border border-zinc-200 shadow-2xs rounded-2xl p-3 space-y-2">
+        <h4 className="text-[11px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-blue-600" />
+          <span>Trazabilidad del Flujo de Garantía</span>
+        </h4>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          {/* Paso 1: Taller */}
+          <div
+            className={`p-2 rounded-xl border flex flex-col justify-between transition-colors ${
+              statusInfo.canonical !== 'en_revision'
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
+                : 'bg-white border-amber-300 text-zinc-900 shadow-2xs'
+            }`}
+          >
+            <div className="flex items-center gap-1 mb-0.5">
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center font-black text-[9px] shrink-0 ${
+                  statusInfo.canonical !== 'en_revision'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-500 text-white animate-pulse'
+                }`}
+              >
+                1
+              </div>
+              <span className="font-bold text-[10px] leading-tight line-clamp-1">1. Taller</span>
+            </div>
+            <p className="text-[9px] text-zinc-500 leading-tight truncate">
+              {formData.tallerOrigin || warranty.tallerOrigin || 'Emisión'}
+            </p>
+          </div>
+
+          {/* Paso 2: Matriz */}
+          <div
+            className={`p-2 rounded-xl border flex flex-col justify-between transition-colors ${
+              statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'aceptada' || statusInfo.canonical === 'en_proceso_aceptacion_2'
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900'
+                : statusInfo.canonical === 'en_revision'
+                ? 'bg-amber-50/70 border-amber-300 text-amber-900 shadow-2xs'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-400'
+            }`}
+          >
+            <div className="flex items-center gap-1 mb-0.5">
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center font-black text-[9px] shrink-0 ${
+                  statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'aceptada' || statusInfo.canonical === 'en_proceso_aceptacion_2'
+                    ? 'bg-emerald-600 text-white'
+                    : statusInfo.canonical === 'en_revision'
+                    ? 'bg-amber-500 text-white animate-pulse'
+                    : 'bg-zinc-200 text-zinc-600'
+                }`}
+              >
+                2
+              </div>
+              <span className="font-bold text-[10px] leading-tight line-clamp-1">2. Matriz</span>
+            </div>
+            <p className="text-[9px] text-zinc-500 leading-tight truncate">
+              {statusInfo.canonical === 'en_revision'
+                ? 'En revisión'
+                : 'Validado'}
+            </p>
+          </div>
+
+          {/* Paso 3: Garante */}
+          <div
+            className={`p-2 rounded-xl border flex flex-col justify-between transition-colors ${
+              statusInfo.canonical === 'aceptada'
+                ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-2xs'
+                : statusInfo.canonical === 'en_proceso_aceptacion_2'
+                ? 'bg-indigo-50 border-indigo-300 text-indigo-900 shadow-2xs'
+                : statusInfo.canonical === 'denegada'
+                ? 'bg-red-50 border-red-300 text-red-900 shadow-2xs'
+                : statusInfo.canonical === 'en_proceso'
+                ? 'bg-blue-50 border-blue-300 text-blue-900 animate-pulse'
+                : 'bg-zinc-50 border-zinc-200 text-zinc-400'
+            }`}
+          >
+            <div className="flex items-center gap-1 mb-0.5">
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center font-black text-[9px] shrink-0 ${
+                  statusInfo.canonical === 'aceptada'
+                    ? 'bg-emerald-600 text-white'
+                    : statusInfo.canonical === 'en_proceso_aceptacion_2'
+                    ? 'bg-indigo-600 text-white'
+                    : statusInfo.canonical === 'denegada'
+                    ? 'bg-red-600 text-white'
+                    : statusInfo.canonical === 'en_proceso'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-zinc-200 text-zinc-600'
+                }`}
+              >
+                3
+              </div>
+              <span className="font-bold text-[10px] leading-tight line-clamp-1">3. Garante</span>
+            </div>
+            <p className="text-[9px] text-zinc-500 leading-tight truncate">
+              {statusInfo.canonical === 'aceptada'
+                ? 'Aceptada'
+                : statusInfo.canonical === 'en_proceso_aceptacion_2'
+                ? 'Encargada'
+                : statusInfo.canonical === 'denegada'
+                ? 'Denegada'
+                : statusInfo.canonical === 'en_proceso'
+                ? 'Auditoría'
+                : 'Pendiente'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. SELECTOR DE PESTAÑAS (COLOR TRAZABILIDAD: CLIENTE, MOTO, RECLAMO, DICTAMEN) */}
       {/* ========================================================================= */}
       <div className="flex rounded-xl bg-emerald-50/40 p-1 gap-1 overflow-x-auto shrink-0 scrollbar-none text-[11px] font-bold border border-emerald-100">
         {/* Pestaña: Cliente */}
@@ -846,13 +1065,32 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-zinc-700 mb-1">Marca Garantía</label>
-            <input
-              type="text"
-              readOnly
-              value={warranty.targetBrand || warranty.garanteName || formData.motorcycleBrand || 'Garante Oficial'}
-              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-800 outline-none"
-            />
+            <label className="block text-xs font-bold text-zinc-700 mb-1">Marca / Garante Responsable</label>
+            {isFieldEditable && formData.warrantyType === 'marca' ? (
+              <select
+                value={formData.motorcycleBrand || warranty.targetBrand || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    motorcycleBrand: e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 bg-purple-50 border-2 border-purple-300 focus:border-purple-600 rounded-xl text-xs font-bold text-purple-950 outline-none cursor-pointer"
+              >
+                {getRegisteredBrands().map((b: string) => (
+                  <option key={b} value={b}>
+                    {b} (Garante Oficial)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                readOnly
+                value={warranty.targetBrand || warranty.garanteName || formData.motorcycleBrand || 'Garante Oficial'}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-800 outline-none cursor-not-allowed"
+              />
+            )}
           </div>
         </div>
       )}
@@ -1066,6 +1304,81 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </p>
             )}
           </div>
+
+          {/* Modalidad Dictaminada (Garante) o Estado de la Resolución */}
+          {viewerRole === 'garante' && !isLocked ? (
+            <div className="pt-2">
+              <label className="block text-xs font-bold text-zinc-700 mb-1.5">Modalidad Dictaminada</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, resolutionType: 'encargar_taller' })}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                    formData.resolutionType === 'encargar_taller'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-900 ring-2 ring-indigo-200 font-bold'
+                      : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span className="text-xs font-black text-zinc-900 leading-tight">Encargar a taller</span>
+                    </div>
+                    {formData.resolutionType === 'encargar_taller' && (
+                      <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                        <Check className="w-2.5 h-2.5" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-tight">
+                    Taller repara y se reconocen repuestos y MO.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, resolutionType: 'envio_repuesto' })}
+                  className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                    formData.resolutionType === 'envio_repuesto'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-200 font-bold'
+                      : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="text-xs font-black text-zinc-900 leading-tight">Envío repuesto</span>
+                    </div>
+                    {formData.resolutionType === 'envio_repuesto' && (
+                      <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <Check className="w-2.5 h-2.5" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-tight">
+                    Fábrica despacha piezas sin costo.
+                  </p>
+                </button>
+              </div>
+            </div>
+          ) : formData.resolutionType ? (
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                Resolución Dictaminada por la Marca
+              </span>
+              {formData.resolutionType === 'encargar_taller' ? (
+                <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs">
+                  <Wrench className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Encargado al Taller (Repuestos y MO autorizados)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+                  <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Envío de Repuesto Directo de Fábrica</span>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {/* =============================================================== */}
           {/* SECCIÓN DE PRESUPUESTO OFICIAL (EN MATRIZ SIEMPRE; EN GARANTE Y TALLER SOLO SI ENCARGAR AL TALLER) */}
@@ -1568,25 +1881,106 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               <p className="text-[10px] text-red-700 opacity-80 font-mono">
                 {warranty.rejectedAt || 'Hoy, Dictamen Garante Oficial'}
               </p>
-              {onCreateNewRequest && (
-                <button
-                  type="button"
-                  onClick={onCreateNewRequest}
-                  className="mt-2 w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>+ Crear Nueva Solicitud de Garantía</span>
-                </button>
+            </div>
+          )}
+
+          {/* 1. FORMULARIO DE DICTAMEN Y VALIDACIÓN EN MATRIZ (ADMIN) */}
+          {viewerRole === 'admin' && (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') && !isLocked && (
+            <div className="bg-blue-50/50 border-2 border-blue-300 rounded-2xl p-4 space-y-3 animate-fade-in shadow-2xs">
+              <div className="flex items-center gap-2 text-xs font-black uppercase text-blue-900 tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span>Dictamen y Validación Técnica en Matriz</span>
+              </div>
+
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                Revise los datos del cliente, motocicleta y fotos. Estipule las observaciones técnicas de
+                inspección y presione <strong>Aceptar</strong> para poner la solicitud <strong>En Proceso</strong> y
+                enviarla al Garante de la Marca.
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                  Observaciones / Dictamen de Matriz Central
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.matrizNotes}
+                  onChange={(e) => setFormData({ ...formData, matrizNotes: e.target.value })}
+                  placeholder="Ingrese observaciones técnicas de inspección de Matriz..."
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 focus:border-blue-600 rounded-xl text-xs text-zinc-900 outline-none"
+                />
+              </div>
+
+              {showRejectBox ? (
+                <div className="p-3.5 bg-red-50 border-2 border-red-200 rounded-xl space-y-2.5 animate-fade-in shadow-2xs">
+                  <label className="block text-[11px] font-bold text-red-900">
+                    Motivo / Observación del Rechazo en Matriz: <span className="text-red-600">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={rejectionInput}
+                    onChange={(e) => setRejectionInput(e.target.value)}
+                    placeholder="Ej. Falla causada por desgaste natural o falta de mantenimiento..."
+                    className="w-full px-3 py-2 bg-white border border-red-300 rounded-xl text-xs text-red-950 outline-none leading-relaxed focus:ring-2 focus:ring-red-400"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowRejectBox(false)}
+                      className="flex-1 py-2 bg-white border border-zinc-300 text-zinc-700 rounded-xl text-xs font-bold hover:bg-zinc-100 transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMatrizReject()}
+                      className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition active:scale-95"
+                    >
+                      Confirmar Denegación en Matriz
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowRejectBox(true)}
+                    className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs transition active:scale-95"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-red-600" />
+                    <span>✕ Denegar Solicitud</span>
+                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleMatrizDirectApprove}
+                      className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                      title="Aprobar y validar la garantía directamente en Matriz"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>✓ Aprobar Garantía</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleMatrizApprove}
+                      className="py-2 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                      title="Poner en proceso y remitir al buzón de Garantía de Marca"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>Aceptar y Enviar a Garantía</span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
 
-          {/* FORMULARIO PARA EMITIR DICTAMEN (SI ES GARANTE Y AÚN NO ESTÁ SELLADA) */}
+          {/* 2. FORMULARIO PARA EMITIR DICTAMEN DE MARCA (GARANTE) */}
           {viewerRole === 'garante' &&
-            formData.status !== 'aceptada' &&
-            formData.status !== 'aprobada' &&
-            formData.status !== 'denegada' &&
-            formData.status !== 'completada' && (
+            (statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'en_revision') &&
+            !isLocked && (
               <div className="bg-white p-4 rounded-2xl border-2 border-purple-200 shadow-2xs space-y-3.5 animate-fade-in">
                 <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 text-xs sm:text-sm font-black text-purple-950">
                   <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
@@ -1706,13 +2100,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               </div>
             )}
 
-          {/* ESTADO EN REVISIÓN / EN PROCESO (PARA OTROS ROLES) */}
+          {/* 3. ESTADO EN REVISIÓN / EN PROCESO (PARA TALLER Y OTROS ROLES) */}
           {viewerRole !== 'garante' &&
-            formData.status !== 'aceptada' &&
-            formData.status !== 'aprobada' &&
-            formData.status !== 'validada_matriz' &&
-            formData.status !== 'denegada' &&
-            formData.status !== 'rechazada' && (
+            !(viewerRole === 'admin' && statusInfo.canonical === 'en_revision') &&
+            !isLocked &&
+            !isDenied && (
               <>
                 {statusInfo.canonical === 'en_revision' ? (
                   <div className="p-4 rounded-2xl border-2 border-amber-300 bg-amber-50/80 text-amber-900 space-y-2 shadow-2xs">
@@ -1783,115 +2175,149 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       {/* ========================================================================= */}
       {/* 10. FOOTER DE ACCIONES RÁPIDAS                                            */}
       {/* ========================================================================= */}
-      <div className="pt-2 border-t border-zinc-200 w-full shrink-0">
-        {isEditing ? (
-          <div className="flex items-center gap-2 w-full">
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              className="flex-1 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <X className="w-4 h-4 text-zinc-500" />
-              <span>Cancelar</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveMobile}
-              className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Cambios</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 w-full">
-            {/* Acción para Matriz si está en_revision */}
-            {viewerRole === 'admin' && formData.status === 'en_revision' && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMatrizReject}
-                  className="flex-1 py-2 px-2 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
-                  title="Denegar garantía"
-                >
-                  <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                  <span>Denegar</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleMatrizDirectApprove}
-                  className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
-                  title="Aprobar y aceptar la garantía en Matriz"
-                >
-                  <Check className="w-3.5 h-3.5 shrink-0" />
-                  <span>Aprobar</span>
-                </button>
-
-                {!isForMatriz && onValidateWarranty && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleSave();
-                      onValidateWarranty(warranty.id, formData.matrizNotes || 'Validado por Matriz.');
-                      setFormData({ ...formData, status: 'validada_matriz' });
-                      confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
-                    }}
-                    className="flex-1 py-2 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
-                    title="Remitir solicitud al Garante de la Marca"
-                  >
-                    <Send className="w-3.5 h-3.5 shrink-0" />
-                    <span>A Garante</span>
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* Acción para Garante si está pendiente */}
-            {viewerRole === 'garante' &&
-              formData.status !== 'aceptada' &&
-              formData.status !== 'aprobada' &&
-              formData.status !== 'denegada' &&
-              formData.status !== 'completada' && (
-                <button
-                  type="button"
-                  onClick={handleGaranteApprove}
-                  className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Aprobar Dictamen</span>
-                </button>
-              )}
-
-            {/* Botón Nueva Solicitud si está denegada */}
-            {isDenied && onCreateNewRequest && (
+      {(isEditing ||
+        (isDenied && Boolean(onCreateNewRequest)) ||
+        (viewerRole === 'admin' &&
+          (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') &&
+          !isLocked &&
+          !showRejectBox &&
+          activeTab !== 'dictamen') ||
+        (viewerRole === 'garante' &&
+          (statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'en_revision') &&
+          !isLocked &&
+          !showRejectBox &&
+          activeTab !== 'dictamen') ||
+        (viewerRole !== 'garante' &&
+          !(viewerRole === 'admin' && (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso')) &&
+          !isDenied &&
+          !isLocked &&
+          canAdminOrTallerEdit)) && (
+        <div className="pt-2 border-t border-zinc-200 w-full shrink-0">
+          {isEditing ? (
+            <div className="flex items-center gap-2 w-full">
               <button
                 type="button"
-                onClick={onCreateNewRequest}
-                className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                onClick={handleCancelEdit}
+                className="flex-1 py-2.5 px-3 bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
               >
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Crear Nueva Solicitud</span>
+                <X className="w-4 h-4 text-zinc-500" />
+                <span>Cancelar</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleSaveMobile}
+                className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar Cambios</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 w-full">
+              {/* Acción para Matriz si está en_revision o en_proceso (solo visible fuera de dictamen para no duplicar con la tarjeta) */}
+              {viewerRole === 'admin' &&
+                (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') &&
+                !isLocked &&
+                !showRejectBox &&
+                activeTab !== 'dictamen' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('dictamen');
+                        setShowRejectBox(true);
+                      }}
+                      className="flex-1 py-2 px-2 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                      title="Denegar garantía"
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <span>✕ Denegar</span>
+                    </button>
 
-            {/* Si es taller o admin en otro estado y puede editar */}
-            {viewerRole !== 'garante' &&
-              !(viewerRole === 'admin' && formData.status === 'en_revision') &&
-              !isDenied &&
-              canAdminOrTallerEdit && (
+                    <button
+                      type="button"
+                      onClick={handleMatrizDirectApprove}
+                      className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                      title="Aprobar y aceptar la garantía en Matriz"
+                    >
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      <span>✓ Aprobar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleMatrizApprove}
+                      className="flex-1 py-2 px-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                      title="Remitir solicitud al Garante de la Marca"
+                    >
+                      <Send className="w-3.5 h-3.5 shrink-0" />
+                      <span>Aceptar y Enviar</span>
+                    </button>
+                  </>
+                )}
+
+              {/* Acción para Garante si está pendiente (solo fuera de dictamen para no duplicar) */}
+              {viewerRole === 'garante' &&
+                (statusInfo.canonical === 'en_proceso' || statusInfo.canonical === 'en_revision') &&
+                !isLocked &&
+                !showRejectBox &&
+                activeTab !== 'dictamen' && (
+                  <div className="flex items-center gap-2 w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('dictamen');
+                        setShowRejectBox(true);
+                      }}
+                      className="flex-1 py-2 px-2 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                      title="Denegar garantía"
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <span>✕ Denegar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleGaranteApprove}
+                      className="flex-1 py-2 px-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>✓ Aprobar Dictamen</span>
+                    </button>
+                  </div>
+                )}
+
+              {/* Botón ÚNICO al final para volver a crear solicitud si está denegada */}
+              {isDenied && onCreateNewRequest && (
                 <button
                   type="button"
-                  onClick={handleStartEdit}
-                  className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  onClick={onCreateNewRequest}
+                  className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Editar Solicitud</span>
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Volver a crear una solicitud</span>
                 </button>
               )}
-          </div>
-        )}
-      </div>
+
+              {/* Si es taller o admin en otro estado y puede editar */}
+              {viewerRole !== 'garante' &&
+                !(viewerRole === 'admin' && (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso')) &&
+                !isDenied &&
+                !isLocked &&
+                canAdminOrTallerEdit && (
+                  <button
+                    type="button"
+                    onClick={handleStartEdit}
+                    className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Editar Solicitud</span>
+                  </button>
+                )}
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* FICHA OFICIAL DE RECLAMO PARA IMPRESIÓN Y PDF */}

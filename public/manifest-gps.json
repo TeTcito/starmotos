@@ -1,0 +1,32 @@
+{
+  "short_name": "StarMotos GPS",
+  "name": "StarMotos - GPS Servicios",
+  "description": "Portal técnico de auditoría satelital, validación de dispositivos y emisión de credenciales StarMotos.",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/gps/",
+  "id": "/gps/",
+  "background_color": "#ffffff",
+  "theme_color": "#0891b2",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/gps/"
+}

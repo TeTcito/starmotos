@@ -22,11 +22,11 @@
       "purpose": "maskable"
     }
   ],
-  "start_url": "/?portal=cliente#eventos",
-  "id": "/?portal=cliente",
+  "start_url": "/cliente/",
+  "id": "/cliente/",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "scope": "/"
+  "scope": "/cliente/"
 }

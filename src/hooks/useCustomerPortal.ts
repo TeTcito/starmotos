@@ -21,6 +21,8 @@ import {
   OrderRating,
   SystemAlert,
   SolicitudAbonoCliente,
+  GarantiaPlusRecord,
+  GpsRecord,
 } from '../types/customer';
 import { ActiveSection } from '../components/SidebarDrawer';
 import {
@@ -35,8 +37,20 @@ import {
   saveStoredRating,
   isOrderRated,
   addStoredAlerts,
+  getStoredGarantiasPlusRecords,
+  saveStoredGarantiaPlusRecord,
+  checkClientGarantiaPlus,
+  getStoredGpsRecords,
+  getStoredWorkshops,
+  INITIAL_WORKSHOPS,
 } from '../data/mockMultiRoleData';
-import { cloudSaveClient, cloudSaveAlistamiento } from '../services/supabaseService';
+import {
+  cloudSaveClient,
+  cloudSaveAlistamiento,
+  cloudSaveGarantiaPlusRecord,
+  isDeletedTombstone,
+  getDeletedGpsIds,
+} from '../services/supabaseService';
 import { isValidMediaUrl } from '../services/mediaStorage';
 
 // Sucursales Oficiales StarMotos
@@ -83,8 +97,8 @@ export const BRANCH_QUEVEDO: Branch = {
   province: 'Los Ríos',
   canton: 'Quevedo',
   reference: 'Ingresa por lubricadora Don Lucho, al lado de Hostal Carmita',
-  phone: '0982852456 / 0939316698',
-  whatsapp: '593982852456',
+  phone: '0939316698',
+  whatsapp: '593939316698',
   email: 'starsmotor17@gmail.com',
   schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
   googleMapsUrl: 'https://maps.google.com/?q=Quevedo+Ecuador',
@@ -138,14 +152,50 @@ export const BRANCH_PORTOVIEJO: Branch = {
   googleMapsUrl: 'https://maps.google.com/?q=Portoviejo+Manabi+Ecuador',
 };
 
-export const ALL_BRANCHES = [
-  BRANCH_MATRIZ,
-  BRANCH_LA_MANA,
-  BRANCH_QUEVEDO,
-  BRANCH_BUENAFE,
-  BRANCH_ELCARMEN,
-  BRANCH_PORTOVIEJO,
-];
+export function getAllBranches(): Branch[] {
+  try {
+    const workshops = getStoredWorkshops();
+    const map = new Map<string, any>();
+    INITIAL_WORKSHOPS.forEach((w) => map.set(w.id, w));
+    if (Array.isArray(workshops)) {
+      workshops.forEach((w) => map.set(w.id, { ...map.get(w.id), ...w }));
+    }
+    const list = Array.from(map.values());
+    return list.map((w) => ({
+      id: w.id,
+      name: w.name,
+      code: w.code,
+      address: w.address,
+      city: w.city,
+      province: w.province || w.city,
+      canton: w.canton || w.city,
+      reference: w.reference || '',
+      phone: '0939316698',
+      whatsapp: '593939316698',
+      email: w.email || 'starsmotor17@gmail.com',
+      schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
+      googleMapsUrl: `https://maps.google.com/?q=${encodeURIComponent(w.name + ' ' + w.city + ' Ecuador')}`,
+    }));
+  } catch (_) {
+    return INITIAL_WORKSHOPS.map((w) => ({
+      id: w.id,
+      name: w.name,
+      code: w.code,
+      address: w.address,
+      city: w.city,
+      province: w.province || w.city,
+      canton: w.canton || w.city,
+      reference: w.reference || '',
+      phone: '0939316698',
+      whatsapp: '593939316698',
+      email: w.email || 'starsmotor17@gmail.com',
+      schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
+      googleMapsUrl: `https://maps.google.com/?q=${encodeURIComponent(w.name + ' ' + w.city + ' Ecuador')}`,
+    }));
+  }
+}
+
+export const ALL_BRANCHES: Branch[] = getAllBranches();
 
 // Perfil base limpio para nuevos clientes
 export const DEFAULT_PROFILE: ClientProfile = {
@@ -453,6 +503,8 @@ export const VALID_SECTIONS: ActiveSection[] = [
   'agendar_cita',
   'eventos',
   'historial',
+  'garantia_plus',
+  'gps',
   // Secciones heredadas para compatibilidad con redirección
   'mi_moto',
   'mantenimientos',
@@ -781,6 +833,64 @@ const getClientHistory = (p: ClientProfile, m: MotorcycleClientData): Maintenanc
     });
   });
 
+  // Pólizas de Garantía Plus oficiales registradas para el cliente
+  try {
+    const allGp = getStoredGarantiasPlusRecords();
+    const userCedula = norm(p.idNumber).replace(/[^a-z0-9]/g, '');
+    const userPlaca = norm(m.plate).replace(/[^a-z0-9]/g, '');
+    const userVin = norm(m.vin).replace(/[^a-z0-9]/g, '');
+
+    const clientGpRecords = allGp.filter((gp) => {
+      if (!gp || !gp.id || isDeletedTombstone(gp.id)) return false;
+      const cleanCedula = norm(gp.cedulaRuc).replace(/[^a-z0-9]/g, '');
+      const cleanPlaca = norm(gp.placa).replace(/[^a-z0-9]/g, '');
+      const cleanVin = norm(gp.chasis).replace(/[^a-z0-9]/g, '');
+
+      return Boolean(
+        (userCedula && cleanCedula === userCedula) ||
+        (userPlaca && !isPlaceholderPlate(m.plate) && cleanPlaca === userPlaca) ||
+        (userVin && cleanVin === userVin)
+      );
+    });
+
+    clientGpRecords.forEach((gp) => {
+      // Evitar duplicados si ya fue incorporado con el mismo id o ticket
+      if (result.some((r) => r.id === gp.id || (gp.numeroTicket && r.otNumber === gp.numeroTicket))) return;
+
+      const val = Number(gp.valorServicio || 0);
+      const pag = gp.abono !== undefined && gp.abono !== null
+        ? Number(gp.abono)
+        : Number(gp.montoPagado || 0);
+      const pend = gp.saldoPendiente !== undefined && gp.saldoPendiente !== null
+        ? Number(gp.saldoPendiente)
+        : Math.max(0, val - pag);
+
+      result.push({
+        id: gp.id,
+        otNumber: gp.numeroTicket || `GP-${gp.id.slice(-6).toUpperCase()}`,
+        invoiceNumber: gp.numeroFactura || `FAC-${gp.id.slice(-6).toUpperCase()}`,
+        date: formatDisplayDate(gp.fechaServicio),
+        mileage: Number(gp.kilometraje) || 0,
+        branchName: gp.sede || 'StarMotos Matriz Central',
+        workSummary: [
+          'Membresía Oficial Garantía Plus StarMotos',
+          ...(gp.observaciones ? [gp.observaciones] : ['Mantenimientos preventivos y mano de obra 100% cubiertos'])
+        ],
+        partsReplaced: ['Póliza Garantía Plus Oficial'],
+        totalPaid: pag,
+        technicianName: gp.tecnicoResponsable || 'Técnico Especialista StarMotos',
+        totalCost: val,
+        saldoPendiente: pend,
+        abono: pag,
+        alistamientoId: gp.id,
+        solicitudAbonoPendiente: gp.solicitudAbonoPendiente,
+        fotos: (gp.fotos || []).filter(isValidMediaUrl),
+      });
+    });
+  } catch (e) {
+    console.error('Error integrando Garantía Plus en historial del cliente:', e);
+  }
+
   if (result.length > 0) return result;
 
   // Fallback para cuenta demo Fernando Vaca si no tiene alistamientos
@@ -934,7 +1044,9 @@ export const buildWorkOrderFromTallerOrder = (
     serviciosRealizados: matchedAls?.serviciosRealizados || [],
     tecnicoResponsable: techName,
     kilometrajeIngreso: matchedAls?.kilometraje !== undefined ? Number(matchedAls.kilometraje) : (m.currentKm || 0),
-    proximoMantenimientoKm: matchedAls?.proximoMantenimientoKm || ((matchedAls?.kilometraje || m.currentKm || 0) + 3000),
+    proximoMantenimientoKm: (matchedAls?.proximoMantenimientoKm && Number(matchedAls.proximoMantenimientoKm) > 0)
+      ? Number(matchedAls.proximoMantenimientoKm)
+      : undefined,
     tipoAceite: matchedAls?.tipoAceite || '20W-50',
     nivelAceite: matchedAls?.nivelAceite || 'mineral',
     estadoAceite: matchedAls?.aceite || 'con_aceite',
@@ -1126,15 +1238,25 @@ const enrichMotorcycleFromAlistamientos = (
       updatedLastOil = latest.kilometraje;
     }
 
+    // Extraer el próximo kilometraje asignado por el jefe de taller en alistamiento (el más reciente)
+    const alistWithNextKm = matched.find(
+      (a) => a.proximoMantenimientoKm && Number(a.proximoMantenimientoKm) > 0
+    );
+    const assignedNextKm = alistWithNextKm ? Number(alistWithNextKm.proximoMantenimientoKm) : undefined;
+
     return {
       ...m,
       currentKm: updatedKm,
       lastOilChangeKm: updatedLastOil,
       preferredBranchId: latest.sedeId || m.preferredBranchId,
+      proximoMantenimientoKm: assignedNextKm,
     };
   }
 
-  return m;
+  return {
+    ...m,
+    proximoMantenimientoKm: m.proximoMantenimientoKm && Number(m.proximoMantenimientoKm) > 0 ? Number(m.proximoMantenimientoKm) : undefined,
+  };
 };
 
 export function useCustomerPortal() {
@@ -1277,10 +1399,47 @@ export function useCustomerPortal() {
     }
   });
 
-  // Sucursal activa actual
+  // Sucursal activa actual (donde está registrado el cliente)
   const activeBranch = useMemo(() => {
-    return ALL_BRANCHES.find((b) => b.id === motorcycle.preferredBranchId) || BRANCH_MATRIZ;
-  }, [motorcycle.preferredBranchId]);
+    const all = getAllBranches();
+
+    // 1. Si en la base de clientes registrados tiene una sede asignada (Ficha Cliente)
+    if (profile.idNumber) {
+      try {
+        const storedClients = getStoredClients();
+        const clientFound = storedClients.find(
+          (c) =>
+            (profile.idNumber && c.idNumber && c.idNumber.trim() === profile.idNumber.trim()) ||
+            (profile.email && c.email && c.email.trim().toLowerCase() === profile.email.trim().toLowerCase())
+        );
+        if (clientFound?.workshopId) {
+          const match = all.find((b) => b.id === clientFound.workshopId);
+          if (match) return match;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Si la moto tiene preferredBranchId
+    if (motorcycle.preferredBranchId) {
+      const match = all.find((b) => b.id === motorcycle.preferredBranchId);
+      if (match) return match;
+    }
+
+    // 3. Si profile.city o address coincide con alguna sede
+    if (profile.city || profile.address) {
+      const clean = `${profile.city || ''} ${profile.address || ''}`.toLowerCase();
+      const match = all.find(
+        (b) =>
+          (b.canton && clean.includes(b.canton.toLowerCase())) ||
+          (b.city && clean.includes(b.city.toLowerCase())) ||
+          (b.name && clean.includes(b.name.toLowerCase())) ||
+          (b.name && b.name.toLowerCase().includes(clean))
+      );
+      if (match) return match;
+    }
+
+    return all.find((b) => b.id === 'matriz-la-mana') || all[0] || BRANCH_MATRIZ;
+  }, [motorcycle.preferredBranchId, profile.idNumber, profile.email, profile.city, profile.address]);
 
   const [scheduledMaintenances, setScheduledMaintenances] = useState<ScheduledMaintenance[]>(() =>
     getClientScheduledMaintenances(profile, motorcycle, activeBranch)
@@ -1304,6 +1463,10 @@ export function useCustomerPortal() {
   const [warranties, setWarranties] = useState<WarrantyItem[]>(() =>
     getClientWarranties(profile, motorcycle)
   );
+
+  // Garantías Plus y GPS oficiales
+  const [garantiasPlusList, setGarantiasPlusList] = useState<GarantiaPlusRecord[]>(getStoredGarantiasPlusRecords);
+  const [gpsList, setGpsList] = useState<GpsRecord[]>(getStoredGpsRecords);
 
   // Calificación del Servicio Técnico (Orden Entregada)
   const [pendingRatingOrder, setPendingRatingOrder] = useState<TallerOrder | null>(() =>
@@ -1353,6 +1516,8 @@ export function useCustomerPortal() {
       setActiveOrders(ordersList);
       setSelectedActiveOrderIndex((prev) => (prev < ordersList.length ? prev : 0));
       setWarranties(getClientWarranties(curProfile, enrichedMoto));
+      setGarantiasPlusList(getStoredGarantiasPlusRecords());
+      setGpsList(getStoredGpsRecords());
 
       const unratedOrder = getPendingRatingOrder(curProfile, enrichedMoto);
       setPendingRatingOrder(unratedOrder);
@@ -1366,6 +1531,8 @@ export function useCustomerPortal() {
     window.addEventListener('starmotos_warranties_updated', syncAll);
     window.addEventListener('starmotos_clients_updated', syncAll);
     window.addEventListener('starmotos_ratings_updated', syncAll);
+    window.addEventListener('starmotos_garantias_plus_updated', syncAll);
+    window.addEventListener('starmotos_gps_updated', syncAll);
     window.addEventListener('storage', syncAll);
 
     return () => {
@@ -1374,6 +1541,8 @@ export function useCustomerPortal() {
       window.removeEventListener('starmotos_warranties_updated', syncAll);
       window.removeEventListener('starmotos_clients_updated', syncAll);
       window.removeEventListener('starmotos_ratings_updated', syncAll);
+      window.removeEventListener('starmotos_garantias_plus_updated', syncAll);
+      window.removeEventListener('starmotos_gps_updated', syncAll);
       window.removeEventListener('storage', syncAll);
     };
   }, []);
@@ -1656,6 +1825,85 @@ export function useCustomerPortal() {
       notas?: string;
     }): Promise<boolean> => {
       try {
+        // 1. Verificar si el abono va dirigido a una Garantía Plus oficial
+        const allGp = getStoredGarantiasPlusRecords();
+        const norm = (s?: string) => (s || '').trim().toLowerCase();
+        let targetGp = data.alistamientoId
+          ? allGp.find((g) => g.id === data.alistamientoId || g.numeroTicket === data.alistamientoId)
+          : undefined;
+
+        if (!targetGp && (!data.alistamientoId || data.alistamientoId === 'garantia_plus')) {
+          targetGp = allGp.find((g) => {
+            const cleanCedula = norm(g.cedulaRuc).replace(/[^a-z0-9]/g, '');
+            const cleanPlaca = norm(g.placa).replace(/[^a-z0-9]/g, '');
+            const cleanVin = norm(g.chasis).replace(/[^a-z0-9]/g, '');
+            const userCedula = norm(profile.idNumber).replace(/[^a-z0-9]/g, '');
+            const userPlaca = norm(motorcycle.plate).replace(/[^a-z0-9]/g, '');
+            const userVin = norm(motorcycle.vin).replace(/[^a-z0-9]/g, '');
+
+            const isClientMatch = Boolean(
+              (userCedula && cleanCedula === userCedula) ||
+              (userPlaca && !isPlaceholderPlate(motorcycle.plate) && cleanPlaca === userPlaca) ||
+              (userVin && cleanVin === userVin)
+            );
+            if (!isClientMatch) return false;
+            const val = Number(g.valorServicio) || 0;
+            const abn = g.abono !== undefined ? Number(g.abono) : (Number(g.montoPagado) || 0);
+            const pend = g.saldoPendiente !== undefined ? Number(g.saldoPendiente) : Math.max(0, val - abn);
+            return pend > 0.01;
+          });
+        }
+
+        if (targetGp) {
+          const nuevaSolicitud: SolicitudAbonoCliente = {
+            id: `sol-abn-gp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            fechaSolicitud: new Date().toISOString(),
+            monto: Number(data.monto),
+            comprobanteUrl: data.comprobanteUrl,
+            bancoOrigen: data.bancoOrigen,
+            numeroComprobante: data.numeroComprobante,
+            estado: 'pendiente',
+            observacionesCliente: data.notas,
+            clienteNombre: profile.fullName,
+            clienteCedula: profile.idNumber,
+            clienteTelefono: profile.phone,
+          };
+
+          const updatedGp: GarantiaPlusRecord = {
+            ...targetGp,
+            solicitudAbonoPendiente: nuevaSolicitud,
+          };
+
+          saveStoredGarantiaPlusRecord(updatedGp);
+          cloudSaveGarantiaPlusRecord(updatedGp);
+
+          // Crear alerta de sistema para taller y matriz
+          const abonoAlert: SystemAlert = {
+            id: `alt-abn-gp-${Date.now()}`,
+            type: 'info',
+            targetRole: 'all',
+            targetWorkshopId: targetGp.sedeId || activeBranch.id,
+            title: `💰 Abono Garantía Plus ($${data.monto.toFixed(2)}) - ${profile.fullName}`,
+            message: `${profile.fullName} envió comprobante de transferencia por $${data.monto.toFixed(2)} (${data.bancoOrigen || 'Banco'}). Ticket: ${targetGp.numeroTicket || 'GP-OFICIAL'}. Requiere validación.`,
+            timestamp: 'Ahora mismo',
+            read: false,
+            relatedId: targetGp.id,
+          };
+          addStoredAlerts(abonoAlert);
+
+          window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+
+          confetti({
+            particleCount: 90,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#a855f7', '#8b5cf6', '#10b981', '#3b82f6'],
+          });
+
+          showToast('¡Comprobante de abono enviado con éxito! Administración lo revisará enseguida.', 'success');
+          return true;
+        }
+
         const allAls = getStoredFullAlistamientos();
         let targetIndex = -1;
 
@@ -1780,6 +2028,48 @@ export function useCustomerPortal() {
     [profile, motorcycle, activeBranch, showToast]
   );
 
+  const clientGarantiaPlus = useMemo(() => {
+    if (profile.idNumber) {
+      const byCedula = checkClientGarantiaPlus(profile.idNumber, garantiasPlusList);
+      if (byCedula.hasGarantiaPlus || byCedula.record) return byCedula;
+    }
+    if (motorcycle.plate) {
+      const byPlaca = checkClientGarantiaPlus(motorcycle.plate, garantiasPlusList);
+      if (byPlaca.hasGarantiaPlus || byPlaca.record) return byPlaca;
+    }
+    if (motorcycle.vin) {
+      const byVin = checkClientGarantiaPlus(motorcycle.vin, garantiasPlusList);
+      if (byVin.hasGarantiaPlus || byVin.record) return byVin;
+    }
+    return { hasGarantiaPlus: false, isExpired: false, daysRemaining: 0 };
+  }, [profile.idNumber, motorcycle.plate, motorcycle.vin, garantiasPlusList]);
+
+  const clientGpsRecord = useMemo(() => {
+    const cleanCedula = (profile.idNumber || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanPlaca = (motorcycle.plate || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanVin = (motorcycle.vin || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    return gpsList.find((g) => {
+      if (!g || !g.id || isDeletedTombstone(g.id) || getDeletedGpsIds().has(g.id)) return false;
+      const gCedula = (g.cedulaRuc || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const gPlaca = (g.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const gVin = (g.chasis || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      return Boolean(
+        (cleanCedula && gCedula === cleanCedula) ||
+        (cleanPlaca && gPlaca === cleanPlaca) ||
+        (cleanVin && gVin === cleanVin)
+      );
+    });
+  }, [profile.idNumber, motorcycle.plate, motorcycle.vin, gpsList]);
+
+  // Redireccionar si el registro GPS fue eliminado mientras el cliente estaba viendo el módulo GPS
+  useEffect(() => {
+    if (activeSection === 'gps' && !clientGpsRecord) {
+      setActiveSection('perfil', true);
+    }
+  }, [activeSection, clientGpsRecord, setActiveSection]);
+
   return {
     isAuthenticated,
     login,
@@ -1800,7 +2090,7 @@ export function useCustomerPortal() {
     setSelectedActiveOrderIndex,
     history,
     warranties,
-    branches: ALL_BRANCHES,
+    branches: getAllBranches(),
     activeBranch,
     isApprovalModalOpen,
     setIsApprovalModalOpen,
@@ -1813,6 +2103,8 @@ export function useCustomerPortal() {
     submitClientAbono,
     toastMessage,
     showToast,
+    clientGarantiaPlus,
+    clientGpsRecord,
   };
 }
 

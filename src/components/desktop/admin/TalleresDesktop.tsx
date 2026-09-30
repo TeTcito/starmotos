@@ -71,7 +71,7 @@ export const TalleresDesktop: React.FC<Props> = ({
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string | null>(null);
   const [selectedProvince, setSelectedProvince] = useState<string>('Todas');
   const [searchWorkshop, setSearchWorkshop] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'inicio' | 'entregado'>('inicio');
   const [orderSearch, setOrderSearch] = useState('');
   const [ratings, setRatings] = useState<OrderRating[]>(getStoredRatings);
 
@@ -515,8 +515,14 @@ export const TalleresDesktop: React.FC<Props> = ({
     const activeWsOrders = wsOrders.length > 0 ? wsOrders.filter(o => o.status !== 'entregada' && o.status !== 'entregado').length : ws.activeOrders;
     
     let filteredWsOrders = wsOrders;
-    if (orderStatusFilter !== 'all') {
-      filteredWsOrders = filteredWsOrders.filter(o => o.status === orderStatusFilter);
+    if (orderStatusFilter === 'inicio') {
+      filteredWsOrders = filteredWsOrders.filter(
+        (o) => o.status !== 'entregada' && o.status !== 'entregado' && o.status !== 'cancelada'
+      );
+    } else if (orderStatusFilter === 'entregado') {
+      filteredWsOrders = filteredWsOrders.filter(
+        (o) => o.status === 'entregada' || o.status === 'entregado'
+      );
     }
     if (orderSearch.trim()) {
       const q = orderSearch.toLowerCase();
@@ -811,20 +817,29 @@ export const TalleresDesktop: React.FC<Props> = ({
                     <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-2" />
                   </div>
                 </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-                  {['all', 'recepcion', 'diagnostico', 'en_reparacion', 'control_calidad', 'lista_retiro', 'entregada'].map(st => (
-                    <button
-                      key={st}
-                      onClick={() => setOrderStatusFilter(st)}
-                      className={`px-2.5 py-1 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                        orderStatusFilter === st 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
-                      }`}
-                    >
-                      {st === 'all' ? 'Todos' : getOrderStatusLabel(st).label}
-                    </button>
-                  ))}
+                <div className="flex gap-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setOrderStatusFilter('inicio')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      orderStatusFilter === 'inicio'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                    }`}
+                  >
+                    Inicio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrderStatusFilter('entregado')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      orderStatusFilter === 'entregado'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                    }`}
+                  >
+                    Entregado
+                  </button>
                 </div>
               </div>
               <div className="p-0 overflow-auto max-h-[300px]">

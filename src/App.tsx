@@ -47,25 +47,68 @@ function App() {
     initSupabaseRealtime();
     initMobileKeyboardHelper();
 
-    // Sincronización periódica de respaldo cada 45s para toda la red de sedes
-    const syncInterval = setInterval(() => {
-      syncAllFromSupabase();
-    }, 45000);
-
-    return () => clearInterval(syncInterval);
+    // Sincronización inicial única al cargar la aplicación (el resto se gestiona en tiempo real por WebSockets sin gastar ancho de banda)
+    syncAllFromSupabase();
   }, []);
-
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('starmotos_auth') === 'true';
-  });
 
   const [role, setRole] = useState<UserRole>(detectInitialRole);
   const [loginActiveRole, setLoginActiveRole] = useState<UserRole>(detectInitialRole);
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const current = detectInitialRole();
+    return (
+      localStorage.getItem(`starmotos_auth_${current}`) === 'true' ||
+      (localStorage.getItem('starmotos_auth') === 'true' && localStorage.getItem('starmotos_role') === current)
+    );
+  });
+
+  // Sincronizar estado de rol y autenticación al cambiar URL o navegar entre portales
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const detected = detectInitialRole();
+      setRole(detected);
+      setLoginActiveRole(detected);
+      const isAuth =
+        localStorage.getItem(`starmotos_auth_${detected}`) === 'true' ||
+        (localStorage.getItem('starmotos_auth') === 'true' && localStorage.getItem('starmotos_role') === detected);
+      setIsAuthenticated(isAuth);
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // Si la página se abre con query params (?portal=admin), normalizar la URL a la ruta canónica (/admin/, /taller/, etc.)
+  // para que coincida exactamente con el scope de la PWA de Android/iOS y no intercepte otros enlaces.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      const currentRole = detectInitialRole();
+      const rolePaths: Record<UserRole, string> = {
+        admin: '/admin/',
+        taller: '/taller/',
+        garante: '/garantia/',
+        cliente: '/cliente/',
+        gps: '/gps/',
+      };
+      const canonicalPath = rolePaths[currentRole];
+      if (canonicalPath && path === '/' && window.location.search) {
+        try {
+          window.history.replaceState(null, '', `${canonicalPath}${window.location.hash}`);
+        } catch (_) {}
+      }
+    }
+  }, []);
 
   const handleLogin = (selectedRole: UserRole) => {
     setRole(selectedRole);
     setLoginActiveRole(selectedRole);
     setIsAuthenticated(true);
+    localStorage.setItem(`starmotos_auth_${selectedRole}`, 'true');
     localStorage.setItem('starmotos_role', selectedRole);
     localStorage.setItem('starmotos_auth', 'true');
 
@@ -87,14 +130,30 @@ function App() {
   };
 
   const handleLogout = () => {
-    const logoutRole = role === 'garante' ? 'garantia' : role;
+    const rolePaths: Record<UserRole, string> = {
+      admin: '/admin/',
+      taller: '/taller/',
+      garante: '/garantia/',
+      cliente: '/cliente/',
+      gps: '/gps/',
+    };
+    const logoutPath = rolePaths[role] || '/cliente/';
     setIsAuthenticated(false);
-    localStorage.removeItem('starmotos_auth');
-    localStorage.removeItem('starmotos_role');
+    localStorage.removeItem(`starmotos_auth_${role}`);
+
+    // Si ya no queda ninguna sesión activa de otros roles, limpiar variables globales
+    const anyOtherActive = ['admin', 'taller', 'garante', 'cliente', 'gps'].some(
+      (r) => r !== role && localStorage.getItem(`starmotos_auth_${r}`) === 'true'
+    );
+    if (!anyOtherActive) {
+      localStorage.removeItem('starmotos_auth');
+      localStorage.removeItem('starmotos_role');
+    }
+
     localStorage.setItem('starmotos_preferred_login_role', role);
     setLoginActiveRole(role);
     try {
-      window.history.pushState(null, '', `/?portal=${logoutRole}`);
+      window.history.pushState(null, '', logoutPath);
     } catch (_) {}
     window.location.hash = '';
   };

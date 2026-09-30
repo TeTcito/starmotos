@@ -1,5 +1,5 @@
 // src/components/mobile/common/ClientesModuleMobile.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Users,
@@ -22,6 +22,7 @@ import {
   Phone,
   MessageCircle,
   ExternalLink,
+  ChevronLeft,
   ChevronRight,
   ShieldCheck,
   AlertCircle,
@@ -329,6 +330,21 @@ export const ClientesModuleMobile: React.FC<Props> = ({
       return true;
     });
   }, [unifiedClients, role, currentWorkshopId, tallerScope, selectedWorkshopFilter, searchTerm, clientOverrides]);
+
+  // Paginación de 20 en 20 para versión móvil
+  const CLIENTS_PER_PAGE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedWorkshopFilter, tallerScope]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / CLIENTS_PER_PAGE));
+
+  const paginatedClients = useMemo(() => {
+    const start = (currentPage - 1) * CLIENTS_PER_PAGE;
+    return filteredClients.slice(start, start + CLIENTS_PER_PAGE);
+  }, [filteredClients, currentPage]);
 
   // Abrir Ficha de Detalle de Cliente
   const handleOpenClientDetail = (client: UnifiedClient) => {
@@ -1518,7 +1534,7 @@ export const ClientesModuleMobile: React.FC<Props> = ({
           {/* Lista de Tarjetas de Clientes (Una encima de otra, compactas) */}
           <div className="space-y-2">
             {filteredClients.length > 0 ? (
-              filteredClients.map((client) => {
+              paginatedClients.map((client) => {
                 const override = clientOverrides[client.cedulaRuc];
                 const displayName = override?.fullName || client.fullName;
                 const moto = override?.motoModel || client.motorcycles[0]?.model || 'Sin motocicleta';
@@ -1619,6 +1635,37 @@ export const ClientesModuleMobile: React.FC<Props> = ({
               </div>
             )}
           </div>
+
+          {/* Barra de paginación en esquina inferior para móvil */}
+          {filteredClients.length > CLIENTS_PER_PAGE && (
+            <div className="bg-white border border-zinc-200 rounded-xl p-3 flex items-center justify-between shadow-2xs text-xs select-none">
+              <span className="text-zinc-600 font-medium">
+                Pág. <span className="font-bold text-zinc-900">{currentPage}</span> de{' '}
+                <span className="font-bold text-zinc-900">{totalPages}</span>
+                <span className="text-zinc-400 ml-1">({filteredClients.length} total)</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-zinc-700 flex items-center gap-0.5"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Ant.</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1.5 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-zinc-700 flex items-center gap-0.5"
+                >
+                  <span>Sig.</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

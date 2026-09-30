@@ -289,11 +289,12 @@ export async function uploadWarrantyMedia(
     const folder = cleanPrefix.startsWith('als_') ? 'alistamientos' : 'garantias';
     const filePath = `${folder}/${fileName}`;
 
-    // Subir al bucket público en Supabase Storage
+    // Subir al bucket público en Supabase Storage con caché estricta de 1 año
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filePath, blob, {
         contentType: mimeType,
+        cacheControl: '31536000',
         upsert: true,
       });
 

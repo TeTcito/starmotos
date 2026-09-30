@@ -514,7 +514,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     placa: '',
     modeloMarca: '',
     color: '',
-    serviciosRealizados: ['alistamiento_pdi'],
+    serviciosRealizados: ['garantia_plus'],
     tecnicoResponsable: technicians[0]?.name || '',
     tecnicoId: technicians[0]?.id || '',
     kilometraje: '',
@@ -1100,62 +1100,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     });
   }, [formData.id, formData.cedulaRuc, formData.chasis, formData.placa, allKnownRecords]);
 
-  // 1. ¿Ya se realizó alistamiento PDI previamente para este cliente/moto?
-  const hasPdiDone = useMemo(() => {
-    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('alistamiento_pdi'));
-  }, [clientHistoricalRecords]);
-
-  // 2. ¿Ya se realizó engrasado previamente para este cliente/moto?
-  const hasEngrasadoDone = useMemo(() => {
-    return clientHistoricalRecords.some((r) => r.serviciosRealizados?.includes('engrasado'));
-  }, [clientHistoricalRecords]);
-
-  // Flujo Secuencial Obligatorio:
-  // Paso 1: Alistamiento PDI (bloqueado si ya se realizó)
-  const isPdiBlocked = hasPdiDone;
-  // Paso 2: Engrasado (bloqueado si ya se realizó)
-  const isEngrasadoBlocked = hasEngrasadoDone;
-  // Paso 3: Mantenimiento (bloqueado si ya se hizo PDI pero aún NO ha realizado el Engrasado)
-  const isMantenimientoBlocked = hasPdiDone && !hasEngrasadoDone;
-
-  // Sincronizar dinámicamente qué servicios pueden estar marcados según la etapa secuencial
-  useEffect(() => {
-    setFormData((prev) => {
-      let updated = [...prev.serviciosRealizados];
-      let changed = false;
-
-      // Etapa B: Ya tiene PDI previo pero NO engrasado -> Paso 2 Engrasado OBLIGATORIO
-      if (hasPdiDone && !hasEngrasadoDone) {
-        if (updated.length !== 1 || updated[0] !== 'engrasado') {
-          updated = ['engrasado'];
-          changed = true;
-        }
-      }
-      // Etapa C: Ya completó Engrasado previo -> Paso 3 Mantenimiento OBLIGATORIO
-      else if (hasEngrasadoDone) {
-        if (updated.length !== 1 || updated[0] !== 'mantenimiento') {
-          updated = ['mantenimiento'];
-          changed = true;
-        }
-      }
-      // Etapa A: Primera vez (sin PDI previo) -> Asegurar al menos alistamiento_pdi
-      else {
-        if (updated.length === 0) {
-          updated = ['alistamiento_pdi'];
-          changed = true;
-        }
-      }
-
-      if (!changed) return prev;
-
-      return {
-        ...prev,
-        serviciosRealizados: updated,
-      };
-    });
-  }, [hasPdiDone, hasEngrasadoDone]);
-
-  // Al crear un nuevo alistamiento para un cliente que ya tiene historial previo,
+  // Al crear un nuevo registro de Garantía Plus para un cliente que ya tiene historial previo,
   // mantener y precargar el número de factura y ticket que había antes (manteniendo la capacidad de edición)
   useEffect(() => {
     if (!formData.id && clientHistoricalRecords.length > 0) {
@@ -1383,7 +1328,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       placa: '',
       modeloMarca: '',
       color: '',
-      serviciosRealizados: ['alistamiento_pdi'],
+      serviciosRealizados: ['garantia_plus'],
       tecnicoResponsable: technicians[0]?.name || '',
       tecnicoId: technicians[0]?.id || '',
       kilometraje: '',
@@ -1414,18 +1359,8 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     }
   };
 
-  // Reusar datos de un cliente existente para nuevo servicio
+  // Reusar datos de un cliente existente para nueva póliza de Garantía Plus
   const handleNewServiceForExisting = (record: GarantiaPlusRecord | GarantiaPlusFormData) => {
-    const prevServicios = Array.isArray(record.serviciosRealizados) ? record.serviciosRealizados : [];
-    let nextServicios: ServiceActionType[] = ['engrasado'];
-    if (prevServicios.includes('engrasado')) {
-      nextServicios = ['mantenimiento'];
-    } else if (prevServicios.includes('alistamiento_pdi')) {
-      nextServicios = ['engrasado'];
-    } else {
-      nextServicios = ['mantenimiento'];
-    }
-
     setFormData({
       id: '',
       atendidoPor: defaultAtendidoPor,
@@ -1433,8 +1368,8 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       sedeId: defaultSedeId,
       fechaServicio: todayStr,
       fechaVencimiento: defaultVencimientoStr,
-    horaServicio: getCurrentTimeStr(),
-    estado: "activa",
+      horaServicio: getCurrentTimeStr(),
+      estado: "activa",
       nombres: record.nombres,
       apellidos: record.apellidos,
       cedulaRuc: record.cedulaRuc,
@@ -1448,7 +1383,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       placa: record.placa,
       modeloMarca: record.modeloMarca,
       color: record.color || '',
-      serviciosRealizados: nextServicios,
+      serviciosRealizados: ['garantia_plus'],
       tecnicoResponsable: (record.tecnicoResponsable && technicians.some((t) => t.name === record.tecnicoResponsable))
         ? record.tecnicoResponsable
         : (technicians[0]?.name || ''),
@@ -1571,54 +1506,9 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     setTimeout(() => setDetailSuccessToast(null), 3500);
   };
 
-  // Servicios toggle (con bloqueo si ya se realizaron previamente o según flujo secuencial)
-  const toggleServicio = (servicio: ServiceActionType) => {
-    if (servicio === 'alistamiento_pdi' && isPdiBlocked) return;
-    if (servicio === 'engrasado' && isEngrasadoBlocked) return;
-    if (servicio === 'mantenimiento' && isMantenimientoBlocked) return;
-
-    // Si PDI está completado y engrasado aún no, engrasado es obligatorio (no se puede desmarcar)
-    if (hasPdiDone && !hasEngrasadoDone && servicio === 'engrasado') {
-      return;
-    }
-
-    // Si engrasado ya está completado, mantenimiento es obligatorio (no se puede desmarcar)
-    if (hasEngrasadoDone && servicio === 'mantenimiento') {
-      return;
-    }
-
-    setFormData((prev) => {
-      const exists = prev.serviciosRealizados.includes(servicio);
-      let updatedServicios: ServiceActionType[];
-      if (exists) {
-        if (prev.serviciosRealizados.length === 1) return prev; // Mantener al menos uno seleccionado
-        updatedServicios = prev.serviciosRealizados.filter((s) => s !== servicio);
-      } else {
-        updatedServicios = [...prev.serviciosRealizados, servicio];
-      }
-
-      const isPdiOnly = updatedServicios.length === 1 && updatedServicios[0] === 'alistamiento_pdi';
-      let valor = prev.valorServicio;
-      let pagado = prev.montoPagado;
-      let abono = prev.abono;
-      let saldo = prev.saldoPendiente;
-
-      if (isPdiOnly) {
-        valor = 0;
-        pagado = 0;
-        abono = 0;
-        saldo = 0;
-      }
-
-      return {
-        ...prev,
-        serviciosRealizados: updatedServicios,
-        valorServicio: valor,
-        montoPagado: pagado,
-        abono: abono,
-        saldoPendiente: saldo,
-      };
-    });
+  // Garantía Plus es una compra de póliza independiente (no aplica selección de servicios de alistamiento)
+  const toggleServicio = (_servicio: ServiceActionType) => {
+    // No-op en Garantía Plus
   };
 
   // Subir archivos reales desde el computador o dispositivo (comprimidas y subidas a Storage)
@@ -1724,17 +1614,11 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     if (!formData.modeloMarca.trim()) missingStep2.push('Modelo y Marca');
     if (!formData.placa.trim() && !formData.chasis.trim()) missingStep2.push('Placa o Chasis (VIN)');
 
-    // 3. Validar Paso 3: Servicio
+    // 3. Validar Paso 3: Póliza & Cobro
     const missingStep3: string[] = [];
     if (!formData.tecnicoResponsable.trim()) missingStep3.push('Técnico responsable');
-    if (!formData.serviciosRealizados || formData.serviciosRealizados.length === 0) {
-      missingStep3.push('¿Qué se realizó?');
-    }
-    const isPdiOnly = false;
-    const isGarantiaPlusCovered = false;
-
     if (formData.valorServicio === undefined || formData.valorServicio === null || formData.valorServicio === '' || isNaN(Number(formData.valorServicio))) {
-      missingStep3.push('Valor del servicio ($)');
+      missingStep3.push('Valor de Garantía Plus ($)');
     }
 
     if (missingStep1.length > 0) {
@@ -1759,7 +1643,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
 
     if (missingStep3.length > 0) {
       setValidationAlert({
-        title: 'Faltan datos en Paso 3: Servicio',
+        title: 'Faltan datos en Paso 3: Póliza & Cobro',
         fields: missingStep3,
         stepTarget: 3,
       });
@@ -1782,6 +1666,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
     const fullRecord: GarantiaPlusRecord = {
       estado: ((formData.estado || 'activa') as 'activa' | 'vencida' | 'cancelada'),
       ...formData,
+      serviciosRealizados: ['garantia_plus'],
       kilometraje: Number(formData.kilometraje) || 0,
       proximoMantenimientoKm: Number(formData.proximoMantenimientoKm) || 0,
       year: formData.year !== undefined && formData.year !== '' ? Number(formData.year) : undefined,
@@ -1793,8 +1678,8 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
       abono: finalAbono,
       saldoPendiente: finalSaldo,
       observaciones: finalObservaciones,
-      id: `als-${Date.now()}`,
-      createdAt: new Date().toLocaleString('es-EC', {
+      id: formData.id || `gp-${Date.now()}`,
+      createdAt: formData.createdAt || new Date().toLocaleString('es-EC', {
         dateStyle: 'medium',
         timeStyle: 'short',
       }),
@@ -1803,10 +1688,54 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
         `001-002-${Math.floor(1000000 + Math.random() * 9000000)}`,
       numeroTicket:
         formData.numeroTicket ||
-        `TCK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        `GP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     };
 
     onSaveRecord(fullRecord);
+
+    // Guardar / actualizar cliente en la base de datos de clientes para integración con Alistamientos
+    try {
+      const cleanId = formData.cedulaRuc.trim();
+      const cleanNombres = formData.nombres.trim();
+      const cleanApellidos = formData.apellidos.trim();
+      const fullName = `${cleanNombres} ${cleanApellidos}`.trim();
+      if (cleanId && fullName) {
+        const currentClients = getStoredClients();
+        const existingIndex = currentClients.findIndex(
+          (c) => c.idNumber && c.idNumber.trim().toLowerCase() === cleanId.toLowerCase()
+        );
+        const clientToSave: TallerClient = {
+          id: existingIndex >= 0 ? currentClients[existingIndex].id : `cli-${Date.now()}`,
+          fullName,
+          idNumber: cleanId,
+          phone: formData.celular1.trim() || formData.celular2?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].phone : ''),
+          email: formData.email.trim() || (existingIndex >= 0 ? currentClients[existingIndex].email : ''),
+          address: formData.direccion.trim() || (existingIndex >= 0 ? currentClients[existingIndex].address : ''),
+          motorcycleBrand: formData.modeloMarca ? formData.modeloMarca.split(' ')[0] : (existingIndex >= 0 ? currentClients[existingIndex].motorcycleBrand : 'Benelli'),
+          motorcycleModel: formData.modeloMarca.trim() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleModel : 'Modelo por definir'),
+          motorcyclePlate: formData.placa.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcyclePlate : 'S/P'),
+          motorcycleVin: formData.chasis.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorcycleVin : undefined),
+          motorNumber: formData.numeroMotor?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].motorNumber : undefined),
+          ramvNumber: formData.ramv?.trim().toUpperCase() || (existingIndex >= 0 ? currentClients[existingIndex].ramvNumber : undefined),
+          color: formData.color?.trim() || (existingIndex >= 0 ? currentClients[existingIndex].color : undefined),
+          motorcycleMileage: Number(formData.kilometraje) || 0,
+          workshopName: formData.sede || defaultSede,
+          workshopId: formData.sedeId || defaultSedeId,
+          totalVisits: existingIndex >= 0 ? (currentClients[existingIndex].totalVisits || 1) + 1 : 1,
+          lastVisit: todayStr,
+        };
+        let updatedClients: TallerClient[];
+        if (existingIndex >= 0) {
+          updatedClients = [...currentClients];
+          updatedClients[existingIndex] = clientToSave;
+        } else {
+          updatedClients = [clientToSave, ...currentClients];
+        }
+        saveStoredClients(updatedClients);
+      }
+    } catch (err) {
+      console.warn('Error saving client cascade:', err);
+    }
 
     confetti({
       particleCount: 120,
@@ -2171,18 +2100,14 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <span className="text-[10px] text-zinc-400 font-mono">Técnico</span>
                 </div>
 
-                {/* Servicios Realizados Chips */}
+                {/* Póliza Oficial */}
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Servicios Ejecutados:</label>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1">Póliza y Cobertura:</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {detailFormData.serviciosRealizados?.map((s) => (
-                      <span
-                        key={s}
-                        className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 uppercase"
-                      >
-                        {s.replace('_', ' ')}
-                      </span>
-                    ))}
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-amber-50 text-amber-900 border border-amber-300 uppercase flex items-center gap-1.5 shadow-2xs">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      Garantía Plus StarMotos
+                    </span>
                   </div>
                 </div>
 
@@ -2270,15 +2195,8 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Si solo es PDI en detalle: Sin cobro */}
-                {detailFormData.serviciosRealizados?.length === 1 && detailFormData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
-                  <div className="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-xs text-blue-900 font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Alistamiento PDI (Cero costo al cliente / Cubierto por Fábrica)</span>
-                  </div>
-                ) : (
-                  /* Cobro y Facturación en Detalle */
-                  <div className="space-y-2 bg-zinc-50/80 p-2.5 rounded-xl border border-zinc-200">
+                {/* Cobro y Facturación en Detalle */}
+                <div className="space-y-2 bg-zinc-50/80 p-2.5 rounded-xl border border-zinc-200">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[10px] font-bold text-zinc-700 mb-1">Valor Servicio ($)</label>
@@ -2474,7 +2392,6 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
-                )}
 
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 mb-1">N° Factura o Ticket</label>
@@ -3278,24 +3195,31 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                           {/* 7. Servicios */}
                           <td className="px-2 py-2 truncate">
                             <div className="flex flex-wrap gap-1">
-                              {record.serviciosRealizados.map((srv) => (
-                                <span
-                                  key={srv}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                    srv === 'alistamiento_pdi'
-                                      ? 'bg-blue-50 text-blue-800 border border-blue-200'
-                                      : srv === 'engrasado'
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                      : 'bg-purple-50 text-purple-800 border border-purple-200'
-                                  }`}
-                                >
-                                  {srv === 'alistamiento_pdi'
-                                    ? 'PDI'
-                                    : srv === 'engrasado'
-                                    ? 'Engrasado'
-                                    : 'Mantenimiento'}
+                              {record.serviciosRealizados.length === 0 || record.serviciosRealizados.includes('garantia_plus') ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1 shadow-2xs">
+                                  <Sparkles className="w-3 h-3 text-amber-600" />
+                                  Garantía Plus
                                 </span>
-                              ))}
+                              ) : (
+                                record.serviciosRealizados.map((srv) => (
+                                  <span
+                                    key={srv}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      srv === 'alistamiento_pdi'
+                                        ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                        : srv === 'engrasado'
+                                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                        : 'bg-purple-50 text-purple-800 border border-purple-200'
+                                    }`}
+                                  >
+                                    {srv === 'alistamiento_pdi'
+                                      ? 'PDI'
+                                      : srv === 'engrasado'
+                                      ? 'Engrasado'
+                                      : 'Mantenimiento'}
+                                  </span>
+                                ))
+                              )}
                             </div>
                           </td>
 
@@ -3993,103 +3917,13 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       3
                     </div>
                     <div>
-                      <h3 className="text-sm font-black text-zinc-900">Servicio & Cobro</h3>
-                      <p className="text-[11px] text-zinc-400">Trabajos, aceite y facturación</p>
+                      <h3 className="text-sm font-black text-zinc-900">Póliza & Cobro</h3>
+                      <p className="text-[11px] text-zinc-400">Valores, póliza y facturación</p>
                     </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Paso 3
                   </span>
-                </div>
-
-                {/* ¿Qué se realizó? (Alistamiento PDI, Engrasado, Mantenimiento con bloqueo secuencial estricto) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold uppercase text-zinc-700">
-                      ¿Qué se realizó? *
-                    </label>
-                    {hasPdiDone && !hasEngrasadoDone && (
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                        Paso 2 Obligatorio: Engrasado
-                      </span>
-                    )}
-                    {hasEngrasadoDone && (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        Paso 3 Obligatorio: Mantenimiento
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      {
-                        id: 'alistamiento_pdi' as ServiceActionType,
-                        label: 'Alistamiento PDI',
-                        stepBadge: 'Paso 1',
-                        isBlocked: isPdiBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'engrasado' as ServiceActionType,
-                        label: 'Engrasado',
-                        stepBadge: 'Paso 2',
-                        isBlocked: isEngrasadoBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'mantenimiento' as ServiceActionType,
-                        label: 'Mantenimiento',
-                        stepBadge: 'Paso 3',
-                        isBlocked: isMantenimientoBlocked,
-                        blockReason: 'Requiere Engrasado',
-                      },
-                    ].map((srv) => {
-                      const isSelected = formData.serviciosRealizados.includes(srv.id);
-
-                      if (srv.isBlocked) {
-                        return (
-                          <div
-                            key={srv.id}
-                            title={`Opción bloqueada: ${srv.blockReason}`}
-                            className="px-2 py-2 rounded-xl text-[11px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Lock className="w-3 h-3 text-zinc-400" />
-                              <span className="line-through opacity-70 truncate">{srv.label}</span>
-                            </div>
-                            <span className="text-[9px] font-semibold text-zinc-400">{srv.blockReason}</span>
-                          </div>
-                        );
-                      }
-
-                      const isMandatory =
-                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
-                        (hasEngrasadoDone && srv.id === 'mantenimiento');
-
-                      return (
-                        <button
-                          key={srv.id}
-                          type="button"
-                          onClick={() => toggleServicio(srv.id)}
-                          className={`px-2 py-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                          }`}
-                        >
-                          <span className="truncate">{srv.label}</span>
-                          {isMandatory ? (
-                            <span className={`text-[9px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
-                              {srv.stepBadge} Obligatorio
-                            </span>
-                          ) : (
-                            <span className={`text-[9px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
-                              {srv.stepBadge}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
 
                 {/* Técnico Responsable */}
@@ -4251,52 +4085,13 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Si el cliente tiene Garantía Plus activa: Todos los servicios salen Pagados $0.00 */}
-                {garantiaPlusStatus.hasGarantiaPlus ? (
-                  <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl p-3.5 space-y-2.5 shadow-2xs animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4.5 h-4.5 text-amber-600" />
-                        <span className="text-xs font-black uppercase text-amber-900 tracking-wider">
-                          Garantía Plus - Cobertura 100%
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-600 text-white uppercase shadow-2xs">
-                        ✓ Pagado ($0.00)
-                      </span>
-                    </div>
-                    <p className="text-xs text-amber-950 font-medium">
-                      Este cliente cuenta con <strong>Garantía Plus Vigente</strong> hasta el <strong>{garantiaPlusStatus.record?.fechaVencimiento}</strong>. Todos los mantenimientos o servicios que realice no generan cobro alguno.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <div className="p-2 bg-white/90 rounded-lg border border-amber-200">
-                        <span className="block text-[10px] uppercase font-bold text-zinc-500">Valor Cobrado</span>
-                        <span className="text-sm font-mono font-black text-emerald-600">$0.00</span>
-                      </div>
-                      <div className="p-2 bg-white/90 rounded-lg border border-amber-200">
-                        <span className="block text-[10px] uppercase font-bold text-zinc-500">Estado Contable</span>
-                        <span className="text-xs font-black text-emerald-700">✓ 100% CUBIERTO</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
-                  <div className="bg-blue-50/80 border border-blue-200 p-3 rounded-xl flex items-center gap-2.5 text-xs text-blue-900 font-semibold shadow-2xs">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                {/* Bloque de Cobro: Valor, Método de Pago, Abono y Crédito */}
+                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2.5 shadow-2xs">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <span className="font-bold block">Alistamiento PDI de Fábrica / Concesionario</span>
-                      <span className="text-[11px] text-blue-700 font-normal">
-                        Servicio oficial de cortesía sin cobro al cliente (Cubierto por Garantía PDI de Entrega).
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  /* Bloque de Cobro: Valor, Método de Pago, Abono y Crédito */
-                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 space-y-2.5 shadow-2xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                          Valor Servicio ($) *
-                        </label>
+                      <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
+                        Valor Garantía Plus ($) *
+                      </label>
                         <input
                           type="number"
                           step="0.01"
@@ -4535,7 +4330,6 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
-                )}
 
                 {/* Factura y Ticket (2 datos seguidos en una fila) */}
                 <div className="grid grid-cols-2 gap-2">
@@ -5041,95 +4835,7 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   <span className="text-[10px] font-bold text-emerald-600">3 de 3</span>
                 </div>
 
-                {/* ¿Qué se realizó? Móvil (Flujo Secuencial) */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold uppercase text-zinc-700">
-                      ¿Qué se realizó? *
-                    </label>
-                    {hasPdiDone && !hasEngrasadoDone && (
-                      <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-200">
-                        Paso 2: Engrasado
-                      </span>
-                    )}
-                    {hasEngrasadoDone && (
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
-                        Paso 3: Mantenimiento
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      {
-                        id: 'alistamiento_pdi' as ServiceActionType,
-                        label: 'Alistamiento PDI',
-                        stepBadge: 'Paso 1',
-                        isBlocked: isPdiBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'engrasado' as ServiceActionType,
-                        label: 'Engrasado',
-                        stepBadge: 'Paso 2',
-                        isBlocked: isEngrasadoBlocked,
-                        blockReason: 'Ya realizado',
-                      },
-                      {
-                        id: 'mantenimiento' as ServiceActionType,
-                        label: 'Mantenimiento',
-                        stepBadge: 'Paso 3',
-                        isBlocked: isMantenimientoBlocked,
-                        blockReason: 'Requiere Engrasado',
-                      },
-                    ].map((srv) => {
-                      const isSelected = formData.serviciosRealizados.includes(srv.id);
 
-                      if (srv.isBlocked) {
-                        return (
-                          <div
-                            key={srv.id}
-                            title={`Opción bloqueada: ${srv.blockReason}`}
-                            className="px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center bg-zinc-100/90 border-zinc-200 text-zinc-400 cursor-not-allowed select-none flex flex-col items-center justify-center gap-0.5"
-                          >
-                            <div className="flex items-center gap-1">
-                              <Lock className="w-3 h-3 text-zinc-400" />
-                              <span className="line-through opacity-70 truncate">{srv.label}</span>
-                            </div>
-                            <span className="text-[8px] font-semibold text-zinc-400">{srv.blockReason}</span>
-                          </div>
-                        );
-                      }
-
-                      const isMandatory =
-                        (hasPdiDone && !hasEngrasadoDone && srv.id === 'engrasado') ||
-                        (hasEngrasadoDone && srv.id === 'mantenimiento');
-
-                      return (
-                        <button
-                          key={srv.id}
-                          type="button"
-                          onClick={() => toggleServicio(srv.id)}
-                          className={`px-1.5 py-2 rounded-xl text-[10px] font-bold border text-center transition-all cursor-pointer truncate flex flex-col items-center justify-center gap-0.5 ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                          }`}
-                        >
-                          <span className="truncate">{srv.label}</span>
-                          {isMandatory ? (
-                            <span className={`text-[8px] font-bold ${isSelected ? 'text-blue-200' : 'text-amber-600'}`}>
-                              {srv.stepBadge} Obligatorio
-                            </span>
-                          ) : (
-                            <span className={`text-[8px] font-semibold ${isSelected ? 'text-blue-200' : 'text-zinc-400'}`}>
-                              {srv.stepBadge}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase text-zinc-700 mb-1">
@@ -5191,34 +4897,11 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {garantiaPlusStatus.hasGarantiaPlus ? (
-                  <div className="p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/15 border-2 border-amber-400 rounded-xl space-y-1.5 shadow-2xs animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-amber-600" />
-                        <span className="text-xs font-black uppercase text-amber-900">Garantía Plus Activa</span>
-                      </div>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase">
-                        ✓ Pagado ($0.00)
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-amber-950 font-medium">
-                      Mantenimientos y servicios cubiertos al 100% sin costo para el cliente (Vence: {garantiaPlusStatus.record?.fechaVencimiento}).
-                    </p>
-                  </div>
-                ) : formData.serviciosRealizados.length === 1 && formData.serviciosRealizados[0] === 'alistamiento_pdi' ? (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
-                    <span className="text-xs text-blue-900 font-bold">
-                      Alistamiento PDI es un servicio oficial previo a la venta. No genera cobro directo al cliente ($0.00).
-                    </span>
-                  </div>
-                ) : (
                   <div className="space-y-2.5 bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] font-black uppercase text-emerald-900 mb-1">
-                          Valor ($) *
+                          Valor Garantía Plus ($) *
                         </label>
                         <input
                           type="number"
@@ -5427,7 +5110,38 @@ export const GarantiasPlusDesktop: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
-                )}
+
+                  {/* Factura y Ticket (Móvil) */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold uppercase text-zinc-700">
+                          N° Factura
+                        </label>
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.numeroFactura}
+                        onChange={(e) => setFormData({ ...formData, numeroFactura: e.target.value })}
+                        placeholder="001-002-..."
+                        className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold uppercase text-zinc-700">
+                          N° Ticket Físico
+                        </label>
+                      </div>
+                      <input
+                        type="text"
+                        value={formData.numeroTicket}
+                        onChange={(e) => setFormData({ ...formData, numeroTicket: e.target.value })}
+                        placeholder="TCK-2026-..."
+                        className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono font-medium outline-none focus:border-emerald-600 focus:bg-white"
+                      />
+                    </div>
+                  </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">

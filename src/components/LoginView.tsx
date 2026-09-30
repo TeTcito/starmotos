@@ -77,21 +77,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
     };
   }, [onRoleActiveChange]);
 
-  const switchRole = (newRole: UserRole) => {
-    setActiveRole(newRole);
-    const portalUrls: Record<UserRole, string> = {
-      admin: '/?portal=admin',
-      taller: '/?portal=taller',
-      garante: '/?portal=garantia',
-      gps: '/?portal=gps',
-      cliente: '/?portal=cliente',
-    };
-    try {
-      window.history.pushState(null, '', portalUrls[newRole]);
-    } catch (_) {}
-    onRoleActiveChange?.(newRole);
-    updateWebManifestForRole(newRole);
-  };
 
   return (
     <div className="h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-full bg-white flex flex-col lg:flex-row overflow-hidden font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -155,64 +140,6 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
           </div>
         </div>
 
-        {/* SELECTOR DE ACCESO DIRECTO POR ROL */}
-        <div className="w-full max-w-sm flex items-center justify-center p-1 bg-zinc-100 rounded-xl gap-1 text-[11px] font-bold mt-1 mb-2">
-          <button
-            type="button"
-            onClick={() => switchRole('cliente')}
-            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
-              activeRole === 'cliente'
-                ? 'bg-white text-blue-600 shadow-xs font-black'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Clientes
-          </button>
-          <button
-            type="button"
-            onClick={() => switchRole('taller')}
-            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
-              activeRole === 'taller'
-                ? 'bg-white text-emerald-700 shadow-xs font-black'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Taller
-          </button>
-          <button
-            type="button"
-            onClick={() => switchRole('garante')}
-            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
-              activeRole === 'garante'
-                ? 'bg-white text-purple-700 shadow-xs font-black'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Garantías
-          </button>
-          <button
-            type="button"
-            onClick={() => switchRole('gps')}
-            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
-              activeRole === 'gps'
-                ? 'bg-white text-cyan-700 shadow-xs font-black'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            GPS
-          </button>
-          <button
-            type="button"
-            onClick={() => switchRole('admin')}
-            className={`flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
-              activeRole === 'admin'
-                ? 'bg-white text-red-600 shadow-xs font-black'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Matriz
-          </button>
-        </div>
 
         {/* RENDERIZADO EXCLUSIVO E INDEPENDIENTE DEL FORMULARIO */}
         <div className="w-full flex justify-center pt-1">

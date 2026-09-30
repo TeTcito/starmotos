@@ -177,7 +177,7 @@ export function isDeletedTombstone(id?: string | null): boolean {
   if (!id) return false;
   const clean = String(id).trim();
   if (!clean) return false;
-  return getDeletedTombstones().has(clean);
+  return getDeletedTombstones().has(clean) || getDeletedGpsIds().has(clean) || getDeletedGarantiaPlusIds().has(clean);
 }
 
 /**
@@ -760,28 +760,52 @@ export async function syncAllFromSupabase(): Promise<{
         .order('updated_at', { ascending: false });
 
       if (!gpsErr && Array.isArray(gpsData)) {
-        const cloudGps: GpsRecord[] = gpsData.map((row: any) => row.data as GpsRecord).filter(Boolean);
-        const rawLocal = localStorage.getItem(STORAGE_KEYS.GPS_RECORDS);
-        let localList: GpsRecord[] = rawLocal ? JSON.parse(rawLocal) : [];
-        const cloudMap = new Map<string, GpsRecord>();
-        cloudGps.forEach((r) => {
-          if (r && r.id) cloudMap.set(r.id, r);
+        const deletedGpsIds = getDeletedGpsIds();
+        const cloudGps: GpsRecord[] = gpsData
+          .map((row: any) => row.data as GpsRecord)
+          .filter((r) => r && r.id && !deletedGpsIds.has(r.id));
+
+        // Purgar de Supabase registros que fueron eliminados localmente
+        gpsData.forEach((row: any) => {
+          const doc = row.data as GpsRecord;
+          if (doc && doc.id && deletedGpsIds.has(doc.id)) {
+            cloudDeleteGpsRecord(doc.id);
+          }
         });
 
-        // Si hay registros locales que no estén en la nube, subirlos a Supabase
-        for (const loc of localList) {
-          if (loc && loc.id && !cloudMap.has(loc.id)) {
-            cloudSaveGpsRecord(loc);
-            cloudMap.set(loc.id, loc);
-          }
-        }
-
-        const mergedGps = Array.from(cloudMap.values());
-        localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(mergedGps));
+        localStorage.setItem(STORAGE_KEYS.GPS_RECORDS, JSON.stringify(cloudGps));
         window.dispatchEvent(new Event('starmotos_gps_updated'));
       }
     } catch (e) {
       console.warn('Error sincronizando registros GPS de Supabase:', e);
+    }
+
+    // 12. Registros Oficiales de Garantía Plus (Matriz <-> Red de Sedes & Clientes)
+    try {
+      const { data: gpData, error: gpErr } = await supabase
+        .from('garantias_plus')
+        .select('data')
+        .order('created_at', { ascending: false });
+
+      if (!gpErr && Array.isArray(gpData)) {
+        const deletedGpIds = getDeletedGarantiaPlusIds();
+        const cloudGp: GarantiaPlusRecord[] = gpData
+          .map((row: any) => row.data as GarantiaPlusRecord)
+          .filter((r) => r && r.id && !deletedGpIds.has(r.id));
+
+        // Purgar de Supabase registros que fueron eliminados localmente
+        gpData.forEach((row: any) => {
+          const doc = row.data as GarantiaPlusRecord;
+          if (doc && doc.id && deletedGpIds.has(doc.id)) {
+            cloudDeleteGarantiaPlusRecord(doc.id);
+          }
+        });
+
+        localStorage.setItem(STORAGE_KEYS.GARANTIAS_PLUS, JSON.stringify(cloudGp));
+        window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+      }
+    } catch (e) {
+      console.warn('Error sincronizando registros de Garantía Plus de Supabase:', e);
     }
 
     return {
@@ -1393,8 +1417,48 @@ export async function cloudDeleteAgendamiento(id: string) {
   }
 }
 
+export function getDeletedGpsIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem('starmotos_deleted_gps_ids');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (_) {}
+  return new Set();
+}
+
+export function markGpsAsDeleted(id: string) {
+  try {
+    addDeletedTombstone(id);
+    const current = getDeletedGpsIds();
+    current.add(id);
+    localStorage.setItem('starmotos_deleted_gps_ids', JSON.stringify(Array.from(current)));
+  } catch (_) {}
+}
+
+export function getDeletedGarantiaPlusIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem('starmotos_deleted_gp_ids');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (_) {}
+  return new Set();
+}
+
+export function markGarantiaPlusAsDeleted(id: string) {
+  try {
+    addDeletedTombstone(id);
+    const current = getDeletedGarantiaPlusIds();
+    current.add(id);
+    localStorage.setItem('starmotos_deleted_gp_ids', JSON.stringify(Array.from(current)));
+  } catch (_) {}
+}
+
 export async function cloudSaveGpsRecord(record: GpsRecord) {
   try {
+    removeDeletedTombstone(record.id);
+    const deletedIds = getDeletedGpsIds();
+    if (deletedIds.has(record.id)) {
+      deletedIds.delete(record.id);
+      localStorage.setItem('starmotos_deleted_gps_ids', JSON.stringify(Array.from(deletedIds)));
+    }
     const payload = {
       id: record.id,
       ticket_number: record.ticketNumber,
@@ -1418,11 +1482,54 @@ export async function cloudSaveGpsRecord(record: GpsRecord) {
 
 export async function cloudDeleteGpsRecord(id: string) {
   if (!id) return;
+  markGpsAsDeleted(id);
   try {
     const { error } = await supabase.from('gps_records').delete().eq('id', id);
     if (error) console.error('[Supabase] Error eliminando registro GPS:', error);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando registro GPS:', err);
+  }
+}
+
+export async function cloudSaveGarantiaPlusRecord(record: GarantiaPlusRecord) {
+  try {
+    removeDeletedTombstone(record.id);
+    const deletedGpIds = getDeletedGarantiaPlusIds();
+    if (deletedGpIds.has(record.id)) {
+      deletedGpIds.delete(record.id);
+      localStorage.setItem('starmotos_deleted_gp_ids', JSON.stringify(Array.from(deletedGpIds)));
+    }
+    const payload = {
+      id: record.id,
+      numero_ticket: record.numeroTicket,
+      cedula_ruc: record.cedulaRuc,
+      nombres: record.nombres,
+      apellidos: record.apellidos,
+      placa: record.placa,
+      chasis: record.chasis,
+      fecha_servicio: record.fechaServicio,
+      fecha_vencimiento: record.fechaVencimiento,
+      estado: record.estado,
+      sede_id: record.sedeId,
+      sede: record.sede,
+      data: record,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('garantias_plus').upsert(payload, { onConflict: 'id' });
+    if (error) console.error('[Supabase] Error guardando registro Garantía Plus:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando registro Garantía Plus:', err);
+  }
+}
+
+export async function cloudDeleteGarantiaPlusRecord(id: string) {
+  if (!id) return;
+  markGarantiaPlusAsDeleted(id);
+  try {
+    const { error } = await supabase.from('garantias_plus').delete().eq('id', id);
+    if (error) console.error('[Supabase] Error eliminando registro Garantía Plus:', error);
+  } catch (err) {
+    console.error('[Supabase] Excepción eliminando registro Garantía Plus:', err);
   }
 }
 
@@ -2072,17 +2179,22 @@ export function initSupabaseRealtime() {
 
           if (payload.eventType === 'INSERT') {
             const newDoc = payload.new.data as GpsRecord;
-            if (newDoc && !current.some((r) => r.id === newDoc.id)) {
+            if (newDoc && !isDeletedTombstone(newDoc.id) && !getDeletedGpsIds().has(newDoc.id) && !current.some((r) => r.id === newDoc.id)) {
               current = [newDoc, ...current];
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedDoc = payload.new.data as GpsRecord;
             if (updatedDoc) {
-              current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
+              if (isDeletedTombstone(updatedDoc.id) || getDeletedGpsIds().has(updatedDoc.id)) {
+                current = current.filter((r) => r.id !== updatedDoc.id);
+              } else {
+                current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
             if (deletedId) {
+              markGpsAsDeleted(deletedId);
               current = current.filter((r) => r.id !== deletedId);
             }
           }
@@ -2091,6 +2203,44 @@ export function initSupabaseRealtime() {
           window.dispatchEvent(new Event('starmotos_gps_updated'));
         } catch (e) {
           console.error('Error procesando realtime gps_records:', e);
+        }
+      }
+    )
+    // Registros de Garantía Plus (Matriz <-> Red de Sedes & Clientes)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'garantias_plus' },
+      (payload) => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.GARANTIAS_PLUS);
+          let current: GarantiaPlusRecord[] = raw ? JSON.parse(raw) : [];
+
+          if (payload.eventType === 'INSERT') {
+            const newDoc = payload.new.data as GarantiaPlusRecord;
+            if (newDoc && !isDeletedTombstone(newDoc.id) && !getDeletedGarantiaPlusIds().has(newDoc.id) && !current.some((r) => r.id === newDoc.id)) {
+              current = [newDoc, ...current];
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedDoc = payload.new.data as GarantiaPlusRecord;
+            if (updatedDoc) {
+              if (isDeletedTombstone(updatedDoc.id) || getDeletedGarantiaPlusIds().has(updatedDoc.id)) {
+                current = current.filter((r) => r.id !== updatedDoc.id);
+              } else {
+                current = current.map((r) => (r.id === updatedDoc.id ? updatedDoc : r));
+              }
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              markGarantiaPlusAsDeleted(deletedId);
+              current = current.filter((r) => r.id !== deletedId);
+            }
+          }
+
+          localStorage.setItem(STORAGE_KEYS.GARANTIAS_PLUS, JSON.stringify(current));
+          window.dispatchEvent(new Event('starmotos_garantias_plus_updated'));
+        } catch (e) {
+          console.error('Error procesando realtime garantias_plus:', e);
         }
       }
     )

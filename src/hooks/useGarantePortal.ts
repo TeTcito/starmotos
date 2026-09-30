@@ -29,6 +29,7 @@ import {
   saveStoredDictamen,
 } from '../data/mockMultiRoleData';
 import { AlistamientoFullRecord, TallerClient, Workshop } from '../types/customer';
+import { syncAllFromSupabase } from '../services/supabaseService';
 
 export const GARANTE_SECTIONS: GaranteSection[] = [
   'solicitudes_garante',
@@ -100,6 +101,9 @@ export function useGarantePortal() {
     window.addEventListener('starmotos_garante_profile_updated', handleGaranteProfileUpdate);
     window.addEventListener('starmotos_dictamenes_updated', handleDictamenesUpdate);
     window.addEventListener('storage', handleStorageEvent);
+
+    // Sincronización proactiva de arranque para garantizar recepción de todas las solicitudes dictaminadas
+    syncAllFromSupabase();
 
     return () => {
       window.removeEventListener('starmotos_warranties_updated', handleWarrantiesUpdate);

@@ -35,6 +35,7 @@ export interface MotorcycleClientData {
   preferredPartsQuality: 'originales_oem' | 'alternativos_premium';
   preferredBranchId: string; // 'matriz-la-mana' | 'taller-quevedo'
   photoUrl: string;
+  proximoMantenimientoKm?: number;
 }
 
 export type ScheduledMaintenanceStatus = 'pendiente' | 'confirmada' | 'completada';
@@ -451,7 +452,8 @@ export interface Workshop {
 export type ServiceActionType =
   | 'alistamiento_pdi'
   | 'engrasado'
-  | 'mantenimiento';
+  | 'mantenimiento'
+  | 'garantia_plus';
 
 export interface AlistamientoFullRecord {
   id: string;

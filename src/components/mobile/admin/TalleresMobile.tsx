@@ -143,7 +143,7 @@ export const TalleresMobile: React.FC<Props> = ({
           ...w,
           status: isGoingInoperativo ? 'inoperativo' : 'operativo',
           inoperativoMotivo: isGoingInoperativo
-            ? (inoperativoReason.trim() || 'Acceso a la sede restringido por disposición de la administración central de Matriz.')
+            ? (inoperativoReason.trim() || 'A usted se le ha suspendido sus actividades, para más información acérquese o contáctese a la matriz.')
             : undefined,
           inoperativoFecha: isGoingInoperativo ? new Date().toISOString() : undefined,
         };

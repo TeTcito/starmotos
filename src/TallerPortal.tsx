@@ -68,7 +68,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
           </span>
 
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            Acceso a Sede Restringido
+            A usted se le ha suspendido sus actividades
           </h1>
           <p className="text-xs sm:text-sm font-semibold text-zinc-400 mt-1">
             {currentWorkshop.name} <span className="font-mono text-zinc-500">({currentWorkshop.code})</span>
@@ -81,7 +81,7 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
               <span>Mensaje de la Administración Matriz:</span>
             </div>
             <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-medium">
-              "{currentWorkshop.inoperativoMotivo || 'Acceso restringido temporalmente por disposición administrativa de la Matriz Central.'}"
+              "{currentWorkshop.inoperativoMotivo || 'A usted se le ha suspendido sus actividades, para más información acérquese o contáctese a la matriz.'}"
             </p>
             {currentWorkshop.inoperativoFecha && (
               <p className="text-[10px] text-zinc-500 mt-2 font-mono">
@@ -92,14 +92,14 @@ export const TallerPortal: React.FC<Props> = ({ onLogout }) => {
 
           {/* Instrucciones */}
           <div className="mt-4 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 text-left w-full text-xs text-zinc-400 leading-relaxed">
-            <p className="font-medium text-zinc-300 mb-0.5">¿Cómo reactivar mi sede?</p>
-            Comuníquese con el equipo administrativo de Matriz Central para coordinar la reactivación y desbloqueo de su portal.
+            <p className="font-medium text-zinc-300 mb-0.5">Para más información:</p>
+            Acérquese o contáctese directamente con la administración de Matriz Central.
           </div>
 
           {/* Acciones */}
           <div className="flex flex-col sm:flex-row gap-2.5 w-full mt-6">
             <a
-              href="https://wa.me/593987654321?text=Hola,%20solicito%20información%20sobre%20el%20bloqueo%20de%20mi%20sede%20de%20taller"
+              href={`https://wa.me/593939316698?text=${encodeURIComponent(`Hola Matriz StarMotos, me comunico de la sede ${currentWorkshop.name} (${currentWorkshop.code}) para solicitar información sobre la suspensión de actividades.`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-md cursor-pointer"

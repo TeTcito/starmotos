@@ -1,5 +1,5 @@
 // src/components/common/ClientesModule.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -19,6 +19,7 @@ import {
   Check,
   X,
   Building2,
+  ChevronLeft,
   ChevronRight,
   Filter,
   Eye,
@@ -59,6 +60,7 @@ import {
   querySriMock,
   addStoredAlerts,
   updateClientCedulaCascade,
+  checkClientGarantiaPlus,
 } from '../../data/mockMultiRoleData';
 import { cloudSaveClient, isValidMediaUrl } from '../../services/supabaseService';
 import { cleanNumberInput, selectOnFocus } from '../../utils/numberUtils';
@@ -641,6 +643,22 @@ export const ClientesModule: React.FC<Props> = ({
     () => filteredClients.filter((c) => c.pdiCompleted).length,
     [filteredClients]
   );
+
+  // Paginación de 20 en 20 para evitar sobrecarga y optimizar renderizado
+  const CLIENTS_PER_PAGE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reiniciar a la página 1 al cambiar filtros o búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedWorkshopFilter, activeFilterTab, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / CLIENTS_PER_PAGE));
+
+  const paginatedClients = useMemo(() => {
+    const start = (currentPage - 1) * CLIENTS_PER_PAGE;
+    return filteredClients.slice(start, start + CLIENTS_PER_PAGE);
+  }, [filteredClients, currentPage]);
 
   const handleExportCsv = () => {
     const headers = [
@@ -2372,9 +2390,12 @@ export const ClientesModule: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 text-zinc-800">
-                {filteredClients.map((client, idx) => {
+                {paginatedClients.map((client, index) => {
+                  const idx = (currentPage - 1) * CLIENTS_PER_PAGE + index;
                   const data = getRowData(client);
                   const moto = client.motorcycles[0];
+                  const gpCheck = checkClientGarantiaPlus(client.cedulaRuc || moto?.plate || moto?.chasis || '');
+                  const isVip = gpCheck.hasGarantiaPlus || (gpCheck.record && gpCheck.record.estado !== 'cancelada');
 
                   return (
                     <tr
@@ -2391,9 +2412,19 @@ export const ClientesModule: React.FC<Props> = ({
                       {/* 2. Cliente / Cédula */}
                       <td className="px-2.5 py-2 text-zinc-900 truncate" title={`${data.nombre} (C.I. ${client.cedulaRuc})`}>
                         <div className="flex flex-col truncate">
-                          <span className="font-bold truncate text-xs group-hover:text-blue-600 transition-colors">
-                            {data.nombre}
-                          </span>
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="font-bold truncate text-xs group-hover:text-blue-600 transition-colors">
+                              {data.nombre}
+                            </span>
+                            {isVip && (
+                              <span
+                                className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-400 to-yellow-500 text-zinc-950 shadow-2xs border border-amber-300 flex items-center gap-0.5"
+                                title="Cliente VIP - Garantía Plus Activa (Atención Preferencial Nacional)"
+                              >
+                                👑 VIP
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
                             C.I. {client.cedulaRuc}
                           </span>
@@ -2543,6 +2574,71 @@ export const ClientesModule: React.FC<Props> = ({
                 </tr>
               </tfoot>
             </table>
+          </div>
+
+          {/* 3. BARRA DE PAGINACIÓN DE 20 EN 20 (ESQUINA INFERIOR) */}
+          <div className="bg-zinc-50 border-t border-zinc-200 px-4 py-2.5 flex items-center justify-between text-xs select-none shrink-0">
+            <div className="text-zinc-600 font-medium">
+              Mostrando <span className="font-bold text-zinc-900">{(currentPage - 1) * CLIENTS_PER_PAGE + 1}</span> -{' '}
+              <span className="font-bold text-zinc-900">
+                {Math.min(currentPage * CLIENTS_PER_PAGE, filteredClients.length)}
+              </span>{' '}
+              de <span className="font-bold text-zinc-900">{filteredClients.length}</span> clientes
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 font-medium mr-1 hidden sm:inline">
+                Pág. <span className="font-bold text-zinc-800">{currentPage}</span> de{' '}
+                <span className="font-bold text-zinc-800">{totalPages}</span>
+              </span>
+
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-zinc-700 flex items-center gap-1 shadow-2xs transition-colors"
+                title="Página anterior"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Anterior</span>
+              </button>
+
+              {/* Botones de acceso directo a páginas */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    return (
+                      <React.Fragment key={p}>
+                        {prev && p - prev > 1 && <span className="px-1 text-zinc-400">...</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          className={`w-7 h-7 rounded-md font-bold text-xs flex items-center justify-center transition-colors ${
+                            currentPage === p
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-2.5 py-1.5 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-zinc-700 flex items-center gap-1 shadow-2xs transition-colors"
+                title="Página siguiente"
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (

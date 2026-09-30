@@ -47,6 +47,7 @@ import { GpsMatrizDesktop } from './GpsMatrizDesktop';
 import { GarantiasPlusDesktop } from './GarantiasPlusDesktop';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
+import { FloatingPendientesModal } from '../../common/FloatingPendientesModal';
 
 interface Props {
   activeSection: AdminSection;
@@ -156,6 +157,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   const [alistamientoViewMode, setAlistamientoViewMode] = React.useState<'list' | 'form'>('list');
   const [garantiasPlusViewMode, setGarantiasPlusViewMode] = React.useState<'list' | 'form'>('list');
   const [isPrivacyLocked, setIsPrivacyLocked] = React.useState(false);
+  const [isFloatingPendientesOpen, setIsFloatingPendientesOpen] = React.useState(false);
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -262,20 +264,24 @@ export const AdminViewDesktop: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-3.5 shrink-0">
-            {uncompletedPendientesCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setActiveSection('pendientes')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition cursor-pointer"
-                title="Ver pendientes por hacer"
-              >
-                <CalendarClock className="w-4 h-4" />
-                <span>
-                  {uncompletedPendientesCount}{' '}
-                  {uncompletedPendientesCount === 1 ? 'Pendiente' : 'Pendientes'}
-                </span>
-              </button>
-            )}
+            {/* Botón Encabezado de Ventana Flotante de Pendientes */}
+            <button
+              type="button"
+              onClick={() => setIsFloatingPendientesOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer ${
+                uncompletedPendientesCount > 0
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                  : 'bg-blue-800 hover:bg-blue-900 border border-blue-500 text-blue-100 hover:text-white'
+              }`}
+              title="Abrir ventana flotante de tareas pendientes"
+            >
+              <CalendarClock className="w-4 h-4 text-amber-300" />
+              <span>
+                {uncompletedPendientesCount > 0
+                  ? `${uncompletedPendientesCount} ${uncompletedPendientesCount === 1 ? 'Pendiente' : 'Pendientes'}`
+                  : 'Pendientes'}
+              </span>
+            </button>
 
             {((activeSection === 'alistamiento' && alistamientoViewMode === 'form') ||
               (activeSection === 'garantias_plus' && garantiasPlusViewMode === 'form')) && (
@@ -606,6 +612,20 @@ export const AdminViewDesktop: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      {/* Ventana Flotante de Pendientes para Revisar sin salir de la pantalla */}
+      <FloatingPendientesModal
+        isOpen={isFloatingPendientesOpen}
+        onClose={() => setIsFloatingPendientesOpen(false)}
+        pendientes={pendientes}
+        onSavePendiente={onSavePendiente}
+        onToggleComplete={onToggleCompletePendiente}
+        onGoToFullModule={() => {
+          setIsFloatingPendientesOpen(false);
+          setActiveSection('pendientes');
+        }}
+        workshops={workshops}
+      />
     </div>
   );
 };

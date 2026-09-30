@@ -65,10 +65,11 @@ export const EventsMobile: React.FC<Props> = ({
     (item) => item.solicitudAbonoPendiente?.estado === 'pendiente'
   );
 
-  const nextServiceKm = history.length > 0 && history[0].mileage > 0
-    ? history[0].mileage + (motorcycle.oilChangeIntervalKm || 3000)
-    : (motorcycle.currentKm + (motorcycle.oilChangeIntervalKm || 3000));
-  const kmToNextService = Math.max(0, nextServiceKm - motorcycle.currentKm);
+  const hasAssignedNextKm = Boolean(
+    motorcycle.proximoMantenimientoKm && Number(motorcycle.proximoMantenimientoKm) > 0
+  );
+  const nextServiceKm = hasAssignedNextKm ? Number(motorcycle.proximoMantenimientoKm) : null;
+  const kmToNextService = nextServiceKm ? Math.max(0, nextServiceKm - (motorcycle.currentKm || 0)) : null;
 
   return (
     <div className="space-y-4 pb-20 animate-fade-in text-zinc-900">
@@ -149,10 +150,21 @@ export const EventsMobile: React.FC<Props> = ({
               <Bike className="w-3.5 h-3.5" />
             </div>
           </div>
-          <h3 className="text-base font-extrabold text-zinc-900 font-mono">
-            {nextServiceKm.toLocaleString()} <span className="text-[10px] font-normal text-zinc-500">km</span>
-          </h3>
-          <p className="text-[9px] text-indigo-700 font-medium">Faltan ~{kmToNextService} km</p>
+          {hasAssignedNextKm && nextServiceKm ? (
+            <>
+              <h3 className="text-base font-extrabold text-zinc-900 font-mono">
+                {nextServiceKm.toLocaleString()} <span className="text-[10px] font-normal text-zinc-500">km</span>
+              </h3>
+              <p className="text-[9px] text-indigo-700 font-medium">Faltan ~{kmToNextService} km</p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-base font-extrabold text-zinc-900 font-mono">
+                -
+              </h3>
+              <p className="text-[9px] text-zinc-400 font-medium">Por asignar</p>
+            </>
+          )}
         </div>
       </div>
 

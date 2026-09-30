@@ -51,6 +51,7 @@ import { GpsMatrizMobile } from './GpsMatrizMobile';
 import { GarantiasPlusMobile } from './GarantiasPlusMobile';
 import { NotificationsPopover } from '../../common/NotificationsPopover';
 import { PendientesModule } from '../../common/PendientesModule';
+import { FloatingPendientesModal } from '../../common/FloatingPendientesModal';
 
 interface Props {
   activeSection: AdminSectionMobile;
@@ -61,8 +62,10 @@ interface Props {
   workshops: Workshop[];
   warranties: WarrantyRequest[];
   onValidateWarranty: (id: string, notes: string) => void;
+  onRejectWarranty?: (id: string, reason: string) => void;
   onSendToGarante: (id: string, notes?: string) => void;
   onCompleteRepair: (id: string, invoiceNumber?: string) => void;
+  onUpdateWarranty?: (updated: WarrantyRequest) => void;
   alerts: SystemAlert[];
   onMarkAlertAsRead: (id: string) => void;
   onMarkAllAlertsAsRead: () => void;
@@ -114,8 +117,10 @@ export const AdminViewMobile: React.FC<Props> = ({
   workshops,
   warranties,
   onValidateWarranty,
+  onRejectWarranty,
   onSendToGarante,
   onCompleteRepair,
+  onUpdateWarranty,
   alerts,
   onMarkAlertAsRead,
   onMarkAllAlertsAsRead,
@@ -158,6 +163,7 @@ export const AdminViewMobile: React.FC<Props> = ({
   onDeleteGarantiaPlusRecord,
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isFloatingPendientesOpen, setIsFloatingPendientesOpen] = useState(false);
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -215,9 +221,21 @@ export const AdminViewMobile: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-white truncate max-w-[130px]">
+          <span className="text-xs font-bold text-white truncate max-w-[110px]">
             {sectionTitles[activeSection]}
           </span>
+          <button
+            type="button"
+            onClick={() => setIsFloatingPendientesOpen(true)}
+            className={`p-1.5 rounded-lg transition flex items-center justify-center cursor-pointer ${
+              uncompletedPendientesCount > 0
+                ? 'bg-amber-500 text-white animate-pulse'
+                : 'bg-blue-800 text-blue-200 hover:text-white'
+            }`}
+            title="Abrir ventana flotante de pendientes"
+          >
+            <CalendarClock className="w-4 h-4" />
+          </button>
           <NotificationsPopover
             role="admin"
             alerts={alerts}
@@ -389,9 +407,11 @@ export const AdminViewMobile: React.FC<Props> = ({
             warranties={warranties}
             clients={clients}
             onValidateWarranty={onValidateWarranty}
+            onRejectWarranty={onRejectWarranty}
             onSendToGarante={onSendToGarante}
             onCompleteRepair={onCompleteRepair}
             onCreateWarranty={onCreateWarranty}
+            onUpdateWarranty={onUpdateWarranty}
             onDeleteWarranty={onDeleteWarranty}
             onQuickUpdateStatus={onQuickUpdateWarrantyStatus}
           />
@@ -422,6 +442,20 @@ export const AdminViewMobile: React.FC<Props> = ({
           />
         )}
       </main>
+
+      {/* Ventana Flotante de Pendientes Móvil */}
+      <FloatingPendientesModal
+        isOpen={isFloatingPendientesOpen}
+        onClose={() => setIsFloatingPendientesOpen(false)}
+        pendientes={pendientes}
+        onSavePendiente={onSavePendiente}
+        onToggleComplete={onToggleCompletePendiente}
+        onGoToFullModule={() => {
+          setIsFloatingPendientesOpen(false);
+          setActiveSection('pendientes');
+        }}
+        workshops={workshops}
+      />
     </div>
   );
 };

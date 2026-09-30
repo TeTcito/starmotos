@@ -22,11 +22,11 @@
       "purpose": "maskable"
     }
   ],
-  "start_url": "/?portal=admin#talleres",
-  "id": "/?portal=admin",
+  "start_url": "/admin/",
+  "id": "/admin/",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "scope": "/"
+  "scope": "/admin/"
 }

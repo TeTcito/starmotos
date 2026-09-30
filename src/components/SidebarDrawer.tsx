@@ -14,8 +14,9 @@ import {
   Sparkles,
   Receipt,
   CalendarPlus,
+  Radio,
 } from 'lucide-react';
-import { ClientProfile, Branch } from '../types/customer';
+import { ClientProfile, Branch, GarantiaPlusRecord, GpsRecord } from '../types/customer';
 
 export type ActiveSection =
   | 'eventos'
@@ -25,7 +26,9 @@ export type ActiveSection =
   | 'mantenimientos'
   | 'orden_activa'
   | 'historial'
-  | 'garantias';
+  | 'garantias'
+  | 'garantia_plus'
+  | 'gps';
 
 interface Props {
   isOpen: boolean;
@@ -35,6 +38,13 @@ interface Props {
   profile: ClientProfile;
   activeBranch: Branch;
   onLogout: () => void;
+  clientGarantiaPlus?: {
+    hasGarantiaPlus: boolean;
+    record?: GarantiaPlusRecord;
+    daysRemaining: number;
+    isExpired: boolean;
+  };
+  clientGpsRecord?: GpsRecord | null;
 }
 
 export const SidebarDrawer: React.FC<Props> = ({
@@ -45,6 +55,8 @@ export const SidebarDrawer: React.FC<Props> = ({
   profile,
   activeBranch,
   onLogout,
+  clientGarantiaPlus,
+  clientGpsRecord,
 }) => {
   // Bloquear el scroll del body cuando el drawer esté abierto
   useEffect(() => {
@@ -86,6 +98,28 @@ export const SidebarDrawer: React.FC<Props> = ({
       label: 'Historial',
       icon: <History className="w-4 h-4" />,
     },
+    ...(clientGarantiaPlus?.hasGarantiaPlus
+      ? [
+          {
+            id: 'garantia_plus' as ActiveSection,
+            label: 'Garantía Plus VIP',
+            icon: <Sparkles className="w-4 h-4 text-amber-600" />,
+            badge: (clientGarantiaPlus.record?.saldoPendiente && Number(clientGarantiaPlus.record.saldoPendiente) > 0.01)
+              ? `$${Number(clientGarantiaPlus.record.saldoPendiente).toFixed(0)} pend.`
+              : 'VIP',
+          },
+        ]
+      : []),
+    ...(clientGpsRecord
+      ? [
+          {
+            id: 'gps' as ActiveSection,
+            label: 'Rastreo Satelital GPS',
+            icon: <Radio className="w-4 h-4 text-cyan-600" />,
+            badge: 'GPS',
+          },
+        ]
+      : []),
   ];
 
   return (

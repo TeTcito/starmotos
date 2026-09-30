@@ -59,10 +59,11 @@ export const EventsDesktop: React.FC<Props> = ({
     (item) => item.solicitudAbonoPendiente?.estado === 'pendiente'
   );
 
-  const nextServiceKm = history.length > 0 && history[0].mileage > 0
-    ? history[0].mileage + (motorcycle.oilChangeIntervalKm || 3000)
-    : (motorcycle.currentKm + (motorcycle.oilChangeIntervalKm || 3000));
-  const kmToNextService = Math.max(0, nextServiceKm - motorcycle.currentKm);
+  const hasAssignedNextKm = Boolean(
+    motorcycle.proximoMantenimientoKm && Number(motorcycle.proximoMantenimientoKm) > 0
+  );
+  const nextServiceKm = hasAssignedNextKm ? Number(motorcycle.proximoMantenimientoKm) : null;
+  const kmToNextService = nextServiceKm ? Math.max(0, nextServiceKm - (motorcycle.currentKm || 0)) : null;
 
   const displayedRecords = useMemo(() => {
     if (filterType === 'pendientes') {
@@ -214,12 +215,25 @@ export const EventsDesktop: React.FC<Props> = ({
           </div>
           <div>
             <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Próximo Servicio</p>
-            <h3 className="text-base font-extrabold text-zinc-900 font-mono">
-              {nextServiceKm.toLocaleString()} <span className="text-xs text-zinc-500 font-normal">km</span>
-            </h3>
-            <p className="text-[10px] text-indigo-700 font-medium">
-              Faltan ~{kmToNextService.toLocaleString()} km
-            </p>
+            {hasAssignedNextKm && nextServiceKm ? (
+              <>
+                <h3 className="text-base font-extrabold text-zinc-900 font-mono">
+                  {nextServiceKm.toLocaleString()} <span className="text-xs text-zinc-500 font-normal">km</span>
+                </h3>
+                <p className="text-[10px] text-indigo-700 font-medium">
+                  Faltan ~{kmToNextService?.toLocaleString()} km
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base font-extrabold text-zinc-900 font-mono">
+                  -
+                </h3>
+                <p className="text-[10px] text-zinc-400 font-medium">
+                  Pendiente de asignación en taller
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

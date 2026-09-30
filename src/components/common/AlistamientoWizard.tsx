@@ -1332,7 +1332,36 @@ export const AlistamientoWizard: React.FC<Props> = ({
       return;
     }
 
-    // 3. No encontrado en la base de datos (y actualmente sin API externa conectada)
+    // 3. Buscar en base de datos de Garantía Plus
+    if (gpCheck.record) {
+      const gpRec = gpCheck.record;
+      setIsSearching(false);
+      setFormData((prev) => ({
+        ...prev,
+        cedulaRuc: gpRec.cedulaRuc || cleanId,
+        nombres: gpRec.nombres || prev.nombres,
+        apellidos: gpRec.apellidos || prev.apellidos,
+        celular1: gpRec.celular1 || prev.celular1,
+        celular2: gpRec.celular2 || prev.celular2,
+        email: gpRec.email || prev.email,
+        direccion: gpRec.direccion || prev.direccion,
+        origen: gpRec.origen || prev.origen,
+        motoPreviaId: gpRec.chasis || gpRec.placa || prev.motoPreviaId,
+        chasis: gpRec.chasis || prev.chasis,
+        placa: gpRec.placa || prev.placa,
+        modeloMarca: gpRec.modeloMarca || prev.modeloMarca,
+        color: gpRec.color || prev.color,
+        kilometraje: gpRec.kilometraje || prev.kilometraje,
+        numeroFactura: gpRec.numeroFactura || prev.numeroFactura,
+        numeroTicket: gpRec.numeroTicket || prev.numeroTicket,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (gpRec.sede || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (gpRec.sedeId || prev.sedeId),
+      }));
+      setSearchFeedback(`✓ Cliente Garantía Plus encontrado: ${gpRec.nombres} ${gpRec.apellidos}`);
+      return;
+    }
+
+    // 4. No encontrado en la base de datos (y actualmente sin API externa conectada)
     // NO rellenar ni inventar datos ficticios: el usuario debe poder continuar llenando los datos manualmente
     setTimeout(() => {
       setIsSearching(false);
@@ -2885,30 +2914,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Accesos directos a Garantías Plus y GPS */}
-              {onNavigateSection && (
-                <div className="hidden md:flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onNavigateSection('garantias_plus')}
-                    className="h-12 sm:h-13 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
-                    title="Crear o gestionar contratos de Garantía Plus"
-                  >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span>Garantía Plus</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateSection('gps')}
-                    className="h-12 sm:h-13 px-4 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98 shrink-0"
-                    title="Crear o gestionar ventas y solicitudes de GPS"
-                  >
-                    <Radio className="w-4 h-4 text-blue-400" />
-                    <span>GPS Matriz</span>
-                  </button>
-                </div>
-              )}
-
               {/* Botón "+ Nuevo Alistamiento" Destacado */}
               <button
                 type="button"
@@ -3671,45 +3676,6 @@ export const AlistamientoWizard: React.FC<Props> = ({
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-          )}
-
-          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS */}
-          {isMatriz && (
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-3 sm:p-3.5 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 font-black shrink-0 border border-white/15">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold block text-white">Módulos Especiales de Matriz</span>
-                  <span className="text-[11px] text-slate-300 block">¿El cliente desea contratar el plan Garantía Plus o equipar un GPS Satelital?</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {onNavigateSection && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onNavigateSection('garantias_plus')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 rounded-xl text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
-                      title="Ir al módulo de Garantías Plus para registrar un nuevo contrato"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                      <span>Contratar Garantía Plus</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onNavigateSection('gps')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all active:scale-95"
-                      title="Ir al módulo de GPS para registrar una nueva venta"
-                    >
-                      <Radio className="w-3.5 h-3.5 text-blue-200" />
-                      <span>Registrar GPS</span>
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
           )}
 

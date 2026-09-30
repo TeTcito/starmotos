@@ -14,6 +14,7 @@ import {
   FileCheck,
   Receipt,
   CalendarPlus,
+  Radio,
 } from 'lucide-react';
 import { WhatsAppIcon } from '../WhatsAppIcon';
 import { ActiveSection } from '../SidebarDrawer';
@@ -22,6 +23,8 @@ import { ScheduleAppointmentDesktop } from './ScheduleAppointmentDesktop';
 import { ProfileDesktop } from './ProfileDesktop';
 import { ActiveOrderDesktop } from './ActiveOrderDesktop';
 import { HistoryDesktop } from './HistoryDesktop';
+import { GarantiaPlusCustomerCard } from './GarantiaPlusCustomerCard';
+import { GpsCustomerCard } from './GpsCustomerCard';
 import { ModalPortal } from '../common/ModalPortal';
 import { NotificationsPopover } from '../common/NotificationsPopover';
 import {
@@ -33,6 +36,8 @@ import {
   WarrantyItem,
   Branch,
   TallerOrder,
+  GarantiaPlusRecord,
+  GpsRecord,
 } from '../../types/customer';
 
 interface Props {
@@ -67,6 +72,13 @@ interface Props {
     numeroComprobante?: string;
     notas?: string;
   }) => Promise<boolean>;
+  clientGarantiaPlus?: {
+    hasGarantiaPlus: boolean;
+    record?: GarantiaPlusRecord;
+    daysRemaining: number;
+    isExpired: boolean;
+  };
+  clientGpsRecord?: GpsRecord | null;
 }
 
 export const CustomerViewDesktop: React.FC<Props> = ({
@@ -94,6 +106,8 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   pendingRatingOrder,
   onOpenRatingModal,
   onSubmitAbono,
+  clientGarantiaPlus,
+  clientGpsRecord,
 }) => {
   const menuItems: { id: ActiveSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -124,6 +138,28 @@ export const CustomerViewDesktop: React.FC<Props> = ({
       label: 'Historial',
       icon: <History className="w-4 h-4" />,
     },
+    ...(clientGarantiaPlus?.hasGarantiaPlus
+      ? [
+          {
+            id: 'garantia_plus' as ActiveSection,
+            label: 'Garantía Plus VIP',
+            icon: <Sparkles className="w-4 h-4 text-amber-500" />,
+            badge: (clientGarantiaPlus.record?.saldoPendiente && Number(clientGarantiaPlus.record.saldoPendiente) > 0.01)
+              ? `$${Number(clientGarantiaPlus.record.saldoPendiente).toFixed(0)} pend.`
+              : 'VIP',
+          },
+        ]
+      : []),
+    ...(clientGpsRecord
+      ? [
+          {
+            id: 'gps' as ActiveSection,
+            label: 'Rastreo Satelital GPS',
+            icon: <Radio className="w-4 h-4 text-cyan-600" />,
+            badge: 'GPS',
+          },
+        ]
+      : []),
   ];
 
   const sectionTitles: Record<ActiveSection, string> = {
@@ -135,12 +171,15 @@ export const CustomerViewDesktop: React.FC<Props> = ({
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita Técnica',
     garantias: 'Historial',
+    garantia_plus: 'Membresía Garantía Plus VIP',
+    gps: 'Rastreo Satelital GPS StarMotos',
   };
 
   const handleWhatsAppAdvisor = () => {
-    const waNumber = activeBranch.whatsapp || '593939316698';
+    const waNumber = '593939316698';
+    const motoInfo = motorcycle.plate ? ` (${motorcycle.brand} ${motorcycle.model} - ${motorcycle.plate})` : '';
     const text = encodeURIComponent(
-      `Hola StarMotos, soy ${profile.fullName}, cliente con moto ${motorcycle.brand} ${motorcycle.model} (${motorcycle.plate}). Deseo consultar sobre mi servicio técnico.`
+      `Hola StarMotos, soy el cliente ${profile.fullName}${motoInfo}. Quiero alistar un mantenimiento.`
     );
     window.open(`https://wa.me/${waNumber}?text=${text}`, '_blank');
   };
@@ -318,6 +357,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
                 motorcycle={motorcycle}
                 profile={profile}
                 branches={branches}
+                activeBranchId={activeBranch?.id}
                 scheduledMaintenances={scheduledMaintenances}
                 onScheduleNewMaintenance={addScheduledMaintenance}
                 onBack={() => {
@@ -354,11 +394,32 @@ export const CustomerViewDesktop: React.FC<Props> = ({
               />
             )}
 
+            {activeSection === 'garantia_plus' && (
+              <GarantiaPlusCustomerCard
+                garantiaPlus={
+                  clientGarantiaPlus || {
+                    hasGarantiaPlus: false,
+                    daysRemaining: 0,
+                    isExpired: false,
+                  }
+                }
+                onScheduleMaintenance={() => setActiveSection('agendar_cita')}
+                onSubmitAbono={onSubmitAbono}
+                profile={profile}
+                motorcycle={motorcycle}
+              />
+            )}
+
+            {activeSection === 'gps' && (
+              <GpsCustomerCard gpsRecord={clientGpsRecord} />
+            )}
+
             {activeSection === 'mantenimientos' && (
               <ScheduleAppointmentDesktop
                 motorcycle={motorcycle}
                 profile={profile}
                 branches={branches}
+                activeBranchId={activeBranch?.id}
                 scheduledMaintenances={scheduledMaintenances}
                 onScheduleNewMaintenance={addScheduledMaintenance}
                 onBack={() => setActiveSection('perfil')}

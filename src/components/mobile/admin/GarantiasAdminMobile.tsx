@@ -44,9 +44,11 @@ interface Props {
   warranties: WarrantyRequest[];
   clients?: TallerClient[];
   onValidateWarranty: (id: string, notes: string) => void;
+  onRejectWarranty?: (id: string, reason: string) => void;
   onSendToGarante: (id: string, notes?: string) => void;
   onCompleteRepair: (id: string, invoiceNumber?: string) => void;
   onCreateWarranty?: (newReq: WarrantyRequest) => void;
+  onUpdateWarranty?: (updated: WarrantyRequest) => void;
   onDeleteWarranty?: (id: string) => void;
   onQuickUpdateStatus?: (id: string, status: WarrantyRequestStatus, notes?: string) => void;
 }
@@ -55,9 +57,11 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
   warranties,
   clients = [],
   onValidateWarranty,
+  onRejectWarranty,
   onSendToGarante,
   onCompleteRepair,
   onCreateWarranty,
+  onUpdateWarranty,
   onDeleteWarranty,
   onQuickUpdateStatus,
 }) => {
@@ -137,7 +141,7 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
         if (selectedStatusFilter === 'pendientes') {
           if (!['enviada_matriz', 'en_revision', 'creada'].includes(w.status)) return false;
         } else if (selectedStatusFilter === 'validadas') {
-          if (!['validada_matriz', 'aprobada', 'en_proceso', 'enviada_garante'].includes(w.status)) return false;
+          if (!['validada_matriz', 'aprobada', 'aceptada', 'en_proceso', 'enviada_garante'].includes(w.status)) return false;
         } else if (selectedStatusFilter === 'completadas') {
           if (!['reparacion_completada', 'completada'].includes(w.status)) return false;
         } else if (w.status !== selectedStatusFilter) {
@@ -227,6 +231,14 @@ export const GarantiasAdminMobile: React.FC<Props> = ({
           }}
           onValidateWarranty={onValidateWarranty}
           onSendToGarante={onSendToGarante}
+          onRejectWarranty={(id, reason) => {
+            if (onRejectWarranty) onRejectWarranty(id, reason);
+            setSelectedWarrantyForDetail(null);
+          }}
+          onUpdateWarranty={(updated) => {
+            setSelectedWarrantyForDetail(updated);
+            if (onUpdateWarranty) onUpdateWarranty(updated);
+          }}
           onCreateNewRequest={() => {
             setSelectedWarrantyForDetail(null);
             setIsEmitting(true);

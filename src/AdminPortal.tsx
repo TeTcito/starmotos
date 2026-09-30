@@ -5,6 +5,8 @@ import { useIsDesktop } from './hooks/useIsDesktop';
 import { AdminViewDesktop } from './components/desktop/admin/AdminViewDesktop';
 import { AdminViewMobile } from './components/mobile/admin/AdminViewMobile';
 import { PendientesAlertModal } from './components/common/PendientesAlertModal';
+import { PendienteAlarmModal } from './components/common/PendienteAlarmModal';
+import { AdminPendiente } from './types/customer';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -15,6 +17,7 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
   const portal = useAdminPortal();
   const isDesktop = useIsDesktop(1024);
   const [showEntranceAlert, setShowEntranceAlert] = React.useState(false);
+  const [alarmedPendiente, setAlarmedPendiente] = React.useState<AdminPendiente | null>(null);
   const hasCheckedEntranceRef = React.useRef(false);
 
   const {
@@ -72,27 +75,43 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     submitAlistamiento,
   } = portal;
 
-  // Alerta de ingreso al sistema: "Tienes X pendientes por hacer"
+  // Alerta de ingreso al sistema: "Tienes X pendientes por hacer" con botones Aceptar y Recordar más tarde
   React.useEffect(() => {
-    if (hasCheckedEntranceRef.current) return;
-    hasCheckedEntranceRef.current = true;
+    const checkEntrance = () => {
+      try {
+        const alreadySeen = sessionStorage.getItem('starmotos_admin_seen_pendientes_alert_v1');
+        const snoozeUntilStr = sessionStorage.getItem('starmotos_admin_snooze_pendientes_until');
+        const isSnoozed = snoozeUntilStr ? Date.now() < parseInt(snoozeUntilStr, 10) : false;
 
-    try {
-      const alreadySeen = sessionStorage.getItem('starmotos_admin_seen_pendientes_alert_v1');
-      const uncompletedCount = pendientes.filter((p) => !p.completed).length;
+        const uncompletedCount = pendientes.filter((p) => !p.completed).length;
 
-      if (!alreadySeen && uncompletedCount > 0) {
-        const timer = setTimeout(() => {
+        if (!alreadySeen && !isSnoozed && uncompletedCount > 0) {
           setShowEntranceAlert(true);
-        }, 500);
-        return () => clearTimeout(timer);
-      }
-    } catch (_) {}
+        }
+      } catch (_) {}
+    };
+
+    if (!hasCheckedEntranceRef.current) {
+      hasCheckedEntranceRef.current = true;
+      const timer = setTimeout(checkEntrance, 600);
+      return () => clearTimeout(timer);
+    }
   }, [pendientes]);
 
-  const handleCloseAlert = () => {
+  const handleAcceptAlert = () => {
     try {
       sessionStorage.setItem('starmotos_admin_seen_pendientes_alert_v1', 'true');
+    } catch (_) {}
+    setShowEntranceAlert(false);
+  };
+
+  const handleRemindLaterAlert = () => {
+    try {
+      // Posponer recordatorio por 15 minutos
+      sessionStorage.setItem(
+        'starmotos_admin_snooze_pendientes_until',
+        (Date.now() + 15 * 60 * 1000).toString()
+      );
     } catch (_) {}
     setShowEntranceAlert(false);
   };
@@ -103,6 +122,65 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
     } catch (_) {}
     setShowEntranceAlert(false);
     setActiveSection('pendientes' as any);
+  };
+
+  // Monitor periódico de Alarma Programada cuando se cumple fecha y hora de un pendiente
+  React.useEffect(() => {
+    const checkScheduledPendienteAlarm = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      for (const p of pendientes) {
+        if (p.completed) continue;
+        if (!p.dueDate) continue;
+
+        // Comprobar si la fecha es hoy
+        if (p.dueDate === todayStr) {
+          if (p.dueTime) {
+            const [hStr, mStr] = p.dueTime.split(':');
+            const targetMinutes = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+
+            // Alarma cuando ya es la hora o transcurrieron menos de 60 minutos de retraso
+            if (currentMinutes >= targetMinutes && currentMinutes - targetMinutes <= 60) {
+              const alarmKey = `starmotos_alarm_p_${p.id}_${todayStr}_${p.dueTime}`;
+              const snoozeKey = `starmotos_snooze_alarm_${p.id}`;
+              const snoozeUntil = sessionStorage.getItem(snoozeKey);
+              const isSnoozed = snoozeUntil ? Date.now() < parseInt(snoozeUntil, 10) : false;
+
+              if (!sessionStorage.getItem(alarmKey) && !isSnoozed) {
+                sessionStorage.setItem(alarmKey, 'true');
+                setAlarmedPendiente(p);
+                break;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    checkScheduledPendienteAlarm();
+    const interval = setInterval(checkScheduledPendienteAlarm, 15000);
+    return () => clearInterval(interval);
+  }, [pendientes]);
+
+  const handleSnoozeAlarm = (id: string, minutes: number) => {
+    try {
+      sessionStorage.setItem(
+        `starmotos_snooze_alarm_${id}`,
+        (Date.now() + minutes * 60 * 1000).toString()
+      );
+    } catch (_) {}
+    setAlarmedPendiente(null);
+  };
+
+  const handleCompleteFromAlarm = (id: string) => {
+    toggleCompletePendiente(id);
+    setAlarmedPendiente(null);
   };
 
   return (
@@ -170,9 +248,11 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
           workshops={workshops}
           warranties={warranties}
           onValidateWarranty={validateWarrantyByMatriz}
+          onRejectWarranty={rejectWarrantyByMatriz}
           onSendToGarante={sendWarrantyToGarante}
           onCompleteRepair={completeWarrantyRepair}
           onCreateWarranty={createWarrantyRequest}
+          onUpdateWarranty={updateWarranty}
           onDeleteWarranty={deleteWarranty}
           onQuickUpdateWarrantyStatus={quickUpdateWarrantyStatus}
           alerts={alerts}
@@ -215,12 +295,23 @@ export const AdminPortal: React.FC<Props> = ({ onLogout }) => {
         />
       )}
 
-      {/* Modal de Alerta de Ingreso para Pendientes Agendados */}
+      {/* Modal de Alerta de Ingreso para Pendientes Agendados con Aceptar y Recordar más tarde */}
       <PendientesAlertModal
         isOpen={showEntranceAlert}
-        onClose={handleCloseAlert}
+        onClose={handleAcceptAlert}
+        onAccept={handleAcceptAlert}
+        onRemindLater={handleRemindLaterAlert}
         onGoToPendientes={handleGoToPendientes}
         pendientes={pendientes}
+      />
+
+      {/* Modal de Alarma Sonora para Pendiente Cumplido en Fecha y Hora */}
+      <PendienteAlarmModal
+        isOpen={Boolean(alarmedPendiente)}
+        pendiente={alarmedPendiente}
+        onClose={() => setAlarmedPendiente(null)}
+        onComplete={handleCompleteFromAlarm}
+        onSnooze={handleSnoozeAlarm}
       />
 
       {/* Global Toast */}

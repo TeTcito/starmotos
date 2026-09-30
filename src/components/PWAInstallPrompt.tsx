@@ -122,7 +122,7 @@ export function updateWebManifestForRole(role: UserRole) {
     admin: '/manifest-admin.json',
     taller: '/manifest-taller.json',
     garante: '/manifest-garante.json',
-    gps: '/manifest-admin.json',
+    gps: '/manifest-gps.json',
     cliente: '/manifest-cliente.json',
   };
 
@@ -320,24 +320,9 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ currentRole 
     setIsIOS(device.isIOS);
     setIsMobile(device.isMobile);
 
-    // ─── PASO 3: Verificar instalación previa para ESTE rol ───
-    const storedInstalled = safeGetItem(roleStorageKeys.installed);
-    if (storedInstalled === 'true') {
-      checkInstalledRelatedApps().then((confirmed) => {
-        if (!confirmed) {
-          safeSetItem(roleStorageKeys.installed, '');
-        } else {
-          markAsInstalled();
-        }
-      });
-    }
-
-    // ─── PASO 4: Respetar descartes recientes por el usuario para ESTE rol ───
-    const dismissedUntil = safeGetItem(roleStorageKeys.dismissedUntil);
-    const isSnoozed = dismissedUntil && Date.now() < Number(dismissedUntil);
+    // Si está en el navegador, permitir siempre la instalación si el usuario lo necesita
     const dismissedInSession = safeSessionGetItem(roleStorageKeys.dismissedSession);
-
-    if (isSnoozed || dismissedInSession) {
+    if (dismissedInSession) {
       return;
     }
 
@@ -353,44 +338,35 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({ currentRole 
       const promptEvent = e as BeforeInstallPromptEvent;
       (window as any).__pwaInstallPrompt = promptEvent;
       setDeferredPrompt(promptEvent);
+      setIsInstalled(false);
+      setIsVisible(true);
     };
 
     const handlePromptReadyCustom = () => {
       if ((window as any).__pwaInstallPrompt) {
         setDeferredPrompt((window as any).__pwaInstallPrompt);
+        setIsInstalled(false);
+        setIsVisible(true);
       }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('starmotos_pwa_prompt_ready', handlePromptReadyCustom);
 
-    // ─── PASO 7: Comprobar instalación con API y mostrar la tarjeta ───
+    // ─── PASO 7: Mostrar la tarjeta tras breve delay ───
     let appearanceTimer: ReturnType<typeof setTimeout>;
 
-    checkInstalledRelatedApps().then((alreadyInstalled) => {
-      if (alreadyInstalled && storedInstalled === 'true') {
+    appearanceTimer = setTimeout(() => {
+      if (isRunningStandalone()) {
         markAsInstalled();
         return;
       }
 
-      appearanceTimer = setTimeout(() => {
-        if (isRunningStandalone()) {
-          markAsInstalled();
-          return;
-        }
+      const freshSessionDismissed = safeSessionGetItem(roleStorageKeys.dismissedSession);
+      if (freshSessionDismissed) return;
 
-        const freshInstalled = safeGetItem(roleStorageKeys.installed);
-        if (freshInstalled === 'true') return;
-
-        const freshSessionDismissed = safeSessionGetItem(roleStorageKeys.dismissedSession);
-        if (freshSessionDismissed) return;
-
-        const freshDismissedUntil = safeGetItem(roleStorageKeys.dismissedUntil);
-        if (freshDismissedUntil && Date.now() < Number(freshDismissedUntil)) return;
-
-        setIsVisible(true);
-      }, APPEARANCE_DELAY_MS);
-    });
+      setIsVisible(true);
+    }, APPEARANCE_DELAY_MS);
 
     // ─── PASO 8: Observar si el modo standalone cambia en tiempo real ───
     const standaloneQuery = window.matchMedia('(display-mode: standalone)');

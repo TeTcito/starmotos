@@ -22,11 +22,11 @@
       "purpose": "maskable"
     }
   ],
-  "start_url": "/?portal=taller#perfil_taller",
-  "id": "/?portal=taller",
+  "start_url": "/taller/",
+  "id": "/taller/",
   "background_color": "#ffffff",
   "theme_color": "#059669",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "scope": "/"
+  "scope": "/taller/"
 }

@@ -71,6 +71,10 @@ export function getWarrantyStatusInfo(status: WarrantyRequestStatus): StatusInfo
     case 'en_revision':
     case 'enviada_matriz':
     case 'creada':
+    case 'pendiente' as any:
+    case 'revision' as any:
+    case 'en-revision' as any:
+    case 'nueva' as any:
       return {
         canonical: 'en_revision',
         label: 'En Revisión (Matriz)',
@@ -2149,17 +2153,15 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 <span>✓ Aprobar Garantía</span>
               </button>
 
-              {!isForMatriz && (
-                <button
-                  type="button"
-                  onClick={handleMatrizApprove}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
-                  title="Poner en proceso y remitir al buzón de Garantía de Marca"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Aceptar y Enviar a Garantía de Marca</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleMatrizApprove}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                title="Poner en proceso y remitir al buzón de Garantía de Marca"
+              >
+                <Send className="w-4 h-4" />
+                <span>Aceptar y Enviar a Garantía de Marca</span>
+              </button>
             </div>
           </div>
         </div>

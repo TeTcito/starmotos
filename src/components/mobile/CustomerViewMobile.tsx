@@ -7,6 +7,8 @@ import { ScheduleAppointmentMobile } from './ScheduleAppointmentMobile';
 import { ProfileMobile } from './ProfileMobile';
 import { ActiveOrderMobile } from './ActiveOrderMobile';
 import { HistoryMobile } from './HistoryMobile';
+import { GarantiaPlusCustomerCard } from '../desktop/GarantiaPlusCustomerCard';
+import { GpsCustomerCard } from '../desktop/GpsCustomerCard';
 import { FileCheck } from 'lucide-react';
 import { ModalPortal } from '../common/ModalPortal';
 import {
@@ -18,6 +20,8 @@ import {
   WarrantyItem,
   Branch,
   TallerOrder,
+  GarantiaPlusRecord,
+  GpsRecord,
 } from '../../types/customer';
 
 interface Props {
@@ -54,6 +58,13 @@ interface Props {
     numeroComprobante?: string;
     notas?: string;
   }) => Promise<boolean>;
+  clientGarantiaPlus?: {
+    hasGarantiaPlus: boolean;
+    record?: GarantiaPlusRecord;
+    daysRemaining: number;
+    isExpired: boolean;
+  };
+  clientGpsRecord?: GpsRecord | null;
 }
 
 export const CustomerViewMobile: React.FC<Props> = ({
@@ -83,6 +94,8 @@ export const CustomerViewMobile: React.FC<Props> = ({
   pendingRatingOrder,
   onOpenRatingModal,
   onSubmitAbono,
+  clientGarantiaPlus,
+  clientGpsRecord,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
     perfil: 'Perfil del Cliente',
@@ -93,6 +106,8 @@ export const CustomerViewMobile: React.FC<Props> = ({
     mi_moto: 'Perfil del Cliente',
     mantenimientos: 'Agendar Cita',
     garantias: 'Historial',
+    garantia_plus: 'Garantía Plus VIP',
+    gps: 'Rastreo Satelital GPS',
   };
 
   return (
@@ -119,6 +134,8 @@ export const CustomerViewMobile: React.FC<Props> = ({
         profile={profile}
         activeBranch={activeBranch}
         onLogout={logout}
+        clientGarantiaPlus={clientGarantiaPlus}
+        clientGpsRecord={clientGpsRecord}
       />
 
       {/* 3. Contenido Principal Móvil */}
@@ -151,6 +168,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
             motorcycle={motorcycle}
             profile={profile}
             branches={branches}
+            activeBranchId={activeBranch?.id}
             scheduledMaintenances={scheduledMaintenances}
             onScheduleNewMaintenance={addScheduledMaintenance}
             onBack={() => {
@@ -187,11 +205,32 @@ export const CustomerViewMobile: React.FC<Props> = ({
           />
         )}
 
+        {activeSection === 'garantia_plus' && (
+          <GarantiaPlusCustomerCard
+            garantiaPlus={
+              clientGarantiaPlus || {
+                hasGarantiaPlus: false,
+                daysRemaining: 0,
+                isExpired: false,
+              }
+            }
+            onScheduleMaintenance={() => setActiveSection('agendar_cita')}
+            onSubmitAbono={onSubmitAbono}
+            profile={profile}
+            motorcycle={motorcycle}
+          />
+        )}
+
+        {activeSection === 'gps' && (
+          <GpsCustomerCard gpsRecord={clientGpsRecord} />
+        )}
+
         {activeSection === 'mantenimientos' && (
           <ScheduleAppointmentMobile
             motorcycle={motorcycle}
             profile={profile}
             branches={branches}
+            activeBranchId={activeBranch?.id}
             scheduledMaintenances={scheduledMaintenances}
             onScheduleNewMaintenance={addScheduledMaintenance}
             onBack={() => setActiveSection('perfil')}

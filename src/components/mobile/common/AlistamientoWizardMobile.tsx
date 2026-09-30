@@ -1100,7 +1100,36 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       return;
     }
 
-    // 3. No encontrado en la base de datos (y actualmente sin API externa conectada)
+    // 3. Fallback: verificar si está registrado en Garantía Plus
+    if (gpCheck.record) {
+      const gpRec = gpCheck.record;
+      setIsSearching(false);
+      setFormData((prev) => ({
+        ...prev,
+        cedulaRuc: gpRec.cedulaRuc || cleanId,
+        nombres: gpRec.nombres || prev.nombres,
+        apellidos: gpRec.apellidos || prev.apellidos,
+        celular1: gpRec.celular1 || prev.celular1,
+        celular2: gpRec.celular2 || prev.celular2,
+        email: gpRec.email || prev.email,
+        direccion: gpRec.direccion || prev.direccion,
+        origen: gpRec.origen || prev.origen,
+        motoPreviaId: gpRec.chasis || gpRec.placa || prev.motoPreviaId,
+        chasis: gpRec.chasis || prev.chasis,
+        placa: gpRec.placa || prev.placa,
+        modeloMarca: gpRec.modeloMarca || prev.modeloMarca,
+        color: gpRec.color || prev.color,
+        kilometraje: gpRec.kilometraje || prev.kilometraje,
+        numeroFactura: gpRec.numeroFactura || prev.numeroFactura,
+        numeroTicket: gpRec.numeroTicket || prev.numeroTicket,
+        sede: selectedWorkshopFilter !== 'all' ? prev.sede : (gpRec.sede || prev.sede),
+        sedeId: selectedWorkshopFilter !== 'all' ? prev.sedeId : (gpRec.sedeId || prev.sedeId),
+      }));
+      setSearchFeedback(`✓ Cliente Garantía Plus encontrado: ${gpRec.nombres} ${gpRec.apellidos}`);
+      return;
+    }
+
+    // 4. No encontrado en la base de datos (y actualmente sin API externa conectada)
     // NO rellenar ni inventar datos ficticios: el usuario debe poder continuar llenando los datos manualmente
     setTimeout(() => {
       setIsSearching(false);
@@ -2860,30 +2889,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Accesos directos a Garantías Plus y GPS en Móvil */}
-          {onNavigateSection && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar shrink-0">
-              <button
-                type="button"
-                onClick={() => onNavigateSection('garantias_plus')}
-                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 rounded-xl text-xs font-black shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
-                title="Crear o gestionar contratos de Garantía Plus"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                <span>Garantía Plus</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateSection('gps')}
-                className="px-3 py-1.5 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
-                title="Crear o gestionar solicitudes de GPS"
-              >
-                <Radio className="w-3.5 h-3.5 text-blue-400" />
-                <span>GPS Matriz</span>
-              </button>
-            </div>
-          )}
-
           {/* Panel Desplegable de Filtros Móvil */}
           {isFilterOpen && (
             <div className="bg-zinc-50 border border-blue-200 rounded-xl p-3 shadow-xs space-y-3 shrink-0 animate-fade-in">
@@ -3435,32 +3440,6 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-          )}
-
-          {/* BARRA DE NAVEGACIÓN RÁPIDA: GARANTÍA PLUS Y GPS MÓVIL */}
-          {isMatriz && onNavigateSection && (
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-2.5 rounded-xl shadow-xs flex items-center justify-between gap-2 text-white">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-[11px] font-bold truncate">Módulos Especiales:</span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onNavigateSection('garantias_plus')}
-                  className="px-2 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 rounded-lg text-[10px] font-black shadow-2xs cursor-pointer active:scale-95"
-                >
-                  Garantía Plus
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigateSection('gps')}
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-2xs cursor-pointer active:scale-95"
-                >
-                  GPS
-                </button>
-              </div>
             </div>
           )}
 

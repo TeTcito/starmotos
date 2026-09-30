@@ -1,5 +1,4 @@
-// src/components/desktop/ScheduleAppointmentDesktop.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   CalendarPlus,
@@ -26,12 +25,13 @@ import {
   Branch,
   AgendamientoTicket,
 } from '../../types/customer';
-import { addStoredAgendamiento, getStoredAgendamientos } from '../../data/mockMultiRoleData';
+import { addStoredAgendamiento, getStoredAgendamientos, getStoredClients } from '../../data/mockMultiRoleData';
 
 interface Props {
   motorcycle: MotorcycleClientData;
   profile: ClientProfile;
   branches: Branch[];
+  activeBranchId?: string;
   scheduledMaintenances: ScheduledMaintenance[];
   onScheduleNewMaintenance: (maintenance: ScheduledMaintenance) => void;
   onBack?: () => void;
@@ -138,12 +138,53 @@ export const ScheduleAppointmentDesktop: React.FC<Props> = ({
   motorcycle,
   profile,
   branches,
+  activeBranchId,
   scheduledMaintenances,
   onScheduleNewMaintenance,
   onBack,
 }) => {
+  // Sede por defecto según registro del cliente / moto
+  const defaultBranchId = useMemo(() => {
+    if (activeBranchId && branches.some((b) => b.id === activeBranchId)) {
+      return activeBranchId;
+    }
+    if (motorcycle?.preferredBranchId) {
+      const match = branches.find((b) => b.id === motorcycle.preferredBranchId);
+      if (match) return match.id;
+    }
+    if (profile?.idNumber) {
+      try {
+        const storedClients = getStoredClients();
+        const clientFound = storedClients.find(
+          (c) =>
+            (profile.idNumber && c.idNumber && c.idNumber.trim() === profile.idNumber.trim()) ||
+            (profile.email && c.email && c.email.trim().toLowerCase() === profile.email.trim().toLowerCase())
+        );
+        if (clientFound?.workshopId && branches.some((b) => b.id === clientFound.workshopId)) {
+          return clientFound.workshopId;
+        }
+      } catch (_) {}
+    }
+    if (profile?.city || profile?.address) {
+      const clean = `${profile?.city || ''} ${profile?.address || ''}`.toLowerCase().trim();
+      const match = branches.find(
+        (b) =>
+          (b.canton && clean.includes(b.canton.toLowerCase())) ||
+          (b.city && clean.includes(b.city.toLowerCase())) ||
+          clean.includes(b.name.toLowerCase()) ||
+          b.name.toLowerCase().includes(clean)
+      );
+      if (match) return match.id;
+    }
+    return branches[0]?.id || 'matriz-la-mana';
+  }, [activeBranchId, motorcycle?.preferredBranchId, profile?.idNumber, profile?.email, profile?.city, profile?.address, branches]);
+
   // Sede seleccionada
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'matriz-la-mana');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(defaultBranchId);
+
+  useEffect(() => {
+    setSelectedBranchId(defaultBranchId);
+  }, [defaultBranchId]);
 
   // Navegación de semanas (baseDate inicia hoy)
   const [currentWeekOffset, setCurrentWeekOffset] = useState<number>(0);

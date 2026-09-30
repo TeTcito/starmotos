@@ -47,10 +47,16 @@ import {
   cloudDeleteAgendamiento,
   cloudSaveGpsRecord,
   cloudDeleteGpsRecord,
+  cloudSaveGarantiaPlusRecord,
+  cloudDeleteGarantiaPlusRecord,
   getDeletedTombstones,
   addDeletedTombstone,
   removeDeletedTombstone,
   isDeletedTombstone,
+  getDeletedGpsIds,
+  markGpsAsDeleted,
+  getDeletedGarantiaPlusIds,
+  markGarantiaPlusAsDeleted,
   syncBus,
   safeSaveAlistamientosToLocalStorage,
   safeSaveWarrantiesToLocalStorage,
@@ -2354,12 +2360,14 @@ export function getStoredGpsRecords(): GpsRecord[] {
     const raw = localStorage.getItem(STORAGE_KEYS.GPS_RECORDS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((r) => r && r.id && !isDeletedTombstone(r.id) && !getDeletedGpsIds().has(r.id));
+      }
     }
   } catch (e) {
     console.error('Error al leer registros GPS de localStorage:', e);
   }
-  return INITIAL_GPS_RECORDS;
+  return INITIAL_GPS_RECORDS.filter((r) => r && r.id && !isDeletedTombstone(r.id) && !getDeletedGpsIds().has(r.id));
 }
 
 export function saveStoredGpsRecords(records: GpsRecord[]) {
@@ -2392,6 +2400,8 @@ export function saveStoredGpsRecord(record: GpsRecord) {
 
 export function deleteStoredGpsRecord(id: string) {
   try {
+    markGpsAsDeleted(id);
+    addDeletedTombstone(id);
     const current = getStoredGpsRecords();
     const updated = current.filter((r) => r.id !== id);
     saveStoredGpsRecords(updated);
@@ -2518,12 +2528,14 @@ export function getStoredGarantiasPlusRecords(): GarantiaPlusRecord[] {
     const raw = localStorage.getItem(STORAGE_KEYS.GARANTIAS_PLUS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((r) => r && r.id && !isDeletedTombstone(r.id) && !getDeletedGarantiaPlusIds().has(r.id));
+      }
     }
   } catch (e) {
     console.error('Error al leer registros de Garantías Plus de localStorage:', e);
   }
-  return INITIAL_GARANTIAS_PLUS;
+  return INITIAL_GARANTIAS_PLUS.filter((r) => r && r.id && !isDeletedTombstone(r.id) && !getDeletedGarantiaPlusIds().has(r.id));
 }
 
 export function saveStoredGarantiasPlusRecords(records: GarantiaPlusRecord[]) {
@@ -2548,6 +2560,7 @@ export function saveStoredGarantiaPlusRecord(record: GarantiaPlusRecord) {
       updated = [{ ...record, createdAt: record.createdAt || new Date().toISOString() }, ...current];
     }
     saveStoredGarantiasPlusRecords(updated);
+    cloudSaveGarantiaPlusRecord(record);
   } catch (e) {
     console.error('Error al guardar registro individual de Garantía Plus:', e);
   }
@@ -2555,9 +2568,12 @@ export function saveStoredGarantiaPlusRecord(record: GarantiaPlusRecord) {
 
 export function deleteStoredGarantiaPlusRecord(id: string) {
   try {
+    markGarantiaPlusAsDeleted(id);
+    addDeletedTombstone(id);
     const current = getStoredGarantiasPlusRecords();
     const updated = current.filter((r) => r.id !== id);
     saveStoredGarantiasPlusRecords(updated);
+    cloudDeleteGarantiaPlusRecord(id);
   } catch (e) {
     console.error('Error al eliminar registro de Garantía Plus:', e);
   }
@@ -2580,11 +2596,11 @@ export function checkClientGarantiaPlus(
   }
 
   const cleanTerm = term.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  const records = recordsList || getStoredGarantiasPlusRecords();
+  const records = (recordsList || getStoredGarantiasPlusRecords()).filter((r) => r && r.id && !isDeletedTombstone(r.id));
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const found = records.find((r) => {
+  const matches = records.filter((r) => {
     const cleanCedula = (r.cedulaRuc || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanPlaca = (r.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanChasis = (r.chasis || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2596,10 +2612,19 @@ export function checkClientGarantiaPlus(
     );
   });
 
+  matches.sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.fechaServicio || 0).getTime();
+    const timeB = new Date(b.createdAt || b.fechaServicio || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const found = matches[0];
+
   if (!found) {
     try {
       const fullAlistamientos = getStoredFullAlistamientos();
       const alsFound = fullAlistamientos.find((a) => {
+        if (!a || !a.id || isDeletedTombstone(a.id)) return false;
         const cleanCedula = (a.cedulaRuc || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanPlaca = (a.placa || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanChasis = (a.chasis || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');

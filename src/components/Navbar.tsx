@@ -104,11 +104,11 @@ export const Navbar: React.FC<Props> = ({
           </div>
 
           <a
-            href={`https://wa.me/${activeBranch.whatsapp || '593939316698'}?text=${encodeURIComponent(`Hola StarMotos ${activeBranch.name}, soy el cliente ${profile.fullName}.`)}`}
+            href={`https://wa.me/593939316698?text=${encodeURIComponent(`Hola StarMotos, soy el cliente ${profile.fullName}. Quiero alistar un mantenimiento.`)}`}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 px-2.5 py-1.5 rounded-lg text-xs font-bold transition shadow-xs"
-            title="WhatsApp Taller"
+            title="WhatsApp Asesor - Quiero alistar un mantenimiento"
           >
             <WhatsAppIcon className="w-3.5 h-3.5 text-white" />
             <span className="hidden sm:inline">WhatsApp</span>

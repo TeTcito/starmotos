@@ -20,6 +20,8 @@ import { AdminPendiente, PendienteCategory } from '../../types/customer';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onAccept?: () => void;
+  onRemindLater?: () => void;
   onGoToPendientes: () => void;
   pendientes: AdminPendiente[];
 }
@@ -88,6 +90,8 @@ const getPriorityBadge = (priority: string) => {
 export const PendientesAlertModal: React.FC<Props> = ({
   isOpen,
   onClose,
+  onAccept,
+  onRemindLater,
   onGoToPendientes,
   pendientes,
 }) => {
@@ -217,23 +221,34 @@ export const PendientesAlertModal: React.FC<Props> = ({
         </div>
 
         {/* Footer con botones de acción */}
-        <div className="p-4 bg-white border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-end gap-2.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 text-zinc-700 text-xs font-bold transition cursor-pointer text-center"
-          >
-            Revisar más tarde
-          </button>
-
+        <div className="p-4 bg-white border-t border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <button
             type="button"
             onClick={onGoToPendientes}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 active:scale-98 text-white text-xs font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto text-xs text-blue-700 hover:text-blue-900 font-bold flex items-center justify-center sm:justify-start gap-1 cursor-pointer py-1 underline underline-offset-2"
           >
             <span>Ir a Registrar Pendientes</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={onRemindLater || onClose}
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-zinc-300 hover:bg-zinc-100 text-zinc-700 text-xs font-bold transition cursor-pointer text-center"
+            >
+              Recordar más tarde
+            </button>
+
+            <button
+              type="button"
+              onClick={onAccept || onClose}
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 active:scale-98 text-white text-xs font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              <span>Aceptar</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

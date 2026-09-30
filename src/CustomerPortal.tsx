@@ -6,6 +6,7 @@ import { CustomerViewMobile } from './components/mobile/CustomerViewMobile';
 import { CustomerViewDesktop } from './components/desktop/CustomerViewDesktop';
 import { ForceChangePasswordModal } from './components/common/ForceChangePasswordModal';
 import { RatingServiceModal } from './components/common/RatingServiceModal';
+import { ClientTermsNoticeModal } from './components/common/ClientTermsNoticeModal';
 import { CheckCircle2 } from 'lucide-react';
 
 interface CustomerPortalProps {
@@ -45,6 +46,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     submitRating,
     submitClientAbono,
     toastMessage,
+    clientGarantiaPlus,
+    clientGpsRecord,
   } = portal;
 
   // Estado para forzar cambio de contraseña en clientes creados manualmente
@@ -84,6 +87,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           pendingRatingOrder={pendingRatingOrder}
           onOpenRatingModal={() => setIsRatingModalOpen(true)}
           onSubmitAbono={submitClientAbono}
+          clientGarantiaPlus={clientGarantiaPlus}
+          clientGpsRecord={clientGpsRecord}
         />
       ) : (
         <CustomerViewMobile
@@ -113,8 +118,16 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           pendingRatingOrder={pendingRatingOrder}
           onOpenRatingModal={() => setIsRatingModalOpen(true)}
           onSubmitAbono={submitClientAbono}
+          clientGarantiaPlus={clientGarantiaPlus}
+          clientGpsRecord={clientGpsRecord}
         />
       )}
+
+      {/* Modal Notificación Única de Términos y Políticas para Garantía Plus y GPS */}
+      <ClientTermsNoticeModal
+        garantiaPlus={clientGarantiaPlus}
+        gpsRecord={clientGpsRecord}
+      />
 
       {/* Modal Emergente de Calificar Servicio Técnico (Orden Entregada) */}
       <RatingServiceModal

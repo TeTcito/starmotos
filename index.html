@@ -59,8 +59,40 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="StarMotos" />
     <link rel="apple-touch-icon" href="/pwa-512.png" />
-    <link rel="manifest" href="/manifest.json" />
+    <link id="app-manifest" rel="manifest" href="/manifest-cliente.json" />
     <script>
+      (function() {
+        try {
+          var p = window.location.pathname.toLowerCase();
+          var s = window.location.search.toLowerCase();
+          var m = '/manifest-cliente.json';
+          var title = 'StarMotos Clientes';
+
+          if (p.includes('/admin') || s.includes('portal=admin')) {
+            m = '/manifest-admin.json';
+            title = 'StarMotos Admin';
+          } else if (p.includes('/taller') || s.includes('portal=taller')) {
+            m = '/manifest-taller.json';
+            title = 'StarMotos Taller';
+          } else if (p.includes('/garante') || p.includes('/garantia') || s.includes('portal=garante') || s.includes('portal=garantia')) {
+            m = '/manifest-garante.json';
+            title = 'StarMotos Garantías';
+          } else if (p.includes('/gps') || s.includes('portal=gps')) {
+            m = '/manifest-gps.json';
+            title = 'StarMotos GPS';
+          }
+
+          var manifestTag = document.getElementById('app-manifest');
+          if (manifestTag) {
+            manifestTag.setAttribute('href', m);
+          }
+          var titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (titleMeta) {
+            titleMeta.setAttribute('content', title);
+          }
+        } catch(e) {}
+      })();
+
       // Capturar evento de instalación PWA de forma inmediata para no perderlo
       window.__pwaInstallPrompt = null;
       window.addEventListener('beforeinstallprompt', function(e) {

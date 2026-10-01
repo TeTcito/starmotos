@@ -251,10 +251,16 @@ export function safeSaveWarrantiesToLocalStorage(warranties: WarrantyRequest[]):
   const sanitizeWarranty = (w: WarrantyRequest, stripMediaCompletely = false): WarrantyRequest => {
     const copy = { ...w };
     if (Array.isArray(copy.diagnosticPhotos) && copy.diagnosticPhotos.length > 0) {
+      const normalizedPhotos = copy.diagnosticPhotos.map((item: any) => {
+        if (typeof item === 'string' && item.includes('djbvtgjykrkygkdhfhos.supabase.co')) {
+          return item.replace(/djbvtgjykrkygkdhfhos\.supabase\.co/g, 'nphfdolcupkyvjyglgjx.supabase.co');
+        }
+        return item;
+      });
       if (stripMediaCompletely) {
-        copy.diagnosticPhotos = copy.diagnosticPhotos.filter((item: any) => typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://')));
+        copy.diagnosticPhotos = normalizedPhotos.filter((item: any) => typeof item === 'string' && (item.startsWith('http://') || item.startsWith('https://')));
       } else {
-        copy.diagnosticPhotos = copy.diagnosticPhotos.filter((item: any) => {
+        copy.diagnosticPhotos = normalizedPhotos.filter((item: any) => {
           if (typeof item === 'string') {
             if (item.startsWith('http://') || item.startsWith('https://')) return true;
             if (item.startsWith('data:image/')) return isValidDataUrl(item);

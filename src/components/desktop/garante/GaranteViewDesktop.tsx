@@ -106,13 +106,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
     },
     {
       id: 'historial_garantias',
-      label: 'Historial Dictámenes',
+      label: 'Historial & Calidad',
       icon: <History className="w-4 h-4" />,
-    },
-    {
-      id: 'reportes_garante',
-      label: 'Reportes & Calidad',
-      icon: <BarChart3 className="w-4 h-4" />,
     },
     {
       id: 'perfil_garante',
@@ -130,8 +125,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
   const sectionTitles: Record<GaranteSection, string> = {
     solicitudes_garante: 'Solicitudes de Garantía Pendientes de Dictamen',
     clientes_garante: 'Clientes y Unidades con Cobertura de Garantía',
-    historial_garantias: 'Historial Consolidado de Garantías Emitidas',
-    reportes_garante: 'Indicadores Técnicos & Tasa de Reclamos',
+    historial_garantias: 'Historial de Dictámenes & Métricas de Calidad de la Marca',
+    reportes_garante: 'Historial de Dictámenes & Métricas de Calidad de la Marca',
     perfil_garante: 'Mi Perfil de Garantía y Respaldo de Marca',
     alertas_garante: 'Auditoría de Alertas & Eventos de Garantía',
   };
@@ -273,14 +268,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
         </aside>
 
         {/* CONTENIDO PRINCIPAL */}
-        <main
-          className={`flex-1 w-full bg-white ${
-            activeSection === 'clientes_garante'
-              ? 'overflow-hidden flex flex-col p-4'
-              : 'overflow-y-auto px-6 lg:px-8 py-6'
-          }`}
-        >
-          <div className={`w-full ${activeSection === 'clientes_garante' ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+        <main className="flex-1 w-full bg-white overflow-y-auto px-6 lg:px-8 py-6">
+          <div className="w-full">
             {activeSection === 'solicitudes_garante' && (
               <SolicitudesGaranteDesktop
                 pendingRequests={pendingRequests}
@@ -295,11 +284,8 @@ export const GaranteViewDesktop: React.FC<Props> = ({
                 warranties={warranties}
               />
             )}
-            {activeSection === 'historial_garantias' && (
-              <HistorialGarantiasDesktop historyRequests={historyRequests} />
-            )}
-            {activeSection === 'reportes_garante' && (
-              <ReportesGaranteDesktop warranties={warranties} />
+            {(activeSection === 'historial_garantias' || activeSection === 'reportes_garante') && (
+              <HistorialGarantiasDesktop historyRequests={historyRequests} profile={profile} />
             )}
             {activeSection === 'perfil_garante' && (
               <PerfilGaranteDesktop profile={profile} onUpdateProfile={onUpdateProfile} />

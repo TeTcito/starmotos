@@ -363,21 +363,71 @@ export const RESTORED_WARRANTY_9135: WarrantyRequest = {
   targetBrand: 'MMOTASA',
   invoiceNumber: '024-000024',
   diagnosticPhotos: [
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_1_1790270354929_bjjqh2.webp',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_2_1790270273169_olg6i3.webp',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_3_1790270275904_zofe2n.webp',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_4_1790270278838_u71d9c.webp',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_5_1790270359752_mpwi2u.webp',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_1_1790270295244_xxa14v.mp4',
-    'https://djbvtgjykrkygkdhfhos.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_2_1790270299550_gsqvke.mp4',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_1_1790270354929_bjjqh2.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_2_1790270273169_olg6i3.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_3_1790270275904_zofe2n.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_4_1790270278838_u71d9c.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_5_1790270359752_mpwi2u.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_1_1790270295244_xxa14v.mp4',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/video_movil_2_1790270299550_gsqvke.mp4',
   ],
 };
 
+// --- Solicitud de Garantía Real Daytona GAR-2026-3898 ---
+export const RESTORED_WARRANTY_DAYTONA_3898: WarrantyRequest = {
+  id: 'gar-1790647043605',
+  requestNumber: 'GAR-2026-3898',
+  status: 'aceptada',
+  createdAt: 'Hoy, Solicitud Emitida',
+  clientName: 'Gina Karina Villegas Sanchez',
+  clientIdNumber: '0940853245',
+  clientPhone: '0939056963',
+  motorcycleBrand: 'Daytona',
+  motorcycleModel: 'Daytona DY200 Crucero',
+  motorcyclePlate: 'EN TRÁMITE',
+  motorcycleVin: 'LEAPCM0E8V0045548',
+  motorNumber: 'S/N',
+  ramvNumber: 'S/N',
+  warrantyType: 'marca',
+  issueDescription: 'Problema de ensamblado. Está quebrado el eje de las pistas. Se necesita reemplazar la T de Pistas',
+  tallerOrigin: 'StarMotos Sucursal Balzar',
+  tallerOriginId: 'taller-balzar',
+  partsRequired: 'T de Pistas',
+  partsTags: ['T de Pistas'],
+  diagnosticPhotos: [
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_1_1790646958654_py0os6.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_2_1790646962154_g48ozr.webp',
+    'https://nphfdolcupkyvjyglgjx.supabase.co/storage/v1/object/public/warranty-media/garantias/foto_movil_3_1790647015588_s6epsw.webp',
+  ],
+  targetBrand: 'Daytona',
+  laborTime: '1 hora',
+  laborCost: 0,
+  totalBudget: 0,
+  estimatedCost: 0,
+  matrizNotes: 'Inspección técnica de Matriz aprobada. Aplica cobertura de fábrica.',
+};
+
 // --- Solicitudes de Garantía Iniciales ---
-export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [RESTORED_WARRANTY_9135];
+export const INITIAL_WARRANTY_REQUESTS: WarrantyRequest[] = [
+  RESTORED_WARRANTY_9135,
+  RESTORED_WARRANTY_DAYTONA_3898,
+];
+
+// --- Alerta Real Daytona ---
+export const INITIAL_DAYTONA_ALERT: SystemAlert = {
+  id: 'alt-daytona-001',
+  type: 'garantia_aprobada',
+  title: 'Garantía Daytona Registrada',
+  message: 'Solicitud GAR-2026-3898 (Daytona DY200 Crucero - Gina Villegas).',
+  targetRole: 'garante',
+  targetBrand: 'Daytona',
+  relatedId: 'gar-1790647043605',
+  timestamp: '2026-10-01T16:39:01.090Z',
+  read: false,
+};
 
 // --- Alertas del Sistema ---
-export const INITIAL_ALERTS: SystemAlert[] = [];
+export const INITIAL_ALERTS: SystemAlert[] = [INITIAL_DAYTONA_ALERT];
 
 // --- Facturas Administrador SRI ---
 export const INITIAL_INVOICES: AdminInvoice[] = [];
@@ -391,20 +441,24 @@ export const INITIAL_TALLER_CLIENTS: TallerClient[] = [];
 // --- Órdenes de Taller Activas ---
 export const INITIAL_TALLER_ORDERS: TallerOrder[] = [];
 
-// --- Perfil del Garante ---
-export const INITIAL_GARANTE_PROFILE: GaranteProfile = {
-  id: 'gar-autorex',
-  companyName: 'Autorex',
-  ruc: '1792849102001',
-  contactName: 'Responsable de Garantías',
-  roleTitle: 'Representante Autorizado',
-  phone: '0990000000',
-  email: 'garantias@autorex.com',
-  address: 'Ecuador',
-  brandsRepresented: ['Autorex'],
-  contractStartDate: '01 Ene 2025',
+// --- Perfil Oficial del Garante Daytona Ecuador (Registrado por Anthony Morocho) ---
+export const INITIAL_GARANTE_DAYTONA: GaranteProfile = {
+  id: 'gar-1790872741079',
+  companyName: 'Daytona',
+  ruc: '0105925432',
+  contactName: 'Anthony Morocho',
+  roleTitle: 'Jefe Servicio Técnico Movilidad',
+  phone: '0984920881',
+  email: 'asisdaytona@comjcev.com',
+  address: 'Nicolas de Rocha y Anthony de Sevilla',
+  brandsRepresented: ['Daytona'],
+  contractStartDate: '01 oct 2026',
   contractEndDate: '31 Dic 2028',
+  password: 'Morocho239/',
 };
+
+// --- Perfil del Garante por defecto ---
+export const INITIAL_GARANTE_PROFILE: GaranteProfile = INITIAL_GARANTE_DAYTONA;
 
 // --- Mock Base de Datos SRI para Auto-Llenado de Cédula/RUC en Ecuador ---
 export const SRI_MOCK_DATABASE: Record<string, { razonSocial: string; tipoContribuyente: string; address: string; email: string; phone: string }> = {
@@ -546,15 +600,20 @@ export function getStoredWarranties(): WarrantyRequest[] {
       );
       const sanitized = filtered.map((w) => {
         if (Array.isArray(w.diagnosticPhotos)) {
-          const clean = w.diagnosticPhotos.filter((p) => {
-            if (typeof p === 'string' && p.startsWith('data:')) {
-              return isValidDataUrl(p);
-            }
-            return Boolean(p);
-          });
-          if (clean.length !== w.diagnosticPhotos.length) {
-            return { ...w, diagnosticPhotos: clean };
-          }
+          const clean = w.diagnosticPhotos
+            .map((p) => {
+              if (typeof p === 'string' && p.includes('djbvtgjykrkygkdhfhos.supabase.co')) {
+                return p.replace(/djbvtgjykrkygkdhfhos\.supabase\.co/g, 'nphfdolcupkyvjyglgjx.supabase.co');
+              }
+              return p;
+            })
+            .filter((p) => {
+              if (typeof p === 'string' && p.startsWith('data:')) {
+                return isValidDataUrl(p);
+              }
+              return Boolean(p);
+            });
+          return { ...w, diagnosticPhotos: clean };
         }
         return w;
       });
@@ -567,18 +626,35 @@ export function getStoredWarranties(): WarrantyRequest[] {
         sanitized.unshift(RESTORED_WARRANTY_9135);
         safeSaveWarrantiesToLocalStorage(sanitized);
       }
+
+      if (
+        !isDeletedTombstone('gar-1790647043605') &&
+        !isDeletedTombstone('GAR-2026-3898') &&
+        !sanitized.some((w) => w.id === 'gar-1790647043605' || w.requestNumber === 'GAR-2026-3898')
+      ) {
+        sanitized.push(RESTORED_WARRANTY_DAYTONA_3898);
+        safeSaveWarrantiesToLocalStorage(sanitized);
+      }
       return sanitized;
     } else {
+      const initialSeed: WarrantyRequest[] = [];
       if (!isDeletedTombstone('gar-1790270366447') && !isDeletedTombstone('GAR-2026-9135')) {
-        safeSaveWarrantiesToLocalStorage([RESTORED_WARRANTY_9135]);
-        return [RESTORED_WARRANTY_9135];
+        initialSeed.push(RESTORED_WARRANTY_9135);
       }
-      return [];
+      if (!isDeletedTombstone('gar-1790647043605') && !isDeletedTombstone('GAR-2026-3898')) {
+        initialSeed.push(RESTORED_WARRANTY_DAYTONA_3898);
+      }
+      if (initialSeed.length > 0) {
+        safeSaveWarrantiesToLocalStorage(initialSeed);
+      }
+      return initialSeed;
     }
   } catch (e) {
     console.error('Error reading warranties from localStorage', e);
   }
-  return !isDeletedTombstone('gar-1790270366447') && !isDeletedTombstone('GAR-2026-9135') ? [RESTORED_WARRANTY_9135] : [];
+  return INITIAL_WARRANTY_REQUESTS.filter(
+    (w) => !isDeletedTombstone(w.id) && (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
+  );
 }
 
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {
@@ -715,7 +791,11 @@ export function getStoredAlerts(): SystemAlert[] {
     const stored = localStorage.getItem(STORAGE_KEYS.ALERTS);
     if (stored) {
       const parsed: SystemAlert[] = JSON.parse(stored);
-      return parsed.filter((a) => a && a.id && !isDeletedTombstone(a.id));
+      const clean = parsed.filter((a) => a && a.id && !isDeletedTombstone(a.id));
+      if (!isDeletedTombstone('alt-daytona-001') && !clean.some((a) => a.id === 'alt-daytona-001')) {
+        clean.unshift(INITIAL_DAYTONA_ALERT);
+      }
+      return clean;
     }
   } catch (e) {
     console.error('Error reading alerts from localStorage', e);
@@ -781,38 +861,194 @@ export function filterAlertsForRole(
 ): SystemAlert[] {
   const { role, workshopId, brand, brandsRepresented, clientId } = options;
 
+  const brandTokens = [
+    ...(brandsRepresented || []),
+    brand || '',
+  ]
+    .map((b) => b.trim().toLowerCase())
+    .filter(Boolean);
+
+  const cleanWorkshopId = workshopId?.trim().toLowerCase();
+  const cleanClientId = clientId?.trim().toLowerCase();
+
   return alerts.filter((alert) => {
     if (!alert) return false;
 
-    // 1. Role match
-    const hasRole =
-      !alert.targetRole ||
-      alert.targetRole === 'all' ||
-      alert.targetRole === role ||
-      (alert.targetRoles && alert.targetRoles.includes(role));
+    const targetRole = alert.targetRole;
+    const targetRoles = alert.targetRoles;
+    const alertWorkshopId = alert.targetWorkshopId?.trim().toLowerCase();
+    const alertBrand = alert.targetBrand?.trim().toLowerCase();
+    const alertClientId = alert.targetClientId?.trim().toLowerCase();
 
-    if (!hasRole) return false;
-
-    // 2. Specific role constraints
-    if (role === 'taller') {
-      if (alert.targetWorkshopId && workshopId) {
-        if (alert.targetWorkshopId.trim() !== workshopId.trim()) return false;
-      }
-    }
-
+    // -------------------------------------------------------------------------
+    // 1. ROL: GARANTE (PORTAL DE MARCAS / GERENTES DE MARCA)
+    // -------------------------------------------------------------------------
     if (role === 'garante') {
-      if (alert.targetBrand) {
-        const targetB = alert.targetBrand.trim().toLowerCase();
-        const matchesMainBrand = brand && brand.trim().toLowerCase() === targetB;
-        const matchesRep = brandsRepresented?.some((b) => b.trim().toLowerCase() === targetB);
-        if (!matchesMainBrand && !matchesRep) return false;
+      const isRoleTargeted =
+        targetRole === 'garante' ||
+        (Array.isArray(targetRoles) && targetRoles.includes('garante'));
+
+      // No permitir alertas exclusivas de otros roles (admin, taller, cliente, gps)
+      if (
+        targetRole &&
+        targetRole !== 'garante' &&
+        targetRole !== 'all' &&
+        (!targetRoles || !targetRoles.includes('garante'))
+      ) {
+        return false;
       }
+
+      // No permitir alertas operativas internas de taller o cliente
+      if (alertWorkshopId && !isRoleTargeted) {
+        return false;
+      }
+      if (alertClientId && !isRoleTargeted) {
+        return false;
+      }
+
+      // Descartar tipos de alerta que son puramente internas de taller/cliente/admin
+      const workshopOrClientTypes = [
+        'orden_creada',
+        'factura_emitida',
+        'cliente_creado',
+        'cita_agendada',
+        'stock_bajo',
+      ];
+      if (workshopOrClientTypes.includes(alert.type as string) && !isRoleTargeted) {
+        return false;
+      }
+
+      // Validación estricta de MARCA:
+      // Si la alerta tiene marca definida, DEBE coincidir con las marcas de este gerente
+      if (alertBrand && alertBrand !== 'all' && alertBrand !== 'todas') {
+        if (brandTokens.length === 0) return false;
+        const matchesBrand = brandTokens.some(
+          (bt) => bt === alertBrand || bt.includes(alertBrand) || alertBrand.includes(bt)
+        );
+        if (!matchesBrand) return false;
+      } else {
+        // Si no tiene targetBrand, solo se admite si está explícitamente dirigida a 'garante'
+        if (!isRoleTargeted) {
+          return false;
+        }
+
+        // Si es una alerta de garantía sin targetBrand, verificar si en el título o mensaje nombra la marca
+        const isWarrantyType = [
+          'solicitud_garantia',
+          'garantia_aprobada',
+          'garantia_rechazada',
+          'garantia_validada',
+          'dictamen_emitido',
+        ].includes(alert.type as string);
+
+        if (isWarrantyType && brandTokens.length > 0) {
+          const textToSearch = `${alert.title} ${alert.message}`.toLowerCase();
+          const matchesText = brandTokens.some((bt) => textToSearch.includes(bt));
+          if (!matchesText && alert.relatedId) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     }
 
+    // -------------------------------------------------------------------------
+    // 2. ROL: CLIENTE (PORTAL DE CLIENTES)
+    // -------------------------------------------------------------------------
     if (role === 'cliente') {
-      if (alert.targetClientId && clientId) {
-        if (alert.targetClientId.trim() !== clientId.trim()) return false;
+      const isRoleTargeted =
+        targetRole === 'cliente' ||
+        (Array.isArray(targetRoles) && targetRoles.includes('cliente'));
+
+      // Descartar alertas de otros roles
+      if (
+        targetRole &&
+        targetRole !== 'cliente' &&
+        targetRole !== 'all' &&
+        (!targetRoles || !targetRoles.includes('cliente'))
+      ) {
+        return false;
       }
+
+      // Descartar alertas internas de taller o fabricante
+      const internalAlertTypes = [
+        'solicitud_garantia',
+        'dictamen_emitido',
+        'stock_bajo',
+      ];
+      if (internalAlertTypes.includes(alert.type as string) && !isRoleTargeted) {
+        return false;
+      }
+
+      // Si la alerta tiene cliente específico, debe coincidir con este cliente
+      if (alertClientId) {
+        if (!cleanClientId || alertClientId !== cleanClientId) {
+          return false;
+        }
+      } else if (!isRoleTargeted) {
+        // Alerta sin cliente específico y sin targetRole 'cliente' no debe mostrarse al cliente
+        return false;
+      }
+
+      // Alertas operativas de taller no van al cliente a menos que sea su cliente específico
+      if (alertWorkshopId && !isRoleTargeted && !alertClientId) {
+        return false;
+      }
+
+      return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. ROL: TALLER (SEDES)
+    // -------------------------------------------------------------------------
+    if (role === 'taller') {
+      const isRoleTargeted =
+        targetRole === 'taller' ||
+        (Array.isArray(targetRoles) && targetRoles.includes('taller')) ||
+        targetRole === 'all' ||
+        !targetRole;
+
+      // No permitir alertas dirigidas exclusivamente a garante o gps
+      if (
+        (targetRole === 'garante' || targetRole === 'gps') &&
+        (!targetRoles || !targetRoles.includes('taller'))
+      ) {
+        return false;
+      }
+
+      // Si la alerta va a un taller específico, debe coincidir con esta sede
+      if (alertWorkshopId && cleanWorkshopId && cleanWorkshopId !== 'all') {
+        if (alertWorkshopId !== cleanWorkshopId) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. ROL: ADMINISTRADOR (MATRIZ CENTRAL)
+    // -------------------------------------------------------------------------
+    if (role === 'admin') {
+      // Admin ve todo el flujo general, excepto comunicaciones privadas exclusivas de un garante o un cliente
+      if (targetRole === 'garante' && (!targetRoles || !targetRoles.includes('admin'))) {
+        return false;
+      }
+      if (targetRole === 'cliente' && (!targetRoles || !targetRoles.includes('admin'))) {
+        return false;
+      }
+      return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. ROL: GPS
+    // -------------------------------------------------------------------------
+    if (role === 'gps') {
+      return (
+        targetRole === 'gps' ||
+        (Array.isArray(targetRoles) && targetRoles.includes('gps'))
+      );
     }
 
     return true;
@@ -1192,7 +1428,7 @@ export function saveStoredGaranteProfile(profile: GaranteProfile) {
 }
 
 // ===================== GARANTES Y MARCAS REGISTRADAS =====================
-export const INITIAL_GARANTES: GaranteProfile[] = [];
+export const INITIAL_GARANTES: GaranteProfile[] = [INITIAL_GARANTE_DAYTONA];
 
 export function getStoredGarantes(): GaranteProfile[] {
   try {
@@ -1211,13 +1447,23 @@ export function getStoredGarantes(): GaranteProfile[] {
             !(g.companyName && testCompanies.includes(g.companyName.toLowerCase().trim())) &&
             !(g.companyName && g.companyName.toLowerCase().includes('benelli'))
         );
+        const hasDaytona = clean.some(
+          (g) =>
+            g.id === INITIAL_GARANTE_DAYTONA.id ||
+            g.companyName?.toLowerCase().trim() === 'daytona' ||
+            g.companyName?.toLowerCase().includes('daytona') ||
+            g.email?.toLowerCase().trim() === 'daytona@starmotos.com'
+        );
+        if (!hasDaytona) {
+          clean.unshift(INITIAL_GARANTE_DAYTONA);
+        }
         return clean;
       }
     }
   } catch (e) {
     console.error('Error reading garantes from localStorage', e);
   }
-  return [];
+  return [INITIAL_GARANTE_DAYTONA];
 }
 
 export function saveStoredGarantes(garantes: GaranteProfile[]) {

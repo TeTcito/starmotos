@@ -58,6 +58,18 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     passwords: ['StarMotos@Garante2026', 'StarMotos@2026'],
     name: 'Garantías Oficial Benelli Ecuador',
   },
+  'asisdaytona@comjcev.com': {
+    email: 'asisdaytona@comjcev.com',
+    role: 'garante',
+    passwords: ['Morocho239/', 'StarMotos@Garante2026', 'StarMotos@2026'],
+    name: 'Daytona Ecuador - Anthony Morocho',
+  },
+  'daytona': {
+    email: 'asisdaytona@comjcev.com',
+    role: 'garante',
+    passwords: ['Morocho239/', 'Daytona@2026', 'StarMotos@Garante2026', 'StarMotos@2026'],
+    name: 'Daytona Ecuador - Anthony Morocho',
+  },
 
   // 3. Talleres y Sedes Oficiales (12 Ubicaciones de la Red Oficial)
   'sede.la-mana@starmotos.com': {

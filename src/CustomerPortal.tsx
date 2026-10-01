@@ -48,6 +48,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
     toastMessage,
     clientGarantiaPlus,
     clientGpsRecord,
+    alerts,
   } = portal;
 
   // Estado para forzar cambio de contraseña en clientes creados manualmente
@@ -89,6 +90,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           onSubmitAbono={submitClientAbono}
           clientGarantiaPlus={clientGarantiaPlus}
           clientGpsRecord={clientGpsRecord}
+          alerts={alerts}
         />
       ) : (
         <CustomerViewMobile
@@ -120,6 +122,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onLogout }) => {
           onSubmitAbono={submitClientAbono}
           clientGarantiaPlus={clientGarantiaPlus}
           clientGpsRecord={clientGpsRecord}
+          alerts={alerts}
         />
       )}
 

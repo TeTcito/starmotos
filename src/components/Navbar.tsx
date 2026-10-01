@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, MapPin, LogOut } from 'lucide-react';
 import { WhatsAppIcon } from './WhatsAppIcon';
-import { ClientProfile, Branch, WorkOrder, WarrantyItem, MaintenanceRecord } from '../types/customer';
+import { ClientProfile, Branch, WorkOrder, WarrantyItem, MaintenanceRecord, SystemAlert } from '../types/customer';
 import { NotificationsPopover } from './common/NotificationsPopover';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   warranties?: WarrantyItem[];
   history?: MaintenanceRecord[];
   onNavigateToEvents?: () => void;
+  alerts?: SystemAlert[];
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -27,6 +28,7 @@ export const Navbar: React.FC<Props> = ({
   warranties,
   history,
   onNavigateToEvents,
+  alerts,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -91,6 +93,8 @@ export const Navbar: React.FC<Props> = ({
           {onNavigateToEvents && (
             <NotificationsPopover
               role="cliente"
+              clientId={profile?.idNumber || profile?.id}
+              alerts={alerts}
               customerActiveOrder={activeOrder}
               customerWarranties={warranties}
               customerHistory={history}

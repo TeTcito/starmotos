@@ -198,8 +198,16 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
         });
       });
     } else if (role === 'taller') {
+      const cleanWorkshopId = workshopId?.trim().toLowerCase();
+
       // Garantías emitidas por el taller
-      warranties.forEach((w) => {
+      const tallerWarranties = warranties.filter((w) => {
+        if (!cleanWorkshopId || cleanWorkshopId === 'all') return true;
+        const originId = w.tallerOriginId?.trim().toLowerCase();
+        return originId === cleanWorkshopId;
+      });
+
+      tallerWarranties.forEach((w) => {
         let statusBadgeText = 'Enviada Matriz';
         let variant: StatusBadgeVariant = 'amber';
 
@@ -231,7 +239,13 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
       });
 
       // Órdenes de trabajo del taller
-      orders.slice(0, 5).forEach((o) => {
+      const tallerOrders = orders.filter((o) => {
+        if (!cleanWorkshopId || cleanWorkshopId === 'all') return true;
+        const ordWsId = o.workshopId?.trim().toLowerCase();
+        return ordWsId === cleanWorkshopId;
+      });
+
+      tallerOrders.slice(0, 5).forEach((o) => {
         const statusMap: Record<string, { text: string; variant: StatusBadgeVariant }> = {
           ingresada: { text: 'Ingresada', variant: 'zinc' },
           en_diagnostico: { text: 'En Diagnóstico', variant: 'amber' },
@@ -255,8 +269,42 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
         });
       });
     } else if (role === 'garante') {
-      // Garantías para dictamen del garante
-      warranties.forEach((w) => {
+      // Garantías filtradas estrictamente para las marcas que representa este Garante
+      const brandTokens = [
+        ...(brandsRepresented || []),
+        brand || '',
+      ]
+        .map((b) => b.trim().toLowerCase())
+        .filter(Boolean);
+
+      const relevantStatuses = [
+        'en_proceso',
+        'enviada_garante',
+        'validada_matriz',
+        'aceptada',
+        'aprobada',
+        'denegada',
+        'rechazada',
+        'completada',
+        'en_proceso_aceptacion_2',
+      ];
+
+      const scopedWarranties = warranties.filter((w) => {
+        if (!relevantStatuses.includes(w.status)) return false;
+        if (brandTokens.length === 0) return false;
+
+        const target = (w.targetBrand || w.garanteName || '').trim().toLowerCase();
+        const moto = (w.motorcycleBrand || '').trim().toLowerCase();
+
+        return brandTokens.some((bt) => {
+          if (target) {
+            return target === bt || target.includes(bt) || bt.includes(target);
+          }
+          return moto === bt || moto.includes(bt) || bt.includes(moto);
+        });
+      });
+
+      scopedWarranties.forEach((w) => {
         let statusBadgeText = 'Pendiente Dictamen';
         let variant: StatusBadgeVariant = 'amber';
 
@@ -266,9 +314,15 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
         } else if (w.status === 'denegada' || w.status === 'rechazada') {
           statusBadgeText = 'Dictamen Denegado';
           variant = 'red';
-        } else if (w.status === 'en_revision') {
-          statusBadgeText = 'Validación Matriz';
+        } else if (w.status === 'validada_matriz' || w.status === 'enviada_garante' || w.status === 'en_proceso') {
+          statusBadgeText = 'Pendiente Dictamen';
+          variant = 'amber';
+        } else if (w.status === 'en_proceso_aceptacion_2') {
+          statusBadgeText = 'Encargada Taller';
           variant = 'blue';
+        } else if (w.status === 'completada') {
+          statusBadgeText = 'Completada';
+          variant = 'purple';
         }
 
         list.push({

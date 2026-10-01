@@ -355,7 +355,7 @@ export function useAdminPortal() {
       id: `alt-gar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'solicitud_garantia',
       targetRole: 'garante',
-      targetBrand: targetW?.motorcycleBrand,
+      targetBrand: targetW?.targetBrand || targetW?.motorcycleBrand,
       title: 'Te llegó una solicitud de garantía',
       message: `Nueva solicitud de garantía #${targetW?.requestNumber || id} para la marca ${targetW?.motorcycleBrand} (${targetW?.motorcycleModel}) remitida por Matriz Central para dictamen oficial.`,
       timestamp: 'Ahora mismo',

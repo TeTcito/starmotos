@@ -52,7 +52,7 @@ export const TalleresGaranteDesktop: React.FC<Props> = ({ workshops, warranties 
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* 1. CABECERA CON MÉTRICAS DE LA RED B2B */}
+      {/* 1. CABECERA CON MÉTRICAS DE LA RED */}
       <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-2xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -61,7 +61,7 @@ export const TalleresGaranteDesktop: React.FC<Props> = ({ workshops, warranties 
             </div>
             <div>
               <h2 className="text-lg font-black text-zinc-900 tracking-tight">
-                Red de Clientes B2B: Talleres & Concesionarios Homologados
+                Red de Talleres & Concesionarios Autorizados
               </h2>
               <p className="text-xs text-zinc-500 font-medium">
                 Puntos de servicio oficiales autorizados por la Marca para atención técnica y trámite de garantías.
@@ -69,7 +69,7 @@ export const TalleresGaranteDesktop: React.FC<Props> = ({ workshops, warranties 
             </div>
           </div>
 
-          {/* Métricas Globales B2B */}
+          {/* Métricas Globales */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-50 text-purple-900 border border-purple-200 shadow-2xs flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-purple-600" />

@@ -37,6 +37,8 @@ import {
   saveStoredRating,
   isOrderRated,
   addStoredAlerts,
+  getStoredAlerts,
+  filterAlertsForRole,
   getStoredGarantiasPlusRecords,
   saveStoredGarantiaPlusRecord,
   checkClientGarantiaPlus,
@@ -1399,6 +1401,31 @@ export function useCustomerPortal() {
     }
   });
 
+  // Alertas del sistema filtradas estrictamente para este cliente
+  const [allAlerts, setAllAlerts] = useState<SystemAlert[]>(getStoredAlerts);
+
+  useEffect(() => {
+    const handleAlertsUpdate = () => setAllAlerts(getStoredAlerts());
+    window.addEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === 'starmotos_shared_alerts') {
+        handleAlertsUpdate();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('starmotos_alerts_updated', handleAlertsUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const alerts = useMemo(() => {
+    return filterAlertsForRole(allAlerts, {
+      role: 'cliente',
+      clientId: profile.idNumber || profile.id,
+    });
+  }, [allAlerts, profile]);
+
   // Sucursal activa actual (donde está registrado el cliente)
   const activeBranch = useMemo(() => {
     const all = getAllBranches();
@@ -1587,7 +1614,8 @@ export function useCustomerPortal() {
       const ratingAlert: SystemAlert = {
         id: `alt-rat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: 'info',
-        targetRole: 'all',
+        targetRole: 'taller',
+        targetRoles: ['admin', 'taller'],
         targetWorkshopId: target.workshopId,
         title: `⭐ Calificación al Técnico ${target.mechanicName} (${data.stars}/5)`,
         message: `${target.clientName} calificó con ${data.stars} estrellas el servicio de la orden ${target.otNumber}. ${data.comment ? `Comentario: "${data.comment}"` : ''}`,
@@ -1881,7 +1909,8 @@ export function useCustomerPortal() {
           const abonoAlert: SystemAlert = {
             id: `alt-abn-gp-${Date.now()}`,
             type: 'info',
-            targetRole: 'all',
+            targetRole: 'admin',
+            targetRoles: ['admin', 'taller'],
             targetWorkshopId: targetGp.sedeId || activeBranch.id,
             title: `💰 Abono Garantía Plus ($${data.monto.toFixed(2)}) - ${profile.fullName}`,
             message: `${profile.fullName} envió comprobante de transferencia por $${data.monto.toFixed(2)} (${data.bancoOrigen || 'Banco'}). Ticket: ${targetGp.numeroTicket || 'GP-OFICIAL'}. Requiere validación.`,
@@ -1998,7 +2027,8 @@ export function useCustomerPortal() {
         const abonoAlert: SystemAlert = {
           id: `alt-abn-${Date.now()}`,
           type: 'info',
-          targetRole: 'all',
+          targetRole: 'admin',
+          targetRoles: ['admin', 'taller'],
           targetWorkshopId: target.sedeId || activeBranch.id,
           title: `💰 Abono por Transferencia ($${data.monto.toFixed(2)}) - ${profile.fullName}`,
           message: `${profile.fullName} envió comprobante de transferencia por $${data.monto.toFixed(2)} (${data.bancoOrigen || 'Banco'}). Requiere revisión y validación.`,
@@ -2105,6 +2135,7 @@ export function useCustomerPortal() {
     showToast,
     clientGarantiaPlus,
     clientGpsRecord,
+    alerts,
   };
 }
 

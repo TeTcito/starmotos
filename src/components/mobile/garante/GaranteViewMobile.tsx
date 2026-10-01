@@ -98,9 +98,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
 
   const menuItems: { id: GaranteSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'solicitudes_garante', label: 'Bandeja', icon: <Inbox className="w-4 h-4" />, badge: `${pendingRequests.length || ''}` },
-    { id: 'clientes_garante', label: 'Talleres B2B', icon: <Building2 className="w-4 h-4" /> },
+    { id: 'clientes_garante', label: 'Talleres', icon: <Building2 className="w-4 h-4" /> },
     { id: 'historial_garantias', label: 'Historial', icon: <History className="w-4 h-4" /> },
-    { id: 'reportes_garante', label: 'Reportes', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'perfil_garante', label: 'Mi Perfil', icon: <Building2 className="w-4 h-4" /> },
     {
       id: 'alertas_garante',
@@ -113,8 +112,8 @@ export const GaranteViewMobile: React.FC<Props> = ({
   const sectionTitles: Record<GaranteSection, string> = {
     solicitudes_garante: 'Bandeja de Entrada',
     clientes_garante: 'Red de Talleres & Concesionarios',
-    historial_garantias: 'Historial Dictámenes',
-    reportes_garante: 'Reportes Técnicos',
+    historial_garantias: 'Historial & Calidad',
+    reportes_garante: 'Historial & Calidad',
     perfil_garante: 'Mi Perfil',
     alertas_garante: 'Alertas & Eventos',
   };
@@ -261,14 +260,12 @@ export const GaranteViewMobile: React.FC<Props> = ({
                 warranties={warranties}
               />
             )}
-            {activeSection === 'historial_garantias' && (
+            {(activeSection === 'historial_garantias' || activeSection === 'reportes_garante') && (
               <HistorialGarantiasMobile
                 historyRequests={historyRequests}
+                profile={profile}
                 onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
               />
-            )}
-            {activeSection === 'reportes_garante' && (
-              <ReportesGaranteMobile warranties={warranties} />
             )}
             {activeSection === 'perfil_garante' && (
               <PerfilGaranteMobile profile={profile} onUpdateProfile={onUpdateProfile} />

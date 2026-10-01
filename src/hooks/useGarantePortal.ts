@@ -35,7 +35,6 @@ export const GARANTE_SECTIONS: GaranteSection[] = [
   'solicitudes_garante',
   'historial_garantias',
   'clientes_garante',
-  'reportes_garante',
   'perfil_garante',
   'alertas_garante',
 ];
@@ -43,6 +42,7 @@ export const GARANTE_SECTIONS: GaranteSection[] = [
 const getSectionFromHash = (): GaranteSection => {
   if (typeof window === 'undefined') return 'solicitudes_garante';
   const cleanHash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (cleanHash === 'reportes_garante') return 'historial_garantias';
   if (GARANTE_SECTIONS.includes(cleanHash as GaranteSection)) {
     return cleanHash as GaranteSection;
   }
@@ -220,13 +220,14 @@ export function useGarantePortal() {
       return [];
     }
     const matched = statusFiltered.filter((w) => {
-      const target = (w.targetBrand || w.garanteName || '').trim().toLowerCase();
+      const target = (w.targetBrand || '').trim().toLowerCase();
+      const garante = (w.garanteName || '').trim().toLowerCase();
       const moto = (w.motorcycleBrand || '').trim().toLowerCase();
       return brandTokens.some((bt) => {
-        if (target) {
-          return target === bt || target.includes(bt) || bt.includes(target);
-        }
-        return moto === bt || moto.includes(bt) || bt.includes(moto);
+        const matchesMoto = moto && (moto === bt || moto.includes(bt) || bt.includes(moto));
+        const matchesTarget = target && target !== 'starmotos matriz' && (target === bt || target.includes(bt) || bt.includes(target));
+        const matchesGarante = garante && garante !== 'starmotos matriz' && (garante === bt || garante.includes(bt) || bt.includes(garante));
+        return Boolean(matchesMoto || matchesTarget || matchesGarante);
       });
     });
     return matched;
@@ -286,17 +287,26 @@ export function useGarantePortal() {
       return [];
     }
     const matched = allDictaminated.filter((w) => {
-      const target = (w.targetBrand || w.garanteName || '').trim().toLowerCase();
+      const target = (w.targetBrand || '').trim().toLowerCase();
+      const garante = (w.garanteName || '').trim().toLowerCase();
       const moto = (w.motorcycleBrand || '').trim().toLowerCase();
       return brandTokens.some((bt) => {
-        if (target) {
-          return target === bt || target.includes(bt) || bt.includes(target);
-        }
-        return moto === bt || moto.includes(bt) || bt.includes(moto);
+        const matchesMoto = moto && (moto === bt || moto.includes(bt) || bt.includes(moto));
+        const matchesTarget = target && target !== 'starmotos matriz' && (target === bt || target.includes(bt) || bt.includes(target));
+        const matchesGarante = garante && garante !== 'starmotos matriz' && (garante === bt || garante.includes(bt) || bt.includes(garante));
+        return Boolean(matchesMoto || matchesTarget || matchesGarante);
       });
     });
     return matched;
   }, [warranties, dictamenes, profile]);
+
+  // Consolidado de todas las garantías pertenecientes exclusivamente a las marcas de este Garante
+  const brandWarranties = useMemo(() => {
+    const map = new Map<string, WarrantyRequest>();
+    pendingRequests.forEach((w) => map.set(w.id, w));
+    historyRequests.forEach((w) => map.set(w.id, w));
+    return Array.from(map.values());
+  }, [pendingRequests, historyRequests]);
 
   // Abrir modal de decisión
   const openDecisionModal = useCallback((warranty: WarrantyRequest, type: 'aprobar' | 'rechazar') => {
@@ -377,7 +387,7 @@ export function useGarantePortal() {
       id: `alt-gar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'garantia_aprobada',
       targetRole: 'garante',
-      targetBrand: baseTarget.motorcycleBrand,
+      targetBrand: baseTarget.targetBrand || baseTarget.motorcycleBrand,
       title: 'Dictamen Aprobado Emitido',
       message: `Has autorizado la cobertura de la solicitud #${baseTarget.requestNumber} (${baseTarget.motorcycleBrand} ${baseTarget.motorcycleModel}). Resolución: ${resText}.`,
       timestamp: 'Ahora mismo',
@@ -495,7 +505,7 @@ export function useGarantePortal() {
       id: `alt-gar-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: 'garantia_rechazada',
       targetRole: 'garante',
-      targetBrand: targetWarranty.motorcycleBrand,
+      targetBrand: targetWarranty.targetBrand || targetWarranty.motorcycleBrand,
       title: 'Dictamen de Rechazo Registrado',
       message: `Emitiste rechazo técnico para la solicitud #${targetWarranty.requestNumber} (${targetWarranty.motorcycleBrand}). Motivo: "${finalReason}".`,
       timestamp: 'Ahora mismo',
@@ -541,7 +551,8 @@ export function useGarantePortal() {
     setActiveSection,
     isSidebarOpen,
     setIsSidebarOpen,
-    warranties,
+    warranties: brandWarranties,
+    allWarranties: warranties,
     pendingRequests,
     historyRequests,
     fullAlistamientos,

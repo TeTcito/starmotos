@@ -44,7 +44,7 @@ export const TalleresGaranteMobile: React.FC<Props> = ({ workshops, warranties }
         />
       </div>
 
-      {/* Lista de Talleres B2B */}
+      {/* Lista de Talleres */}
       <div className="space-y-3">
         {filteredWorkshops.map((ws) => {
           const wsWarranties = warranties.filter(

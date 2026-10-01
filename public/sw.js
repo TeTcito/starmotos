@@ -1,4 +1,4 @@
-const CACHE_NAME = 'starmotos-v48';
+const CACHE_NAME = 'starmotos-v49';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -43,8 +43,27 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  const url = event.request.url;
+  let targetRequest = event.request;
+
+  // Reencaminar peticiones a dominios de almacenamiento antiguos de Supabase hacia el nuevo dominio activo
+  if (url.includes('djbvtgjykrkygkdhfhos.supabase.co')) {
+    const fixedUrl = url.replace(/djbvtgjykrkygkdhfhos\.supabase\.co/g, 'nphfdolcupkyvjyglgjx.supabase.co');
+    try {
+      targetRequest = new Request(fixedUrl, {
+        method: event.request.method,
+        headers: event.request.headers,
+        mode: event.request.mode,
+        credentials: event.request.credentials,
+        redirect: event.request.redirect,
+      });
+    } catch (_) {
+      targetRequest = fixedUrl;
+    }
+  }
+
   event.respondWith(
-    fetch(event.request)
+    fetch(targetRequest)
       .then((networkResponse) => {
         // Cache valid responses
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
@@ -63,6 +82,8 @@ self.addEventListener('fetch', (event) => {
           if (event.request.headers.get('accept')?.includes('text/html')) {
             return caches.match('/index.html');
           }
+          // Siempre retornar un Response válido para evitar "Failed to convert value to Response"
+          return new Response(null, { status: 404, statusText: 'Not Found' });
         });
       })
   );

@@ -38,6 +38,7 @@ import {
   TallerOrder,
   GarantiaPlusRecord,
   GpsRecord,
+  SystemAlert,
 } from '../../types/customer';
 
 interface Props {
@@ -79,6 +80,7 @@ interface Props {
     isExpired: boolean;
   };
   clientGpsRecord?: GpsRecord | null;
+  alerts?: SystemAlert[];
 }
 
 export const CustomerViewDesktop: React.FC<Props> = ({
@@ -108,6 +110,7 @@ export const CustomerViewDesktop: React.FC<Props> = ({
   onSubmitAbono,
   clientGarantiaPlus,
   clientGpsRecord,
+  alerts,
 }) => {
   const menuItems: { id: ActiveSection; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -217,6 +220,8 @@ export const CustomerViewDesktop: React.FC<Props> = ({
             {/* Botón de Notificaciones (Casos y Eventos) */}
             <NotificationsPopover
               role="cliente"
+              clientId={profile.idNumber || profile.id}
+              alerts={alerts}
               customerActiveOrder={activeOrder}
               customerWarranties={warranties}
               customerHistory={history}

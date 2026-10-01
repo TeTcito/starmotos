@@ -22,6 +22,7 @@ import {
   TallerOrder,
   GarantiaPlusRecord,
   GpsRecord,
+  SystemAlert,
 } from '../../types/customer';
 
 interface Props {
@@ -65,6 +66,7 @@ interface Props {
     isExpired: boolean;
   };
   clientGpsRecord?: GpsRecord | null;
+  alerts?: SystemAlert[];
 }
 
 export const CustomerViewMobile: React.FC<Props> = ({
@@ -96,6 +98,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
   onSubmitAbono,
   clientGarantiaPlus,
   clientGpsRecord,
+  alerts,
 }) => {
   const sectionTitles: Record<ActiveSection, string> = {
     perfil: 'Perfil del Cliente',
@@ -123,6 +126,7 @@ export const CustomerViewMobile: React.FC<Props> = ({
         warranties={warranties}
         history={history}
         onNavigateToEvents={() => setActiveSection('eventos')}
+        alerts={alerts}
       />
 
       {/* 2. Drawer Lateral Desplegable Móvil */}

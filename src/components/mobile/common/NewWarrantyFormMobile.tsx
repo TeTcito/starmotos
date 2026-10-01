@@ -27,6 +27,7 @@ import {
   Video,
   Building2,
   FileCheck2,
+  Images,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -35,6 +36,7 @@ import {
 import { getStoredFullAlistamientos, getRegisteredBrands } from '../../../data/mockMultiRoleData';
 import { compressImageBase64, compressVideoBase64 } from '../../../utils/imageCompressor';
 import { uploadWarrantyMedia } from '../../../services/mediaStorage';
+import { ModalPortal } from '../../common/ModalPortal';
 
 export const isVideoUrl = (url?: string): boolean => {
   if (!url) return false;
@@ -133,9 +135,14 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null, null, null]);
   const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
   const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
+  const [uploadingPhotoIndices, setUploadingPhotoIndices] = useState<number[]>([]);
+  const [uploadProgressText, setUploadProgressText] = useState<string>('');
+  const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
+  const [targetSlotIndex, setTargetSlotIndex] = useState<number | null>(null);
 
   const activeSlotRef = useRef<{ type: 'photo' | 'video'; index: number } | null>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const PHOTO_SLOT_GUIDES = [
@@ -238,44 +245,56 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     }
   };
 
-  // Subir fotos o videos por slot
-  const handleTriggerPhotoUpload = (index: number) => {
-    activeSlotRef.current = { type: 'photo', index };
-    if (photoInputRef.current) {
-      photoInputRef.current.value = '';
-      photoInputRef.current.click();
+  // Subir fotos: abre el modal para elegir cámara en vivo o galería/archivos
+  const handleTriggerPhotoUpload = (index: number | null = null) => {
+    setTargetSlotIndex(index);
+    activeSlotRef.current = index !== null ? { type: 'photo', index } : null;
+    setShowPhotoSourceModal(true);
+  };
+
+  const handleChooseCamera = () => {
+    setShowPhotoSourceModal(false);
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
     }
   };
 
-  const handleTriggerVideoUpload = (index: number) => {
-    activeSlotRef.current = { type: 'video', index };
-    if (videoInputRef.current) {
-      videoInputRef.current.value = '';
-      videoInputRef.current.click();
+  const handleChooseGallery = () => {
+    setShowPhotoSourceModal(false);
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = '';
+      galleryInputRef.current.click();
     }
   };
 
-  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    const active = activeSlotRef.current;
-    if (!file || !active || active.type !== 'photo') return;
-    setUploadingSlot({ type: 'photo', index: active.index });
+    if (!file) return;
+
+    let targetIdx = targetSlotIndex;
+    if (targetIdx === null || targetIdx < 0) {
+      const firstEmpty = photoSlots.findIndex((s) => s === null);
+      targetIdx = firstEmpty >= 0 ? firstEmpty : 0;
+    }
+
+    setUploadingPhotoIndices((prev) => Array.from(new Set([...prev, targetIdx!])));
     try {
       const compressed = await compressImageBase64(file);
       if (compressed) {
         setPhotoSlots((prev) => {
           const next = [...prev];
-          next[active.index] = compressed;
+          next[targetIdx!] = compressed;
           return next;
         });
 
-        // Subida asíncrona a Supabase Storage bucket warranty-media
-        uploadWarrantyMedia(compressed, `foto_movil_${active.index + 1}`)
+        // Subida en segundo plano a Supabase Storage
+        uploadWarrantyMedia(compressed, `foto_movil_${targetIdx! + 1}`)
           .then((cloudUrl) => {
             if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
               setPhotoSlots((prev) => {
                 const next = [...prev];
-                next[active.index] = cloudUrl;
+                next[targetIdx!] = cloudUrl;
                 return next;
               });
             }
@@ -286,8 +305,102 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       console.error('Error al comprimir foto:', err);
       alert('Error al comprimir la fotografía.');
     } finally {
-      setUploadingSlot(null);
+      setUploadingPhotoIndices((prev) => prev.filter((i) => i !== targetIdx));
       e.target.value = '';
+    }
+  };
+
+  const handleGalleryFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
+
+    // Filtrar exclusivamente imágenes
+    const imageFiles = rawFiles.filter((f) => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      alert('Por favor seleccione archivos de imagen válidos (JPG, PNG, WEBP).');
+      e.target.value = '';
+      return;
+    }
+
+    // Permitir hasta 7 imágenes como máximo
+    const filesToUpload = imageFiles.slice(0, 7);
+    if (imageFiles.length > 7) {
+      alert('Se seleccionaron más de 7 imágenes. Se procesarán las primeras 7 fotos como evidencia técnica.');
+    }
+
+    // Calcular slots de destino
+    let targetIndices: number[] = [];
+    let startIdx = targetSlotIndex;
+
+    if (filesToUpload.length === 1 && startIdx !== null) {
+      targetIndices = [startIdx];
+    } else {
+      if (startIdx === null) {
+        const firstEmpty = photoSlots.findIndex((s) => s === null);
+        startIdx = firstEmpty >= 0 ? firstEmpty : 0;
+      }
+      if (startIdx + filesToUpload.length > 7) {
+        startIdx = Math.max(0, 7 - filesToUpload.length);
+      }
+      for (let k = 0; k < filesToUpload.length && (startIdx + k) < 7; k++) {
+        targetIndices.push(startIdx + k);
+      }
+    }
+
+    // Marcar slots afectados como subiendo
+    setUploadingPhotoIndices((prev) => Array.from(new Set([...prev, ...targetIndices])));
+    setUploadProgressText(`Optimizando y subiendo ${filesToUpload.length} foto(s) simultáneamente...`);
+
+    try {
+      // Subir y optimizar todas las fotos al mismo instante con Promise.all
+      await Promise.all(
+        filesToUpload.map(async (file, idx) => {
+          const slotIdx = targetIndices[idx];
+          if (slotIdx === undefined) return;
+          try {
+            // 1. Comprimir y convertir a WebP ligero
+            const compressed = await compressImageBase64(file);
+            if (compressed) {
+              setPhotoSlots((prev) => {
+                const next = [...prev];
+                next[slotIdx] = compressed;
+                return next;
+              });
+
+              // 2. Subida concurrente a Supabase Storage
+              try {
+                const cloudUrl = await uploadWarrantyMedia(compressed, `foto_movil_${slotIdx + 1}`);
+                if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
+                  setPhotoSlots((prev) => {
+                    const next = [...prev];
+                    next[slotIdx] = cloudUrl;
+                    return next;
+                  });
+                }
+              } catch (upErr) {
+                console.warn(`Subida en segundo plano para slot ${slotIdx + 1}:`, upErr);
+              }
+            }
+          } catch (err) {
+            console.error(`Error al procesar foto ${idx + 1}:`, err);
+          } finally {
+            setUploadingPhotoIndices((prev) => prev.filter((i) => i !== slotIdx));
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Error durante la carga concurrente de fotos:', err);
+    } finally {
+      setUploadProgressText('');
+      e.target.value = '';
+    }
+  };
+
+  const handleTriggerVideoUpload = (index: number) => {
+    activeSlotRef.current = { type: 'video', index };
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+      videoInputRef.current.click();
     }
   };
 
@@ -381,8 +494,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   const handleFormSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    if (uploadingSlot !== null) {
-      alert('Por favor espere a que termine de cargarse el archivo seleccionado antes de emitir la solicitud.');
+    if (uploadingPhotoIndices.length > 0 || uploadingSlot !== null) {
+      alert('Por favor espere a que terminen de cargarse y optimizarse las fotografías o videos antes de emitir la solicitud.');
       return;
     }
 
@@ -468,12 +581,23 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
 
   return (
     <div className="w-full flex flex-col min-h-0 space-y-3 -mt-1.5 animate-fade-in">
-      {/* Selector para Foto */}
+      {/* Selector para Cámara Móvil Directa */}
       <input
-        ref={photoInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
-        onChange={handlePhotoFileChange}
+        capture="environment"
+        onChange={handleCameraFileChange}
+        className="hidden"
+      />
+
+      {/* Selector para Archivos / Galería Móvil (Múltiple, hasta 7) */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleGalleryFilesChange}
         className="hidden"
       />
 
@@ -1020,18 +1144,33 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
 
           {/* Sección 1: Fotos de Peritaje */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-zinc-800 uppercase tracking-wide flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                1. Fotos de Peritaje (Hasta 7 - Opcionales)
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-xs font-black text-zinc-800 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>1. Fotos (Hasta 7)</span>
               </span>
-              <span className="text-[10px] text-zinc-400">WebP ultraligero</span>
+              <button
+                type="button"
+                onClick={() => handleTriggerPhotoUpload(null)}
+                className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 cursor-pointer transition active:scale-95 shadow-2xs shrink-0"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Subir Múltiples</span>
+              </button>
             </div>
+
+            {/* Banner de progreso al subir fotos concurrentemente */}
+            {uploadProgressText && (
+              <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold flex items-center gap-2 animate-pulse shadow-2xs">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                <span className="truncate">{uploadProgressText}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               {photoSlots.map((photo, idx) => {
                 const guide = PHOTO_SLOT_GUIDES[idx];
-                const isUploading = uploadingSlot?.type === 'photo' && uploadingSlot?.index === idx;
+                const isUploading = uploadingPhotoIndices.includes(idx);
 
                 return (
                   <div
@@ -1262,6 +1401,108 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL SELECTOR: CÁMARA O ARCHIVOS / GALERÍA DEL CELULAR                    */}
+      {/* ========================================================================= */}
+      {showPhotoSourceModal && (
+        <ModalPortal
+          isOpen={showPhotoSourceModal}
+          onClose={() => setShowPhotoSourceModal(false)}
+          maxWidth="max-w-sm"
+          className="rounded-3xl border border-zinc-200 shadow-2xl p-0 overflow-hidden"
+        >
+          <div className="bg-white rounded-3xl overflow-hidden flex flex-col animate-scale-in">
+            {/* Cabecera */}
+            <div className="p-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black tracking-tight leading-tight truncate">
+                    {targetSlotIndex !== null
+                      ? `Foto #${targetSlotIndex + 1}: ${PHOTO_SLOT_GUIDES[targetSlotIndex]?.title?.replace(/Foto \d+: /, '') || 'Evidencia'}`
+                      : 'Cargar Evidencias Fotográficas'}
+                  </h3>
+                  <p className="text-[11px] text-blue-100 font-medium">
+                    Elija el origen de las fotografías
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPhotoSourceModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 text-white flex items-center justify-center transition shrink-0 ml-2 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Opciones */}
+            <div className="p-4 space-y-3">
+              {/* Opción 1: Cámara en Vivo */}
+              <button
+                type="button"
+                onClick={handleChooseCamera}
+                className="w-full text-left p-3.5 rounded-2xl border-2 border-zinc-200 hover:border-blue-500 bg-zinc-50/80 hover:bg-blue-50/50 active:bg-blue-100 transition-all flex items-center gap-3.5 group cursor-pointer active:scale-98 shadow-xs"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs sm:text-sm font-black text-zinc-900 group-hover:text-blue-700">
+                      Tomar Foto Directamente
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                      Cámara
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
+                    Abre la cámara trasera para fotografiar la falla o peritaje en vivo.
+                  </p>
+                </div>
+              </button>
+
+              {/* Opción 2: Archivos / Galería Móvil Múltiple */}
+              <button
+                type="button"
+                onClick={handleChooseGallery}
+                className="w-full text-left p-3.5 rounded-2xl border-2 border-zinc-200 hover:border-indigo-500 bg-zinc-50/80 hover:bg-indigo-50/50 active:bg-indigo-100 transition-all flex items-center gap-3.5 group cursor-pointer active:scale-98 shadow-xs"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-xs">
+                  <Images className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs sm:text-sm font-black text-zinc-900 group-hover:text-indigo-700">
+                      Elegir desde Archivos / Galería
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                      Hasta 7 fotos a la vez
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
+                    Selecciona varias imágenes de tu celular y súbelas al mismo instante.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Pie de modal */}
+            <div className="p-3 bg-zinc-50 border-t border-zinc-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPhotoSourceModal(false)}
+                className="w-full py-2.5 rounded-xl bg-zinc-200 hover:bg-zinc-300 text-zinc-800 text-xs font-bold transition active:scale-98 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}

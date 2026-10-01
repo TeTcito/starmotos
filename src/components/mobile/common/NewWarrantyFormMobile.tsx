@@ -129,8 +129,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     photos: [] as string[],
   });
 
-  // 5 slots de fotos obligatorias y 2 slots de videos obligatorios
-  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null]);
+  // 7 slots de fotos de evidencia y 2 slots de videos opcionales
+  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null, null, null]);
   const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
   const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
 
@@ -144,6 +144,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     { title: 'Foto 3: Odómetro', desc: 'Kilometraje en el tablero' },
     { title: 'Foto 4: Pieza Averiada', desc: 'Primer plano del daño' },
     { title: 'Foto 5: Complementaria', desc: 'Ángulo adicional o código' },
+    { title: 'Foto 6: Evidencia Técnica', desc: 'Detalle de ensamble o cableado' },
+    { title: 'Foto 7: Evidencia Extra', desc: 'Ángulo posterior o sello de garantía' },
   ];
 
   const VIDEO_SLOT_GUIDES = [
@@ -1002,7 +1004,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                     : 'bg-zinc-50 text-zinc-600 border-zinc-200'
                 }`}
               >
-                {photoSlots.filter(Boolean).length}/5 Fotos
+                {photoSlots.filter(Boolean).length}/7 Fotos
               </span>
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -1021,7 +1023,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-zinc-800 uppercase tracking-wide flex items-center gap-1.5">
                 <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                1. Fotos de Peritaje (Hasta 5 - Opcionales)
+                1. Fotos de Peritaje (Hasta 7 - Opcionales)
               </span>
               <span className="text-[10px] text-zinc-400">WebP ultraligero</span>
             </div>

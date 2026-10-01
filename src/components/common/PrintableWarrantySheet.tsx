@@ -23,7 +23,7 @@ const PHOTO_GUIDE_LABELS = [
   'Foto 4: Componente o Pieza Averiada',
   'Foto 5: Ángulo Complementario de Inspección',
   'Foto 6: Evidencia Técnica Adicional',
-  'Foto 7: Evidencia Técnica Adicional',
+  'Foto 7: Evidencia de Peritaje Extra',
   'Foto 8: Evidencia Técnica Adicional',
 ];
 

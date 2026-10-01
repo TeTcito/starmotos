@@ -32,6 +32,7 @@ import {
   getStoredWarranties,
   saveStoredAlerts,
   getStoredAlerts,
+  isWarrantyExpiredForTaller,
 } from '../../../data/mockMultiRoleData';
 import { WarrantyDetailViewMobile } from '../common/WarrantyDetailViewMobile';
 import { NewWarrantyFormMobile } from '../common/NewWarrantyFormMobile';
@@ -54,12 +55,14 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
   currentWorkshopId,
   onCreateRequest,
 }) => {
-  // Lista local reactiva
-  const [localWarranties, setLocalWarranties] = useState<WarrantyRequest[]>(initialWarranties);
+  // Lista local reactiva (filtrada por el temporizador de 1 mes para talleres)
+  const [localWarranties, setLocalWarranties] = useState<WarrantyRequest[]>(() =>
+    initialWarranties.filter((w) => !isWarrantyExpiredForTaller(w))
+  );
 
   // Sincronizar si cambian los props
   React.useEffect(() => {
-    setLocalWarranties(initialWarranties);
+    setLocalWarranties(initialWarranties.filter((w) => !isWarrantyExpiredForTaller(w)));
   }, [initialWarranties]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,6 +141,11 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
   // Filtrado de garantías
   const filteredWarranties = useMemo(() => {
     return localWarranties.filter((w) => {
+      // Temporizador interno: ocultar garantías con más de 1 mes (30 días) para los talleres registrados
+      if (isWarrantyExpiredForTaller(w)) {
+        return false;
+      }
+
       // Filtro por pestaña de tipo
       if (activeTypeTab !== 'all' && w.warrantyType !== activeTypeTab) {
         return false;

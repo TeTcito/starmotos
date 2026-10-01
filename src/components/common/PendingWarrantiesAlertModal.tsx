@@ -18,28 +18,12 @@ import { ModalPortal } from './ModalPortal';
 
 export const TWO_HOURS_MS = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
 
-/**
- * Obtiene la marca de tiempo (timestamp en ms) de creación de una solicitud de garantía
- */
-export function getWarrantyCreationTimestamp(w: WarrantyRequest): number {
-  if (w.createdTimestamp && typeof w.createdTimestamp === 'number' && !isNaN(w.createdTimestamp)) {
-    return w.createdTimestamp;
-  }
-  // Extraer timestamp de IDs generados con Date.now() (ej. gar-1748293847291)
-  const idMatch = w.id?.match(/(\d{13})/);
-  if (idMatch) {
-    const num = parseInt(idMatch[1], 10);
-    if (!isNaN(num) && num > 1672531199000 && num < 2524608000000) {
-      return num;
-    }
-  }
-  // Intentar parsear fecha createdAt estándar
-  if (w.createdAt) {
-    const parsed = Date.parse(w.createdAt);
-    if (!isNaN(parsed)) return parsed;
-  }
-  return 0;
-}
+import {
+  getWarrantyCreationTimestamp,
+  isWarrantyExpiredForTaller,
+} from '../../data/mockMultiRoleData';
+
+export { getWarrantyCreationTimestamp };
 
 /**
  * Determina si una solicitud de garantía está pendiente de aceptación y supera las 2 horas
@@ -294,8 +278,11 @@ export const AutoPendingWarrantiesAlert: React.FC<{
 
   const overdueWarranties = useMemo(() => {
     if (!warranties || !Array.isArray(warranties)) return [];
-    return warranties.filter(isWarrantyOverdueForAcceptance);
-  }, [warranties]);
+    return warranties.filter((w) => {
+      if (role === 'taller' && isWarrantyExpiredForTaller(w)) return false;
+      return isWarrantyOverdueForAcceptance(w);
+    });
+  }, [warranties, role]);
 
   useEffect(() => {
     if (overdueWarranties.length > 0 && Date.now() > dismissedUntil) {

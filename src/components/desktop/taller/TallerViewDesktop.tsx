@@ -441,6 +441,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 onCreateRequest={onCreateWarrantyRequest}
                 clients={clients}
                 currentWorkshop={currentWs}
+                isMatriz={isMatriz}
               />
             )}
             {activeSection === 'clientes_taller' && (

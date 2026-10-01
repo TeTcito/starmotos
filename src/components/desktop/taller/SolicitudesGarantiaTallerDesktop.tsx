@@ -15,6 +15,7 @@ import {
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
 import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
+import { isWarrantyExpiredForTaller } from '../../../data/mockMultiRoleData';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -23,6 +24,7 @@ interface Props {
   onCreateRequest: (directReq?: WarrantyRequest) => boolean;
   clients?: TallerClient[];
   currentWorkshop?: Workshop;
+  isMatriz?: boolean;
 }
 
 export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
@@ -30,6 +32,7 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
   onCreateRequest,
   clients = [],
   currentWorkshop,
+  isMatriz = false,
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'new' | 'detail'>('list');
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
@@ -38,6 +41,11 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
 
   // Filtrado reactivo de reclamos
   const filteredWarranties = warranties.filter((w) => {
+    // Si no es Matriz (taller registrado), ocultar garantías con más de 1 mes (30 días)
+    if (!isMatriz && isWarrantyExpiredForTaller(w)) {
+      return false;
+    }
+
     const sInfo = getWarrantyStatusInfo(w.status);
     const matchesStatus =
       statusFilter === 'all'

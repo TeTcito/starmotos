@@ -692,6 +692,79 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
  * Eliminación de garantías: Ahora se confirma mediante ventana emergente directa
  * sin requerir el periodo de espera de 30 días.
  */
+/**
+ * Temporizador interno de vigencia en talleres: 1 mes (30 días).
+ * Pasado este tiempo, las garantías se ocultan para los talleres registrados
+ * pero se conservan íntegras y visibles en Matriz Central.
+ */
+export const WARRANTY_TALLER_EXPIRY_DAYS = 30;
+export const WARRANTY_TALLER_EXPIRY_MS = WARRANTY_TALLER_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
+export function getWarrantyCreationTimestamp(w?: WarrantyRequest | null): number {
+  if (!w) return 0;
+  if (w.createdTimestamp && typeof w.createdTimestamp === 'number' && !isNaN(w.createdTimestamp)) {
+    return w.createdTimestamp;
+  }
+  // Extraer timestamp de IDs generados con Date.now() (ej. gar-1748293847291)
+  const idMatch = w.id?.match(/(\d{13})/);
+  if (idMatch) {
+    const num = parseInt(idMatch[1], 10);
+    if (!isNaN(num) && num > 1672531199000 && num < 2524608000000) {
+      return num;
+    }
+  }
+  if (w.createdAt) {
+    if (w.createdAt.toLowerCase().includes('hoy')) {
+      return Date.now();
+    }
+    const parsed = Date.parse(w.createdAt);
+    if (!isNaN(parsed)) return parsed;
+
+    // Parser manual para formato es-EC / es-ES tipo "24 sep. 2026" o "24/09/2026"
+    const match = w.createdAt.match(/(\d{1,2})[\s\/\-\.]+([a-záéíóú]{3,4}|\d{1,2})[\s\/\-\.]+(\d{4})/i);
+    if (match) {
+      const day = parseInt(match[1], 10);
+      const monthStr = match[2].toLowerCase().slice(0, 3);
+      const year = parseInt(match[3], 10);
+      const monthsMap: Record<string, number> = {
+        ene: 0, feb: 1, mar: 2, abr: 3, may: 4, jun: 5,
+        jul: 6, ago: 7, sep: 8, oct: 9, nov: 10, dic: 11,
+      };
+      const month = monthsMap[monthStr] !== undefined ? monthsMap[monthStr] : (parseInt(monthStr, 10) - 1);
+      if (!isNaN(month) && month >= 0 && month <= 11) {
+        return new Date(year, month, day).getTime();
+      }
+    }
+  }
+  return 0;
+}
+
+export function isWarrantyExpiredForTaller(w?: WarrantyRequest | null): boolean {
+  if (!w) return false;
+  const timestamp = getWarrantyCreationTimestamp(w);
+  if (!timestamp) return false;
+  return (Date.now() - timestamp) > WARRANTY_TALLER_EXPIRY_MS;
+}
+
+export function getWarrantyTallerExpiryInfo(w?: WarrantyRequest | null): {
+  isExpired: boolean;
+  daysRemaining: number;
+  daysElapsed: number;
+} {
+  const timestamp = getWarrantyCreationTimestamp(w);
+  if (!timestamp) {
+    return { isExpired: false, daysRemaining: WARRANTY_TALLER_EXPIRY_DAYS, daysElapsed: 0 };
+  }
+  const diffMs = Date.now() - timestamp;
+  const daysElapsed = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  const daysRemaining = Math.max(0, WARRANTY_TALLER_EXPIRY_DAYS - daysElapsed);
+  return {
+    isExpired: daysElapsed >= WARRANTY_TALLER_EXPIRY_DAYS,
+    daysRemaining,
+    daysElapsed,
+  };
+}
+
 export function canDeleteWarranty(warranty?: WarrantyRequest | null): {
   canDelete: boolean;
   reason?: string;

@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
-import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes, canDeleteWarranty } from '../../data/mockMultiRoleData';
+import { saveStoredWarranties, getStoredWarranties, saveStoredAlerts, getStoredAlerts, getStoredFullAlistamientos, getRegisteredBrands, getStoredGarantes, canDeleteWarranty, isWarrantyExpiredForTaller, getWarrantyTallerExpiryInfo } from '../../data/mockMultiRoleData';
 import { cloudSaveWarranty } from '../../services/supabaseService';
 import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
@@ -188,6 +188,25 @@ export const WarrantySquareCard: React.FC<WarrantySquareCardProps> = ({
             {warranty.resolutionType && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
                 {warranty.resolutionType === 'encargar_taller' ? '🔧 Taller' : '📦 Repuesto'}
+              </span>
+            )}
+            {viewerRole === 'admin' && isWarrantyExpiredForTaller(warranty) && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1" title="Esta garantía superó los 30 días: está oculta para los talleres registrados pero resguardada en Matriz.">
+                <Clock className="w-2.5 h-2.5 text-amber-600" />
+                Solo Matriz (&gt;30d)
+              </span>
+            )}
+            {viewerRole === 'taller' && (
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 border ${
+                  getWarrantyTallerExpiryInfo(warranty).daysRemaining <= 5
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                }`}
+                title={`Vigencia en taller: ${getWarrantyTallerExpiryInfo(warranty).daysRemaining} días restantes antes de archivarse en Matriz`}
+              >
+                <Clock className="w-2.5 h-2.5" />
+                {getWarrantyTallerExpiryInfo(warranty).daysRemaining}d
               </span>
             )}
           </div>
@@ -2498,8 +2517,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     resolutionType: undefined as 'encargar_taller' | 'envio_repuesto' | undefined,
   });
 
-  // 5 slots de fotos obligatorias y 2 slots de videos obligatorios
-  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null]);
+  // 7 slots de fotos de evidencia y 2 slots de videos opcionales
+  const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null, null, null]);
   const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
   const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
@@ -2514,6 +2533,8 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     { title: 'Foto 3: Odómetro / Tacómetro', desc: 'Foto clara del tablero digital o análogo mostrando el kilometraje.' },
     { title: 'Foto 4: Pieza Averiada', desc: 'Primer plano del componente averiado o zona del desperfecto.' },
     { title: 'Foto 5: Ángulo Complementario', desc: 'Evidencia adicional, número de serie de repuesto o vista opuesta.' },
+    { title: 'Foto 6: Evidencia Técnica Adicional', desc: 'Vista de contexto del ensamble, cableado o piezas circundantes.' },
+    { title: 'Foto 7: Evidencia de Peritaje Extra', desc: 'Detalle microscópico, factura, sello de garantía o ángulo posterior.' },
   ];
 
   const VIDEO_SLOT_GUIDES = [
@@ -3328,7 +3349,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                   : 'bg-zinc-50 text-zinc-600 border-zinc-200'
               }`}
             >
-              {photoSlots.filter(Boolean).length}/5 Fotos Adjuntas
+              {photoSlots.filter(Boolean).length}/7 Fotos Adjuntas
             </span>
             <span
               className={`px-3 py-1 rounded-lg text-xs font-bold border ${
@@ -3348,13 +3369,13 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
             <div className="flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-blue-600" />
               <h4 className="text-xs sm:text-sm font-bold text-zinc-800 uppercase tracking-wider">
-                1. Fotografías de Peritaje (Hasta 5 - Opcionales)
+                1. Fotografías de Peritaje (Hasta 7 - Opcionales)
               </h4>
             </div>
             <span className="text-[11px] text-zinc-400">Formato WebP optimizado</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3.5">
             {photoSlots.map((photo, idx) => {
               const guide = PHOTO_SLOT_GUIDES[idx];
               const isUploading = uploadingSlot?.type === 'photo' && uploadingSlot?.index === idx;

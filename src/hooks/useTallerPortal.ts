@@ -35,6 +35,7 @@ import {
   getStoredAgendamientos,
   deleteStoredAgendamiento,
   cleanExpiredAgendamientos,
+  isWarrantyExpiredForTaller,
 } from '../data/mockMultiRoleData';
 import { syncAllFromSupabase } from '../services/supabaseService';
 import { Technician, AlistamientoFullRecord, Workshop, TallerSectionMobile, AgendamientoTicket } from '../types/customer';
@@ -133,6 +134,11 @@ export function useTallerPortal() {
     const targetWsId = isMatriz ? selectedWorkshopFilter : (currentWorkshop?.id || activeWorkshopId);
     const targetWs = workshops.find((w) => w.id === targetWsId) || currentWorkshop;
     return warranties.filter((w) => {
+      // Temporizador interno: si no es Matriz (es un taller registrado), ocultar garantías con más de 1 mes (30 días)
+      if (!isMatriz && isWarrantyExpiredForTaller(w)) {
+        return false;
+      }
+
       if (w.tallerOriginId) {
         return w.tallerOriginId === targetWsId;
       }

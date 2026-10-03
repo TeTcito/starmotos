@@ -10,7 +10,7 @@ import { GpsPortal } from './GpsPortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { initSupabaseRealtime, syncAllFromSupabase } from './services/supabaseService';
 import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
-import { useSystemScheduleLock } from './utils/systemScheduleLock';
+import { useSystemScheduleLock, calculateLockStatus } from './utils/systemScheduleLock';
 import { SystemNightLockScreen } from './components/common/SystemNightLockScreen';
 
 function detectInitialRole(): UserRole {
@@ -58,6 +58,16 @@ function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const current = detectInitialRole();
+    const lockStatus = calculateLockStatus();
+    // Si el sistema está en horario de bloqueo nocturno y el rol no es admin, cerrar sesión automáticamente
+    if (lockStatus.isLocked && current !== 'admin') {
+      localStorage.removeItem(`starmotos_auth_${current}`);
+      if (localStorage.getItem('starmotos_role') === current) {
+        localStorage.removeItem('starmotos_auth');
+        localStorage.removeItem('starmotos_role');
+      }
+      return false;
+    }
     return (
       localStorage.getItem(`starmotos_auth_${current}`) === 'true' ||
       (localStorage.getItem('starmotos_auth') === 'true' && localStorage.getItem('starmotos_role') === current)
@@ -70,6 +80,12 @@ function App() {
       const detected = detectInitialRole();
       setRole(detected);
       setLoginActiveRole(detected);
+      const lockStatus = calculateLockStatus();
+      if (lockStatus.isLocked && detected !== 'admin') {
+        localStorage.removeItem(`starmotos_auth_${detected}`);
+        setIsAuthenticated(false);
+        return;
+      }
       const isAuth =
         localStorage.getItem(`starmotos_auth_${detected}`) === 'true' ||
         (localStorage.getItem('starmotos_auth') === 'true' && localStorage.getItem('starmotos_role') === detected);
@@ -106,31 +122,6 @@ function App() {
     }
   }, []);
 
-  const handleLogin = (selectedRole: UserRole) => {
-    setRole(selectedRole);
-    setLoginActiveRole(selectedRole);
-    setIsAuthenticated(true);
-    localStorage.setItem(`starmotos_auth_${selectedRole}`, 'true');
-    localStorage.setItem('starmotos_role', selectedRole);
-    localStorage.setItem('starmotos_auth', 'true');
-
-    // Sincronizar inmediatamente al iniciar sesión para cargar todos los datos de las sedes
-    syncAllFromSupabase();
-
-    // Limpiar hash o redirigir según el rol para evitar colisiones de rutas previas
-    if (selectedRole === 'admin') {
-      window.location.hash = '#talleres';
-    } else if (selectedRole === 'taller') {
-      window.location.hash = '#perfil_taller';
-    } else if (selectedRole === 'garante') {
-      window.location.hash = '#solicitudes_garante';
-    } else if (selectedRole === 'gps') {
-      window.location.hash = '#solicitudes_gps';
-    } else {
-      window.location.hash = '#eventos';
-    }
-  };
-
   const handleLogout = () => {
     const rolePaths: Record<UserRole, string> = {
       admin: '/admin/',
@@ -163,17 +154,53 @@ function App() {
   const activeAppRole = isAuthenticated ? role : loginActiveRole;
   const scheduleLock = useSystemScheduleLock();
 
+  // Si el sistema entra en bloqueo (automático a las 10:00 PM o manual) y hay una sesión abierta de rol no admin: cerrar sesión inmediatamente
+  useEffect(() => {
+    if (scheduleLock.isLocked && isAuthenticated && role !== 'admin') {
+      try {
+        sessionStorage.setItem('starmotos_night_lock_kicked', 'true');
+      } catch (_) {}
+      handleLogout();
+    }
+  }, [scheduleLock.isLocked, isAuthenticated, role]);
+
+  const handleLogin = (selectedRole: UserRole) => {
+    // Si el sistema está bloqueado y no es admin, impedir inicio de sesión
+    if (scheduleLock.isLocked && selectedRole !== 'admin') {
+      alert('Acceso cerrado: Las sedes y demás roles se encuentran bloqueados por horario nocturno (10:00 PM a 07:00 AM). Solo la administración central puede ingresar.');
+      return;
+    }
+
+    setRole(selectedRole);
+    setLoginActiveRole(selectedRole);
+    setIsAuthenticated(true);
+    localStorage.setItem(`starmotos_auth_${selectedRole}`, 'true');
+    localStorage.setItem('starmotos_role', selectedRole);
+    localStorage.setItem('starmotos_auth', 'true');
+
+    // Sincronizar inmediatamente al iniciar sesión para cargar todos los datos de las sedes
+    syncAllFromSupabase();
+
+    // Limpiar hash o redirigir según el rol para evitar colisiones de rutas previas
+    if (selectedRole === 'admin') {
+      window.location.hash = '#talleres';
+    } else if (selectedRole === 'taller') {
+      window.location.hash = '#perfil_taller';
+    } else if (selectedRole === 'garante') {
+      window.location.hash = '#solicitudes_garante';
+    } else if (selectedRole === 'gps') {
+      window.location.hash = '#solicitudes_gps';
+    } else {
+      window.location.hash = '#eventos';
+    }
+  };
+
   return (
     <>
-      {!isAuthenticated ? (
+      {!isAuthenticated || (scheduleLock.isLocked && role !== 'admin') ? (
         <LoginView
           onLoginSuccess={handleLogin}
           onRoleActiveChange={setLoginActiveRole}
-        />
-      ) : scheduleLock.isLocked && role !== 'admin' ? (
-        <SystemNightLockScreen
-          currentRole={role}
-          onLogout={handleLogout}
         />
       ) : (
         <>

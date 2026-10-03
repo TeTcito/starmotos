@@ -9,7 +9,7 @@ import { GpsLoginView } from './login/GpsLoginView';
 import { OFFICIAL_CORPORATE_ACCOUNTS, CorporateAccount } from '../data/authAccounts';
 import { updateWebManifestForRole } from './PWAInstallPrompt';
 import { useSystemScheduleLock } from '../utils/systemScheduleLock';
-import { Moon, Lock, ShieldCheck, Clock } from 'lucide-react';
+import { Moon, Lock, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
 
 export { OFFICIAL_CORPORATE_ACCOUNTS };
 export type { CorporateAccount };
@@ -166,6 +166,18 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
                   Solo el personal de <strong>Administración Central</strong> está habilitado para ingresar.
                 </p>
               </div>
+
+              {typeof window !== 'undefined' && sessionStorage.getItem('starmotos_night_lock_kicked') === 'true' && (
+                <div className="p-3 rounded-2xl bg-rose-950/80 border border-rose-600/50 text-rose-200 text-xs flex items-start gap-2.5 text-left animate-fade-in shadow-inner">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block text-rose-100">Sesión Cerrada Automáticamente</span>
+                    <span className="text-[11px] text-rose-200/90 leading-tight">
+                      Tu sesión fue cerrada porque el sistema entró en horario nocturno (10:00 PM a 07:00 AM). Las sedes están bloqueadas hasta las 07:00 AM.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <button
                 type="button"

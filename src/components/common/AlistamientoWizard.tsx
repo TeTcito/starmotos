@@ -9,6 +9,7 @@ import {
   Camera,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   X,
   UserCheck,
   Building2,
@@ -89,6 +90,16 @@ export const isPdiOnlyRecord = (record: AlistamientoFullRecord | AlistamientoFor
   const hasOtherPaidServices = services.some((s) => s === 'mantenimiento' || s === 'engrasado');
   if (hasPdi && !hasOtherPaidServices) return true;
   return Number(record.valorServicio || 0) === 0 && Number(record.montoPagado || 0) === 0 && hasPdi;
+};
+
+export const isDebtorRecord = (record: AlistamientoFullRecord | AlistamientoFormData): boolean => {
+  if (!record) return false;
+  if (isPdiOnlyRecord(record)) return false;
+  const valor = Number(record.valorServicio) || 0;
+  const pagado = record.abono !== undefined && record.abono !== '' ? Number(record.abono) : (Number(record.montoPagado) || 0);
+  const pendiente = record.saldoPendiente !== undefined && record.saldoPendiente !== '' ? Number(record.saldoPendiente) : Math.max(0, valor - pagado);
+  const isCred = record.metodoPago === 'Crédito' || record.metodoPago === 'Crédito Directo' || Boolean(record.esCredito);
+  return pendiente > 0.01 || (isCred && valor > 0 && pendiente > 0);
 };
 
 export const matchRecordToWorkshop = (
@@ -353,6 +364,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     'recientes' | 'antiguos' | 'hoy' | 'por_semana' | 'por_mes' | 'por_ano' | 'cliente_asc' | 'cliente_desc' | 'modelo_asc' | 'modelo_desc' | 'mayor_valor' | 'mayor_saldo'
   >('recientes');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+  const [debtorSummaryRecord, setDebtorSummaryRecord] = useState<AlistamientoFullRecord | null>(null);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -635,12 +648,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
     evidenciaTransferencia: string;
     numeroFactura: string;
     esSuma: boolean;
+    fechaPagoPendiente: string;
   }>({
     montoAbono: '',
     metodoPago: 'Efectivo',
     evidenciaTransferencia: '',
     numeroFactura: '',
     esSuma: true,
+    fechaPagoPendiente: '',
   });
 
   const [rejectingAbono, setRejectingAbono] = useState<boolean>(false);
@@ -659,6 +674,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       evidenciaTransferencia: record.evidenciaTransferencia || record.comprobantePagoUrl || '',
       numeroFactura: record.numeroFactura || '',
       esSuma: true,
+      fechaPagoPendiente: record.fechaPagoPendiente || '',
     });
   };
 
@@ -703,6 +719,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       abono: nuevoTotalPagado,
       montoPagado: nuevoTotalPagado,
       saldoPendiente: nuevoSaldo,
+      fechaPagoPendiente: nuevoSaldo > 0.01 ? (abonoFormData.fechaPagoPendiente || abonoModalRecord.fechaPagoPendiente || '') : '',
       metodoPago: abonoFormData.metodoPago,
       esCredito: abonoFormData.metodoPago === 'Crédito' ? true : (!isPaidInFull && Boolean(abonoModalRecord.esCredito)),
       evidenciaTransferencia: abonoFormData.evidenciaTransferencia || abonoModalRecord.evidenciaTransferencia,
@@ -976,6 +993,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
     let countPdi = 0;
     let countMantenimiento = 0;
     let countConSaldo = 0;
+    let totalComision = 0;
+    let totalComisionCobrada = 0;
+    let totalComisionPendiente = 0;
 
     baseRecords.forEach((r) => {
       const isPdi = isPdiOnlyRecord(r);
@@ -988,6 +1008,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
       totalFacturado += valor;
       totalRecaudado += pagado;
       totalPendiente += pendiente;
+
+      // Comisiones de la sede hacia Matriz StarMotos
+      const comTotal = Number(r.comisionTotal) || 0;
+      const comAbono = r.comisionAbono !== undefined ? Number(r.comisionAbono) : (r.comisionTotal !== undefined ? Number(r.comisionTotal) : 0);
+      const comPend = r.comisionPendiente !== undefined ? Number(r.comisionPendiente) : Math.max(0, comTotal - comAbono);
+      totalComision += comTotal;
+      totalComisionCobrada += comAbono;
+      totalComisionPendiente += comPend;
 
       if (pendiente > 0.01) countConSaldo++;
       if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
@@ -1002,6 +1030,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
       countMantenimiento,
       countConSaldo,
       totalOperaciones: baseRecords.length,
+      totalComision,
+      totalComisionCobrada,
+      totalComisionPendiente,
     };
   }, [baseRecords]);
 
@@ -1040,8 +1071,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
       return true;
     });
 
-    // 5. Ordenamiento
+    // 5. Ordenamiento: Clientes deudores SIEMPRE primero en las tablas
     return [...afterPayment].sort((a, b) => {
+      const isDeudorA = isDebtorRecord(a);
+      const isDeudorB = isDebtorRecord(b);
+      if (isDeudorA && !isDeudorB) return -1;
+      if (!isDeudorA && isDeudorB) return 1;
+
       if (sortBy === 'recientes' || sortBy === 'hoy' || sortBy === 'por_semana' || sortBy === 'por_mes' || sortBy === 'por_ano') {
         const timeA = getRecordTimestamp(a);
         const timeB = getRecordTimestamp(b);
@@ -1648,6 +1684,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
       proximoMantenimientoKm: Number(detailFormData.proximoMantenimientoKm) || 0,
       year: detailFormData.year !== undefined && detailFormData.year !== '' ? Number(detailFormData.year) : undefined,
       mesesCredito: Number(detailFormData.mesesCredito) || 3,
+      comisionTotal: detailFormData.comisionTotal !== undefined && (detailFormData.comisionTotal as any) !== '' ? Number(detailFormData.comisionTotal) : undefined,
+      comisionAbono: detailFormData.comisionAbono !== undefined && (detailFormData.comisionAbono as any) !== '' ? Number(detailFormData.comisionAbono) : undefined,
+      comisionPendiente: detailFormData.comisionPendiente !== undefined && (detailFormData.comisionPendiente as any) !== '' ? Number(detailFormData.comisionPendiente) : undefined,
     };
     setSelectedRecordForDetail(securedDetail);
     setDetailFormData(securedDetail);
@@ -1871,6 +1910,10 @@ export const AlistamientoWizard: React.FC<Props> = ({
           : `[Cubierto 100% por Garantía Plus - Vence: ${garantiaPlusStatus.record?.fechaVencimiento || 'Vigente'}]`)
       : formData.observaciones;
 
+    const numComisionTotal = isPdiOnly ? 0 : (Number(formData.comisionTotal) || 0);
+    const numComisionAbono = isPdiOnly ? 0 : (Number(formData.comisionAbono) || 0);
+    const finalComisionPendiente = isPdiOnly ? 0 : Math.max(0, numComisionTotal - numComisionAbono);
+
     const fullRecord: AlistamientoFullRecord = {
       ...formData,
       kilometraje: Number(formData.kilometraje) || 0,
@@ -1883,6 +1926,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
       montoPagado: finalAbono,
       abono: finalAbono,
       saldoPendiente: finalSaldo,
+      fechaPagoPendiente: finalSaldo > 0 ? (formData.fechaPagoPendiente || '') : '',
+      comisionTotal: numComisionTotal,
+      comisionAbono: numComisionAbono,
+      comisionPendiente: finalComisionPendiente,
+      comisionMetodoPago: isPdiOnly ? undefined : (formData.comisionMetodoPago || 'Efectivo'),
+      comisionObservaciones: isPdiOnly ? undefined : formData.comisionObservaciones,
       observaciones: finalObservaciones,
       id: `als-${Date.now()}`,
       createdAt: new Date().toLocaleString('es-EC', {
@@ -2448,7 +2497,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                           <div>
                             <label className="block text-[10px] font-bold text-blue-900 mb-0.5">Monto a Crédito ($)</label>
                             <input
@@ -2465,41 +2514,70 @@ export const AlistamientoWizard: React.FC<Props> = ({
                               <span className="text-[9px] text-amber-700 font-bold">Crédito</span>
                             </div>
                           </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-rose-900 mb-0.5 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-rose-600" /> Próximo Pago *
+                            </label>
+                            <input
+                              type="date"
+                              value={detailFormData.fechaPagoPendiente || ''}
+                              onChange={(e) => setDetailFormData({ ...detailFormData, fechaPagoPendiente: e.target.value })}
+                              className="w-full px-2 py-1 bg-white border border-rose-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
+                            />
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-100">
-                        <div>
-                          <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">Abono ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado ?? '')}
-                            onFocus={selectOnFocus}
-                            onChange={(e) => {
-                              const clean = cleanNumberInput(e.target.value);
-                              const abVal = clean === '' ? 0 : parseFloat(clean);
-                              const valServ = Number(detailFormData.valorServicio || 0);
-                              setDetailFormData({
-                                ...detailFormData,
-                                abono: clean,
-                                montoPagado: clean,
-                                saldoPendiente: Math.max(0, valServ - abVal),
-                              });
-                            }}
-                            placeholder="0.00"
-                            className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente ($)</label>
-                          <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between">
-                            <span>
-                              ${Number(detailFormData.saldoPendiente ?? Math.max(0, Number(detailFormData.valorServicio || 0) - Number(detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
-                            </span>
-                            <span className="text-[9px] text-amber-700">Saldo</span>
+                      <div className="space-y-2 pt-1 border-t border-zinc-100">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">Abono ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={detailFormData.abono !== undefined && detailFormData.abono !== '' ? detailFormData.abono : (detailFormData.montoPagado ?? '')}
+                              onFocus={selectOnFocus}
+                              onChange={(e) => {
+                                const clean = cleanNumberInput(e.target.value);
+                                const abVal = clean === '' ? 0 : parseFloat(clean);
+                                const valServ = Number(detailFormData.valorServicio || 0);
+                                setDetailFormData({
+                                  ...detailFormData,
+                                  abono: clean,
+                                  montoPagado: clean,
+                                  saldoPendiente: Math.max(0, valServ - abVal),
+                                });
+                              }}
+                              placeholder="0.00"
+                              className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Pendiente ($)</label>
+                            <div className="px-2 py-1 bg-amber-50 border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-900 flex justify-between">
+                              <span>
+                                ${Number(detailFormData.saldoPendiente ?? Math.max(0, Number(detailFormData.valorServicio || 0) - Number(detailFormData.abono ?? detailFormData.montoPagado ?? 0))).toFixed(2)}
+                              </span>
+                              <span className="text-[9px] text-amber-700">Saldo</span>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Si queda pendiente con abono, mostrar campo para poner cuándo va a pagar */}
+                        {Number(detailFormData.saldoPendiente ?? Math.max(0, Number(detailFormData.valorServicio || 0) - Number(detailFormData.abono ?? detailFormData.montoPagado ?? 0))) > 0.01 && (
+                          <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg animate-fade-in">
+                            <label className="block text-[10px] font-bold text-rose-900 mb-0.5 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-rose-600" />
+                              ¿Cuándo va a pagar el saldo pendiente? *
+                            </label>
+                            <input
+                              type="date"
+                              value={detailFormData.fechaPagoPendiente || ''}
+                              onChange={(e) => setDetailFormData({ ...detailFormData, fechaPagoPendiente: e.target.value })}
+                              className="w-full px-2 py-1 bg-white border border-rose-300 rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -2565,6 +2643,100 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Bloque de Comisión del Taller a la Matriz StarMotos (Excluido en PDI) */}
+                {!(detailFormData.serviciosRealizados && detailFormData.serviciosRealizados.length === 1 && detailFormData.serviciosRealizados[0] === 'alistamiento_pdi') && (
+                  <div className="p-3 bg-gradient-to-r from-amber-50/80 via-orange-50/50 to-amber-50/80 border border-amber-300 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-amber-200/60">
+                      <div className="flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="text-[11px] font-black uppercase text-amber-950 tracking-wide">
+                          Comisión a Matriz StarMotos (Taller ➜ Matriz)
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">
+                        Sede / Franquicia
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-900 mb-0.5">
+                          Comisión Total ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={detailFormData.comisionTotal ?? ''}
+                          placeholder="0.00"
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const val = cleanNumberInput(e.target.value);
+                            const numTotal = val === '' ? 0 : parseFloat(val);
+                            const numAbono = Number(detailFormData.comisionAbono) || 0;
+                            setDetailFormData({
+                              ...detailFormData,
+                              comisionTotal: val as any,
+                              comisionPendiente: Math.max(0, numTotal - numAbono),
+                            });
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-amber-300 rounded-lg text-xs font-mono font-bold text-amber-950 outline-none focus:border-amber-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-900 mb-0.5">
+                          Método Pago Matriz
+                        </label>
+                        <select
+                          value={detailFormData.comisionMetodoPago || 'Efectivo'}
+                          onChange={(e) => setDetailFormData({ ...detailFormData, comisionMetodoPago: e.target.value })}
+                          className="w-full px-2 py-1 bg-white border border-amber-300 rounded-lg text-xs font-bold text-amber-950 outline-none focus:border-amber-600"
+                        >
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Transferencia">Transferencia</option>
+                          <option value="Crédito">Crédito</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-900 mb-0.5">
+                          Dar Ahora a Matriz ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={detailFormData.comisionAbono ?? ''}
+                          placeholder="0.00"
+                          onFocus={selectOnFocus}
+                          onChange={(e) => {
+                            const val = cleanNumberInput(e.target.value);
+                            const numAbono = val === '' ? 0 : parseFloat(val);
+                            const numTotal = Number(detailFormData.comisionTotal) || 0;
+                            setDetailFormData({
+                              ...detailFormData,
+                              comisionAbono: val as any,
+                              comisionPendiente: Math.max(0, numTotal - numAbono),
+                            });
+                          }}
+                          className="w-full px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-950 outline-none focus:border-emerald-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-rose-900 mb-0.5">
+                          Queda Pendiente ($)
+                        </label>
+                        <div className="px-2 py-1 bg-white border border-rose-300 rounded-lg text-xs font-mono font-black text-rose-700 flex justify-between items-center h-[26px]">
+                          <span>${Math.max(0, (Number(detailFormData.comisionTotal) || 0) - (Number(detailFormData.comisionAbono) || 0)).toFixed(2)}</span>
+                          <span className="text-[9px] font-sans font-bold text-rose-600 uppercase">Saldo</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2892,6 +3064,137 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
               </button>
 
+              {/* Botón Filtro por Rango de Fecha con Icono de Calendario al lado del botón Filtro */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsDateRangeOpen(!isDateRangeOpen)}
+                  className={`h-12 sm:h-13 px-3.5 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all shadow-2xs ${
+                    filterDateRange !== 'all' || customStartDate || customEndDate
+                      ? 'bg-blue-50 border-blue-400 text-blue-700'
+                      : 'bg-white border-zinc-300 hover:border-zinc-400 text-zinc-700'
+                  }`}
+                  title="Filtro por rango de fecha con calendario"
+                >
+                  <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="hidden sm:inline">
+                    {filterDateRange === 'today'
+                      ? 'Hoy'
+                      : filterDateRange === 'this_week'
+                      ? 'Esta semana'
+                      : filterDateRange === 'this_month'
+                      ? 'Este mes'
+                      : customStartDate && customEndDate
+                      ? `${customStartDate} al ${customEndDate}`
+                      : customStartDate
+                      ? `Desde ${customStartDate}`
+                      : 'Rango de Fecha'}
+                  </span>
+                  <span className="sm:hidden">Fechas</span>
+                  {(filterDateRange !== 'all' || customStartDate || customEndDate) && (
+                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                  )}
+                  <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${isDateRangeOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isDateRangeOpen && (
+                  <div className="absolute top-full mt-2 left-0 z-40 bg-white border border-zinc-200 rounded-2xl p-4 shadow-xl w-72 sm:w-80 space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+                      <div className="flex items-center gap-1.5 text-zinc-900 font-bold text-xs">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span>Filtro por Rango de Fecha</span>
+                      </div>
+                      {(filterDateRange !== 'all' || customStartDate || customEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterDateRange('all');
+                            setCustomStartDate('');
+                            setCustomEndDate('');
+                          }}
+                          className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Limpiar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Presets Rápidos */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'today', label: 'Hoy' },
+                        { id: 'this_week', label: 'Esta Semana' },
+                        { id: 'this_month', label: 'Este Mes' },
+                        { id: 'all', label: 'Todo el Historial' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setFilterDateRange(item.id as any);
+                            setCustomStartDate('');
+                            setCustomEndDate('');
+                            if (item.id === 'all') {
+                              setIsDateRangeOpen(false);
+                            }
+                          }}
+                          className={`py-1.5 px-2.5 rounded-lg text-xs font-bold border transition text-center cursor-pointer ${
+                            filterDateRange === item.id && !customStartDate && !customEndDate
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Rango Desde - Hasta */}
+                    <div className="pt-2 border-t border-zinc-100 space-y-2">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        Rango de Fechas (Desde / Hasta)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block mb-0.5">Desde:</span>
+                          <input
+                            type="date"
+                            value={customStartDate}
+                            onChange={(e) => {
+                              setCustomStartDate(e.target.value);
+                              setFilterDateRange('custom');
+                            }}
+                            className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-zinc-500 block mb-0.5">Hasta:</span>
+                          <input
+                            type="date"
+                            value={customEndDate}
+                            onChange={(e) => {
+                              setCustomEndDate(e.target.value);
+                              setFilterDateRange('custom');
+                            }}
+                            className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-semibold outline-none focus:border-blue-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsDateRangeOpen(false)}
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs cursor-pointer"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Filtro de Sede / Taller (Solo disponible para Matriz) */}
               {effectiveIsMatriz && workshops && workshops.length > 0 && (
                 <div className="h-12 sm:h-13 bg-white border border-zinc-300 rounded-xl px-3 flex items-center shrink-0 shadow-2xs">
@@ -3159,7 +3462,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
               </button>
 
-              {/* Bloque 3: Total Facturado en Servicios (Muestra todos al hacer clic) */}
+              {/* Bloque 3: Total Facturado & Operaciones (Integrados) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment('all')}
@@ -3168,10 +3471,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     ? 'bg-blue-50/90 border border-blue-300 shadow-2xs hover:bg-blue-100/70'
                     : 'bg-blue-50/50 border border-blue-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-blue-100/60'
                 }`}
-                title="Clic para ver todos los alistamientos facturados"
+                title="Clic para ver todos los alistamientos facturados y operaciones"
               >
                 <div className="flex items-center justify-between text-blue-800">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Total Facturado</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-200/80 text-blue-900 font-bold">
+                      {statsMetrics.totalOperaciones} Ops
+                    </span>
+                  </div>
                   <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700">
                     <TrendingUp className="w-3.5 h-3.5" />
                   </div>
@@ -3180,34 +3488,46 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <div className="text-lg sm:text-xl font-black font-mono text-blue-900 leading-tight">
                     ${statsMetrics.totalFacturado.toFixed(2)}
                   </div>
-                  <span className="text-[10px] font-semibold text-blue-700">Volumen total (Ver todos)</span>
+                  <span className="text-[10px] font-semibold text-blue-700 truncate block">
+                    {statsMetrics.totalOperaciones} motos ({statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mant.)
+                  </span>
                 </div>
               </button>
 
-              {/* Bloque 4: Operaciones en Taller (Muestra todas al hacer clic) */}
+              {/* Bloque 4: Comisiones a Matriz (Cobradas y Por Pagar / Pendientes) */}
               <button
                 type="button"
                 onClick={() => setFilterPayment('all')}
                 className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  filterPayment === 'all'
+                  statsMetrics.totalComisionPendiente > 0.01
                     ? 'bg-purple-50/90 border border-purple-300 shadow-2xs hover:bg-purple-100/70'
-                    : 'bg-purple-50/50 border border-purple-200 shadow-2xs opacity-85 hover:opacity-100 hover:bg-purple-100/60'
+                    : 'bg-purple-50/60 border border-purple-200 shadow-2xs hover:bg-purple-100/60'
                 }`}
-                title="Clic para ver todas las operaciones de taller"
+                title="Comisiones de sedes: Cobradas y por pagar a favor de Matriz StarMotos"
               >
                 <div className="flex items-center justify-between text-purple-800">
-                  <span className="text-[10px] font-black uppercase tracking-wider">Operaciones</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Comisiones Matriz</span>
+                    {statsMetrics.totalComisionPendiente > 0.01 && (
+                      <span className="text-[9px] font-black bg-purple-600 text-white px-1.5 py-0.2 rounded-full uppercase">
+                        Pendiente
+                      </span>
+                    )}
+                  </div>
                   <div className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-purple-700">
-                    <Wrench className="w-3.5 h-3.5" />
+                    <Building2 className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div className="mt-1">
-                  <div className="text-lg sm:text-xl font-black text-purple-900 leading-tight">
-                    {statsMetrics.totalOperaciones} <span className="text-xs font-bold text-purple-700">motos</span>
+                  <div className="text-lg sm:text-xl font-black font-mono text-purple-900 leading-tight">
+                    ${statsMetrics.totalComisionCobrada.toFixed(2)}
                   </div>
-                  <span className="text-[10px] font-semibold text-purple-700">
-                    {statsMetrics.countPdi} PDI • {statsMetrics.countMantenimiento} Mant. (Ver todas)
-                  </span>
+                  <div className="text-[10px] font-semibold text-purple-700 flex items-center justify-between gap-1">
+                    <span className="text-purple-700">Total: ${statsMetrics.totalComision.toFixed(2)}</span>
+                    <span className={statsMetrics.totalComisionPendiente > 0.01 ? 'text-amber-800 font-bold' : 'text-purple-600'}>
+                      Por pagar: ${statsMetrics.totalComisionPendiente.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </button>
             </div>
@@ -3273,11 +3593,18 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     {paginatedRecords.map((record, i) => {
                       const idx = (currentPage - 1) * RECORDS_PER_PAGE + i;
                       const orderStatus = getRecordOrderStatus(record, effectiveOrders);
+                      const isDeudor = isDebtorRecord(record);
+                      const valServ = Number(record.valorServicio) || 0;
+                      const pagado = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
+                      const saldoPendiente = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - pagado);
 
                       let rowBgClass = 'even:bg-zinc-50/40 hover:bg-blue-50/70 active:bg-blue-100/70 text-zinc-800';
                       let statusTooltip = `Haga clic en cualquier lado para abrir la ficha técnica de ${record.nombres} ${record.apellidos}`;
 
-                      if (orderStatus === 'completed') {
+                      if (isDeudor) {
+                        rowBgClass = 'bg-rose-50/90 hover:bg-rose-100/90 active:bg-rose-200/80 text-rose-950 border-l-4 border-l-rose-600 shadow-2xs';
+                        statusTooltip = `[CLIENTE DEUDOR - PENDIENTE $${saldoPendiente.toFixed(2)}] Clic para ver ficha resumida de deuda de ${record.nombres} ${record.apellidos}`;
+                      } else if (orderStatus === 'completed') {
                         rowBgClass = 'bg-emerald-50/75 hover:bg-emerald-100/80 active:bg-emerald-200/70 text-emerald-950';
                         statusTooltip = `[ORDEN ENTREGADA / COMPLETADA] Ficha técnica de ${record.nombres} ${record.apellidos}`;
                       } else if (orderStatus === 'in_progress') {
@@ -3288,20 +3615,29 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       return (
                         <tr
                           key={record.id}
-                          onClick={() => handleOpenRecordDetail(record)}
+                          onClick={() => {
+                            if (isDeudor) {
+                              setDebtorSummaryRecord(record);
+                            } else {
+                              handleOpenRecordDetail(record);
+                            }
+                          }}
                           className={`cursor-pointer transition-colors divide-x divide-zinc-200/70 select-none group ${rowBgClass}`}
                           title={statusTooltip}
                         >
                           {/* 1. # */}
                           <td className={`px-1 py-2 text-center font-mono text-[11px] ${orderStatus ? 'bg-transparent' : 'bg-zinc-50/50'}`}>
                             <div className="flex items-center justify-center gap-1">
-                              {orderStatus === 'completed' && (
+                              {isDeudor && (
+                                <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0 animate-ping" title="Cliente deudor" />
+                              )}
+                              {orderStatus === 'completed' && !isDeudor && (
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs" title="Orden entregada" />
                               )}
-                              {orderStatus === 'in_progress' && (
+                              {orderStatus === 'in_progress' && !isDeudor && (
                                 <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse shadow-2xs" title="En proceso en taller" />
                               )}
-                              <span className={orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
+                              <span className={isDeudor ? 'text-rose-700 font-bold' : orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
                                 {idx + 1}
                               </span>
                             </div>
@@ -3314,15 +3650,27 @@ export const AlistamientoWizard: React.FC<Props> = ({
                                 <span className="font-bold truncate text-xs text-zinc-900 group-hover:text-blue-600 transition-colors">
                                   {record.nombres} {record.apellidos}
                                 </span>
+                                {isDeudor && (
+                                  <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-rose-600 text-white shrink-0 uppercase tracking-wider animate-pulse" title="Cliente con saldo pendiente / deuda">
+                                    Deudor
+                                  </span>
+                                )}
                                 {record.metodoPago === 'Garantía Plus' && (
                                   <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 shrink-0 inline-flex items-center gap-0.5" title="Cliente cubierto por Garantía Plus">
                                     <Sparkles className="w-2.5 h-2.5" /> G. Plus
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
-                                C.I. {record.cedulaRuc}
-                              </span>
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="text-[10px] font-mono font-normal text-zinc-400 truncate">
+                                  C.I. {record.cedulaRuc}
+                                </span>
+                                {isDeudor && record.fechaPagoPendiente && (
+                                  <span className="text-[10px] font-bold text-rose-700 font-mono truncate" title={`Fecha de pago acordada: ${record.fechaPagoPendiente}`}>
+                                    📅 Vence: {record.fechaPagoPendiente}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
@@ -4490,11 +4838,29 @@ export const AlistamientoWizard: React.FC<Props> = ({
                             </select>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs">
-                          <span className="font-bold text-amber-900">Total Pendiente por Cobrar:</span>
-                          <span className="font-mono font-black text-amber-700 text-sm">
-                            ${Number(formData.valorServicio || 0).toFixed(2)}
-                          </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+                            <div>
+                              <span className="font-bold text-amber-900 block text-[10px] uppercase">Pendiente</span>
+                              <span className="font-mono font-black text-amber-700 text-sm">
+                                ${Number(formData.valorServicio || 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold">Crédito</span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-blue-900 mb-1 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-blue-600" />
+                              <span>Fecha Próximo Pago</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={formData.fechaPagoPendiente || ''}
+                              onChange={(e) => setFormData({ ...formData, fechaPagoPendiente: e.target.value })}
+                              className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-950 outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -4565,6 +4931,152 @@ export const AlistamientoWizard: React.FC<Props> = ({
                                 Pagado
                               </span>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Fecha para pagar el pendiente si hay saldo pendiente */}
+                        {Number(formData.saldoPendiente ?? Math.max(0, Number(formData.valorServicio || 0) - Number(formData.abono || 0))) > 0 && (
+                          <div className="col-span-2 pt-1 border-t border-emerald-100 animate-fade-in">
+                            <label className="block text-[11px] font-black uppercase text-amber-900 mb-1 flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Fecha para Pagar el Pendiente</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={formData.fechaPagoPendiente || ''}
+                              onChange={(e) => setFormData({ ...formData, fechaPagoPendiente: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ========================================================================= */}
+                    {/* BLOQUE DE COMISIÓN DE SEDE PARA MATRIZ STARMOTOS                          */}
+                    {/* (Solo en Engrasado y Mantenimiento, NO en Alistamiento PDI)               */}
+                    {/* ========================================================================= */}
+                    {!isPdiOnlyRecord(formData) && formData.serviciosRealizados?.some((s) => s === 'engrasado' || s === 'mantenimiento') && (
+                      <div className="mt-3 pt-3 border-t border-emerald-200 bg-purple-50/80 p-3 rounded-xl border border-purple-200 space-y-2.5 shadow-2xs animate-fade-in">
+                        <div className="flex items-center justify-between pb-1 border-b border-purple-200">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-4 h-4 text-purple-700" />
+                            <span className="text-xs font-black uppercase tracking-wider text-purple-950">
+                              Comisión de Sede para Matriz StarMotos
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200/80 text-purple-900">
+                            Taller ➔ Matriz
+                          </span>
+                        </div>
+
+                        {/* Fila 1: Comisión Total a Pagar y Método de Pago a Matriz */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-purple-900 mb-1">
+                              Comisión Total a Pagar ($)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.comisionTotal ?? ''}
+                              onFocus={selectOnFocus}
+                              onChange={(e) => {
+                                const clean = cleanNumberInput(e.target.value);
+                                const val = clean === '' ? 0 : parseFloat(clean);
+                                const abonoVal = formData.comisionAbono !== undefined && formData.comisionAbono !== '' ? Number(formData.comisionAbono) : val;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  comisionTotal: clean,
+                                  comisionPendiente: Math.max(0, val - abonoVal),
+                                }));
+                              }}
+                              placeholder="0.00"
+                              className="w-full px-3 py-1.5 bg-white border border-purple-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-purple-900 mb-1">
+                              Método de Pago a Matriz
+                            </label>
+                            <select
+                              value={formData.comisionMetodoPago || 'Efectivo'}
+                              onChange={(e) => setFormData({ ...formData, comisionMetodoPago: e.target.value })}
+                              className="w-full px-2.5 py-1.5 bg-white border border-purple-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                            >
+                              <option value="Efectivo">Efectivo</option>
+                              <option value="Transferencia">Transferencia</option>
+                              <option value="Crédito">Crédito / Por Liquidar</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Fila 2: Abono a Matriz y Pendiente a Pagar a Matriz */}
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-purple-100">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-[11px] font-black uppercase text-purple-900">
+                                Abono a Matriz ($)
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    comisionAbono: prev.comisionTotal ?? 0,
+                                    comisionPendiente: 0,
+                                  }));
+                                }}
+                                className="text-[10px] text-purple-700 underline font-semibold cursor-pointer"
+                              >
+                                Total
+                              </button>
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.comisionAbono ?? ''}
+                              onFocus={selectOnFocus}
+                              onChange={(e) => {
+                                const clean = cleanNumberInput(e.target.value);
+                                const abonoVal = clean === '' ? 0 : parseFloat(clean);
+                                const totalVal = Number(formData.comisionTotal || 0);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  comisionAbono: clean,
+                                  comisionPendiente: Math.max(0, totalVal - abonoVal),
+                                }));
+                              }}
+                              placeholder="0.00"
+                              className="w-full px-3 py-1.5 bg-white border border-purple-300 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black uppercase text-purple-900 mb-1">
+                              Pendiente a Matriz ($)
+                            </label>
+                            <div
+                              className={`w-full px-3 py-1.5 rounded-xl border text-sm font-mono font-bold flex items-center justify-between ${
+                                Number(formData.comisionPendiente ?? Math.max(0, Number(formData.comisionTotal || 0) - Number(formData.comisionAbono || 0))) > 0
+                                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                  : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                              }`}
+                            >
+                              <span>
+                                ${Number(formData.comisionPendiente ?? Math.max(0, Number(formData.comisionTotal || 0) - Number(formData.comisionAbono || 0))).toFixed(2)}
+                              </span>
+                              {Number(formData.comisionPendiente ?? Math.max(0, Number(formData.comisionTotal || 0) - Number(formData.comisionAbono || 0))) > 0 ? (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-sans">
+                                  Por Pagar
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-200 text-emerald-900 font-sans">
+                                  Liquidado
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -6159,6 +6671,28 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     )}
 
                     {/* N° Factura / Ticket Opcional */}
+                    {/* Fecha de Próximo Pago / Vencimiento si queda saldo */}
+                    {nuevoSaldo > 0.01 && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 animate-fade-in">
+                        <label className="block text-[11px] font-black uppercase text-rose-900 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-rose-600" />
+                            Fecha Compromiso / Próximo Pago *
+                          </span>
+                          <span className="text-[10px] text-rose-700 font-mono font-bold">
+                            Saldo: ${nuevoSaldo.toFixed(2)}
+                          </span>
+                        </label>
+                        <input
+                          type="date"
+                          value={abonoFormData.fechaPagoPendiente || ''}
+                          onChange={(e) => setAbonoFormData((prev) => ({ ...prev, fechaPagoPendiente: e.target.value }))}
+                          className="w-full px-3 py-1.5 bg-white border border-rose-300 rounded-xl text-xs font-mono font-bold text-zinc-900 outline-none focus:border-rose-600 focus:ring-2 focus:ring-rose-100"
+                        />
+                      </div>
+                    )}
+
+                    {/* N° Factura / Ticket Opcional */}
                     <div>
                       <label className="block text-[11px] font-bold text-zinc-700 mb-1">
                         N° Factura o Comprobante (Opcional)
@@ -6270,6 +6804,196 @@ export const AlistamientoWizard: React.FC<Props> = ({
               <span className="text-[11px] text-zinc-400 font-medium">
                 Se cerrará automáticamente en 4 segundos
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL EMERGENTE: CLIENTE DEUDOR (RESUMEN + FECHA DE VENCIMIENTO + X)      */}
+      {/* ========================================================================= */}
+      {debtorSummaryRecord && (
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden"
+          onClick={() => setDebtorSummaryRecord(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl border-2 border-rose-500 max-w-lg w-full p-6 relative overflow-hidden animate-zoom-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Botón cerrar X en la esquina superior derecha */}
+            <button
+              type="button"
+              onClick={() => setDebtorSummaryRecord(null)}
+              className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-zinc-500 hover:text-zinc-900 flex items-center justify-center transition-all cursor-pointer shadow-2xs border border-zinc-200"
+              title="Cerrar ventana emergente (X)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Encabezado con Icono de Alerta de Deuda */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black uppercase tracking-wider">
+                    Cliente Deudor • Saldo Pendiente
+                  </span>
+                  {debtorSummaryRecord.esCredito && (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
+                      Crédito Directo
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight leading-snug">
+                  Detalle de Cuenta por Cobrar
+                </h3>
+              </div>
+            </div>
+
+            {/* Datos Resumidos del Cliente y la Motocicleta */}
+            <div className="bg-zinc-50 rounded-2xl p-3.5 border border-zinc-200 space-y-2 mb-4 text-xs">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-zinc-500 block">Cliente:</span>
+                  <p className="font-bold text-zinc-900 text-sm">
+                    {debtorSummaryRecord.nombres} {debtorSummaryRecord.apellidos}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase text-zinc-500 block">Cédula / RUC:</span>
+                  <p className="font-mono font-bold text-zinc-800">
+                    {debtorSummaryRecord.cedulaRuc || 'S/N'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-200">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-zinc-500 block">Teléfono / Celular:</span>
+                  <p className="font-mono font-semibold text-zinc-800 flex items-center gap-1">
+                    {debtorSummaryRecord.celular1 || debtorSummaryRecord.celular2 || 'No registrado'}
+                    {(debtorSummaryRecord.celular1 || debtorSummaryRecord.celular2) && (
+                      <a
+                        href={`https://wa.me/${(debtorSummaryRecord.celular1 || debtorSummaryRecord.celular2 || '').replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-600 hover:text-emerald-700 ml-1 font-bold text-[11px]"
+                        title="Enviar WhatsApp"
+                      >
+                        (WhatsApp)
+                      </a>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-zinc-500 block">Moto / Placa:</span>
+                  <p className="font-bold text-zinc-800 truncate">
+                    {debtorSummaryRecord.modeloMarca || (debtorSummaryRecord as any).marca || 'Moto'} • {debtorSummaryRecord.placa || 'S/P'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-zinc-200 flex justify-between items-center text-[11px]">
+                <span className="text-zinc-600">
+                  <span className="font-bold">Servicio:</span> {Array.isArray(debtorSummaryRecord.serviciosRealizados) ? debtorSummaryRecord.serviciosRealizados.join(', ') : ((debtorSummaryRecord as any).tipoServicio || 'Mantenimiento')}
+                </span>
+                <span className="text-zinc-500 font-medium">
+                  {debtorSummaryRecord.sede || (debtorSummaryRecord as any).tallerNombre || 'Sede'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bloque Financiero y Fecha de Vencimiento */}
+            <div className="bg-rose-50/80 rounded-2xl p-4 border border-rose-200 space-y-3 mb-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white p-2 rounded-xl border border-rose-100">
+                  <span className="text-[9px] font-bold uppercase text-zinc-500 block">Total Servicio</span>
+                  <span className="text-xs font-bold font-mono text-zinc-900">
+                    ${Number(debtorSummaryRecord.valorServicio || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                  <span className="text-[9px] font-bold uppercase text-emerald-700 block">Abonado</span>
+                  <span className="text-xs font-bold font-mono text-emerald-700">
+                    ${Number(debtorSummaryRecord.abono ?? debtorSummaryRecord.montoPagado ?? 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-rose-600 text-white p-2 rounded-xl shadow-xs">
+                  <span className="text-[9px] font-black uppercase text-rose-100 block">Saldo Deudor</span>
+                  <span className="text-sm font-black font-mono">
+                    ${Number(debtorSummaryRecord.saldoPendiente || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fecha de Vencimiento Prominente */}
+              <div className="p-3 bg-white rounded-xl border-2 border-rose-300 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-rose-950 block">
+                      Fecha de Vencimiento / Compromiso de Pago:
+                    </span>
+                    <span className="text-xs font-black text-rose-700 font-mono">
+                      {debtorSummaryRecord.fechaPagoPendiente
+                        ? debtorSummaryRecord.fechaPagoPendiente
+                        : 'No definida por el cliente/taller'}
+                    </span>
+                  </div>
+                </div>
+                {debtorSummaryRecord.fechaPagoPendiente && (() => {
+                  const today = getLocalDateStr();
+                  const isOverdue = debtorSummaryRecord.fechaPagoPendiente < today;
+                  const isDueToday = debtorSummaryRecord.fechaPagoPendiente === today;
+                  return (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                      isOverdue ? 'bg-red-600 text-white animate-pulse' : isDueToday ? 'bg-amber-500 text-white' : 'bg-blue-100 text-blue-900'
+                    }`}>
+                      {isOverdue ? '¡Vencido!' : isDueToday ? 'Vence Hoy' : 'Por Vencer'}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDebtorSummaryRecord(null)}
+                className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs cursor-pointer transition"
+              >
+                Cerrar (X)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const rec = debtorSummaryRecord;
+                  setDebtorSummaryRecord(null);
+                  handleOpenAbonoModal(rec);
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition"
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Cobrar Abono</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const rec = debtorSummaryRecord;
+                  setDebtorSummaryRecord(null);
+                  handleOpenRecordDetail(rec);
+                }}
+                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 transition"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Ver Ficha</span>
+              </button>
             </div>
           </div>
         </div>

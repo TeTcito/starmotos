@@ -16,7 +16,11 @@ import {
   User,
   CalendarClock,
   Radio,
+  Moon,
+  Lock,
+  Unlock,
 } from 'lucide-react';
+import { useSystemScheduleLock } from '../../../utils/systemScheduleLock';
 import {
   AdminSection,
   AdminSectionMobile,
@@ -164,6 +168,7 @@ export const AdminViewMobile: React.FC<Props> = ({
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isFloatingPendientesOpen, setIsFloatingPendientesOpen] = useState(false);
+  const scheduleLock = useSystemScheduleLock();
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSectionMobile; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -298,7 +303,68 @@ export const AdminViewMobile: React.FC<Props> = ({
               </nav>
             </div>
 
-            <div className="pt-3 border-t border-[#b8d1ea]">
+            <div className="pt-3 border-t border-[#b8d1ea] space-y-2">
+              {/* Control de Bloqueo de Horario Móvil */}
+              <div className="p-2.5 rounded-xl bg-white/80 border border-[#b8d1ea] text-xs space-y-1.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-zinc-900">
+                    <Moon className={`w-3.5 h-3.5 ${scheduleLock.isLocked ? 'text-rose-600' : 'text-blue-600'}`} />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Bloqueo Sedes</span>
+                  </div>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                      scheduleLock.isLocked
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    }`}
+                  >
+                    {scheduleLock.isLocked ? '● Bloqueado' : '● Libre'}
+                  </span>
+                </div>
+
+                <p className="text-[9px] text-zinc-600 leading-tight">
+                  {scheduleLock.mode === 'manual_locked'
+                    ? 'Manual: Sedes bloqueadas ahora.'
+                    : scheduleLock.isNightTime
+                    ? 'Auto: Bloqueo nocturno activo (10 PM - 7 AM).'
+                    : 'Auto: Sedes libres hasta las 10:00 PM.'}
+                </p>
+
+                <div className="flex items-center gap-1 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={scheduleLock.toggleManualLock}
+                    className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1 transition-all shadow-2xs ${
+                      scheduleLock.isLocked
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-rose-600 text-white'
+                    }`}
+                  >
+                    {scheduleLock.isLocked ? (
+                      <>
+                        <Unlock className="w-3 h-3" />
+                        <span>Habilitar</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3 h-3" />
+                        <span>Bloquear Sedes</span>
+                      </>
+                    )}
+                  </button>
+
+                  {scheduleLock.mode !== 'auto' && (
+                    <button
+                      type="button"
+                      onClick={() => scheduleLock.setMode('auto')}
+                      className="py-1.5 px-2 rounded-lg bg-zinc-100 text-zinc-700 font-bold text-[10px] shadow-2xs"
+                    >
+                      Auto
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <button
                 onClick={onLogout}
                 className="w-full py-2 bg-white text-red-600 border border-zinc-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"

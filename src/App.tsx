@@ -10,6 +10,8 @@ import { GpsPortal } from './GpsPortal';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { initSupabaseRealtime, syncAllFromSupabase } from './services/supabaseService';
 import { initMobileKeyboardHelper } from './utils/mobileKeyboardHelper';
+import { useSystemScheduleLock } from './utils/systemScheduleLock';
+import { SystemNightLockScreen } from './components/common/SystemNightLockScreen';
 
 function detectInitialRole(): UserRole {
   if (typeof window === 'undefined') return 'cliente';
@@ -159,6 +161,7 @@ function App() {
   };
 
   const activeAppRole = isAuthenticated ? role : loginActiveRole;
+  const scheduleLock = useSystemScheduleLock();
 
   return (
     <>
@@ -166,6 +169,11 @@ function App() {
         <LoginView
           onLoginSuccess={handleLogin}
           onRoleActiveChange={setLoginActiveRole}
+        />
+      ) : scheduleLock.isLocked && role !== 'admin' ? (
+        <SystemNightLockScreen
+          currentRole={role}
+          onLogout={handleLogout}
         />
       ) : (
         <>

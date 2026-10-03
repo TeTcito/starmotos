@@ -495,9 +495,16 @@ export interface AlistamientoFullRecord {
   montoPagado: number;
   abono?: number;
   saldoPendiente?: number;
+  fechaPagoPendiente?: string;
   esCredito?: boolean;
   mesesCredito?: number;
   metodoPago: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Mixto' | 'Crédito' | 'Crédito Directo' | 'Garantía Plus';
+  // Bloque de comisiones del taller/sede hacia Matriz StarMotos
+  comisionTotal?: number;
+  comisionAbono?: number;
+  comisionPendiente?: number;
+  comisionMetodoPago?: 'Efectivo' | 'Transferencia' | 'Crédito' | string;
+  comisionObservaciones?: string;
   observaciones: string;
   proximoMantenimientoKm: number;
   fotos: string[];
@@ -544,13 +551,19 @@ export interface AbonoRecord {
 
 export type AlistamientoFormData = Omit<
   AlistamientoFullRecord,
-  'kilometraje' | 'valorServicio' | 'montoPagado' | 'abono' | 'saldoPendiente' | 'proximoMantenimientoKm' | 'year'
+  'kilometraje' | 'valorServicio' | 'montoPagado' | 'abono' | 'saldoPendiente' | 'proximoMantenimientoKm' | 'year' | 'comisionTotal' | 'comisionAbono' | 'comisionPendiente'
 > & {
   kilometraje: number | string;
   valorServicio: number | string;
   montoPagado: number | string;
   abono?: number | string;
   saldoPendiente?: number | string;
+  fechaPagoPendiente?: string;
+  comisionTotal?: number | string;
+  comisionAbono?: number | string;
+  comisionPendiente?: number | string;
+  comisionMetodoPago?: 'Efectivo' | 'Transferencia' | 'Crédito' | string;
+  comisionObservaciones?: string;
   proximoMantenimientoKm: number | string;
   year?: number | string;
 };

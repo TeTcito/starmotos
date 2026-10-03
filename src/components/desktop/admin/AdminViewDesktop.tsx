@@ -16,7 +16,12 @@ import {
   CalendarClock,
   Radio,
   Power,
+  Moon,
+  Lock,
+  Unlock,
+  Clock,
 } from 'lucide-react';
+import { useSystemScheduleLock } from '../../../utils/systemScheduleLock';
 import {
   AdminSection,
   Workshop,
@@ -158,6 +163,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
   const [garantiasPlusViewMode, setGarantiasPlusViewMode] = React.useState<'list' | 'form'>('list');
   const [isPrivacyLocked, setIsPrivacyLocked] = React.useState(false);
   const [isFloatingPendientesOpen, setIsFloatingPendientesOpen] = React.useState(false);
+  const scheduleLock = useSystemScheduleLock();
   const uncompletedPendientesCount = pendientes.filter((p) => !p.completed).length;
 
   const menuItems: { id: AdminSection; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -402,6 +408,71 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 <span className="truncate">StarMotos Matriz La Maná</span>
               </div>
               <p className="truncate text-zinc-600 text-[11px] mt-0.5">Jaime Roldós #1 y G. Albarracín</p>
+            </div>
+
+            {/* Control de Bloqueo de Horario (10 PM - 7 AM y Manual) */}
+            <div className="p-2.5 rounded-xl bg-white/85 border border-[#b8d1ea] text-xs space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-zinc-900">
+                  <Moon className={`w-3.5 h-3.5 ${scheduleLock.isLocked ? 'text-rose-600' : 'text-blue-600'}`} />
+                  <span className="text-[11px] font-black uppercase tracking-wider">Bloqueo Sedes</span>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                    scheduleLock.isLocked
+                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  }`}
+                >
+                  {scheduleLock.isLocked ? '● Bloqueado' : '● Libre'}
+                </span>
+              </div>
+
+              <p className="text-[10px] text-zinc-600 leading-tight">
+                {scheduleLock.mode === 'manual_locked'
+                  ? 'Manual: Sedes bloqueadas ahora.'
+                  : scheduleLock.mode === 'manual_unlocked'
+                  ? 'Manual: Sedes habilitadas temporalmente.'
+                  : scheduleLock.isNightTime
+                  ? 'Auto (10 PM - 7 AM): Solo administración.'
+                  : 'Auto activo: Sedes habilitadas hasta las 10 PM.'}
+              </p>
+
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={scheduleLock.toggleManualLock}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-[10px] flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                    scheduleLock.isLocked
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-rose-600 hover:bg-rose-700 text-white'
+                  }`}
+                  title={scheduleLock.isLocked ? 'Desbloquear o restaurar acceso a las sedes' : 'Forzar bloqueo inmediato para sedes'}
+                >
+                  {scheduleLock.isLocked ? (
+                    <>
+                      <Unlock className="w-3 h-3" />
+                      <span>Habilitar Sedes</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3 h-3" />
+                      <span>Forzar Bloqueo</span>
+                    </>
+                  )}
+                </button>
+
+                {scheduleLock.mode !== 'auto' && (
+                  <button
+                    type="button"
+                    onClick={() => scheduleLock.setMode('auto')}
+                    className="py-1.5 px-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-[10px] transition-all cursor-pointer shadow-2xs"
+                    title="Restablecer al horario automático (10:00 PM a 07:00 AM)"
+                  >
+                    Auto
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Botón de Bloqueo de Pantalla (Encendido/Apagado) */}

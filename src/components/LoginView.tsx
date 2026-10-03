@@ -8,6 +8,8 @@ import { GaranteLoginView } from './login/GaranteLoginView';
 import { GpsLoginView } from './login/GpsLoginView';
 import { OFFICIAL_CORPORATE_ACCOUNTS, CorporateAccount } from '../data/authAccounts';
 import { updateWebManifestForRole } from './PWAInstallPrompt';
+import { useSystemScheduleLock } from '../utils/systemScheduleLock';
+import { Moon, Lock, ShieldCheck, Clock } from 'lucide-react';
 
 export { OFFICIAL_CORPORATE_ACCOUNTS };
 export type { CorporateAccount };
@@ -56,6 +58,7 @@ function detectRoleFromUrl(): UserRole {
 
 export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange }) => {
   const [activeRole, setActiveRole] = useState<UserRole>(detectRoleFromUrl);
+  const scheduleLock = useSystemScheduleLock();
 
   useEffect(() => {
     onRoleActiveChange?.(activeRole);
@@ -143,24 +146,56 @@ export const LoginView: React.FC<Props> = ({ onLoginSuccess, onRoleActiveChange 
 
         {/* RENDERIZADO EXCLUSIVO E INDEPENDIENTE DEL FORMULARIO */}
         <div className="w-full flex justify-center pt-1">
-          {activeRole === 'admin' && (
+          {activeRole === 'admin' ? (
             <AdminLoginView onLoginSuccess={onLoginSuccess} />
-          )}
+          ) : scheduleLock.isLocked ? (
+            <div className="w-full max-w-sm p-6 bg-slate-950 text-white rounded-3xl border border-slate-800 text-center shadow-xl space-y-4 animate-fade-in my-auto">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                <Moon className="w-7 h-7 animate-pulse" />
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-900/60 text-blue-300 border border-blue-700/50">
+                <Clock className="w-3 h-3 text-blue-400" />
+                <span>Horario Restringido • 10 PM - 7 AM</span>
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Acceso Cerrado Fuera de Turno</h3>
+                <p className="text-xs text-zinc-300 mt-1 leading-relaxed">
+                  El sistema para sedes, garantes, GPS y clientes se desactiva automáticamente a las <strong>10:00 PM</strong> y se reactiva a las <strong>07:00 AM</strong>.
+                </p>
+                <p className="text-[11px] text-zinc-400 mt-2 font-medium">
+                  Solo el personal de <strong>Administración Central</strong> está habilitado para ingresar.
+                </p>
+              </div>
 
-          {activeRole === 'cliente' && (
-            <CustomerLoginView onLoginSuccess={onLoginSuccess} />
-          )}
-
-          {activeRole === 'taller' && (
-            <TallerLoginView onLoginSuccess={onLoginSuccess} />
-          )}
-
-          {activeRole === 'garante' && (
-            <GaranteLoginView onLoginSuccess={onLoginSuccess} />
-          )}
-
-          {activeRole === 'gps' && (
-            <GpsLoginView onLoginSuccess={onLoginSuccess} />
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('admin');
+                  try {
+                    window.history.pushState(null, '', '/admin/');
+                  } catch (_) {}
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-300" />
+                <span>Ir al Acceso de Administración</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {activeRole === 'cliente' && (
+                <CustomerLoginView onLoginSuccess={onLoginSuccess} />
+              )}
+              {activeRole === 'taller' && (
+                <TallerLoginView onLoginSuccess={onLoginSuccess} />
+              )}
+              {activeRole === 'garante' && (
+                <GaranteLoginView onLoginSuccess={onLoginSuccess} />
+              )}
+              {activeRole === 'gps' && (
+                <GpsLoginView onLoginSuccess={onLoginSuccess} />
+              )}
+            </>
           )}
         </div>
       </div>

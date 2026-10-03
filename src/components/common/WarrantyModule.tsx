@@ -1282,8 +1282,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     type="text"
                     readOnly={!isEditingMode}
                     value={currentWarranty.motorcyclePlate || ''}
-                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcyclePlate: e.target.value.toUpperCase() })}
-                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono font-bold outline-none transition-all ${
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcyclePlate: e.target.value })}
+                    onBlur={(e) => setCurrentWarranty({ ...currentWarranty, motorcyclePlate: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-sm font-mono font-bold uppercase outline-none transition-all ${
                       isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
@@ -1313,8 +1318,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   type="text"
                   readOnly={!isEditingMode}
                   value={currentWarranty.motorcycleVin || ''}
-                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleVin: e.target.value.toUpperCase() })}
-                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono outline-none transition-all ${
+                  onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleVin: e.target.value })}
+                  onBlur={(e) => setCurrentWarranty({ ...currentWarranty, motorcycleVin: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
+                  className={`w-full h-11 sm:h-12 px-4 rounded-xl text-sm font-mono uppercase outline-none transition-all ${
                     isEditingMode
                       ? 'bg-white border-2 border-blue-200 focus:border-blue-600 font-bold text-zinc-900'
                       : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
@@ -1329,8 +1339,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     type="text"
                     readOnly={!isEditingMode}
                     value={currentWarranty.motorNumber || ''}
-                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorNumber: e.target.value.toUpperCase() })}
-                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, motorNumber: e.target.value })}
+                    onBlur={(e) => setCurrentWarranty({ ...currentWarranty, motorNumber: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold uppercase outline-none transition-all ${
                       isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
@@ -1344,8 +1359,13 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                     type="text"
                     readOnly={!isEditingMode}
                     value={currentWarranty.ramvNumber || ''}
-                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, ramvNumber: e.target.value.toUpperCase() })}
-                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold outline-none transition-all ${
+                    onChange={(e) => setCurrentWarranty({ ...currentWarranty, ramvNumber: e.target.value })}
+                    onBlur={(e) => setCurrentWarranty({ ...currentWarranty, ramvNumber: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
+                    className={`w-full h-11 sm:h-12 px-3.5 rounded-xl text-xs font-mono font-bold uppercase outline-none transition-all ${
                       isEditingMode
                         ? 'bg-white border-2 border-blue-200 focus:border-blue-600 text-zinc-900'
                         : 'bg-zinc-50 border border-zinc-200 text-zinc-800 cursor-not-allowed'
@@ -2681,9 +2701,9 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     const active = activeSlotRef.current;
     if (!file || !active || active.type !== 'video') return;
 
-    const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max
+    const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB max
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      alert('El video supera el límite de 25 MB. Por favor seleccione o grabe un clip técnico breve de 15 a 20 segundos.');
+      alert('El video supera el límite de 50 MB. Por favor seleccione o grabe un clip técnico de menor tamaño.');
       e.target.value = '';
       return;
     }
@@ -2698,16 +2718,16 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         return next;
       });
 
-      // 2. Comprimir video en el cliente si es mayor a 1.5 MB para no saturar Storage
+      // 2. Optimizar video si es mayor a 1.5 MB y hasta 20 MB; si es mayor a 20 MB se sube el archivo original directamente a Storage
       let videoToUpload: File | Blob | string = file;
-      if (file.size > 1.5 * 1024 * 1024) {
+      if (file.size > 1.5 * 1024 * 1024 && file.size <= 20 * 1024 * 1024) {
         try {
-          const compressed = await compressVideoBase64(file, 640, 480, 20);
+          const compressed = await compressVideoBase64(file, 640, 480, 45);
           if (compressed && compressed.length > 50) {
             videoToUpload = compressed;
           }
         } catch (compErr) {
-          console.warn('Compresión previa de video falló, usando archivo:', compErr);
+          console.warn('Compresión previa de video falló, usando archivo original:', compErr);
         }
       }
 
@@ -2787,9 +2807,9 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         alert('Por favor arrastre un video válido (MP4, WEBM, MOV).');
         return;
       }
-      const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024;
+      const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
       if (file.size > MAX_VIDEO_SIZE_BYTES) {
-        alert('El video supera el límite de 25 MB. Por favor seleccione o grabe un clip técnico breve de 15 a 20 segundos.');
+        alert('El video supera el límite de 50 MB. Por favor seleccione o grabe un clip técnico de menor tamaño.');
         return;
       }
       setUploadingSlot({ type: 'video', index });
@@ -2802,14 +2822,14 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         });
 
         let videoToUpload: File | Blob | string = file;
-        if (file.size > 1.5 * 1024 * 1024) {
+        if (file.size > 1.5 * 1024 * 1024 && file.size <= 20 * 1024 * 1024) {
           try {
-            const compressed = await compressVideoBase64(file, 640, 480, 20);
+            const compressed = await compressVideoBase64(file, 640, 480, 45);
             if (compressed && compressed.length > 50) {
               videoToUpload = compressed;
             }
           } catch (compErr) {
-            console.warn('Compresión de video falló:', compErr);
+            console.warn('Compresión de video falló, usando archivo original:', compErr);
           }
         }
 
@@ -3194,9 +3214,14 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <input
                   type="text"
                   value={formData.motorcyclePlate}
-                  onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: PBX-8492"
-                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-zinc-900 transition-all outline-none"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold uppercase text-zinc-900 transition-all outline-none"
                 />
               </div>
               <div>
@@ -3216,9 +3241,14 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
               <input
                 type="text"
                 value={formData.motorcycleVin}
-                onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="Ej: LBBP57008PA..."
-                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
+                className="w-full h-11 sm:h-12 px-4 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono uppercase text-zinc-900 transition-all outline-none"
               />
             </div>
 
@@ -3228,9 +3258,14 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <input
                   type="text"
                   value={formData.motorNumber}
-                  onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: BJ265MR-..."
-                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono uppercase text-zinc-900 transition-all outline-none"
                 />
               </div>
               <div>
@@ -3238,9 +3273,14 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 <input
                   type="text"
                   value={formData.ramvNumber}
-                  onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: 2024-RAMV-089"
-                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono text-zinc-900 transition-all outline-none"
+                  className="w-full h-11 sm:h-12 px-3.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl text-sm font-mono uppercase text-zinc-900 transition-all outline-none"
                 />
               </div>
             </div>
@@ -3484,7 +3524,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                 2. Videos de Evidencia Dinámica (Hasta 2 - Opcionales)
               </h4>
             </div>
-            <span className="text-[11px] text-zinc-400">Compresión WebM ligera (&lt; 35s)</span>
+            <span className="text-[11px] text-zinc-500 font-medium">Máx. 50 MB por video</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

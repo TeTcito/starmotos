@@ -645,9 +645,14 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                   <input
                     type="text"
                     value={registerData.motoPlate}
-                    onChange={(e) => setRegisterData({ ...registerData, motoPlate: e.target.value.toUpperCase() })}
+                    onChange={(e) => setRegisterData({ ...registerData, motoPlate: e.target.value })}
+                    onBlur={(e) => setRegisterData({ ...registerData, motoPlate: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="Ej: PBX-1234"
-                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600 uppercase"
                   />
                 </div>
                 <div>
@@ -669,9 +674,14 @@ export const CustomerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
                     type="text"
                     required
                     value={registerData.motoVin}
-                    onChange={(e) => setRegisterData({ ...registerData, motoVin: e.target.value.toUpperCase() })}
+                    onChange={(e) => setRegisterData({ ...registerData, motoVin: e.target.value })}
+                    onBlur={(e) => setRegisterData({ ...registerData, motoVin: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="17 dígitos"
-                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono outline-none focus:border-blue-600 uppercase"
                   />
                 </div>
                 <div>

@@ -4340,7 +4340,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.placa}
-                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="Ejemplo: AB123C o EN TRÁMITE"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
@@ -4368,7 +4373,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.chasis}
-                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="Ejemplo: 3SCBP123456789012"
                     className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-300 rounded-xl text-sm font-mono font-bold uppercase outline-none focus:border-red-600 focus:bg-white"
                   />
@@ -5566,7 +5576,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.placa}
-                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
                     placeholder="Ej: KX284T"
                   />
@@ -5593,7 +5608,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.chasis}
-                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, chasis: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 rounded-lg text-xs font-mono font-bold uppercase"
                     placeholder="LBBP57008..."
                   />

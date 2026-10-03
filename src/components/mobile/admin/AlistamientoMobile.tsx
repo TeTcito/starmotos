@@ -204,9 +204,14 @@ export const AlistamientoMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={motorcycle.plate}
-                  onChange={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value })}
+                  onBlur={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="PBX-8492"
-                  className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-zinc-50 border border-zinc-300 rounded-lg"
+                  className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-zinc-50 border border-zinc-300 rounded-lg uppercase"
                 />
               </div>
 
@@ -226,9 +231,14 @@ export const AlistamientoMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={motorcycle.chassisNumber}
-                  onChange={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value.toUpperCase() })}
+                  onChange={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value })}
+                  onBlur={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="17 dígitos"
-                  className="w-full px-3 py-1.5 text-xs font-mono bg-zinc-50 border border-zinc-300 rounded-lg"
+                  className="w-full px-3 py-1.5 text-xs font-mono bg-zinc-50 border border-zinc-300 rounded-lg uppercase"
                   required
                 />
               </div>

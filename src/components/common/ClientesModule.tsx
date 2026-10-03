@@ -1248,8 +1248,15 @@ export const ClientesModule: React.FC<Props> = ({
                       type="text"
                       value={newClientData.motoPlate}
                       onChange={(e) =>
-                        setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase() })
+                        setNewClientData({ ...newClientData, motoPlate: e.target.value })
                       }
+                      onBlur={(e) =>
+                        setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase().trim() })
+                      }
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       placeholder="Ejemplo: AB123C o EN TRÁMITE"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono font-bold uppercase text-zinc-900 outline-none transition"
                     />
@@ -1281,8 +1288,15 @@ export const ClientesModule: React.FC<Props> = ({
                       type="text"
                       value={newClientData.motoVin}
                       onChange={(e) =>
-                        setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase() })
+                        setNewClientData({ ...newClientData, motoVin: e.target.value })
                       }
+                      onBlur={(e) =>
+                        setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase().trim() })
+                      }
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       placeholder="Ejemplo: 3SCBP123456789012"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono uppercase text-zinc-900 outline-none transition font-bold"
                       required
@@ -1297,8 +1311,15 @@ export const ClientesModule: React.FC<Props> = ({
                       type="text"
                       value={newClientData.motorNumber}
                       onChange={(e) =>
-                        setNewClientData({ ...newClientData, motorNumber: e.target.value.toUpperCase() })
+                        setNewClientData({ ...newClientData, motorNumber: e.target.value })
                       }
+                      onBlur={(e) =>
+                        setNewClientData({ ...newClientData, motorNumber: e.target.value.toUpperCase().trim() })
+                      }
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       placeholder="Ejemplo: 167FMM-8472910"
                       className="w-full px-3 py-2 bg-white hover:border-zinc-400 focus:bg-white border border-zinc-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl text-xs font-mono uppercase text-zinc-900 outline-none transition font-medium"
                     />
@@ -1778,8 +1799,15 @@ export const ClientesModule: React.FC<Props> = ({
                     type="text"
                     value={clientFormData.motoPlate}
                     onChange={(e) =>
-                      setClientFormData({ ...clientFormData, motoPlate: e.target.value.toUpperCase() })
+                      setClientFormData({ ...clientFormData, motoPlate: e.target.value })
                     }
+                    onBlur={(e) =>
+                      setClientFormData({ ...clientFormData, motoPlate: e.target.value.toUpperCase().trim() })
+                    }
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
                     placeholder="Ej: AB123C o SIN PLACA"
                   />
@@ -1795,8 +1823,15 @@ export const ClientesModule: React.FC<Props> = ({
                   type="text"
                   value={clientFormData.motoChasis}
                   onChange={(e) =>
-                    setClientFormData({ ...clientFormData, motoChasis: e.target.value.toUpperCase() })
+                    setClientFormData({ ...clientFormData, motoChasis: e.target.value })
                   }
+                  onBlur={(e) =>
+                    setClientFormData({ ...clientFormData, motoChasis: e.target.value.toUpperCase().trim() })
+                  }
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   required
                   className="w-full px-3 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-lg text-xs font-mono font-medium text-zinc-900 uppercase outline-none transition-all"
                   placeholder="17 dígitos de chasis o serie"

@@ -1150,7 +1150,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 type="text"
                 disabled={!isFieldEditable}
                 value={formData.motorcyclePlate}
-                onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="SIN PLACA"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />
@@ -1179,7 +1184,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
               type="text"
               disabled={!isFieldEditable}
               value={formData.motorcycleVin}
-              onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
+              onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value })}
+              onBlur={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase().trim() })}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              style={{ textTransform: 'uppercase' }}
               className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
             />
           </div>
@@ -1191,7 +1201,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 type="text"
                 disabled={!isFieldEditable}
                 value={formData.motorNumber}
-                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="S/N"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />
@@ -1202,7 +1217,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 type="text"
                 disabled={!isFieldEditable}
                 value={formData.ramvNumber}
-                onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="S/N"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase disabled:opacity-75 disabled:cursor-not-allowed"
               />

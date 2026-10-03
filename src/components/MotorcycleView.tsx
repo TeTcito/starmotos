@@ -72,7 +72,12 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
                 <input
                   type="text"
                   value={motoForm.plate}
-                  onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setMotoForm({ ...motoForm, plate: e.target.value })}
+                  onBlur={(e) => setMotoForm({ ...motoForm, plate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="PBX-8492"
                   className="w-24 text-center text-xs font-black tracking-wider bg-transparent border-none outline-none uppercase p-0 text-white"
                 />
@@ -178,7 +183,12 @@ export const MotorcycleView: React.FC<Props> = ({ motorcycle, onUpdateMotorcycle
               <input
                 type="text"
                 value={motoForm.vin}
-                onChange={(e) => setMotoForm({ ...motoForm, vin: e.target.value.toUpperCase() })}
+                onChange={(e) => setMotoForm({ ...motoForm, vin: e.target.value })}
+                onBlur={(e) => setMotoForm({ ...motoForm, vin: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="VIN (17 caracteres)"
                 className="w-full bg-zinc-900 border border-zinc-800 focus:border-blue-500 text-white rounded-xl pl-9 pr-3 py-2 text-xs font-mono uppercase"
               />

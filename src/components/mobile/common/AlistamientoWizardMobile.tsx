@@ -2125,8 +2125,15 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                         type="text"
                         value={detailFormData.placa}
                         onChange={(e) =>
-                          setDetailFormData({ ...detailFormData, placa: e.target.value.toUpperCase() })
+                          setDetailFormData({ ...detailFormData, placa: e.target.value })
                         }
+                        onBlur={(e) =>
+                          setDetailFormData({ ...detailFormData, placa: e.target.value.toUpperCase().trim() })
+                        }
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={{ textTransform: 'uppercase' }}
                         placeholder="SIN PLACA"
                         className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
                       />
@@ -2150,8 +2157,15 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       type="text"
                       value={detailFormData.chasis}
                       onChange={(e) =>
-                        setDetailFormData({ ...detailFormData, chasis: e.target.value.toUpperCase() })
+                        setDetailFormData({ ...detailFormData, chasis: e.target.value })
                       }
+                      onBlur={(e) =>
+                        setDetailFormData({ ...detailFormData, chasis: e.target.value.toUpperCase().trim() })
+                      }
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       required
                       className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
                     />
@@ -4053,7 +4067,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.placa}
-                    onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="Ejemplo: AB123C o EN TRÁMITE"
                     className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 shadow-2xs"
                   />
@@ -4103,7 +4122,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={formData.chasis}
-                  onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, chasis: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ejemplo: 3SCBP123456789012"
                   required
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-blue-600 shadow-2xs"

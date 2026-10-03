@@ -409,9 +409,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     const active = activeSlotRef.current;
     if (!file || !active || active.type !== 'video') return;
 
-    const MAX_VIDEO_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max
+    const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB max
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      alert('El video supera el límite de 25 MB. Por favor seleccione o grabe un clip técnico breve de 15 a 20 segundos.');
+      alert('El video supera el límite de 50 MB. Por favor seleccione o grabe un clip técnico de menor tamaño.');
       e.target.value = '';
       return;
     }
@@ -426,16 +426,16 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
         return next;
       });
 
-      // Comprimir video en el dispositivo móvil si supera 1.5 MB
+      // Optimizar video si supera 1.5 MB y hasta 20 MB; si es mayor a 20 MB se sube el archivo original directamente a Storage
       let videoToUpload: File | Blob | string = file;
-      if (file.size > 1.5 * 1024 * 1024) {
+      if (file.size > 1.5 * 1024 * 1024 && file.size <= 20 * 1024 * 1024) {
         try {
-          const compressed = await compressVideoBase64(file, 640, 480, 20);
+          const compressed = await compressVideoBase64(file, 640, 480, 45);
           if (compressed && compressed.length > 50) {
             videoToUpload = compressed;
           }
         } catch (compErr) {
-          console.warn('Compresión móvil de video falló:', compErr);
+          console.warn('Compresión móvil de video falló, usando archivo original:', compErr);
         }
       }
 
@@ -957,7 +957,12 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               <input
                 type="text"
                 value={formData.motorcyclePlate}
-                onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorcyclePlate: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="SIN PLACA"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
               />
@@ -985,7 +990,12 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
             <input
               type="text"
               value={formData.motorcycleVin}
-              onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase() })}
+              onChange={(e) => setFormData({ ...formData, motorcycleVin: e.target.value })}
+              onBlur={(e) => setFormData({ ...formData, motorcycleVin: e.target.value.toUpperCase().trim() })}
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              style={{ textTransform: 'uppercase' }}
               placeholder="VIN / Número de chasis"
               className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
             />
@@ -997,7 +1007,12 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               <input
                 type="text"
                 value={formData.motorNumber}
-                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="S/N"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
               />
@@ -1007,7 +1022,12 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               <input
                 type="text"
                 value={formData.ramvNumber}
-                onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, ramvNumber: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, ramvNumber: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="S/N"
                 className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-800 outline-none focus:border-blue-600 focus:bg-white uppercase"
               />
@@ -1263,7 +1283,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                 <Film className="w-3.5 h-3.5 text-purple-600" />
                 2. Videos Demostrativos (Hasta 2 - Opcionales)
               </span>
-              <span className="text-[10px] text-zinc-400">WebM ligero (&lt; 35s)</span>
+              <span className="text-[10px] text-zinc-500 font-medium">Máx. 50 MB</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

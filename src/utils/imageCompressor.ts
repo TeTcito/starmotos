@@ -95,7 +95,7 @@ export async function compressVideoBase64(
   file: File | Blob,
   maxWidth = 640,
   maxHeight = 480,
-  maxDurationSec = 35
+  maxDurationSec = 60
 ): Promise<string> {
   return new Promise((resolve) => {
     // 1. Si es menor a 1.2 MB, leer directamente sin necesidad de re-muestreo pesado

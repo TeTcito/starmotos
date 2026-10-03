@@ -972,8 +972,15 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                         type="text"
                         value={detailFormData.motoPlate}
                         onChange={(e) =>
-                          setDetailFormData({ ...detailFormData, motoPlate: e.target.value.toUpperCase() })
+                          setDetailFormData({ ...detailFormData, motoPlate: e.target.value })
                         }
+                        onBlur={(e) =>
+                          setDetailFormData({ ...detailFormData, motoPlate: e.target.value.toUpperCase().trim() })
+                        }
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={{ textTransform: 'uppercase' }}
                         placeholder="SIN PLACA"
                         className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
                       />
@@ -997,8 +1004,15 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                       type="text"
                       value={detailFormData.motoChasis}
                       onChange={(e) =>
-                        setDetailFormData({ ...detailFormData, motoChasis: e.target.value.toUpperCase() })
+                        setDetailFormData({ ...detailFormData, motoChasis: e.target.value })
                       }
+                      onBlur={(e) =>
+                        setDetailFormData({ ...detailFormData, motoChasis: e.target.value.toUpperCase().trim() })
+                      }
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       required
                       placeholder="VIN-XXXXXXXXXXXXXXX"
                       className="w-full px-2.5 py-1.5 bg-zinc-50 hover:bg-white focus:bg-white border border-zinc-300 focus:border-blue-600 rounded-lg text-xs font-mono font-bold text-zinc-900 uppercase outline-none transition-all"
@@ -1326,7 +1340,12 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={newClientData.motoPlate}
-                  onChange={(e) => setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setNewClientData({ ...newClientData, motoPlate: e.target.value })}
+                  onBlur={(e) => setNewClientData({ ...newClientData, motoPlate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ejemplo: AB123C o EN TRÁMITE"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono uppercase outline-none focus:border-blue-600"
                 />
@@ -1339,7 +1358,12 @@ export const ClientesModuleMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={newClientData.motoVin}
-                  onChange={(e) => setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase() })}
+                  onChange={(e) => setNewClientData({ ...newClientData, motoVin: e.target.value })}
+                  onBlur={(e) => setNewClientData({ ...newClientData, motoVin: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ejemplo: 3SCBP123456789012"
                   className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 rounded-xl text-xs font-mono uppercase outline-none focus:border-blue-600"
                   required

@@ -1320,7 +1320,12 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={formData.placa}
-                  onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ejemplo: AB123C o EN TRÁMITE"
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-red-600 shadow-2xs"
                 />
@@ -1334,7 +1339,12 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={formData.chasis}
-                  onChange={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, chasis: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, chasis: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: 3SCBP123456789012"
                   className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono font-bold uppercase outline-none focus:border-red-600 shadow-2xs"
                   required
@@ -1350,9 +1360,14 @@ export const GpsMatrizMobile: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.numeroMotor}
-                    onChange={(e) => setFormData({ ...formData, numeroMotor: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, numeroMotor: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, numeroMotor: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="Ej: BJ265MN-1"
-                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono text-zinc-800 outline-none focus:border-red-600 shadow-2xs"
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-xl text-xs font-mono text-zinc-800 uppercase outline-none focus:border-red-600 shadow-2xs"
                   />
                 </div>
                 <div>

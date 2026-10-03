@@ -322,7 +322,12 @@ export const AlistamientoDesktop: React.FC<Props> = ({
                 <input
                   type="text"
                   value={motorcycle.plate}
-                  onChange={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value })}
+                  onBlur={(e) => setMotorcycle({ ...motorcycle, plate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: PBX-8492 o S/P"
                   className="w-full px-3.5 py-2 text-xs font-mono font-bold text-zinc-900 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-blue-600 focus:bg-white outline-none"
                 />
@@ -335,7 +340,12 @@ export const AlistamientoDesktop: React.FC<Props> = ({
                 <input
                   type="text"
                   value={motorcycle.chassisNumber}
-                  onChange={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value.toUpperCase() })}
+                  onChange={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value })}
+                  onBlur={(e) => setMotorcycle({ ...motorcycle, chassisNumber: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: LBBP57008PA049182 (17 caracteres)"
                   className="w-full px-3.5 py-2 text-xs font-mono text-zinc-800 bg-zinc-50 border border-zinc-300 rounded-xl focus:border-blue-600 focus:bg-white outline-none"
                   required

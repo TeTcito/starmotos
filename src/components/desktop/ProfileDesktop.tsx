@@ -680,9 +680,14 @@ export const ProfileDesktop: React.FC<Props> = ({
                       <input
                         type="text"
                         value={formData.motoPlate}
-                        onChange={(e) => setFormData({ ...formData, motoPlate: e.target.value.toUpperCase() })}
+                        onChange={(e) => setFormData({ ...formData, motoPlate: e.target.value })}
+                        onBlur={(e) => setFormData({ ...formData, motoPlate: e.target.value.toUpperCase().trim() })}
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={{ textTransform: 'uppercase' }}
                         placeholder="Ej: PBX-1234"
-                        className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl pl-8 pr-2 py-2 text-xs font-mono font-bold outline-none transition"
+                        className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl pl-8 pr-2 py-2 text-xs font-mono font-bold outline-none transition uppercase"
                       />
                     ) : (
                       <div className="pl-8 pr-2 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-900 truncate">
@@ -724,9 +729,14 @@ export const ProfileDesktop: React.FC<Props> = ({
                   <input
                     type="text"
                     value={formData.motoVin}
-                    onChange={(e) => setFormData({ ...formData, motoVin: e.target.value.toUpperCase() })}
+                    onChange={(e) => setFormData({ ...formData, motoVin: e.target.value })}
+                    onBlur={(e) => setFormData({ ...formData, motoVin: e.target.value.toUpperCase().trim() })}
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ textTransform: 'uppercase' }}
                     placeholder="17 caracteres"
-                    className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-medium outline-none transition"
+                    className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-medium outline-none transition uppercase"
                   />
                 ) : (
                   <div className="px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-medium text-zinc-900 truncate">
@@ -767,9 +777,14 @@ export const ProfileDesktop: React.FC<Props> = ({
                     <input
                       type="text"
                       value={formData.motorNumber}
-                      onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
+                      onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value })}
+                      onBlur={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase().trim() })}
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ textTransform: 'uppercase' }}
                       placeholder="Grabado en motor"
-                      className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-medium outline-none transition"
+                      className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-medium outline-none transition uppercase"
                     />
                   ) : (
                     <div className="px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-medium text-zinc-900 truncate">

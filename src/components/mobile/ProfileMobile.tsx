@@ -577,9 +577,14 @@ export const ProfileMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={formData.motoPlate}
-                  onChange={(e) => setFormData({ ...formData, motoPlate: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, motoPlate: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, motoPlate: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="Ej: PBX-1234"
-                  className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold outline-none"
+                  className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold outline-none uppercase"
                 />
               ) : (
                 <div className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-bold text-zinc-900 truncate">
@@ -612,9 +617,14 @@ export const ProfileMobile: React.FC<Props> = ({
                 <input
                   type="text"
                   value={formData.motoVin}
-                  onChange={(e) => setFormData({ ...formData, motoVin: e.target.value.toUpperCase() })}
+                  onChange={(e) => setFormData({ ...formData, motoVin: e.target.value })}
+                  onBlur={(e) => setFormData({ ...formData, motoVin: e.target.value.toUpperCase().trim() })}
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ textTransform: 'uppercase' }}
                   placeholder="17 dígitos"
-                  className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-medium outline-none"
+                  className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-medium outline-none uppercase"
                 />
               ) : (
                 <div className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-medium text-zinc-900 truncate">
@@ -647,9 +657,14 @@ export const ProfileMobile: React.FC<Props> = ({
               <input
                 type="text"
                 value={formData.motorNumber}
-                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase() })}
+                onChange={(e) => setFormData({ ...formData, motorNumber: e.target.value })}
+                onBlur={(e) => setFormData({ ...formData, motorNumber: e.target.value.toUpperCase().trim() })}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ textTransform: 'uppercase' }}
                 placeholder="Número de motor grabado"
-                className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-medium outline-none"
+                className="w-full bg-white border border-zinc-300 focus:border-blue-600 text-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-mono font-medium outline-none uppercase"
               />
             ) : (
               <div className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-mono font-medium text-zinc-900 truncate">

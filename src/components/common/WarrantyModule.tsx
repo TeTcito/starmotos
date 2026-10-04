@@ -418,7 +418,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
     return currentWarranty.partsBudget as Record<string, number>;
   });
   const [laborTime, setLaborTime] = useState<string>(currentWarranty.laborTime || '1 hora');
-  const [laborCost, setLaborCost] = useState<number>(currentWarranty.laborCost !== undefined ? Number(currentWarranty.laborCost) : 0);
+  const [laborCost, setLaborCost] = useState<number | string>(currentWarranty.laborCost !== undefined ? Number(currentWarranty.laborCost) : 0);
 
   const parsedPartsList = useMemo(() => {
     if (currentWarranty.partsTags && currentWarranty.partsTags.length > 0) {
@@ -525,7 +525,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       ...currentWarranty,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotalBudget,
       estimatedCost: grandTotalBudget,
     };
@@ -619,7 +619,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           : currentWarranty.partsRequired,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotalBudget,
       estimatedCost: grandTotalBudget,
     };
@@ -655,7 +655,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           : currentWarranty.partsRequired,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotalBudget,
       estimatedCost: grandTotalBudget,
       matrizNotes: matrizInputNotes,
@@ -694,7 +694,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
           : currentWarranty.partsRequired,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotalBudget,
       estimatedCost: grandTotalBudget,
       matrizNotes: matrizInputNotes || 'Garantía aprobada directamente por Sede Matriz y Almacén Central.',
@@ -763,7 +763,7 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       partsBudget: partsBudgetMap,
       partsObservations,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotalBudget,
       estimatedCost: grandTotalBudget,
     };
@@ -1734,11 +1734,20 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                                 min="0"
                                 placeholder="0.00"
                                 value={partsBudgetMap[part] !== undefined ? partsBudgetMap[part] : ''}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
+                                  const raw = e.target.value;
+                                  const val = raw === '' ? ('' as any) : (parseFloat(raw) || 0);
                                   setPartsBudgetMap((prev) => ({
                                     ...prev,
                                     [part]: val,
+                                  }));
+                                }}
+                                onBlur={(e) => {
+                                  const num = parseFloat(e.target.value);
+                                  setPartsBudgetMap((prev) => ({
+                                    ...prev,
+                                    [part]: isNaN(num) ? 0 : num,
                                   }));
                                 }}
                                 className={`w-full h-8 pl-5 pr-2 bg-white border rounded-lg text-xs font-mono font-bold text-zinc-900 outline-none text-right ${
@@ -1851,7 +1860,15 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                         min="0"
                         placeholder="0.00"
                         value={laborCost !== undefined ? laborCost : ''}
-                        onChange={(e) => setLaborCost(parseFloat(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLaborCost(val === '' ? '' : (parseFloat(val) || 0));
+                        }}
+                        onBlur={(e) => {
+                          const num = parseFloat(e.target.value);
+                          setLaborCost(isNaN(num) ? 0 : num);
+                        }}
                         className="w-full h-10 pl-7 pr-3 bg-white border border-zinc-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm font-mono font-bold text-zinc-900 outline-none"
                       />
                     </div>
@@ -2123,8 +2140,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       {/* SECCIÓN DE DICTÁMENES Y ACCIONES POR ROL */}
 
       {/* 1. SECCIÓN DE ACCIONES PARA MATRIZ CENTRAL (ADMIN) */}
-      {viewerRole === 'admin' && statusInfo.canonical === 'en_revision' && (
-        <div className="bg-blue-50/50 border-2 border-blue-300 rounded-2xl p-5 space-y-3">
+      {viewerRole === 'admin' && statusInfo.canonical === 'en_revision' && !isLocked && (
+        <div className="bg-blue-50/50 border-2 border-blue-300 rounded-2xl p-5 space-y-3 animate-fade-in shadow-2xs">
           <div className="flex items-center gap-2 text-xs font-black uppercase text-blue-900 tracking-wider">
             <ShieldCheck className="w-4 h-4 text-blue-600" />
             <span>Dictamen y Validación Técnica en Matriz</span>
@@ -2148,8 +2165,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             />
           </div>
 
-          {showRejectBox && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+          {showRejectBox ? (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2 animate-fade-in">
               <label className="block text-[11px] font-bold text-red-800">
                 Motivo del Rechazo en Matriz:
               </label>
@@ -2160,32 +2177,37 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 placeholder="Ej. Falla causada por desgaste natural o falta de mantenimiento..."
                 className="w-full px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs text-red-900 outline-none"
               />
-              <button
-                type="button"
-                onClick={handleMatrizReject}
-                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold cursor-pointer"
-              >
-                Confirmar Denegación en Matriz
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowRejectBox(false)}
+                  className="px-3.5 py-1.5 bg-white border border-zinc-300 hover:bg-zinc-100 text-zinc-700 rounded-lg text-xs font-bold cursor-pointer transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMatrizReject}
+                  className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold cursor-pointer transition active:scale-98"
+                >
+                  Confirmar Denegación en Matriz
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            {!showRejectBox && (
+          ) : (
+            <div className="flex items-center justify-end gap-2.5 pt-2 flex-wrap">
               <button
                 type="button"
                 onClick={() => setShowRejectBox(true)}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer transition active:scale-98"
               >
                 ✕ Denegar Solicitud
               </button>
-            )}
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
               <button
                 type="button"
                 onClick={handleMatrizDirectApprove}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98 transition"
                 title="Aprobar y validar la garantía directamente en Matriz"
               >
                 <Check className="w-4 h-4" />
@@ -2195,14 +2217,33 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               <button
                 type="button"
                 onClick={handleMatrizApprove}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98 transition"
                 title="Poner en proceso y remitir al buzón de Garantía de Marca"
               >
                 <Send className="w-4 h-4" />
                 <span>Aceptar y Enviar a Garantía de Marca</span>
               </button>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* 1.1 BANNER INFORMATIVO PARA MATRIZ / TALLER CUANDO YA FUE REMITIDA A LA MARCA */}
+      {viewerRole !== 'garante' && statusInfo.canonical === 'en_proceso' && !isLocked && (
+        <div className="bg-blue-50/70 border-2 border-blue-300 rounded-2xl p-5 space-y-2 animate-fade-in shadow-2xs">
+          <div className="flex items-center gap-2 font-bold text-sm text-blue-900">
+            <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Garantía EN PROCESO - Remitida al Garante Oficial de Marca</span>
           </div>
+          <p className="text-xs text-blue-950 leading-relaxed">
+            Esta solicitud ya fue validada e inspeccionada por Sede Matriz y se encuentra remitida al Garante Oficial de la Marca (<strong>{currentWarranty.targetBrand || currentWarranty.motorcycleBrand}</strong>) para la emisión del dictamen definitivo.
+          </p>
+          {currentWarranty.matrizNotes && (
+            <div className="mt-2 p-3 bg-white/80 rounded-xl border border-blue-200 text-xs text-blue-900">
+              <span className="font-bold">Observación emitida por Matriz: </span>
+              <span>{currentWarranty.matrizNotes}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2268,8 +2309,8 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
             />
           </div>
 
-          {showRejectBox && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
+          {showRejectBox ? (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2 animate-fade-in">
               <label className="block text-[11px] font-bold text-red-800">
                 Motivo Oficial de Denegación:
               </label>
@@ -2280,26 +2321,32 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                 placeholder="Ej. Exceso de kilometraje sin sellos de mantenimiento oficiales..."
                 className="w-full px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs text-red-900 outline-none"
               />
-              <button
-                type="button"
-                onClick={handleGaranteReject}
-                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold cursor-pointer"
-              >
-                Confirmar Denegación Oficial
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowRejectBox(false)}
+                  className="px-3.5 py-1.5 bg-white border border-zinc-300 text-zinc-700 rounded-lg text-xs font-bold cursor-pointer hover:bg-zinc-100 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGaranteReject}
+                  className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold cursor-pointer transition active:scale-98 shadow-xs"
+                >
+                  Confirmar Denegación Oficial
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
-            {!showRejectBox && (
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setShowRejectBox(true)}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer"
+                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer transition active:scale-98"
               >
                 ✕ Denegar Cobertura
               </button>
-            )}
 
             <button
               type="button"
@@ -2337,8 +2384,9 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
               </span>
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* RESOLUCIONES YA SELLADAS (ACEPTADA O DENEGADA) */}
       {(statusInfo.canonical === 'aceptada' || statusInfo.canonical === 'denegada') && (

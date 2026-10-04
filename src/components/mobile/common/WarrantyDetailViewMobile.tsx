@@ -115,7 +115,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   // Auxiliares para cálculo de presupuesto oficial en taller
   const QUICK_LABOR_TIMES = ['30 min', '1 hora', '2 horas', '3 horas', '4 horas'];
   const [laborTime, setLaborTime] = useState<string>(warranty.laborTime || '1 hora');
-  const [laborCost, setLaborCost] = useState<number>(warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0);
+  const [laborCost, setLaborCost] = useState<number | string>(warranty.laborCost !== undefined ? Number(warranty.laborCost) : 0);
   const [partsBudgetMap, setPartsBudgetMap] = useState<Record<string, number>>(() => {
     if (!warranty.partsBudget) return {};
     if (Array.isArray(warranty.partsBudget)) {
@@ -174,7 +174,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     }
 
     if (laborTime !== origLaborTime) return true;
-    if (Math.abs(laborCost - origLaborCost) > 0.001) return true;
+    if (Math.abs((Number(laborCost) || 0) - origLaborCost) > 0.001) return true;
 
     for (const tag of formData.partsTags) {
       const origVal = Number(origMap[tag] || 0);
@@ -218,7 +218,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     const finalMatrizNotes =
       formData.matrizNotes.trim() ||
       'Garantía aprobada directamente por Sede Matriz y Almacén.';
-    const grandTotal = partsTotal + laborCost;
+    const grandTotal = partsTotal + (Number(laborCost) || 0);
     const updated: WarrantyRequest = {
       ...warranty,
       ...formData,
@@ -234,7 +234,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       partsTags: formData.partsTags,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotal,
       estimatedCost: grandTotal,
       status: 'aceptada',
@@ -272,7 +272,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
     const finalMatrizNotes =
       formData.matrizNotes.trim() ||
       'Inspección técnica de Matriz aprobada. Aplica cobertura de fábrica.';
-    const grandTotal = partsTotal + laborCost;
+    const grandTotal = partsTotal + (Number(laborCost) || 0);
     const updated: WarrantyRequest = {
       ...warranty,
       ...formData,
@@ -288,7 +288,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       partsTags: formData.partsTags,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotal,
       estimatedCost: grandTotal,
       matrizNotes: finalMatrizNotes,
@@ -331,7 +331,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       setShowRejectBox(true);
       return;
     }
-    const grandTotal = partsTotal + laborCost;
+    const grandTotal = partsTotal + (Number(laborCost) || 0);
     const updated: WarrantyRequest = {
       ...warranty,
       ...formData,
@@ -380,11 +380,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   const canEditLabor = !isLocked && viewerRole === 'admin' && isEditing;
 
   const handleSaveGaranteParts = () => {
-    const grandTotal = partsTotal + laborCost;
+    const grandTotal = partsTotal + (Number(laborCost) || 0);
     const updated: WarrantyRequest = {
       ...warranty,
       partsBudget: partsBudgetMap,
       partsObservations,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotal,
       estimatedCost: grandTotal,
     };
@@ -419,12 +420,12 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   };
 
   const handleSaveBudget = () => {
-    const grandTotal = partsTotal + laborCost;
+    const grandTotal = partsTotal + (Number(laborCost) || 0);
     const updated: WarrantyRequest = {
       ...warranty,
       partsBudget: partsBudgetMap,
       laborTime,
-      laborCost,
+      laborCost: Number(laborCost) || 0,
       totalBudget: grandTotal,
       estimatedCost: grandTotal,
     };
@@ -1509,13 +1510,20 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                                     min="0"
                                     placeholder="0.00"
                                     value={partsBudgetMap[tag] !== undefined ? partsBudgetMap[tag] : ''}
+                                    onFocus={(e) => e.target.select()}
                                     onChange={(e) => {
-                                      const val = parseFloat(e.target.value) || 0;
+                                      const raw = e.target.value;
+                                      const val = raw === '' ? ('' as any) : (parseFloat(raw) || 0);
                                       const newMap = { ...partsBudgetMap, [tag]: val };
                                       setPartsBudgetMap(newMap);
-                                      const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (newMap[t] || 0), 0);
-                                      const newTotal = newPartsTotal + (laborCost || 0);
+                                      const newPartsTotal = formData.partsTags.reduce((acc, t) => acc + (Number(newMap[t]) || 0), 0);
+                                      const newTotal = newPartsTotal + (Number(laborCost) || 0);
                                       setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
+                                    }}
+                                    onBlur={(e) => {
+                                      const num = parseFloat(e.target.value);
+                                      const finalVal = isNaN(num) ? 0 : num;
+                                      setPartsBudgetMap((prev) => ({ ...prev, [tag]: finalVal }));
                                     }}
                                     className="w-full py-1 pl-5 pr-2 bg-zinc-50 border border-zinc-200 focus:border-indigo-600 focus:bg-white rounded-md text-xs font-mono font-bold text-right outline-none"
                                   />
@@ -1618,11 +1626,22 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                             type="number"
                             step="0.01"
                             min="0"
-                            value={laborCost}
+                            placeholder="0.00"
+                            value={laborCost !== undefined ? laborCost : ''}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) => {
-                              const val = parseFloat(e.target.value) || 0;
+                              const raw = e.target.value;
+                              const val = raw === '' ? '' : (parseFloat(raw) || 0);
                               setLaborCost(val);
-                              const newTotal = partsTotal + val;
+                              const numVal = typeof val === 'number' ? val : 0;
+                              const newTotal = partsTotal + numVal;
+                              setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
+                            }}
+                            onBlur={(e) => {
+                              const num = parseFloat(e.target.value);
+                              const finalVal = isNaN(num) ? 0 : num;
+                              setLaborCost(finalVal);
+                              const newTotal = partsTotal + finalVal;
                               setFormData({ ...formData, estimatedCost: newTotal.toFixed(2) });
                             }}
                             className="w-full py-1.5 pl-6 pr-2 bg-white border border-zinc-300 rounded-lg text-xs font-mono font-bold text-right outline-none focus:border-indigo-600"
@@ -1905,7 +1924,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           )}
 
           {/* 1. FORMULARIO DE DICTAMEN Y VALIDACIÓN EN MATRIZ (ADMIN) */}
-          {viewerRole === 'admin' && (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') && !isLocked && (
+          {viewerRole === 'admin' && statusInfo.canonical === 'en_revision' && !isLocked && (
             <div className="bg-blue-50/50 border-2 border-blue-300 rounded-2xl p-4 space-y-3 animate-fade-in shadow-2xs">
               <div className="flex items-center gap-2 text-xs font-black uppercase text-blue-900 tracking-wider">
                 <ShieldCheck className="w-4 h-4 text-blue-600" />
@@ -1961,37 +1980,36 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setShowRejectBox(true)}
-                    className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs transition active:scale-95"
+                    className="py-2 px-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold cursor-pointer flex items-center justify-center gap-1 shadow-2xs transition active:scale-95"
+                    title="Denegar solicitud"
                   >
-                    <XCircle className="w-3.5 h-3.5 text-red-600" />
-                    <span>✕ Denegar Solicitud</span>
+                    <XCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                    <span className="truncate">✕ Denegar</span>
                   </button>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={handleMatrizDirectApprove}
-                      className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                      title="Aprobar y validar la garantía directamente en Matriz"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>✓ Aprobar Garantía</span>
-                    </button>
+                  <button
+                    type="button"
+                    onClick={handleMatrizDirectApprove}
+                    className="py-2 px-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                    title="Aprobar y validar la garantía directamente en Matriz"
+                  >
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">✓ Aprobar</span>
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={handleMatrizApprove}
-                      className="py-2 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                      title="Poner en proceso y remitir al buzón de Garantía de Marca"
-                    >
-                      <Send className="w-4 h-4" />
-                      <span>Aceptar y Enviar a Garantía</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMatrizApprove}
+                    className="py-2 px-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                    title="Poner en proceso y remitir al buzón de Garantía de Marca"
+                  >
+                    <Send className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Aceptar y Enviar</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -2198,7 +2216,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       {(isEditing ||
         (isDenied && Boolean(onCreateNewRequest)) ||
         (viewerRole === 'admin' &&
-          (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') &&
+          statusInfo.canonical === 'en_revision' &&
           !isLocked &&
           !showRejectBox &&
           activeTab !== 'dictamen') ||
@@ -2208,7 +2226,7 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
           !showRejectBox &&
           activeTab !== 'dictamen') ||
         (viewerRole !== 'garante' &&
-          !(viewerRole === 'admin' && (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso')) &&
+          !(viewerRole === 'admin' && statusInfo.canonical === 'en_revision') &&
           !isDenied &&
           !isLocked &&
           canAdminOrTallerEdit)) && (
@@ -2234,9 +2252,9 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2 w-full">
-              {/* Acción para Matriz si está en_revision o en_proceso (solo visible fuera de dictamen para no duplicar con la tarjeta) */}
+              {/* Acción para Matriz si está en_revision (solo visible fuera de dictamen para no duplicar con la tarjeta) */}
               {viewerRole === 'admin' &&
-                (statusInfo.canonical === 'en_revision' || statusInfo.canonical === 'en_proceso') &&
+                statusInfo.canonical === 'en_revision' &&
                 !isLocked &&
                 !showRejectBox &&
                 activeTab !== 'dictamen' && (

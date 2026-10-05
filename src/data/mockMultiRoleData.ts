@@ -657,6 +657,33 @@ export function getStoredWarranties(): WarrantyRequest[] {
   );
 }
 
+/**
+ * Detecta qué elementos cambiaron o se agregaron respecto al estado anterior en localStorage,
+ * evitando reenviar colecciones completas de cientos de registros a la nube en cada guardado.
+ */
+function getChangedItems<T extends { id?: string }>(newList: T[], oldListRaw: string | null): T[] {
+  if (!oldListRaw) {
+    return [];
+  }
+  try {
+    const oldList: T[] = JSON.parse(oldListRaw);
+    if (!Array.isArray(oldList)) return [];
+    const oldMap = new Map<string, string>();
+    for (const item of oldList) {
+      if (item && item.id) {
+        oldMap.set(String(item.id), JSON.stringify(item));
+      }
+    }
+    return newList.filter((item) => {
+      if (!item || !item.id) return false;
+      const serialized = JSON.stringify(item);
+      return oldMap.get(String(item.id)) !== serialized;
+    });
+  } catch (_) {
+    return [];
+  }
+}
+
 export function saveStoredWarranties(warranties: WarrantyRequest[]) {
   try {
     const cleanList = warranties.filter(
@@ -667,13 +694,16 @@ export function saveStoredWarranties(warranties: WarrantyRequest[]) {
         (!w.requestNumber || !isDeletedTombstone(w.requestNumber))
     );
 
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.WARRANTIES);
+    const changed = getChangedItems(cleanList, oldRaw);
+
     // Guardar en localStorage de forma ultra ligera y protegida
     safeSaveWarrantiesToLocalStorage(cleanList);
     window.dispatchEvent(new Event('starmotos_warranties_updated'));
 
-    // Transmisión a Supabase en paralelo SIEMPRE
-    if (cleanList.length > 0) {
-      cleanList.forEach((w) => {
+    // Transmisión a Supabase: ÚNICAMENTE los registros nuevos o modificados
+    if (changed.length > 0) {
+      changed.forEach((w) => {
         try {
           cloudSaveWarranty(w);
         } catch (e) {
@@ -879,10 +909,12 @@ export function getStoredAlerts(): SystemAlert[] {
 export function saveStoredAlerts(alerts: SystemAlert[]) {
   try {
     const cleanList = alerts.filter((a) => a && a.id && !isDeletedTombstone(a.id));
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.ALERTS);
+    const changed = getChangedItems(cleanList, oldRaw);
     localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_alerts_updated'));
-    if (cleanList.length > 0) {
-      cleanList.forEach((alt) => cloudSaveAlert(alt));
+    if (changed.length > 0) {
+      changed.forEach((alt) => cloudSaveAlert(alt));
     }
   } catch (e) {
     console.error('Error saving alerts to localStorage', e);
@@ -1541,9 +1573,13 @@ export function getStoredGarantes(): GaranteProfile[] {
 
 export function saveStoredGarantes(garantes: GaranteProfile[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.GARANTES);
+    const changed = getChangedItems(garantes, oldRaw);
     localStorage.setItem(STORAGE_KEYS.GARANTES, JSON.stringify(garantes));
     window.dispatchEvent(new Event('starmotos_garantes_updated'));
-    garantes.forEach((g) => cloudSaveGarante(g));
+    if (changed.length > 0) {
+      changed.forEach((g) => cloudSaveGarante(g));
+    }
   } catch (e) {
     console.error('Error saving garantes to localStorage', e);
   }
@@ -1607,9 +1643,13 @@ export function getStoredDictamenes(): DictamenRecord[] {
 
 export function saveStoredDictamenes(dictamenes: DictamenRecord[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.DICTAMENES);
+    const changed = getChangedItems(dictamenes, oldRaw);
     localStorage.setItem(STORAGE_KEYS.DICTAMENES, JSON.stringify(dictamenes));
     window.dispatchEvent(new Event('starmotos_dictamenes_updated'));
-    dictamenes.forEach((d) => cloudSaveDictamen(d));
+    if (changed.length > 0) {
+      changed.forEach((d) => cloudSaveDictamen(d));
+    }
   } catch (e) {
     console.error('Error saving dictamenes to localStorage', e);
   }
@@ -1689,9 +1729,13 @@ export function getStoredWorkshopManagers(): WorkshopManagerAccount[] {
 
 export function saveStoredWorkshopManagers(managers: WorkshopManagerAccount[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.WORKSHOP_MANAGERS);
+    const changed = getChangedItems(managers, oldRaw);
     localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(managers));
     window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
-    managers.forEach((m) => cloudSaveWorkshopManager(m));
+    if (changed.length > 0) {
+      changed.forEach((m) => cloudSaveWorkshopManager(m));
+    }
   } catch (e) {
     console.error('Error saving workshop managers to localStorage', e);
   }
@@ -1723,10 +1767,12 @@ export function getStoredInvoices(): AdminInvoice[] {
 
 export function saveStoredInvoices(invoices: AdminInvoice[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.INVOICES);
+    const changed = getChangedItems(invoices, oldRaw);
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
     window.dispatchEvent(new Event('starmotos_invoices_updated'));
-    if (invoices.length > 0) {
-      invoices.forEach((i) => cloudSaveInvoice(i));
+    if (changed.length > 0) {
+      changed.forEach((i) => cloudSaveInvoice(i));
     }
   } catch (e) {
     console.error('Error saving invoices to localStorage', e);
@@ -1746,10 +1792,12 @@ export function getStoredOrders(): TallerOrder[] {
 
 export function saveStoredOrders(orders: TallerOrder[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.ORDERS);
+    const changed = getChangedItems(orders, oldRaw);
     localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
     window.dispatchEvent(new Event('starmotos_orders_updated'));
-    if (orders.length > 0) {
-      orders.forEach((o) => cloudSaveOrder(o));
+    if (changed.length > 0) {
+      changed.forEach((o) => cloudSaveOrder(o));
     }
   } catch (e) {
     console.error('Error saving orders to localStorage', e);
@@ -1792,10 +1840,12 @@ export function saveStoredClients(clients: TallerClient[]) {
         !isDeletedTombstone(c.id) &&
         (!c.idNumber || !isDeletedTombstone(c.idNumber.trim()))
     );
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+    const changed = getChangedItems(cleanList, oldRaw);
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(cleanList));
     window.dispatchEvent(new Event('starmotos_clients_updated'));
-    if (cleanList.length > 0) {
-      cleanList.forEach((c) => cloudSaveClient(c));
+    if (changed.length > 0) {
+      changed.forEach((c) => cloudSaveClient(c));
     }
   } catch (e) {
     console.error('Error saving clients to localStorage', e);
@@ -1937,10 +1987,13 @@ export function getStoredTechnicians(): Technician[] {
 
 export function saveStoredTechnicians(technicians: Technician[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.TECHNICIANS);
+    const changed = getChangedItems(technicians, oldRaw);
     localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(technicians));
     window.dispatchEvent(new Event('starmotos_technicians_updated'));
-    // Persistir cada técnico a Supabase
-    technicians.forEach((t) => cloudSaveTechnician(t));
+    if (changed.length > 0) {
+      changed.forEach((t) => cloudSaveTechnician(t));
+    }
   } catch (e) {
     console.error('Error saving technicians to localStorage', e);
   }
@@ -2071,10 +2124,12 @@ export function saveStoredFullAlistamientos(records: AlistamientoFullRecord[]) {
         !isDeletedTombstone(r.id) &&
         (!r.cedulaRuc || !isDeletedTombstone(r.cedulaRuc.trim()))
     );
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.ALISTAMIENTOS);
+    const changed = getChangedItems(cleanList, oldRaw);
     safeSaveAlistamientosToLocalStorage(cleanList);
     window.dispatchEvent(new Event('starmotos_alistamientos_updated'));
-    if (cleanList.length > 0) {
-      cleanList.forEach((r) => cloudSaveAlistamiento(r));
+    if (changed.length > 0) {
+      changed.forEach((r) => cloudSaveAlistamiento(r));
     }
   } catch (e) {
     console.error('Error saving alistamientos to localStorage', e);
@@ -2386,9 +2441,13 @@ export function getStoredPendientes(): AdminPendiente[] {
 
 export function saveStoredPendientes(pendientes: AdminPendiente[]) {
   try {
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.PENDIENTES);
+    const changed = getChangedItems(pendientes, oldRaw);
     localStorage.setItem(STORAGE_KEYS.PENDIENTES, JSON.stringify(pendientes));
     window.dispatchEvent(new Event('starmotos_pendientes_updated'));
-    pendientes.forEach((p) => cloudSavePendiente(p));
+    if (changed.length > 0) {
+      changed.forEach((p) => cloudSavePendiente(p));
+    }
   } catch (e) {
     console.error('Error al guardar pendientes en localStorage:', e);
   }
@@ -2552,9 +2611,13 @@ export function getStoredAgendamientos(): AgendamientoTicket[] {
 export function saveStoredAgendamientos(items: AgendamientoTicket[]) {
   try {
     const valid = items.filter((item) => !isAgendamientoExpired(item));
+    const oldRaw = localStorage.getItem(STORAGE_KEYS.AGENDAMIENTOS);
+    const changed = getChangedItems(valid, oldRaw);
     localStorage.setItem(STORAGE_KEYS.AGENDAMIENTOS, JSON.stringify(valid));
     window.dispatchEvent(new Event('starmotos_agendamientos_updated'));
-    valid.forEach((a) => cloudSaveAgendamiento(a));
+    if (changed.length > 0) {
+      changed.forEach((a) => cloudSaveAgendamiento(a));
+    }
   } catch (e) {
     console.error('Error al guardar agendamientos en localStorage:', e);
   }

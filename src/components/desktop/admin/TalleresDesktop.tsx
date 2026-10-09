@@ -9,6 +9,7 @@ import { Workshop, WarrantyRequest, AlistamientoFullRecord, TallerClient, Techni
 import { matchRecordToWorkshop, isPdiOnlyRecord, getRecordTimestamp, matchOrderToWorkshop, calculateWorkshopFinances } from '../../common/AlistamientoWizard';
 import { saveStoredOrders, getStoredOrders, getStoredRatings, saveStoredWorkshops, getStoredWorkshops, getStoredWorkshopManagers, saveStoredWorkshopManagers } from '../../../data/mockMultiRoleData';
 import { ModalPortal } from '../../common/ModalPortal';
+import { cloudSaveWorkshopStatus } from '../../../services/supabaseService';
 
 interface Props {
   workshops: Workshop[];
@@ -190,21 +191,29 @@ export const TalleresDesktop: React.FC<Props> = ({
   const handleConfirmStatusChange = () => {
     if (!statusModalWs) return;
     const isGoingInoperativo = statusModalWs.status !== 'inoperativo';
+    const newStatus = isGoingInoperativo ? 'inoperativo' : 'operativo';
+    const newMotivo = isGoingInoperativo
+      ? (inoperativoReason.trim() || 'A usted se le ha suspendido sus actividades, para más información acérquese o contáctese a la matriz.')
+      : undefined;
+    const newFecha = isGoingInoperativo ? new Date().toISOString() : undefined;
+
     const updated = localWorkshops.map((w) => {
       if (w.id === statusModalWs.id) {
         return {
           ...w,
-          status: isGoingInoperativo ? 'inoperativo' : 'operativo',
-          inoperativoMotivo: isGoingInoperativo
-            ? (inoperativoReason.trim() || 'Acceso a la sede restringido por disposición de la administración central de Matriz.')
-            : undefined,
-          inoperativoFecha: isGoingInoperativo ? new Date().toISOString() : undefined,
+          status: newStatus,
+          inoperativoMotivo: newMotivo,
+          inoperativoFecha: newFecha,
         };
       }
       return w;
     });
     setLocalWorkshops(updated);
     saveStoredWorkshops(updated);
+
+    // Sincronizar con Supabase en la nube para propagar en tiempo real a todas las sedes
+    cloudSaveWorkshopStatus(statusModalWs.id, newStatus, newMotivo, newFecha, statusModalWs.name);
+
     setStatusModalWs(null);
     setInoperativoReason('');
   };

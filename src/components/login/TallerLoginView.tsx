@@ -1,5 +1,5 @@
 // src/components/login/TallerLoginView.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wrench,
   Building2,
@@ -12,13 +12,14 @@ import {
   ArrowLeft,
   CheckCircle2,
 } from 'lucide-react';
-import { UserRole, WorkshopManagerAccount } from '../../types/customer';
+import { UserRole, WorkshopManagerAccount, Workshop } from '../../types/customer';
 import {
   getStoredWorkshops,
   getStoredWorkshopManagers,
   saveStoredWorkshopManager,
 } from '../../data/mockMultiRoleData';
 import { OFFICIAL_CORPORATE_ACCOUNTS } from '../../data/authAccounts';
+import { AccessDeniedLockScreen } from '../common/AccessDeniedLockScreen';
 
 interface Props {
   onLoginSuccess: (role: UserRole) => void;
@@ -32,12 +33,36 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const workshops = getStoredWorkshops();
+  const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
+  const [blockedWsForModal, setBlockedWsForModal] = useState<Workshop | null>(null);
+
+  useEffect(() => {
+    const handleWsUpdate = () => setWorkshops(getStoredWorkshops());
+    window.addEventListener('starmotos_workshops_updated', handleWsUpdate);
+    window.addEventListener('storage', handleWsUpdate);
+    return () => {
+      window.removeEventListener('starmotos_workshops_updated', handleWsUpdate);
+      window.removeEventListener('storage', handleWsUpdate);
+    };
+  }, []);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+
+  if (blockedWsForModal) {
+    return (
+      <AccessDeniedLockScreen
+        workshop={blockedWsForModal}
+        onLogout={() => {
+          setBlockedWsForModal(null);
+          setErrorMessage('');
+          setSuccessMessage('');
+        }}
+      />
+    );
+  }
 
   // Registro sencillo
   const [registerForm, setRegisterForm] = useState({
@@ -88,6 +113,12 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
           localStorage.setItem('starmotos_taller_active_ws', corporateAccount.workshopId);
         }
 
+        // Si la sede está inoperativa por orden de Matriz, bloquear de inmediato
+        if (storedWs?.status === 'inoperativo') {
+          setBlockedWsForModal(storedWs);
+          return;
+        }
+
         setSuccessMessage('¡Ingreso autorizado de taller! Abriendo perfil y configuración de sede...');
         setTimeout(() => {
           onLoginSuccess('taller');
@@ -110,6 +141,13 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
         }
 
         localStorage.setItem('starmotos_taller_active_ws', matchedWorkshop.id);
+
+        // Si la sede está inoperativa por orden de Matriz, bloquear de inmediato
+        if (matchedWorkshop.status === 'inoperativo') {
+          setBlockedWsForModal(matchedWorkshop);
+          return;
+        }
+
         setSuccessMessage(`¡Bienvenido! Ingresando a ${matchedWorkshop.name}...`);
         setTimeout(() => {
           onLoginSuccess('taller');
@@ -141,6 +179,12 @@ export const TallerLoginView: React.FC<Props> = ({ onLoginSuccess }) => {
 
         if (matchedManager.workshopId) {
           localStorage.setItem('starmotos_taller_active_ws', matchedManager.workshopId);
+        }
+
+        // Si la sede está inoperativa por orden de Matriz, bloquear de inmediato
+        if (wsOfManager?.status === 'inoperativo') {
+          setBlockedWsForModal(wsOfManager);
+          return;
         }
 
         setSuccessMessage(`¡Bienvenido, ${matchedManager.name}! Ingresando al taller...`);

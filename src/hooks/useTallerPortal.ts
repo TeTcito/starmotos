@@ -69,7 +69,7 @@ export function useTallerPortal() {
   activeSectionRef.current = activeSection;
 
   // Sede activa fijada desde la autenticación
-  const [activeWorkshopId] = useState<string>(() => {
+  const [activeWorkshopId, setActiveWorkshopId] = useState<string>(() => {
     const saved = localStorage.getItem('starmotos_taller_active_ws');
     if (!saved || saved === 'matriz-la-mana') {
       localStorage.setItem('starmotos_taller_active_ws', 'taller-la-mana');
@@ -77,6 +77,21 @@ export function useTallerPortal() {
     }
     return saved;
   });
+
+  useEffect(() => {
+    const handleActiveWsSync = () => {
+      const saved = localStorage.getItem('starmotos_taller_active_ws');
+      if (saved && saved !== activeWorkshopId) {
+        setActiveWorkshopId(saved);
+      }
+    };
+    window.addEventListener('storage', handleActiveWsSync);
+    window.addEventListener('starmotos_workshops_updated', handleActiveWsSync);
+    return () => {
+      window.removeEventListener('storage', handleActiveWsSync);
+      window.removeEventListener('starmotos_workshops_updated', handleActiveWsSync);
+    };
+  }, [activeWorkshopId]);
 
   const [workshops, setWorkshops] = useState<Workshop[]>(getStoredWorkshops);
   const [orders, setOrders] = useState<TallerOrder[]>(getStoredOrders);

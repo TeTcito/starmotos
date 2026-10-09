@@ -19,6 +19,7 @@ import {
   saveStoredWorkshopManagers
 } from '../../../data/mockMultiRoleData';
 import { ModalPortal } from '../../common/ModalPortal';
+import { cloudSaveWorkshopStatus } from '../../../services/supabaseService';
 
 interface Props {
   workshops: Workshop[];
@@ -137,21 +138,29 @@ export const TalleresMobile: React.FC<Props> = ({
   const handleConfirmStatusChange = () => {
     if (!statusModalWs) return;
     const isGoingInoperativo = statusModalWs.status !== 'inoperativo';
+    const newStatus = isGoingInoperativo ? 'inoperativo' : 'operativo';
+    const newMotivo = isGoingInoperativo
+      ? (inoperativoReason.trim() || 'A usted se le ha suspendido sus actividades, para más información acérquese o contáctese a la matriz.')
+      : undefined;
+    const newFecha = isGoingInoperativo ? new Date().toISOString() : undefined;
+
     const updated = localWorkshops.map((w) => {
       if (w.id === statusModalWs.id) {
         return {
           ...w,
-          status: isGoingInoperativo ? 'inoperativo' : 'operativo',
-          inoperativoMotivo: isGoingInoperativo
-            ? (inoperativoReason.trim() || 'A usted se le ha suspendido sus actividades, para más información acérquese o contáctese a la matriz.')
-            : undefined,
-          inoperativoFecha: isGoingInoperativo ? new Date().toISOString() : undefined,
+          status: newStatus,
+          inoperativoMotivo: newMotivo,
+          inoperativoFecha: newFecha,
         };
       }
       return w;
     });
     setLocalWorkshops(updated);
     saveStoredWorkshops(updated);
+
+    // Sincronizar inmediatamente con la nube de Supabase para todas las sedes
+    cloudSaveWorkshopStatus(statusModalWs.id, newStatus, newMotivo, newFecha, statusModalWs.name);
+
     setStatusModalWs(null);
     setInoperativoReason('');
   };

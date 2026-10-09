@@ -16,6 +16,7 @@ import {
   AgendamientoTicket,
   GpsRecord,
   GarantiaPlusRecord,
+  Workshop,
 } from '../types/customer';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { uploadWarrantyMedia, saveMediaToIndexedDB, isValidDataUrl, isValidMediaUrl, cleanCorruptedMediaFromLocalStorage } from './mediaStorage';
@@ -638,23 +639,44 @@ export async function syncAllFromSupabase(): Promise<{
     }
 
     // -----------------------------------------------------------------------
-    // 9. JEFES DE TALLER REGISTRADOS
+    // 9. JEFES DE TALLER REGISTRADOS & ESTADOS DE SEDE
     // -----------------------------------------------------------------------
     try {
       const { data: managersData, error: mgrErr } = await supabase
         .from('workshop_managers')
-        .select('data')
+        .select('id, workshop_id, data')
         .order('created_at', { ascending: false });
 
       if (!mgrErr && managersData) {
-        const items: WorkshopManagerAccount[] = managersData.map((row) => row.data as WorkshopManagerAccount).filter(Boolean);
+        const items: WorkshopManagerAccount[] = [];
+        const workshopStatusMap: Record<string, { status: string; inoperativoMotivo?: string; inoperativoFecha?: string }> = {};
+
+        for (const row of managersData) {
+          const rowId = row.id || '';
+          if (rowId.startsWith('ws-status-')) {
+            const wsId = row.workshop_id || rowId.replace('ws-status-', '');
+            const d = (row.data as any) || {};
+            workshopStatusMap[wsId] = {
+              status: d.status || 'operativo',
+              inoperativoMotivo: d.inoperativoMotivo,
+              inoperativoFecha: d.inoperativoFecha,
+            };
+          } else if (row.data) {
+            items.push(row.data as WorkshopManagerAccount);
+          }
+        }
+
         if (items.length > 0) {
           localStorage.setItem(STORAGE_KEYS.WORKSHOP_MANAGERS, JSON.stringify(items));
           window.dispatchEvent(new Event('starmotos_workshop_managers_updated'));
         }
+
+        if (Object.keys(workshopStatusMap).length > 0) {
+          applyWorkshopStatusesToStorage(workshopStatusMap);
+        }
       }
     } catch (e) {
-      console.warn('Error sincronizando jefes de taller:', e);
+      console.warn('Error sincronizando jefes de taller y estados de sede:', e);
     }
 
     // -----------------------------------------------------------------------
@@ -1282,6 +1304,84 @@ export async function cloudDeleteWorkshopManager(id: string) {
     if (error) console.error('[Supabase] Error eliminando jefe de taller:', error);
   } catch (err) {
     console.error('[Supabase] Excepción eliminando jefe de taller:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ESTADOS DE OPERATIVIDAD DE SEDES / TALLERES (SINCRONIZACIÓN EN LA NUBE)
+// ---------------------------------------------------------------------------
+
+export function applyWorkshopStatusesToStorage(
+  statusMap: Record<string, { status: string; inoperativoMotivo?: string; inoperativoFecha?: string }>
+) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.WORKSHOPS);
+    if (!raw) return;
+    const workshops: Workshop[] = JSON.parse(raw);
+    let changed = false;
+
+    const updated = workshops.map((ws) => {
+      const cloudData = statusMap[ws.id];
+      if (cloudData) {
+        const isDiffStatus = ws.status !== cloudData.status;
+        const isDiffMotivo = ws.inoperativoMotivo !== cloudData.inoperativoMotivo;
+        const isDiffFecha = ws.inoperativoFecha !== cloudData.inoperativoFecha;
+        if (isDiffStatus || isDiffMotivo || isDiffFecha) {
+          changed = true;
+          return {
+            ...ws,
+            status: cloudData.status as any,
+            inoperativoMotivo: cloudData.inoperativoMotivo,
+            inoperativoFecha: cloudData.inoperativoFecha,
+          };
+        }
+      }
+      return ws;
+    });
+
+    if (changed) {
+      localStorage.setItem(STORAGE_KEYS.WORKSHOPS, JSON.stringify(updated));
+      window.dispatchEvent(new Event('starmotos_workshops_updated'));
+    }
+  } catch (err) {
+    console.error('Error aplicando estados de taller a storage:', err);
+  }
+}
+
+export async function cloudSaveWorkshopStatus(
+  workshopId: string,
+  status: 'operativo' | 'inoperativo' | string,
+  inoperativoMotivo?: string,
+  inoperativoFecha?: string,
+  workshopName?: string
+) {
+  if (!workshopId) return;
+  try {
+    const payload = {
+      id: `ws-status-${workshopId}`,
+      workshop_id: workshopId,
+      workshop_name: workshopName || workshopId,
+      data: {
+        id: `ws-status-${workshopId}`,
+        workshopId,
+        workshopName: workshopName || workshopId,
+        status,
+        inoperativoMotivo: inoperativoMotivo || '',
+        inoperativoFecha: inoperativoFecha || (status === 'inoperativo' ? new Date().toISOString() : undefined),
+        updatedAt: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('workshop_managers')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('[Supabase] Error guardando estado de sede:', error);
+    }
+  } catch (err) {
+    console.error('[Supabase] Excepción guardando estado de sede:', err);
   }
 }
 
@@ -1978,12 +2078,43 @@ export function initSupabaseRealtime() {
         }
       }
     )
-    // Jefes de Taller
+    // Jefes de Taller y Estados de Sede
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'workshop_managers' },
       (payload) => {
         try {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newRow = payload.new as any;
+            const rowId = newRow?.id || '';
+            if (rowId.startsWith('ws-status-')) {
+              const wsId = newRow.workshop_id || rowId.replace('ws-status-', '');
+              const d = newRow.data || {};
+              applyWorkshopStatusesToStorage({
+                [wsId]: {
+                  status: d.status || 'operativo',
+                  inoperativoMotivo: d.inoperativoMotivo,
+                  inoperativoFecha: d.inoperativoFecha,
+                },
+              });
+              return;
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as any;
+            const oldId = oldRow?.id || '';
+            if (oldId.startsWith('ws-status-')) {
+              const wsId = oldId.replace('ws-status-', '');
+              applyWorkshopStatusesToStorage({
+                [wsId]: {
+                  status: 'operativo',
+                  inoperativoMotivo: undefined,
+                  inoperativoFecha: undefined,
+                },
+              });
+              return;
+            }
+          }
+
           const raw = localStorage.getItem(STORAGE_KEYS.WORKSHOP_MANAGERS);
           let current: WorkshopManagerAccount[] = raw ? JSON.parse(raw) : [];
 

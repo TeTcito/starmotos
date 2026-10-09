@@ -550,6 +550,7 @@ export const AdminViewDesktop: React.FC<Props> = ({
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
                 isMatriz={true}
+                isAdmin={true}
                 orders={orders}
                 onNavigateSection={setActiveSection}
               />

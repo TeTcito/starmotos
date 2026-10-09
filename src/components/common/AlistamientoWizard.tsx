@@ -78,6 +78,7 @@ interface Props {
   viewMode?: 'list' | 'form';
   onViewModeChange?: (mode: 'list' | 'form') => void;
   isMatriz?: boolean;
+  isAdmin?: boolean;
   selectedWorkshopFilter?: string;
   onSelectWorkshopFilter?: (wsId: string) => void;
   orders?: TallerOrder[];
@@ -334,6 +335,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   viewMode: externalViewMode,
   onViewModeChange,
   isMatriz = false,
+  isAdmin,
   selectedWorkshopFilter: propSelectedWorkshopFilter,
   onSelectWorkshopFilter,
   orders: propOrders,
@@ -357,6 +359,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
     defaultSedeId === 'matriz-la-mana' ||
     defaultSedeId === 'sede-matriz' ||
     (defaultSede && defaultSede.toLowerCase().includes('matriz'))
+  );
+
+  // Privilegio exclusivo de administrador para editar alistamientos ya registrados
+  const effectiveIsAdmin = Boolean(
+    isAdmin !== undefined
+      ? isAdmin
+      : (onDeleteRecord !== undefined && isMatriz)
   );
 
   // Búsqueda y Filtro de Sede en el listado
@@ -1673,10 +1682,15 @@ export const AlistamientoWizard: React.FC<Props> = ({
     }
   };
 
-  // Guardar modificaciones del formulario de alistamiento
+  // Guardar modificaciones del formulario de alistamiento (exclusivo para Administrador)
   const handleSaveRecordDetail = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!detailFormData) return;
+
+    if (!effectiveIsAdmin) {
+      alert('Acceso no autorizado: Una vez registrado un alistamiento, los talleres no tienen permisos para modificarlo. Solo el Administrador Central tiene autorización para editar datos y comisiones.');
+      return;
+    }
 
     const oldCedula = (selectedRecordForDetail?.cedulaRuc || '').trim();
     const newCedula = (detailFormData.cedulaRuc || '').trim();
@@ -2108,15 +2122,25 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <span>+ Nuevo Servicio</span>
               </button>
 
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Guardar Cambios</span>
-              </button>
+              {effectiveIsAdmin ? (
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-98"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Cambios</span>
+                </button>
+              ) : (
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 text-zinc-500 border border-zinc-200 rounded-lg text-xs font-bold select-none shadow-2xs cursor-not-allowed"
+                  title="Modificación bloqueada para taller. Solo el Administrador Central puede editar."
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Edición Bloqueada</span>
+                </div>
+              )}
 
-              {onDeleteRecord && (
+              {effectiveIsAdmin && onDeleteRecord && (
                 <button
                   type="button"
                   onClick={() => {
@@ -2136,6 +2160,24 @@ export const AlistamientoWizard: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* Banner de protección cuando es visto por Taller */}
+          {!effectiveIsAdmin && (
+            <div className="w-full bg-amber-50/90 border border-amber-300 text-amber-950 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs shrink-0">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                <div>
+                  <span className="font-bold">Alistamiento Registrado (Modo Solo Lectura):</span>
+                  <span className="text-amber-800 ml-1">
+                    Este alistamiento ya está ingresado en el sistema. Los talleres no pueden modificar datos ni comisiones. Únicamente el Administrador Central tiene autorización para editar.
+                  </span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-950 uppercase tracking-wider shrink-0">
+                Solo Lectura
+              </span>
+            </div>
+          )}
+
           {/* Notificación de éxito al guardar */}
           {detailSuccessToast && (
             <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 animate-slide-in shrink-0">
@@ -2144,8 +2186,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Formulario en 3 Columnas Simétricas */}
-          <div className="w-full space-y-4 pr-1">
+          {/* Formulario en 3 Columnas Simétricas (Bloqueado para taller) */}
+          <fieldset disabled={!effectiveIsAdmin} className="w-full space-y-4 pr-1 disabled:opacity-95 border-0 p-0 m-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               {/* COLUMNA 1: DATOS DEL CLIENTE */}
               <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-2xs space-y-3">
@@ -2686,8 +2728,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           Comisión a Matriz StarMotos (Taller ➜ Matriz)
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded">
-                        Sede / Franquicia
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${effectiveIsAdmin ? 'bg-amber-200 text-amber-900' : 'bg-amber-100 text-amber-950 border border-amber-300'}`}>
+                        {!effectiveIsAdmin && <Lock className="w-2.5 h-2.5 text-amber-800" />}
+                        <span>{effectiveIsAdmin ? 'Sede / Franquicia' : 'Protegida (Solo Admin)'}</span>
                       </span>
                     </div>
 
@@ -2933,7 +2976,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 </div>
               </div>
             )}
-          </div>
+          </fieldset>
 
           {/* Footer del Formulario */}
           <div className="pt-3 border-t border-zinc-200 flex items-center justify-between shrink-0">
@@ -2962,13 +3005,23 @@ export const AlistamientoWizard: React.FC<Props> = ({
                 <span>+ Iniciar Nuevo Servicio con este Cliente</span>
               </button>
 
-              <button
-                type="submit"
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Guardar Cambios</span>
-              </button>
+              {effectiveIsAdmin ? (
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-98"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar Cambios</span>
+                </button>
+              ) : (
+                <div
+                  className="px-3 py-1.5 bg-zinc-100 text-zinc-500 border border-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1.5 select-none shadow-2xs cursor-not-allowed"
+                  title="Modificación bloqueada para taller. Solo el Administrador Central puede editar."
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Edición Bloqueada (Taller)</span>
+                </div>
+              )}
             </div>
           </div>
         </form>

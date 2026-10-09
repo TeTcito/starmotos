@@ -329,6 +329,7 @@ export const TallerViewMobile: React.FC<Props> = ({
             onSaveRecord={onSaveFullAlistamiento}
             recentRecords={isMatriz && rawFullAlistamientos ? rawFullAlistamientos : fullAlistamientos}
             isMatriz={isMatriz}
+            isAdmin={false}
             selectedWorkshopFilter={selectedWorkshopFilter}
             onSelectWorkshopFilter={onSelectWorkshopFilter}
             orders={orders}

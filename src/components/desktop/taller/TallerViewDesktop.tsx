@@ -428,6 +428,7 @@ export const TallerViewDesktop: React.FC<Props> = ({
                 viewMode={alistamientoViewMode}
                 onViewModeChange={setAlistamientoViewMode}
                 isMatriz={isMatriz}
+                isAdmin={false}
                 selectedWorkshopFilter={selectedWorkshopFilter}
                 onSelectWorkshopFilter={onSelectWorkshopFilter}
                 orders={orders}

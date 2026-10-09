@@ -154,6 +154,40 @@ export const BRANCH_PORTOVIEJO: Branch = {
   googleMapsUrl: 'https://maps.google.com/?q=Portoviejo+Manabi+Ecuador',
 };
 
+export const BRANCH_MILAGRO: Branch = {
+  id: 'taller-milagro',
+  name: 'StarMotos Sucursal Milagro',
+  code: 'SUC-12',
+  address: 'Av. 17 de Septiembre y Calle Guayaquil S/N',
+  city: 'Milagro, Guayas',
+  province: 'Guayas',
+  canton: 'Milagro',
+  parroquia: 'Milagro',
+  reference: 'Frente al Parque Central de Milagro',
+  phone: '0939316698 / 0939317809',
+  whatsapp: '593939316698',
+  email: 'sede.milagro@starmotos.com',
+  schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
+  googleMapsUrl: 'https://maps.google.com/?q=Milagro+Guayas+Ecuador',
+};
+
+export const BRANCH_SAN_LUIS: Branch = {
+  id: 'taller-san-luis',
+  name: 'StarMotos Sucursal San Luis',
+  code: 'SUC-13',
+  address: 'Av. Principal San Luis S/N y Panamericana Sur',
+  city: 'San Luis, Chimborazo',
+  province: 'Chimborazo',
+  canton: 'Riobamba',
+  parroquia: 'San Luis',
+  reference: 'Entrada a San Luis, sector comercial',
+  phone: '0939316698 / 0939317809',
+  whatsapp: '593939316698',
+  email: 'sede.san-luis@starmotos.com',
+  schedule: 'Lunes a Viernes: 08:00 - 18:00 | Sábados: 08:30 - 13:30',
+  googleMapsUrl: 'https://maps.google.com/?q=San+Luis+Riobamba+Ecuador',
+};
+
 export function getAllBranches(): Branch[] {
   try {
     const workshops = getStoredWorkshops();

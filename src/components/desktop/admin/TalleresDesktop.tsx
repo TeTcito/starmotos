@@ -113,7 +113,7 @@ export const TalleresDesktop: React.FC<Props> = ({
     }
 
     // Coincidencia por palabra clave de sede
-    const keywords = ['mocache', 'buena fe', 'balzar', 'el carmen', 'quevedo', 'ventanas', 'quinzaloma', 'moraspungo', 'empalme', 'la mana', 'la maná'];
+    const keywords = ['mocache', 'buena fe', 'balzar', 'el carmen', 'quevedo', 'ventanas', 'quinzaloma', 'moraspungo', 'empalme', 'la mana', 'la maná', 'ricaurte', 'milagro', 'san luis', 'san-luis'];
     for (const kw of keywords) {
       if ((wsId.includes(kw) || normWsName.includes(kw)) && (rWsId.includes(kw) || rTaller.includes(kw))) {
         return true;

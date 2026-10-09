@@ -156,6 +156,27 @@ export const OFFICIAL_CORPORATE_ACCOUNTS: Record<string, CorporateAccount> = {
     passwords: ['TallerElEmpalme@2026', 'StarMotos@2026'],
     name: 'StarMotos Sucursal El Empalme',
   },
+  'sede.milagro@starmotos.com': {
+    email: 'sede.milagro@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-milagro',
+    passwords: ['TallerMilagro@2026', 'StarMotos@2026', 'taller123', 'Taller2026'],
+    name: 'StarMotos Sucursal Milagro',
+  },
+  'sede.san-luis@starmotos.com': {
+    email: 'sede.san-luis@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-san-luis',
+    passwords: ['TallerSanLuis@2026', 'StarMotos@2026', 'taller123', 'Taller2026'],
+    name: 'StarMotos Sucursal San Luis',
+  },
+  'sede.sanluis@starmotos.com': {
+    email: 'sede.san-luis@starmotos.com',
+    role: 'taller',
+    workshopId: 'taller-san-luis',
+    passwords: ['TallerSanLuis@2026', 'StarMotos@2026', 'taller123', 'Taller2026'],
+    name: 'StarMotos Sucursal San Luis',
+  },
 
   // 4. GPS Servicios Oficial
   'gps@starmotos.com': {

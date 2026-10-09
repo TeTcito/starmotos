@@ -322,6 +322,44 @@ export const INITIAL_WORKSHOPS: Workshop[] = [
     pendingWarranties: 0,
     mechanics: 3,
   },
+  {
+    id: 'taller-milagro',
+    name: 'StarMotos Sucursal Milagro',
+    code: 'SUC-12',
+    address: 'Av. 17 de Septiembre y Calle Guayaquil S/N',
+    city: 'Milagro, Guayas',
+    province: 'Guayas',
+    canton: 'Milagro',
+    parroquia: 'Milagro',
+    reference: 'Frente al Parque Central de Milagro',
+    phone: '0939316698 / 0939317809',
+    manager: 'Jefe de Taller Milagro',
+    email: 'sede.milagro@starmotos.com',
+    status: 'operativo',
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
+    mechanics: 3,
+  },
+  {
+    id: 'taller-san-luis',
+    name: 'StarMotos Sucursal San Luis',
+    code: 'SUC-13',
+    address: 'Av. Principal San Luis S/N y Panamericana Sur',
+    city: 'San Luis, Chimborazo',
+    province: 'Chimborazo',
+    canton: 'Riobamba',
+    parroquia: 'San Luis',
+    reference: 'Entrada a San Luis, sector comercial',
+    phone: '0939316698 / 0939317809',
+    manager: 'Jefe de Taller San Luis',
+    email: 'sede.san-luis@starmotos.com',
+    status: 'operativo',
+    activeOrders: 0,
+    completedToday: 0,
+    pendingWarranties: 0,
+    mechanics: 3,
+  },
 ];
 
 // --- Solicitud de Garantía Restaurada GAR-2026-9135 ---
@@ -1686,6 +1724,22 @@ export const INITIAL_WORKSHOP_MANAGERS: WorkshopManagerAccount[] = [
     email: 'sede.quevedo@starmotos.com',
     phone: '0939317809',
   },
+  {
+    id: 'mgr-milagro',
+    name: 'Jefe de Taller Milagro',
+    workshopId: 'taller-milagro',
+    workshopName: 'StarMotos Sucursal Milagro',
+    email: 'sede.milagro@starmotos.com',
+    phone: '0939316698',
+  },
+  {
+    id: 'mgr-san-luis',
+    name: 'Jefe de Taller San Luis',
+    workshopId: 'taller-san-luis',
+    workshopName: 'StarMotos Sucursal San Luis',
+    email: 'sede.san-luis@starmotos.com',
+    phone: '0939317809',
+  },
 ];
 
 export function getStoredWorkshopManagers(): WorkshopManagerAccount[] {
@@ -1712,6 +1766,12 @@ export function getStoredWorkshopManagers(): WorkshopManagerAccount[] {
         if (!updated.some((m) => m.workshopId === 'taller-la-mana')) {
           updated.unshift(INITIAL_WORKSHOP_MANAGERS[0]);
           changed = true;
+        }
+        for (const initMgr of INITIAL_WORKSHOP_MANAGERS) {
+          if (!updated.some((m) => m.workshopId === initMgr.workshopId || m.email.toLowerCase() === initMgr.email.toLowerCase())) {
+            updated.push(initMgr);
+            changed = true;
+          }
         }
         if (changed) {
           try {
@@ -2020,6 +2080,8 @@ export const INITIAL_ORIGINS: string[] = [
   'Almacén El Carmen',
   'Almacén Portoviejo',
   'Almacén El Empalme',
+  'Almacén Milagro',
+  'Almacén San Luis',
   'Almacén Balzar',
   'Almacén Moraspungo',
   'Almacén Mocache',

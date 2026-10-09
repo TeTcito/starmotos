@@ -61,7 +61,7 @@ import { compressImageBase64 } from '../../../utils/imageCompressor';
 import { cleanNumberInput, selectOnFocus } from '../../../utils/numberUtils';
 import { getMediaFromIndexedDB, uploadWarrantyMedia, isValidMediaUrl } from '../../../services/mediaStorage';
 import { cloudSaveAlistamiento } from '../../../services/supabaseService';
-import { matchRecordToWorkshop, getRecordTimestamp, getRecordOrderStatus, isDebtorRecord } from '../../common/AlistamientoWizard';
+import { matchRecordToWorkshop, getRecordTimestamp, getRecordOrderStatus, isDebtorRecord, getRecordComisionMetrics } from '../../common/AlistamientoWizard';
 import { PrintableAlistamientoSheet } from '../../common/PrintableAlistamientoSheet';
 
 interface Props {
@@ -144,7 +144,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
   };
 
   // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
-  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento'>('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento' | 'con_comision' | 'comision_pendiente'>('all');
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'this_year' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -800,9 +800,7 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
       totalPendiente += pendiente;
 
       // Comisiones de la sede hacia Matriz StarMotos
-      const comTotal = Number(r.comisionTotal) || 0;
-      const comAbono = r.comisionAbono !== undefined ? Number(r.comisionAbono) : (r.comisionTotal !== undefined ? Number(r.comisionTotal) : 0);
-      const comPend = r.comisionPendiente !== undefined ? Number(r.comisionPendiente) : Math.max(0, comTotal - comAbono);
+      const { total: comTotal, pagado: comAbono, pendiente: comPend } = getRecordComisionMetrics(r);
       totalComision += comTotal;
       totalComisionCobrada += comAbono;
       totalComisionPendiente += comPend;
@@ -856,6 +854,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             r.serviciosRealizados?.some((s) => s.toLowerCase() === 'mantenimiento') ||
             (r as any).tipoServicio?.toLowerCase().includes('mantenimiento');
           if (!hasMantenimiento) return false;
+        } else if (filterPayment === 'con_comision') {
+          const { hasComision } = getRecordComisionMetrics(r);
+          if (!hasComision) return false;
+        } else if (filterPayment === 'comision_pendiente') {
+          const { hasPendiente } = getRecordComisionMetrics(r);
+          if (!hasPendiente) return false;
         }
       }
       return true;
@@ -863,6 +867,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
 
     // 5. Ordenamiento (Priorizando clientes deudores primero)
     return [...afterPayment].sort((a, b) => {
+      if (filterPayment === 'con_comision' || filterPayment === 'comision_pendiente') {
+        const comPendA = getRecordComisionMetrics(a).hasPendiente;
+        const comPendB = getRecordComisionMetrics(b).hasPendiente;
+        if (comPendA && !comPendB) return -1;
+        if (!comPendA && comPendB) return 1;
+      }
       const isDeudorA = isDebtorRecord(a);
       const isDeudorB = isDebtorRecord(b);
       if (isDeudorA && !isDeudorB) return -1;
@@ -3217,6 +3227,8 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     { id: 'pdi', label: 'Alistamiento PDI' },
                     { id: 'engrasado', label: 'Engrasado' },
                     { id: 'mantenimiento', label: 'Mantenimiento' },
+                    { id: 'con_comision', label: 'Con Comisión' },
+                    { id: 'comision_pendiente', label: 'Comisión Por Pagar' },
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -3282,7 +3294,13 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                       ? 'Alistamiento PDI'
                       : filterPayment === 'engrasado'
                       ? 'Engrasado'
-                      : 'Mantenimiento'}
+                      : filterPayment === 'mantenimiento'
+                      ? 'Mantenimiento'
+                      : filterPayment === 'con_comision'
+                      ? 'Con Comisión'
+                      : filterPayment === 'comision_pendiente'
+                      ? 'Comisión Por Pagar'
+                      : ''}
                   </span>
                   <button type="button" onClick={() => setFilterPayment('all')} className="hover:text-blue-950">
                     <X className="w-2.5 h-2.5" />
@@ -3432,33 +3450,82 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
             </button>
 
             {/* Bloque 4: Comisiones Matriz (Cobradas y Por Pagar) */}
-            <button
-              type="button"
-              onClick={() => setFilterPayment('all')}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setFilterPayment(filterPayment === 'con_comision' ? 'all' : 'con_comision')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setFilterPayment(filterPayment === 'con_comision' ? 'all' : 'con_comision');
+                }
+              }}
               className={`text-left rounded-xl p-2.5 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
-                filterPayment === 'all'
-                  ? 'bg-purple-50/90 border border-purple-300 shadow-2xs'
-                  : 'bg-purple-50/50 border border-purple-200 shadow-2xs opacity-85'
+                filterPayment === 'con_comision'
+                  ? 'bg-purple-100 border-2 border-purple-500 shadow-md ring-2 ring-purple-300 scale-[1.01]'
+                  : filterPayment === 'comision_pendiente'
+                    ? 'bg-purple-50/90 border border-purple-300 shadow-2xs'
+                    : 'bg-purple-50/50 border border-purple-200 shadow-2xs opacity-90'
               }`}
-              title="Comisiones cobradas y por pagar a la Matriz StarMotos"
+              title="Clic para ver todos los clientes con comisión (o desactivar filtro)"
             >
               <div className="flex items-center justify-between text-purple-800">
-                <span className="text-[10px] font-black uppercase tracking-wider">Comisiones Matriz</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider">Comisiones</span>
+                  {filterPayment === 'con_comision' && (
+                    <span className="text-[8px] font-black bg-purple-600 text-white px-1 py-0.2 rounded-full uppercase">
+                      Filtrado
+                    </span>
+                  )}
+                  {filterPayment === 'comision_pendiente' && (
+                    <span className="text-[8px] font-black bg-amber-600 text-white px-1 py-0.2 rounded-full uppercase">
+                      Por Pagar
+                    </span>
+                  )}
+                </div>
                 <div className="w-5 h-5 rounded-md bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
-                  <DollarSign className="w-3.5 h-3.5" />
+                  <Building2 className="w-3.5 h-3.5" />
                 </div>
               </div>
               <div className="mt-1">
+                <span className="text-[8px] font-bold text-purple-600 uppercase tracking-wider block">Total Cobrado</span>
                 <div className="text-base sm:text-lg font-black font-mono text-purple-900 leading-tight">
                   ${statsMetrics.totalComisionCobrada.toFixed(2)}
                 </div>
-                <span className={`text-[9px] font-semibold ${statsMetrics.totalComisionPendiente > 0 ? 'text-rose-600 font-bold' : 'text-purple-700'}`}>
-                  {statsMetrics.totalComisionPendiente > 0
-                    ? `Pendiente: $${statsMetrics.totalComisionPendiente.toFixed(2)}`
-                    : 'Al día / $0.00 pend.'}
-                </span>
+                <div className="mt-1 pt-1 border-t border-purple-200/70">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFilterPayment(filterPayment === 'comision_pendiente' ? 'all' : 'comision_pendiente');
+                    }}
+                    className={`w-full px-1.5 py-0.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer border flex items-center justify-between gap-1 active:scale-95 ${
+                      filterPayment === 'comision_pendiente'
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-1 ring-amber-300 font-black'
+                        : statsMetrics.totalComisionPendiente > 0.01
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-purple-100/70 text-purple-800 border-purple-200'
+                    }`}
+                    title="Filtrar comisiones de taller por pagar"
+                  >
+                    <span className="flex items-center gap-0.5 truncate">
+                      <Clock className="w-2.5 h-2.5 shrink-0" />
+                      <span className="truncate">Por pagar:</span>
+                      <span className="font-mono font-black">${statsMetrics.totalComisionPendiente.toFixed(2)}</span>
+                    </span>
+                    {filterPayment === 'comision_pendiente' ? (
+                      <span className="text-[7px] bg-white text-amber-900 px-1 py-0.2 rounded-full font-black uppercase">
+                        Activo
+                      </span>
+                    ) : (
+                      <span className="text-[7px] uppercase font-bold text-amber-900">
+                        Filtrar
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
-            </button>
+            </div>
           </div>
 
           {/* Sugerencia si escribe una cédula no encontrada */}
@@ -3506,9 +3573,12 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
               {filteredRecords.map((record) => {
                 const orderStatus = getRecordOrderStatus(record, effectiveOrders);
                 const isDeudor = isDebtorRecord(record);
+                const comMetrics = getRecordComisionMetrics(record);
                 let cardBgClass = 'bg-white border-zinc-200 hover:border-blue-400 active:bg-blue-50/50';
                 if (isDeudor) {
                   cardBgClass = 'bg-rose-50/90 border-rose-300 hover:border-rose-400 active:bg-rose-100/70 border-l-4 border-l-rose-600 shadow-xs ring-1 ring-rose-200/50';
+                } else if (comMetrics.hasPendiente && (filterPayment === 'comision_pendiente' || filterPayment === 'con_comision')) {
+                  cardBgClass = 'bg-purple-50/80 border-purple-300 hover:border-purple-400 active:bg-purple-100/70 border-l-4 border-l-purple-600 shadow-xs ring-1 ring-purple-200/50';
                 } else if (orderStatus === 'completed') {
                   cardBgClass = 'bg-emerald-50/70 border-emerald-300 hover:border-emerald-400 active:bg-emerald-100/60 border-l-4 border-l-emerald-500';
                 } else if (orderStatus === 'in_progress') {
@@ -3530,6 +3600,31 @@ export const AlistamientoWizardMobile: React.FC<Props> = ({
                     {/* MÓDULO 1: Cliente & Sede (sin numeración) */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
+                        {/* Etiqueta de Comisión arriba del nombre */}
+                        {comMetrics.hasComision && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span
+                              className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs ${
+                                comMetrics.hasPendiente
+                                  ? 'bg-purple-700 text-white shadow-2xs animate-pulse'
+                                  : 'bg-purple-100 text-purple-900 border border-purple-300'
+                              }`}
+                              title={
+                                comMetrics.hasPendiente
+                                  ? `Comisión de sede por pagar a Matriz: $${comMetrics.pendiente.toFixed(2)}`
+                                  : `Comisión de sede cobrada: $${comMetrics.pagado.toFixed(2)}`
+                              }
+                            >
+                              <Building2 className="w-2.5 h-2.5 shrink-0" />
+                              <span>
+                                Comisión
+                                {comMetrics.hasPendiente
+                                  ? ` • Por pagar: $${comMetrics.pendiente.toFixed(2)}`
+                                  : ` • Cobrada: $${comMetrics.pagado.toFixed(2)}`}
+                              </span>
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className={`font-bold text-xs truncate leading-tight ${isDeudor ? 'text-rose-950 font-black' : 'text-zinc-900'}`}>
                             {record.nombres} {record.apellidos}

@@ -102,6 +102,20 @@ export const isDebtorRecord = (record: AlistamientoFullRecord | AlistamientoForm
   return pendiente > 0.01 || (isCred && valor > 0 && pendiente > 0);
 };
 
+export const getRecordComisionMetrics = (record: AlistamientoFullRecord | AlistamientoFormData | null | undefined) => {
+  if (!record) return { total: 0, pagado: 0, pendiente: 0, hasComision: false, hasPendiente: false };
+  const total = Number(record.comisionTotal) || 0;
+  const pagado = record.comisionAbono !== undefined && (record.comisionAbono as any) !== ''
+    ? Number(record.comisionAbono)
+    : (record.comisionPendiente !== undefined && (record.comisionPendiente as any) !== '' ? Math.max(0, total - Number(record.comisionPendiente)) : (total > 0 ? total : 0));
+  const pendiente = record.comisionPendiente !== undefined && (record.comisionPendiente as any) !== ''
+    ? Number(record.comisionPendiente)
+    : Math.max(0, total - pagado);
+  const hasComision = total > 0.01 || pagado > 0.01 || pendiente > 0.01;
+  const hasPendiente = pendiente > 0.01;
+  return { total, pagado, pendiente, hasComision, hasPendiente };
+};
+
 export const matchRecordToWorkshop = (
   record: AlistamientoFullRecord,
   targetWsId: string,
@@ -356,7 +370,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
   };
 
   // Filtros interactivos avanzados (Pago, Fechas, Ordenamiento)
-  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento'>('all');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'con_saldo' | 'pagados' | 'pdi' | 'engrasado' | 'mantenimiento' | 'con_comision' | 'comision_pendiente'>('all');
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'this_week' | 'this_month' | 'this_year' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -1010,9 +1024,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
       totalPendiente += pendiente;
 
       // Comisiones de la sede hacia Matriz StarMotos
-      const comTotal = Number(r.comisionTotal) || 0;
-      const comAbono = r.comisionAbono !== undefined ? Number(r.comisionAbono) : (r.comisionTotal !== undefined ? Number(r.comisionTotal) : 0);
-      const comPend = r.comisionPendiente !== undefined ? Number(r.comisionPendiente) : Math.max(0, comTotal - comAbono);
+      const { total: comTotal, pagado: comAbono, pendiente: comPend } = getRecordComisionMetrics(r);
       totalComision += comTotal;
       totalComisionCobrada += comAbono;
       totalComisionPendiente += comPend;
@@ -1066,6 +1078,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
             r.serviciosRealizados?.some((s) => s.toLowerCase() === 'mantenimiento') ||
             (r as any).tipoServicio?.toLowerCase().includes('mantenimiento');
           if (!hasMantenimiento) return false;
+        } else if (filterPayment === 'con_comision') {
+          const { hasComision } = getRecordComisionMetrics(r);
+          if (!hasComision) return false;
+        } else if (filterPayment === 'comision_pendiente') {
+          const { hasPendiente } = getRecordComisionMetrics(r);
+          if (!hasPendiente) return false;
         }
       }
       return true;
@@ -1073,6 +1091,12 @@ export const AlistamientoWizard: React.FC<Props> = ({
 
     // 5. Ordenamiento: Clientes deudores SIEMPRE primero en las tablas
     return [...afterPayment].sort((a, b) => {
+      if (filterPayment === 'con_comision' || filterPayment === 'comision_pendiente') {
+        const comPendA = getRecordComisionMetrics(a).hasPendiente;
+        const comPendB = getRecordComisionMetrics(b).hasPendiente;
+        if (comPendA && !comPendB) return -1;
+        if (!comPendA && comPendB) return 1;
+      }
       const isDeudorA = isDebtorRecord(a);
       const isDeudorB = isDebtorRecord(b);
       if (isDeudorA && !isDeudorB) return -1;
@@ -1126,6 +1150,8 @@ export const AlistamientoWizard: React.FC<Props> = ({
     let countPdi = 0;
     let countConSaldo = 0;
     let countMantenimiento = 0;
+    let totalComisionCobrada = 0;
+    let totalComisionPendiente = 0;
 
     filteredRecords.forEach((r) => {
       const isPdi = isPdiOnlyRecord(r);
@@ -1141,9 +1167,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
       if (pendiente > 0.01) countConSaldo++;
       if (r.serviciosRealizados?.includes('alistamiento_pdi')) countPdi++;
       if (r.serviciosRealizados?.includes('mantenimiento') || r.serviciosRealizados?.includes('engrasado')) countMantenimiento++;
+
+      const { pagado: comAbono, pendiente: comPend } = getRecordComisionMetrics(r);
+      totalComisionCobrada += comAbono;
+      totalComisionPendiente += comPend;
     });
 
-    return { totalFacturado, totalRecaudado, totalPendiente, countPdi, countConSaldo, countMantenimiento };
+    return { totalFacturado, totalRecaudado, totalPendiente, countPdi, countConSaldo, countMantenimiento, totalComisionCobrada, totalComisionPendiente };
   }, [filteredRecords]);
 
   // Paginación derivada
@@ -3259,12 +3289,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                     <label className="block text-[11px] font-black uppercase text-zinc-600 tracking-wider">
                       Servicios
                     </label>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                       {[
                         { id: 'all', label: 'Todos' },
                         { id: 'pdi', label: 'Alistamiento PDI' },
                         { id: 'engrasado', label: 'Engrasado' },
                         { id: 'mantenimiento', label: 'Mantenimiento' },
+                        { id: 'con_comision', label: 'Con Comisión' },
+                        { id: 'comision_pendiente', label: 'Comisión Por Pagar' },
                       ].map((item) => (
                         <button
                           key={item.id}
@@ -3336,7 +3368,13 @@ export const AlistamientoWizard: React.FC<Props> = ({
                         ? 'Alistamiento PDI'
                         : filterPayment === 'engrasado'
                         ? 'Engrasado'
-                        : 'Mantenimiento'}
+                        : filterPayment === 'mantenimiento'
+                        ? 'Mantenimiento'
+                        : filterPayment === 'con_comision'
+                        ? 'Con Comisión'
+                        : filterPayment === 'comision_pendiente'
+                        ? 'Comisión Por Pagar'
+                        : ''}
                     </span>
                     <button
                       type="button"
@@ -3495,20 +3533,41 @@ export const AlistamientoWizard: React.FC<Props> = ({
               </button>
 
               {/* Bloque 4: Comisiones a Matriz (Cobradas y Por Pagar / Pendientes) */}
-              <button
-                type="button"
-                onClick={() => setFilterPayment('all')}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setFilterPayment(filterPayment === 'con_comision' ? 'all' : 'con_comision')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setFilterPayment(filterPayment === 'con_comision' ? 'all' : 'con_comision');
+                  }
+                }}
                 className={`text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
-                  statsMetrics.totalComisionPendiente > 0.01
-                    ? 'bg-purple-50/90 border border-purple-300 shadow-2xs hover:bg-purple-100/70'
-                    : 'bg-purple-50/60 border border-purple-200 shadow-2xs hover:bg-purple-100/60'
+                  filterPayment === 'con_comision'
+                    ? 'bg-purple-100 border-2 border-purple-500 shadow-md ring-2 ring-purple-300 scale-[1.01]'
+                    : filterPayment === 'comision_pendiente'
+                      ? 'bg-purple-50/90 border border-purple-300 shadow-2xs'
+                      : statsMetrics.totalComisionPendiente > 0.01
+                        ? 'bg-purple-50/90 border border-purple-300 shadow-2xs hover:bg-purple-100/70 hover:border-purple-400'
+                        : 'bg-purple-50/60 border border-purple-200 shadow-2xs hover:bg-purple-100/60 hover:border-purple-300'
                 }`}
-                title="Comisiones de sedes: Cobradas y por pagar a favor de Matriz StarMotos"
+                title="Clic para ver todos los clientes con comisión (o desactivar filtro)"
               >
                 <div className="flex items-center justify-between text-purple-800">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-black uppercase tracking-wider">Comisiones Matriz</span>
-                    {statsMetrics.totalComisionPendiente > 0.01 && (
+                    {filterPayment === 'con_comision' && (
+                      <span className="text-[9px] font-black bg-purple-600 text-white px-1.5 py-0.2 rounded-full uppercase">
+                        Filtrado
+                      </span>
+                    )}
+                    {filterPayment === 'comision_pendiente' && (
+                      <span className="text-[9px] font-black bg-amber-600 text-white px-1.5 py-0.2 rounded-full uppercase">
+                        Por Pagar
+                      </span>
+                    )}
+                    {filterPayment !== 'con_comision' && filterPayment !== 'comision_pendiente' && statsMetrics.totalComisionPendiente > 0.01 && (
                       <span className="text-[9px] font-black bg-purple-600 text-white px-1.5 py-0.2 rounded-full uppercase">
                         Pendiente
                       </span>
@@ -3519,17 +3578,51 @@ export const AlistamientoWizard: React.FC<Props> = ({
                   </div>
                 </div>
                 <div className="mt-1">
-                  <div className="text-lg sm:text-xl font-black font-mono text-purple-900 leading-tight">
-                    ${statsMetrics.totalComisionCobrada.toFixed(2)}
-                  </div>
-                  <div className="text-[10px] font-semibold text-purple-700 flex items-center justify-between gap-1">
-                    <span className="text-purple-700">Total: ${statsMetrics.totalComision.toFixed(2)}</span>
-                    <span className={statsMetrics.totalComisionPendiente > 0.01 ? 'text-amber-800 font-bold' : 'text-purple-600'}>
-                      Por pagar: ${statsMetrics.totalComisionPendiente.toFixed(2)}
+                  <div className="flex items-baseline justify-between gap-1">
+                    <div>
+                      <span className="text-[9px] font-bold text-purple-600 uppercase tracking-wider block">Total Cobrado</span>
+                      <div className="text-lg sm:text-xl font-black font-mono text-purple-900 leading-tight">
+                        ${statsMetrics.totalComisionCobrada.toFixed(2)}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-purple-700">
+                      Total: ${statsMetrics.totalComision.toFixed(2)}
                     </span>
                   </div>
+                  <div className="mt-1.5 pt-1.5 border-t border-purple-200/80">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterPayment(filterPayment === 'comision_pendiente' ? 'all' : 'comision_pendiente');
+                      }}
+                      className={`w-full px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer border flex items-center justify-between gap-1 active:scale-[0.98] ${
+                        filterPayment === 'comision_pendiente'
+                          ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-300 font-black'
+                          : statsMetrics.totalComisionPendiente > 0.01
+                            ? 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 hover:border-amber-400'
+                            : 'bg-purple-100/70 text-purple-800 border-purple-200 hover:bg-purple-200/80'
+                      }`}
+                      title="Clic para filtrar únicamente clientes con comisión de taller por pagar (deudores de comisión)"
+                    >
+                      <span className="flex items-center gap-1 truncate">
+                        <Clock className="w-3 h-3 shrink-0" />
+                        <span className="truncate">Por pagar:</span>
+                        <span className="font-mono font-black">${statsMetrics.totalComisionPendiente.toFixed(2)}</span>
+                      </span>
+                      {filterPayment === 'comision_pendiente' ? (
+                        <span className="text-[8px] bg-white text-amber-900 px-1.5 py-0.2 rounded-full font-black uppercase shrink-0">
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="text-[8px] uppercase tracking-wider font-extrabold px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-900 shrink-0">
+                          Filtrar
+                        </span>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             </div>
 
             {/* Aviso o Sugerencia reactiva si escribe una cédula no existente */}
@@ -3594,6 +3687,7 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       const idx = (currentPage - 1) * RECORDS_PER_PAGE + i;
                       const orderStatus = getRecordOrderStatus(record, effectiveOrders);
                       const isDeudor = isDebtorRecord(record);
+                      const comMetrics = getRecordComisionMetrics(record);
                       const valServ = Number(record.valorServicio) || 0;
                       const pagado = record.abono !== undefined ? Number(record.abono) : (Number(record.montoPagado) || 0);
                       const saldoPendiente = record.saldoPendiente !== undefined ? Number(record.saldoPendiente) : Math.max(0, valServ - pagado);
@@ -3604,6 +3698,9 @@ export const AlistamientoWizard: React.FC<Props> = ({
                       if (isDeudor) {
                         rowBgClass = 'bg-rose-50/90 hover:bg-rose-100/90 active:bg-rose-200/80 text-rose-950 border-l-4 border-l-rose-600 shadow-2xs';
                         statusTooltip = `[CLIENTE DEUDOR - PENDIENTE $${saldoPendiente.toFixed(2)}] Clic para ver ficha resumida de deuda de ${record.nombres} ${record.apellidos}`;
+                      } else if (comMetrics.hasPendiente && (filterPayment === 'comision_pendiente' || filterPayment === 'con_comision')) {
+                        rowBgClass = 'bg-purple-50/80 hover:bg-purple-100/90 active:bg-purple-200/80 text-purple-950 border-l-4 border-l-purple-600 shadow-2xs';
+                        statusTooltip = `[COMISIÓN POR PAGAR $${comMetrics.pendiente.toFixed(2)}] Ficha técnica de ${record.nombres} ${record.apellidos}`;
                       } else if (orderStatus === 'completed') {
                         rowBgClass = 'bg-emerald-50/75 hover:bg-emerald-100/80 active:bg-emerald-200/70 text-emerald-950';
                         statusTooltip = `[ORDEN ENTREGADA / COMPLETADA] Ficha técnica de ${record.nombres} ${record.apellidos}`;
@@ -3631,13 +3728,16 @@ export const AlistamientoWizard: React.FC<Props> = ({
                               {isDeudor && (
                                 <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0 animate-ping" title="Cliente deudor" />
                               )}
-                              {orderStatus === 'completed' && !isDeudor && (
+                              {comMetrics.hasPendiente && !isDeudor && (
+                                <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0 animate-pulse" title={`Comisión por pagar $${comMetrics.pendiente.toFixed(2)}`} />
+                              )}
+                              {orderStatus === 'completed' && !isDeudor && !comMetrics.hasPendiente && (
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs" title="Orden entregada" />
                               )}
-                              {orderStatus === 'in_progress' && !isDeudor && (
+                              {orderStatus === 'in_progress' && !isDeudor && !comMetrics.hasPendiente && (
                                 <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse shadow-2xs" title="En proceso en taller" />
                               )}
-                              <span className={isDeudor ? 'text-rose-700 font-bold' : orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
+                              <span className={isDeudor ? 'text-rose-700 font-bold' : comMetrics.hasPendiente ? 'text-purple-700 font-bold' : orderStatus === 'completed' ? 'text-emerald-700 font-bold' : orderStatus === 'in_progress' ? 'text-amber-800 font-bold' : 'text-zinc-400'}>
                                 {idx + 1}
                               </span>
                             </div>
@@ -3646,6 +3746,31 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           {/* 2. Cliente */}
                           <td className="px-2.5 py-2 truncate" title={`${record.nombres} ${record.apellidos} (C.I. ${record.cedulaRuc})`}>
                             <div className="flex flex-col truncate">
+                              {/* Etiqueta de Comisión arriba del nombre */}
+                              {comMetrics.hasComision && (
+                                <div className="flex items-center gap-1 mb-0.5">
+                                  <span
+                                    className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider inline-flex items-center gap-1 ${
+                                      comMetrics.hasPendiente
+                                        ? 'bg-purple-700 text-white shadow-2xs animate-pulse'
+                                        : 'bg-purple-100 text-purple-900 border border-purple-300'
+                                    }`}
+                                    title={
+                                      comMetrics.hasPendiente
+                                        ? `Comisión de sede por pagar a Matriz: $${comMetrics.pendiente.toFixed(2)} (Total: $${comMetrics.total.toFixed(2)})`
+                                        : `Comisión de sede cobrada: $${comMetrics.pagado.toFixed(2)}`
+                                    }
+                                  >
+                                    <Building2 className="w-2.5 h-2.5 shrink-0" />
+                                    <span>
+                                      Comisión
+                                      {comMetrics.hasPendiente
+                                        ? ` • Por pagar: $${comMetrics.pendiente.toFixed(2)}`
+                                        : ` • Cobrada: $${comMetrics.pagado.toFixed(2)}`}
+                                    </span>
+                                  </span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1.5 truncate">
                                 <span className="font-bold truncate text-xs text-zinc-900 group-hover:text-blue-600 transition-colors">
                                   {record.nombres} {record.apellidos}
@@ -3889,6 +4014,14 @@ export const AlistamientoWizard: React.FC<Props> = ({
                           <span className="text-[10px] text-emerald-700 font-bold">Cobrado: ${tableFooterMetrics.totalRecaudado.toFixed(2)}</span>
                           {tableFooterMetrics.totalPendiente > 0.01 && (
                             <span className="text-[10px] text-rose-600 font-black">Por cobrar: ${tableFooterMetrics.totalPendiente.toFixed(2)}</span>
+                          )}
+                          {(filterPayment === 'con_comision' || filterPayment === 'comision_pendiente' || tableFooterMetrics.totalComisionCobrada > 0 || tableFooterMetrics.totalComisionPendiente > 0) && (
+                            <div className="pt-0.5 mt-0.5 border-t border-zinc-200 flex flex-col items-end">
+                              <span className="text-[10px] text-purple-800 font-bold">Com. cobrada: ${tableFooterMetrics.totalComisionCobrada.toFixed(2)}</span>
+                              {tableFooterMetrics.totalComisionPendiente > 0.01 && (
+                                <span className="text-[10px] text-amber-800 font-black">Com. por pagar: ${tableFooterMetrics.totalComisionPendiente.toFixed(2)}</span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>

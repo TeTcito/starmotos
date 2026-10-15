@@ -93,9 +93,9 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       <div className="grid grid-cols-2 gap-4 break-inside-avoid">
         {/* 1. Datos del Cliente & Sede */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 pb-1.5 border-b border-zinc-900">
-            <User className="w-3.5 h-3.5 text-zinc-900 shrink-0" />
-            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none">
+          <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
+            <User className="w-4 h-4 text-zinc-900 shrink-0" />
+            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
               1. Datos del Cliente & Sede
             </span>
           </div>
@@ -145,9 +145,9 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
 
         {/* 2. Motocicleta Registrada */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 pb-1.5 border-b border-zinc-900">
-            <Bike className="w-3.5 h-3.5 text-zinc-900 shrink-0" />
-            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none">
+          <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
+            <Bike className="w-4 h-4 text-zinc-900 shrink-0" />
+            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
               2. Motocicleta Registrada
             </span>
           </div>
@@ -198,16 +198,16 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* 3. RECLAMO TÉCNICO & MOVILIDAD (SIN CONTENEDORES)                          */}
       {/* ========================================================================= */}
       <div className="space-y-1.5 break-inside-avoid">
-        <div className="flex items-center gap-1.5 pb-1.5 border-b border-zinc-900">
-          <Wrench className="w-3.5 h-3.5 text-zinc-900 shrink-0" />
-          <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none">
+        <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
+          <Wrench className="w-4 h-4 text-zinc-900 shrink-0" />
+          <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
             3. Reclamo Técnico & Movilidad
           </span>
         </div>
 
         <div className="space-y-1.5 pt-0.5">
           <div>
-            <span className="text-[9px] uppercase font-bold text-zinc-500 block mb-0.5">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 block mb-1">
               Descripción de la Falla / Reclamo del Cliente:
             </span>
             <p className="text-[10px] text-zinc-950 font-medium whitespace-pre-wrap leading-snug">
@@ -216,17 +216,17 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
           </div>
 
           {partsList.length > 0 && (
-            <div className="pt-2 border-t border-zinc-200">
-              <span className="text-[8.5px] uppercase font-bold text-zinc-500 block mb-1.5">
+            <div className="pt-2.5 mt-1 border-t border-zinc-200">
+              <span className="text-[8.5px] uppercase font-bold text-zinc-500 block mb-2">
                 Repuestos Requeridos / Componentes Involucrados:
               </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2 pt-0.5">
                 {partsList.map((part, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-300 text-zinc-900 font-mono font-bold text-[9px] shadow-2xs"
+                    className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-300 text-zinc-900 font-mono font-bold text-[9px] shadow-2xs leading-none"
                   >
-                    • {part}
+                    <span className="relative -top-[1.5px]">{part.startsWith('•') ? part : `• ${part}`}</span>
                   </span>
                 ))}
               </div>
@@ -234,7 +234,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
           )}
 
           {warranty.resolutionType && (
-            <div className="pt-1 border-t border-zinc-200 flex items-center gap-1.5">
+            <div className="pt-1.5 border-t border-zinc-200 flex items-center gap-1.5">
               <span className="text-[8.5px] uppercase font-bold text-zinc-500">
                 Modalidad Dictaminada:
               </span>
@@ -247,7 +247,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
           )}
 
           {(warranty.matrizNotes || warranty.garanteNotes) && (
-            <div className="pt-1 border-t border-zinc-200 space-y-1">
+            <div className="pt-1.5 border-t border-zinc-200 space-y-1.5">
               {warranty.matrizNotes && (
                 <div>
                   <span className="text-[8.5px] uppercase font-bold text-zinc-500 block mb-0.5">
@@ -277,14 +277,14 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* 4. REGISTRO FOTOGRÁFICO DE INSPECCIÓN TÉCNICA (IMÁGENES)                  */}
       {/* ========================================================================= */}
       <div className="space-y-1.5 pt-1">
-        <div className="flex items-center justify-between pb-1.5 border-b border-zinc-900 break-inside-avoid">
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-900 break-inside-avoid">
           <div className="flex items-center gap-1.5">
-            <Camera className="w-3.5 h-3.5 text-zinc-900 shrink-0" />
-            <span className="font-black text-zinc-900 text-[10.5px] uppercase tracking-wide leading-none">
+            <Camera className="w-4 h-4 text-zinc-900 shrink-0" />
+            <span className="font-black text-zinc-900 text-[10.5px] uppercase tracking-wide leading-none relative -top-[2.5px]">
               4. Evidencias Fotográficas de Diagnóstico Técnico ({photoImages.length} Imágenes)
             </span>
           </div>
-          <span className="text-[8.5px] font-bold text-zinc-500 uppercase leading-none">
+          <span className="text-[8.5px] font-bold text-zinc-500 uppercase leading-none relative -top-[2.5px]">
             Inspección Visual Obligatoria
           </span>
         </div>
@@ -294,18 +294,18 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
             No se adjuntaron fotografías en este expediente.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+          <div className="grid grid-cols-2 gap-3 pt-1">
             {photoImages.map((photoUrl, idx) => (
               <div
                 key={idx}
-                className="border border-zinc-300 rounded-lg p-1.5 space-y-1 break-inside-avoid printable-photo-card bg-white"
+                className="border border-zinc-300 rounded-lg p-2 flex flex-col break-inside-avoid printable-photo-card bg-white"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-center justify-between text-[8.5px] font-bold text-zinc-700">
-                  <span className="truncate pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
-                  <span className="font-mono text-zinc-400 shrink-0">#{idx + 1}</span>
+                <div className="flex items-center justify-between text-[8.5px] font-bold text-zinc-700 pb-1.5 mb-1.5 border-b border-zinc-100">
+                  <span className="truncate pr-1 leading-none relative -top-[1px]">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
+                  <span className="font-mono text-zinc-400 shrink-0 leading-none relative -top-[1px]">#{idx + 1}</span>
                 </div>
-                <div className="w-full h-[168px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-100">
+                <div className="w-full h-[208px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-200">
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}

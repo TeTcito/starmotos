@@ -305,11 +305,11 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                 className="break-inside-avoid printable-photo-card"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-center justify-between text-[9px] font-bold text-zinc-800 pb-1">
+                <div className="flex items-center justify-between text-[9.5px] font-bold text-zinc-800 pb-0.5">
                   <span className="truncate pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
                   <span className="font-mono text-zinc-500 shrink-0">#{idx + 1}</span>
                 </div>
-                <div className="w-full h-[195px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-300">
+                <div className="w-full h-[190px] mt-[5px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-300">
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}

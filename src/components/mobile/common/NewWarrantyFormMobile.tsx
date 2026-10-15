@@ -40,12 +40,13 @@ import { ModalPortal } from '../../common/ModalPortal';
 
 export const isVideoUrl = (url?: string): boolean => {
   if (!url) return false;
+  const cleanUrl = url.split('#')[0].split('?')[0];
   return (
     url.startsWith('data:video/') ||
     url.includes('/garantias/video_') ||
     url.includes('/video_') ||
     url.includes('_video_') ||
-    /\.(mp4|webm|ogg|mov|m4v|quicktime)(\?.*)?$/i.test(url)
+    /\.(mp4|webm|ogg|mov|m4v|quicktime)$/i.test(cleanUrl)
   );
 };
 
@@ -136,6 +137,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
   const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
   const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
   const [uploadingPhotoIndices, setUploadingPhotoIndices] = useState<number[]>([]);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<{
+    [index: number]: { percent: number; loadedMB: string; totalMB: string };
+  }>({});
   const [uploadProgressText, setUploadProgressText] = useState<string>('');
   const [showPhotoSourceModal, setShowPhotoSourceModal] = useState(false);
   const [targetSlotIndex, setTargetSlotIndex] = useState<number | null>(null);
@@ -415,47 +419,58 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       return;
     }
 
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
     const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB max
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      alert('El video supera el límite de 50 MB permitido para almacenamiento en la nube. Por favor seleccione o grabe un clip técnico de menor tamaño.');
+      alert(`El video seleccionado pesa ${sizeMB} MB. El límite máximo de almacenamiento en la nube es 50 MB.\n\nPor favor seleccione o grabe un clip técnico de menor tamaño (de 15 a 30 segundos) o en resolución estándar.`);
       e.target.value = '';
       return;
     }
 
-    setUploadingSlot({ type: 'video', index: active.index });
+    const slotIdx = active.index;
+    setUploadingSlot({ type: 'video', index: slotIdx });
+    setVideoUploadProgress((prev) => ({
+      ...prev,
+      [slotIdx]: { percent: 0, loadedMB: '0.0', totalMB: sizeMB },
+    }));
+
     try {
       // 1. Previsualización local inmediata
       const previewUrl = URL.createObjectURL(file);
       setVideoSlots((prev) => {
         const next = [...prev];
-        next[active.index] = previewUrl;
+        next[slotIdx] = previewUrl;
         return next;
       });
 
-      // 2. Subida directa del archivo original a Supabase Storage (mantiene audio íntegro y carga rápida)
-      const cloudUrl = await uploadWarrantyMedia(file, `video_movil_${active.index + 1}`);
+      // 2. Subida directa del archivo original a Supabase Storage con tracking en tiempo real
+      const cloudUrl = await uploadWarrantyMedia(
+        file,
+        `video_movil_${slotIdx + 1}`,
+        (percent, loaded, total) => {
+          setVideoUploadProgress((prev) => ({
+            ...prev,
+            [slotIdx]: {
+              percent,
+              loadedMB: (loaded / (1024 * 1024)).toFixed(1),
+              totalMB: (total / (1024 * 1024)).toFixed(1),
+            },
+          }));
+        }
+      );
+
       if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
         setVideoSlots((prev) => {
           const next = [...prev];
-          next[active.index] = cloudUrl;
+          next[slotIdx] = cloudUrl;
           return next;
         });
       } else {
-        // Fallback local en caso de falla de conectividad
-        try {
-          const compressed = await compressVideoBase64(file, 640, 480, 45);
-          if (compressed) {
-            setVideoSlots((prev) => {
-              const next = [...prev];
-              next[active.index] = compressed;
-              return next;
-            });
-          }
-        } catch (_) {}
+        alert('No se pudo completar la subida del video a la nube. Por favor verifique su conexión e intente nuevamente.');
       }
     } catch (err) {
       console.error('Error al procesar video móvil:', err);
-      alert('Ocurrió un error al subir el video.');
+      alert('Ocurrió un error al subir el video a la nube.');
     } finally {
       setUploadingSlot(null);
       e.target.value = '';
@@ -1308,29 +1323,58 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                       className="relative w-full aspect-video rounded-lg overflow-hidden flex items-center justify-center cursor-pointer bg-zinc-950"
                     >
                       {isUploading ? (
-                        <div className="flex flex-col items-center justify-center p-2 text-center">
-                          <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-1" />
-                          <span className="text-[10px] font-bold text-purple-300">Subiendo video a la nube...</span>
+                        <div className="relative w-full h-full flex flex-col items-center justify-center p-3 text-center bg-zinc-950 text-white z-10">
+                          {video && (
+                            <video
+                              src={video.includes('#t=') ? video : `${video}#t=0.1`}
+                              className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+                              playsInline
+                              muted
+                            />
+                          )}
+                          <div className="relative z-10 flex flex-col items-center w-full max-w-[200px] space-y-1.5">
+                            <div className="w-7 h-7 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-0.5" />
+                            <span className="text-xs font-black text-purple-200">
+                              Subiendo video: {videoUploadProgress[idx]?.percent ?? 0}%
+                            </span>
+                            {videoUploadProgress[idx] && (
+                              <span className="text-[10px] text-zinc-300 font-mono">
+                                {videoUploadProgress[idx].loadedMB} MB de {videoUploadProgress[idx].totalMB} MB
+                              </span>
+                            )}
+                            <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden border border-zinc-700">
+                              <div
+                                className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full transition-all duration-150 ease-out rounded-full"
+                                style={{ width: `${Math.max(5, videoUploadProgress[idx]?.percent ?? 0)}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
                       ) : video ? (
                         <>
-                          <video src={video} className="w-full h-full object-cover opacity-80" preload="metadata" />
+                          <video
+                            src={video.includes('#t=') ? video : `${video}#t=0.1`}
+                            className="w-full h-full object-cover opacity-85"
+                            preload="metadata"
+                            playsInline
+                            muted
+                          />
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg">
+                            <div className="w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/20">
                               <Play className="w-4 h-4 fill-white ml-0.5 text-white" />
                             </div>
                           </div>
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-1.5">
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-2">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setZoomImage(video);
                               }}
-                              className="px-2.5 py-1 rounded bg-white text-zinc-900 text-[10px] font-bold flex items-center gap-1"
+                              className="px-3 py-1.5 rounded-lg bg-white text-zinc-900 text-xs font-bold flex items-center gap-1 shadow-md active:scale-95 transition"
                               title="Reproducir video"
                             >
-                              <Play className="w-3 h-3 fill-current" />
+                              <Play className="w-3.5 h-3.5 fill-current" />
                               <span>Ver</span>
                             </button>
                             <button
@@ -1339,10 +1383,10 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                                 e.stopPropagation();
                                 handleTriggerVideoUpload(idx);
                               }}
-                              className="p-1.5 rounded bg-purple-600 text-white"
+                              className="p-2 rounded-lg bg-purple-600 text-white shadow-md active:scale-95 transition"
                               title="Reemplazar video"
                             >
-                              <RefreshCw className="w-3 h-3" />
+                              <RefreshCw className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
@@ -1350,10 +1394,10 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                                 e.stopPropagation();
                                 handleRemoveVideo(idx);
                               }}
-                              className="p-1.5 rounded bg-red-600 text-white"
+                              className="p-2 rounded-lg bg-red-600 text-white shadow-md active:scale-95 transition"
                               title="Eliminar video"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </>

@@ -2100,9 +2100,11 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
                   {isVideo ? (
                     <div className="w-full h-full relative flex items-center justify-center bg-black">
                       <video
-                        src={url}
+                        src={url.includes('#t=') ? url : `${url}#t=0.1`}
                         className="w-full h-full object-cover opacity-80"
                         preload="metadata"
+                        playsInline
+                        muted
                       />
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
@@ -2639,6 +2641,9 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
   const [photoSlots, setPhotoSlots] = useState<(string | null)[]>([null, null, null, null, null, null, null]);
   const [videoSlots, setVideoSlots] = useState<(string | null)[]>([null, null]);
   const [uploadingSlot, setUploadingSlot] = useState<{ type: 'photo' | 'video'; index: number } | null>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<{
+    [index: number]: { percent: number; loadedMB: string; totalMB: string };
+  }>({});
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
 
   const activeSlotRef = useRef<{ type: 'photo' | 'video'; index: number } | null>(null);
@@ -2793,7 +2798,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
     }
   };
 
-  // Procesamiento de selección de archivo de video (subida directa a Storage conservando audio + respaldo)
+  // Procesamiento de selección de archivo de video (subida directa a Storage conservando audio + progreso en vivo)
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     const active = activeSlotRef.current;
@@ -2805,47 +2810,58 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
       return;
     }
 
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
     const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB max
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      alert('El video supera el límite de 50 MB permitido para almacenamiento en la nube. Por favor seleccione o grabe un clip técnico de menor tamaño.');
+      alert(`El video seleccionado pesa ${sizeMB} MB. El límite máximo de almacenamiento en la nube es 50 MB.\n\nPor favor seleccione o grabe un clip técnico de menor tamaño (de 15 a 30 segundos) o en resolución estándar.`);
       e.target.value = '';
       return;
     }
 
-    setUploadingSlot({ type: 'video', index: active.index });
+    const slotIdx = active.index;
+    setUploadingSlot({ type: 'video', index: slotIdx });
+    setVideoUploadProgress((prev) => ({
+      ...prev,
+      [slotIdx]: { percent: 0, loadedMB: '0.0', totalMB: sizeMB },
+    }));
+
     try {
       // 1. Previsualización local inmediata
       const previewUrl = URL.createObjectURL(file);
       setVideoSlots((prev) => {
         const next = [...prev];
-        next[active.index] = previewUrl;
+        next[slotIdx] = previewUrl;
         return next;
       });
 
-      // 2. Subida directa del archivo original a Supabase Storage (mantiene audio íntegro y carga rápida)
-      const cloudUrl = await uploadWarrantyMedia(file, `video_${active.index + 1}`);
+      // 2. Subida con reporte de progreso en vivo
+      const cloudUrl = await uploadWarrantyMedia(
+        file,
+        `video_${slotIdx + 1}`,
+        (percent, loaded, total) => {
+          setVideoUploadProgress((prev) => ({
+            ...prev,
+            [slotIdx]: {
+              percent,
+              loadedMB: (loaded / (1024 * 1024)).toFixed(1),
+              totalMB: (total / (1024 * 1024)).toFixed(1),
+            },
+          }));
+        }
+      );
+
       if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
         setVideoSlots((prev) => {
           const next = [...prev];
-          next[active.index] = cloudUrl;
+          next[slotIdx] = cloudUrl;
           return next;
         });
       } else {
-        // Fallback local en caso de falla de conectividad
-        try {
-          const compressed = await compressVideoBase64(file, 640, 480, 45);
-          if (compressed) {
-            setVideoSlots((prev) => {
-              const next = [...prev];
-              next[active.index] = compressed;
-              return next;
-            });
-          }
-        } catch (_) {}
+        alert('No se pudo completar la subida del video a la nube. Por favor verifique su conexión e intente nuevamente.');
       }
     } catch (err) {
       console.error('Error al procesar video:', err);
-      alert('Ocurrió un error al subir el video.');
+      alert('Ocurrió un error al subir el video a la nube.');
     } finally {
       setUploadingSlot(null);
       e.target.value = '';
@@ -2892,12 +2908,18 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
         alert('Por favor arrastre un video válido (MP4, WEBM, MOV).');
         return;
       }
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
       const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
       if (file.size > MAX_VIDEO_SIZE_BYTES) {
-        alert('El video supera el límite de 50 MB permitido para almacenamiento en la nube. Por favor seleccione o grabe un clip técnico de menor tamaño.');
+        alert(`El video supera el límite de 50 MB (pesa ${sizeMB} MB). Por favor seleccione o grabe un clip técnico de menor tamaño.`);
         return;
       }
       setUploadingSlot({ type: 'video', index });
+      setVideoUploadProgress((prev) => ({
+        ...prev,
+        [index]: { percent: 0, loadedMB: '0.0', totalMB: sizeMB },
+      }));
+
       try {
         const previewUrl = URL.createObjectURL(file);
         setVideoSlots((prev) => {
@@ -2906,24 +2928,27 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
           return next;
         });
 
-        const cloudUrl = await uploadWarrantyMedia(file, `video_${index + 1}`);
+        const cloudUrl = await uploadWarrantyMedia(
+          file,
+          `video_${index + 1}`,
+          (percent, loaded, total) => {
+            setVideoUploadProgress((prev) => ({
+              ...prev,
+              [index]: {
+                percent,
+                loadedMB: (loaded / (1024 * 1024)).toFixed(1),
+                totalMB: (total / (1024 * 1024)).toFixed(1),
+              },
+            }));
+          }
+        );
+
         if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
           setVideoSlots((prev) => {
             const next = [...prev];
             next[index] = cloudUrl;
             return next;
           });
-        } else {
-          try {
-            const compressed = await compressVideoBase64(file, 640, 480, 45);
-            if (compressed) {
-              setVideoSlots((prev) => {
-                const next = [...prev];
-                next[index] = compressed;
-                return next;
-              });
-            }
-          } catch (_) {}
         }
       } catch (err) {
         console.error(err);
@@ -3622,45 +3647,73 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
 
                   {/* Recuadro de carga de video */}
                   <div
-                    onClick={() => !isUploading && handleTriggerVideoUpload(idx)}
+                    onClick={() => {
+                      if (!isUploading && !video) {
+                        handleTriggerVideoUpload(idx);
+                      }
+                    }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => handleSlotDrop(e, 'video', idx)}
-                    className={`relative w-full aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${
+                    className={`relative w-full aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden ${
                       video
                         ? 'border-purple-400 bg-black'
-                        : 'border-purple-300 hover:border-purple-600 bg-white hover:bg-purple-50/50'
+                        : 'border-purple-300 hover:border-purple-600 bg-white hover:bg-purple-50/50 cursor-pointer'
                     }`}
                   >
                     {isUploading ? (
-                      <div className="flex flex-col items-center justify-center p-3 text-center">
-                        <div className="w-7 h-7 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mb-2" />
-                        <span className="text-xs font-bold text-purple-800">Subiendo video a la nube...</span>
-                        <span className="text-[10px] text-zinc-500 mt-0.5">Almacenando con audio e imagen completa</span>
+                      <div className="relative w-full h-full flex flex-col items-center justify-center p-3 text-center bg-zinc-950 text-white z-10">
+                        {video && (
+                          <video
+                            src={video.includes('#t=') ? video : `${video}#t=0.1`}
+                            className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+                            playsInline
+                            muted
+                          />
+                        )}
+                        <div className="relative z-10 flex flex-col items-center w-full max-w-[210px] space-y-1.5">
+                          <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin mb-1" />
+                          <span className="text-xs font-black text-purple-200">
+                            Subiendo video: {videoUploadProgress[idx]?.percent ?? 0}%
+                          </span>
+                          {videoUploadProgress[idx] && (
+                            <span className="text-[10px] text-zinc-300 font-mono">
+                              {videoUploadProgress[idx].loadedMB} MB de {videoUploadProgress[idx].totalMB} MB
+                            </span>
+                          )}
+                          <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden border border-zinc-700">
+                            <div
+                              className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full transition-all duration-150 ease-out rounded-full"
+                              style={{ width: `${Math.max(5, videoUploadProgress[idx]?.percent ?? 0)}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ) : video ? (
                       <>
                         <video
-                          src={video}
-                          className="w-full h-full object-cover opacity-85"
+                          src={video.includes('#t=') ? video : `${video}#t=0.1`}
+                          className="w-full h-full object-cover opacity-90"
                           preload="metadata"
+                          playsInline
+                          muted
                         />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="w-10 h-10 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">
                             <Play className="w-5 h-5 fill-white ml-0.5 text-white" />
                           </div>
                         </div>
-                        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-2 p-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               setPreviewMedia(video);
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-white/90 hover:bg-white text-zinc-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                            className="px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-zinc-900 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md"
                             title="Reproducir video"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Reproducir</span>
+                            <span>Ver Video</span>
                           </button>
                           <button
                             type="button"
@@ -3668,7 +3721,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                               e.stopPropagation();
                               handleTriggerVideoUpload(idx);
                             }}
-                            className="p-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-xs"
+                            className="p-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-md"
                             title="Reemplazar video"
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -3679,7 +3732,7 @@ export const NewWarrantyFormView: React.FC<NewWarrantyFormViewProps> = ({
                               e.stopPropagation();
                               handleRemoveVideo(idx);
                             }}
-                            className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition cursor-pointer shadow-xs"
+                            className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition cursor-pointer shadow-md"
                             title="Eliminar video"
                           >
                             <Trash2 className="w-4 h-4" />

@@ -1825,9 +1825,11 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                     {isVideo ? (
                       <div className="w-full h-full relative flex items-center justify-center bg-black">
                         <video
-                          src={url}
+                          src={url.includes('#t=') ? url : `${url}#t=0.1`}
                           className="w-full h-full object-cover opacity-80"
                           preload="metadata"
+                          playsInline
+                          muted
                         />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center shadow-lg border border-white/30 backdrop-blur-xs">

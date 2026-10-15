@@ -1,5 +1,5 @@
 // src/services/mediaStorage.ts
-import { supabase } from '../lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 
 const BUCKET_NAME = 'warranty-media';
 const DB_NAME = 'starmotos_media_db_v1';
@@ -70,6 +70,66 @@ export async function getMediaFromIndexedDB(id: string): Promise<string | null> 
 }
 
 /**
+ * Realiza la subida de un Blob/File a Supabase Storage mediante XMLHttpRequest
+ * para permitir reporte de progreso en tiempo real y timeout extendido en redes móviles.
+ */
+function uploadViaXhr(
+  url: string,
+  blob: Blob,
+  mimeType: string,
+  onProgress?: (percent: number, loaded: number, total: number) => void
+): Promise<{ ok: boolean; status: number }> {
+  return new Promise((resolve) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+      xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+      xhr.setRequestHeader('Content-Type', mimeType);
+      xhr.setRequestHeader('cache-control', 'max-age=31536000');
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.timeout = 300000; // 5 minutos de timeout para subidas de video en redes móviles
+
+      if (xhr.upload && onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && e.total > 0) {
+            const percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+            onProgress(percent, e.loaded, e.total);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (onProgress && blob.size > 0) {
+            onProgress(100, blob.size, blob.size);
+          }
+          resolve({ ok: true, status: xhr.status });
+        } else {
+          console.warn('[Supabase Storage XHR] Status no exitoso:', xhr.status, xhr.responseText);
+          resolve({ ok: false, status: xhr.status });
+        }
+      };
+
+      xhr.onerror = () => {
+        console.warn('[Supabase Storage XHR] Error de red.');
+        resolve({ ok: false, status: 0 });
+      };
+
+      xhr.ontimeout = () => {
+        console.warn('[Supabase Storage XHR] Tiempo de espera agotado.');
+        resolve({ ok: false, status: 408 });
+      };
+
+      xhr.send(blob);
+    } catch (e) {
+      console.warn('[Supabase Storage XHR] Excepción al enviar XHR:', e);
+      resolve({ ok: false, status: 500 });
+    }
+  });
+}
+
+/**
  * Valida si una cadena es un DataURL válido con contenido suficiente y sin caracteres corruptos.
  * Soporta tanto imágenes (data:image/) como videos diagnósticos (data:video/).
  */
@@ -83,11 +143,8 @@ export function isValidDataUrl(dataUrl: string): boolean {
   if (commaIdx === -1) return false;
 
   let b64Data = dataUrl.slice(commaIdx + 1).trim().replace(/\s+/g, '');
-  // Los medios truncados con puntos suspensivos son incompletos y dan ERR_INVALID_URL
   if (b64Data.length < 50) return false;
   if (b64Data.includes('…') || b64Data.includes('...')) return false;
-
-  // Si b64Data.length % 4 === 1, es matemáticamente inválido en base64
   if (b64Data.length % 4 === 1) return false;
 
   b64Data = b64Data.replace(/-/g, '+').replace(/_/g, '/');
@@ -96,14 +153,12 @@ export function isValidDataUrl(dataUrl: string): boolean {
     b64Data += '='.repeat(padLen);
   }
 
-  // Comprobar muestra inicial para evitar expresiones regulares pesadas en buffers grandes
   const sampleToCheck = b64Data.slice(0, 500);
   if (!/^[A-Za-z0-9+/=]+$/.test(sampleToCheck)) {
     return false;
   }
 
   try {
-    // Validar decodificación sobre muestra inicial (evita desbordar memoria con videos de varios MB)
     const decodedSample = atob(sampleToCheck.slice(0, 120));
     if (dataUrl.includes('image/webp')) {
       if (!decodedSample.startsWith('RIFF') || !decodedSample.includes('WEBP')) {
@@ -195,7 +250,6 @@ export function cleanCorruptedMediaFromLocalStorage(): void {
   }
 }
 
-
 /**
  * Convierte un DataURL (Base64) a Blob binario para subida eficiente
  */
@@ -209,24 +263,18 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
     const header = dataUrl.slice(0, commaIdx);
     let b64Data = dataUrl.slice(commaIdx + 1);
 
-    // Extraer mimeType del header
     const mimeMatch = header.match(/^data:([^;]+)/);
     const mimeType = mimeMatch ? mimeMatch[1] : (header.includes('video') ? 'video/mp4' : 'image/webp');
 
-    // Limpieza estricta de b64Data
     b64Data = b64Data.trim().replace(/\s+/g, '');
 
-    // Decodificar si viene con encoding URL
     if (b64Data.includes('%')) {
       try {
         b64Data = decodeURIComponent(b64Data);
       } catch (_) {}
     }
 
-    // Convertir URL-safe Base64 a Base64 estándar
     b64Data = b64Data.replace(/-/g, '+').replace(/_/g, '/');
-
-    // Reparar padding '=' si no es múltiplo de 4
     const padLen = (4 - (b64Data.length % 4)) % 4;
     if (padLen > 0) {
       b64Data += '='.repeat(padLen);
@@ -248,11 +296,12 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
 /**
  * Sube un archivo, blob o cadena base64 a Supabase Storage (bucket warranty-media)
  * y devuelve la URL pública HTTPS permanente.
- * Si falla o está offline, guarda en IndexedDB y devuelve el contenido de respaldo.
+ * Incluye soporte de progreso en tiempo real (0%-100%) y fallback offline.
  */
 export async function uploadWarrantyMedia(
   input: File | Blob | string,
-  prefix = 'media'
+  prefix = 'media',
+  onProgress?: (percent: number, loaded: number, total: number) => void
 ): Promise<string> {
   // 1. Si ya es una URL externa de Supabase o internet, retornar tal cual
   if (typeof input === 'string') {
@@ -270,13 +319,11 @@ export async function uploadWarrantyMedia(
       if (input.startsWith('data:')) {
         const parsed = dataUrlToBlob(input);
         if (!parsed) {
-          // DataURL corrupto o incompleto: no retornar cadena rota para evitar net::ERR_INVALID_URL
           return '';
         }
         blob = parsed.blob;
         mimeType = parsed.mimeType;
       } else if (input.startsWith('blob:')) {
-        // Resolver URL de Blob local del navegador
         try {
           const res = await fetch(input);
           blob = await res.blob();
@@ -292,17 +339,40 @@ export async function uploadWarrantyMedia(
       mimeType = input.type || 'application/octet-stream';
     }
 
-    if (mimeType.includes('mp4')) ext = 'mp4';
-    else if (mimeType.includes('webm')) ext = 'webm';
-    else if (mimeType.includes('quicktime') || mimeType.includes('mov')) ext = 'mov';
-    else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
-    else if (mimeType.includes('png')) ext = 'png';
-    else if (mimeType.includes('webp')) ext = 'webp';
-    else if (input instanceof File && input.name) {
+    // Normalización de extensiones y tipos MIME para máxima compatibilidad cross-platform
+    if (mimeType.includes('mp4') || mimeType.includes('m4v')) {
+      ext = 'mp4';
+      mimeType = 'video/mp4';
+    } else if (mimeType.includes('webm')) {
+      ext = 'webm';
+      mimeType = 'video/webm';
+    } else if (mimeType.includes('quicktime') || mimeType.includes('mov')) {
+      // Normalizar videos de iPhone/QuickTime a .mp4 para compatibilidad universal en Android/Windows
+      ext = 'mp4';
+      mimeType = 'video/mp4';
+    } else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) {
+      ext = 'jpg';
+    } else if (mimeType.includes('png')) {
+      ext = 'png';
+    } else if (mimeType.includes('webp')) {
+      ext = 'webp';
+    } else if (input instanceof File && input.name) {
       const parts = input.name.split('.');
       if (parts.length > 1) {
-        ext = parts.pop()?.toLowerCase() || ext;
+        const fileExt = parts.pop()?.toLowerCase();
+        if (fileExt === 'mov' || fileExt === 'mp4' || fileExt === 'm4v') {
+          ext = 'mp4';
+          mimeType = 'video/mp4';
+        } else if (fileExt) {
+          ext = fileExt;
+        }
       }
+    }
+
+    // Si el prefijo indica video y el tipo quedó genérico, forzar video/mp4
+    if (prefix.toLowerCase().includes('video') && (!mimeType || mimeType === 'application/octet-stream')) {
+      mimeType = 'video/mp4';
+      ext = 'mp4';
     }
 
     const cleanPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -311,42 +381,53 @@ export async function uploadWarrantyMedia(
     const folder = cleanPrefix.startsWith('als_') ? 'alistamientos' : 'garantias';
     const filePath = `${folder}/${fileName}`;
 
-    // Subir al bucket público en Supabase Storage con caché estricta de 1 año
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, blob, {
-        contentType: mimeType,
-        cacheControl: '31536000',
-        upsert: true,
-      });
+    let uploadSuccess = false;
 
-    if (!uploadError) {
+    // Subida primaria con XHR para tracking de progreso en vivo y timeout extendido
+    if (typeof window !== 'undefined' && window.XMLHttpRequest && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filePath}`;
+      const res = await uploadViaXhr(uploadUrl, blob, mimeType, onProgress);
+      uploadSuccess = res.ok;
+    }
+
+    // Fallback secundario con SDK de Supabase si XHR no pudo usarse
+    if (!uploadSuccess) {
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, blob, {
+          contentType: mimeType,
+          cacheControl: '31536000',
+          upsert: true,
+        });
+      uploadSuccess = !uploadError;
+      if (uploadError) {
+        console.warn('[Supabase Storage] Error en subida SDK:', uploadError.message);
+      }
+    }
+
+    if (uploadSuccess) {
       const { data: publicUrlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(filePath);
 
       if (publicUrlData?.publicUrl) {
         const publicUrl = publicUrlData.publicUrl;
-        // Guardar copia local en IndexedDB indexada por URL si vino en base64
         if (typeof input === 'string' && input.startsWith('data:')) {
           saveMediaToIndexedDB(publicUrl, input);
         }
         return publicUrl;
       }
-    } else {
-      console.warn('[Supabase Storage] Advertencia al subir archivo:', uploadError.message);
     }
   } catch (err) {
     console.warn('[Supabase Storage] Excepción durante subida de medio:', err);
   }
 
-  // Fallback: si falló la subida a Supabase, respaldar en IndexedDB y devolver el dataUrl
+  // Fallback de contingencia: si falló la subida a Supabase, respaldar en IndexedDB
   if (typeof input === 'string' && input.startsWith('data:')) {
     const localId = `local_media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     await saveMediaToIndexedDB(localId, input);
     return input;
   } else if (typeof input !== 'string') {
-    // Si era un File o Blob y la nube falló, generar DataURL de respaldo para IndexedDB
     try {
       const fallbackDataUrl = await new Promise<string>((resolve) => {
         const r = new FileReader();

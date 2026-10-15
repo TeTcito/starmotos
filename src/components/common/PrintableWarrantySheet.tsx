@@ -224,12 +224,10 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                 {partsList.map((part, idx) => (
                   <span
                     key={idx}
-                    className="inline-block bg-zinc-100 border border-zinc-300 rounded-md px-3 text-zinc-900 font-bold text-[9.5px] shadow-2xs"
+                    className="inline-block bg-zinc-100 border border-zinc-300 rounded-md text-zinc-900 font-bold text-[9.5px] shadow-2xs"
                     style={{
-                      height: '22px',
-                      lineHeight: '22px',
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
+                      padding: '2px 10px',
+                      lineHeight: '15px',
                     }}
                   >
                     {part.startsWith('•') ? part : `• ${part}`}
@@ -300,27 +298,23 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
             No se adjuntaron fotografías en este expediente.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-1">
             {photoImages.map((photoUrl, idx) => (
               <div
                 key={idx}
-                className="border border-zinc-300 rounded-lg p-2.5 bg-white break-inside-avoid printable-photo-card block"
+                className="break-inside-avoid printable-photo-card"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="bg-zinc-100 border border-zinc-200 rounded px-2.5 py-1 mb-2 flex items-center justify-between text-zinc-800">
-                  <span className="text-[10px] font-bold tracking-tight">
-                    {PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}
-                  </span>
-                  <span className="font-mono font-bold text-zinc-600 bg-white border border-zinc-300 rounded px-1.5 py-0.5 text-[9px] leading-none">
-                    #{idx + 1}
-                  </span>
+                <div className="flex items-center justify-between text-[9px] font-bold text-zinc-800 pb-1">
+                  <span className="truncate pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
+                  <span className="font-mono text-zinc-500 shrink-0">#{idx + 1}</span>
                 </div>
-                <div className="w-full h-[208px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-200">
+                <div className="w-full h-[195px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-300">
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}
                     loading="eager"
-                    className="w-full h-full object-contain block"
+                    className="w-full h-full object-contain"
                   />
                 </div>
               </div>

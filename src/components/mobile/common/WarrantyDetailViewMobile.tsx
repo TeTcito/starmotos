@@ -1,5 +1,5 @@
 // src/components/mobile/common/WarrantyDetailViewMobile.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Clock,
@@ -30,6 +30,7 @@ import {
   Play,
   Film,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import {
   WarrantyRequest,
@@ -46,6 +47,7 @@ import { cloudSaveWarranty } from '../../../services/supabaseService';
 import { isVideoUrl } from './NewWarrantyFormMobile';
 import { PrintableWarrantySheet } from '../../common/PrintableWarrantySheet';
 import { isValidMediaUrl } from '../../../services/mediaStorage';
+import { generateAndOpenWarrantyPdf } from '../../../utils/warrantyPdfGenerator';
 
 interface Props {
   warranty: WarrantyRequest;
@@ -81,6 +83,30 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [rejectionInput, setRejectionInput] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printableSheetRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenPdf = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const el = printableSheetRef.current;
+      if (!el) {
+        window.print();
+        return;
+      }
+      await generateAndOpenWarrantyPdf({
+        element: el,
+        requestNumber: warranty.requestNumber,
+        clientName: formData.clientName || warranty.clientName,
+      });
+    } catch (err) {
+      console.error('Error generando PDF móvil de garantía:', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Estado del formulario editable
   const [formData, setFormData] = useState({
@@ -700,11 +726,16 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
                 {/* Imprimir / PDF */}
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-black active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer shadow-xs"
-                  title="PDF"
+                  onClick={handleOpenPdf}
+                  disabled={isGeneratingPdf}
+                  className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-black active:scale-95 text-amber-400 flex items-center justify-center transition-all cursor-pointer shadow-xs disabled:opacity-75"
+                  title="Abrir expediente en PDF oficial"
                 >
-                  <Printer className="w-4 h-4" />
+                  {isGeneratingPdf ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                  ) : (
+                    <Printer className="w-4 h-4" />
+                  )}
                 </button>
 
                 {/* WhatsApp */}
@@ -2359,7 +2390,21 @@ export const WarrantyDetailViewMobile: React.FC<Props> = ({
       </div>
 
       {/* FICHA OFICIAL DE RECLAMO PARA IMPRESIÓN Y PDF */}
-      <div className="hidden print:block w-full">
+      <div
+        ref={printableSheetRef}
+        id="warranty-printable-area"
+        className="w-full bg-white print:block"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: '-99999px',
+          width: '800px',
+          maxWidth: '800px',
+          zIndex: -9999,
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      >
         <PrintableWarrantySheet
           warranty={{
             ...warranty,

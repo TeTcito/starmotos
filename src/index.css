@@ -43,7 +43,7 @@
 /* Print styling for proforma and warranty sheets */
 @media print {
   @page {
-    size: A4 portrait;
+    size: auto;
     margin: 8mm 10mm;
   }
   html, body, #root {
@@ -91,7 +91,19 @@
     break-inside: avoid !important;
     -webkit-column-break-inside: avoid !important;
   }
-  /* Estructura oficial tipo escritorio A4 para ficha de garantías sin cortes */
+  /* Estructura oficial tipo escritorio para ficha de garantías sin cortes */
+  #warranty-printable-area {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: auto !important;
+  }
   .printable-warranty-sheet {
     display: block !important;
     width: 100% !important;

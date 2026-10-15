@@ -41,6 +41,7 @@ import {
   Image as ImageIcon,
   PlusCircle,
   X,
+  Loader2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WarrantyRequest, WarrantyRequestStatus, TallerClient } from '../../types/customer';
@@ -50,6 +51,7 @@ import { isVideoUrl } from '../mobile/common/NewWarrantyFormMobile';
 import { compressImageBase64, compressVideoBase64 } from '../../utils/imageCompressor';
 import { uploadWarrantyMedia, isValidMediaUrl } from '../../services/mediaStorage';
 import { PrintableWarrantySheet } from './PrintableWarrantySheet';
+import { generateAndOpenWarrantyPdf } from '../../utils/warrantyPdfGenerator';
 
 // =========================================================================
 // 1. HELPERS DE ESTADO Y CANONIZACIÓN
@@ -352,6 +354,30 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 }) => {
   const [currentWarranty, setCurrentWarranty] = useState<WarrantyRequest>(warranty);
   const [newPartInput, setNewPartInput] = useState('');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printableSheetRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenPdf = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const el = printableSheetRef.current;
+      if (!el) {
+        window.print();
+        return;
+      }
+      await generateAndOpenWarrantyPdf({
+        element: el,
+        requestNumber: currentWarranty.requestNumber,
+        clientName: currentWarranty.clientName,
+      });
+    } catch (err) {
+      console.error('Error generando PDF de garantía:', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   // Sincronizar si cambia el prop warranty
   useEffect(() => {
@@ -906,12 +932,22 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
 
           <button
             type="button"
-            onClick={() => window.print()}
-            className="px-3.5 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
-            title="Generar PDF"
+            onClick={handleOpenPdf}
+            disabled={isGeneratingPdf}
+            className="px-3.5 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-98 disabled:opacity-75"
+            title="Abrir expediente en PDF oficial"
           >
-            <Printer className="w-4 h-4 text-amber-400" />
-            <span>PDF</span>
+            {isGeneratingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                <span>Generando...</span>
+              </>
+            ) : (
+              <>
+                <Printer className="w-4 h-4 text-amber-400" />
+                <span>PDF</span>
+              </>
+            )}
           </button>
 
           {currentWarranty.clientPhone && (
@@ -2451,7 +2487,21 @@ export const WarrantyFormView: React.FC<WarrantyFormViewProps> = ({
       {/* ========================================================================= */}
       {/* FICHA TÉCNICA OFICIAL EXCLUSIVA PARA IMPRESIÓN Y PDF                      */}
       {/* ========================================================================= */}
-      <div className="hidden print:block w-full">
+      <div
+        ref={printableSheetRef}
+        id="warranty-printable-area"
+        className="w-full bg-white print:block"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: '-99999px',
+          width: '800px',
+          maxWidth: '800px',
+          zIndex: -9999,
+          pointerEvents: 'none',
+        }}
+        aria-hidden="true"
+      >
         <PrintableWarrantySheet warranty={currentWarranty} />
       </div>
 

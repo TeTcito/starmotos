@@ -303,7 +303,7 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}
-                    crossOrigin="anonymous"
+                    loading="eager"
                     className="w-full h-full object-contain"
                   />
                 </div>

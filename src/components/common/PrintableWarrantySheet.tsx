@@ -309,17 +309,13 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                   <span className="truncate pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
                   <span className="font-mono text-zinc-500 shrink-0">#{idx + 1}</span>
                 </div>
-                <div
-                  className="w-full h-[185px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-300"
+                <img
+                  src={photoUrl}
+                  alt={`Evidencia ${idx + 1}`}
+                  loading="eager"
+                  className="w-full h-[185px] object-contain rounded block"
                   style={{ marginTop: '10px' }}
-                >
-                  <img
-                    src={photoUrl}
-                    alt={`Evidencia ${idx + 1}`}
-                    loading="eager"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+                />
               </div>
             ))}
           </div>

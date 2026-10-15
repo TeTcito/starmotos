@@ -93,9 +93,9 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       <div className="grid grid-cols-2 gap-4 break-inside-avoid">
         {/* 1. Datos del Cliente & Sede */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
-            <User className="w-4 h-4 text-zinc-900 shrink-0" />
-            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
+          <div className="flex items-end gap-1.5 pb-0.5 border-b-2 border-zinc-900">
+            <User className="w-3.5 h-3.5 text-zinc-900 shrink-0 mb-0.5" />
+            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 inline-block mb-1.5 leading-none">
               1. Datos del Cliente & Sede
             </span>
           </div>
@@ -145,9 +145,9 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
 
         {/* 2. Motocicleta Registrada */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
-            <Bike className="w-4 h-4 text-zinc-900 shrink-0" />
-            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
+          <div className="flex items-end gap-1.5 pb-0.5 border-b-2 border-zinc-900">
+            <Bike className="w-3.5 h-3.5 text-zinc-900 shrink-0 mb-0.5" />
+            <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 inline-block mb-1.5 leading-none">
               2. Motocicleta Registrada
             </span>
           </div>
@@ -198,9 +198,9 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* 3. RECLAMO TÉCNICO & MOVILIDAD (SIN CONTENEDORES)                          */}
       {/* ========================================================================= */}
       <div className="space-y-1.5 break-inside-avoid">
-        <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-900">
-          <Wrench className="w-4 h-4 text-zinc-900 shrink-0" />
-          <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 leading-none relative -top-[2.5px]">
+        <div className="flex items-end gap-1.5 pb-0.5 border-b-2 border-zinc-900">
+          <Wrench className="w-3.5 h-3.5 text-zinc-900 shrink-0 mb-0.5" />
+          <span className="font-black text-[10.5px] uppercase tracking-wide text-zinc-950 inline-block mb-1.5 leading-none">
             3. Reclamo Técnico & Movilidad
           </span>
         </div>
@@ -224,9 +224,15 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                 {partsList.map((part, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-300 text-zinc-900 font-mono font-bold text-[9px] shadow-2xs leading-none"
+                    className="inline-block bg-zinc-100 border border-zinc-300 rounded-md px-3 text-zinc-900 font-bold text-[9.5px] shadow-2xs"
+                    style={{
+                      height: '22px',
+                      lineHeight: '22px',
+                      textAlign: 'center',
+                      verticalAlign: 'middle',
+                    }}
                   >
-                    <span className="relative -top-[1.5px]">{part.startsWith('•') ? part : `• ${part}`}</span>
+                    {part.startsWith('•') ? part : `• ${part}`}
                   </span>
                 ))}
               </div>
@@ -277,14 +283,14 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
       {/* 4. REGISTRO FOTOGRÁFICO DE INSPECCIÓN TÉCNICA (IMÁGENES)                  */}
       {/* ========================================================================= */}
       <div className="space-y-1.5 pt-1">
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-900 break-inside-avoid">
-          <div className="flex items-center gap-1.5">
-            <Camera className="w-4 h-4 text-zinc-900 shrink-0" />
-            <span className="font-black text-zinc-900 text-[10.5px] uppercase tracking-wide leading-none relative -top-[2.5px]">
+        <div className="flex items-end justify-between pb-0.5 border-b-2 border-zinc-900 break-inside-avoid">
+          <div className="flex items-end gap-1.5">
+            <Camera className="w-3.5 h-3.5 text-zinc-900 shrink-0 mb-0.5" />
+            <span className="font-black text-zinc-900 text-[10.5px] uppercase tracking-wide leading-none inline-block mb-1.5">
               4. Evidencias Fotográficas de Diagnóstico Técnico ({photoImages.length} Imágenes)
             </span>
           </div>
-          <span className="text-[8.5px] font-bold text-zinc-500 uppercase leading-none relative -top-[2.5px]">
+          <span className="text-[8.5px] font-bold text-zinc-500 uppercase leading-none inline-block mb-1.5">
             Inspección Visual Obligatoria
           </span>
         </div>
@@ -298,19 +304,23 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
             {photoImages.map((photoUrl, idx) => (
               <div
                 key={idx}
-                className="border border-zinc-300 rounded-lg p-2 flex flex-col break-inside-avoid printable-photo-card bg-white"
+                className="border border-zinc-300 rounded-lg p-2.5 bg-white break-inside-avoid printable-photo-card block"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-center justify-between text-[8.5px] font-bold text-zinc-700 pb-1.5 mb-1.5 border-b border-zinc-100">
-                  <span className="truncate pr-1 leading-none relative -top-[1px]">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
-                  <span className="font-mono text-zinc-400 shrink-0 leading-none relative -top-[1px]">#{idx + 1}</span>
+                <div className="bg-zinc-100 border border-zinc-200 rounded px-2.5 py-1 mb-2 flex items-center justify-between text-zinc-800">
+                  <span className="text-[10px] font-bold tracking-tight">
+                    {PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}
+                  </span>
+                  <span className="font-mono font-bold text-zinc-600 bg-white border border-zinc-300 rounded px-1.5 py-0.5 text-[9px] leading-none">
+                    #{idx + 1}
+                  </span>
                 </div>
                 <div className="w-full h-[208px] bg-zinc-50 overflow-hidden flex items-center justify-center rounded border border-zinc-200">
                   <img
                     src={photoUrl}
                     alt={`Evidencia ${idx + 1}`}
                     loading="eager"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain block"
                   />
                 </div>
               </div>

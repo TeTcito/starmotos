@@ -135,16 +135,50 @@ export async function generateAndOpenWarrantyPdf({
     const printWidthMm = pageWidthMm - marginMm * 2; // 203.9 mm
     const printHeightMm = pageHeightMm - marginMm * 2; // 267.4 mm
 
-    // Altura en píxeles de canvas que cabe en una sola página física
-    const pageHeightPx = Math.floor((canvas.width * printHeightMm) / printWidthMm);
-    const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+    // Altura máxima en píxeles de canvas que cabe en una sola página física
+    const maxPageHeightPx = Math.floor((canvas.width * printHeightMm) / printWidthMm);
 
-    // 4. Cortar el canvas en páginas limpias para no duplicar datos ni saturar la memoria
-    for (let page = 0; page < totalPages; page++) {
-      const sourceY = page * pageHeightPx;
-      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - sourceY);
+    // Mapear elementos protegidos contra cortes (tarjetas fotográficas, bloques indivisibles)
+    const containerRect = element.getBoundingClientRect();
+    const scaleY = canvas.height / (containerRect.height || 1);
 
-      if (sliceHeightPx <= 0) break;
+    const avoidElements = Array.from(
+      element.querySelectorAll<HTMLElement>('.printable-photo-card, .break-inside-avoid')
+    );
+
+    const avoidBoxes = avoidElements
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        const top = Math.round((r.top - containerRect.top) * scaleY);
+        const bottom = Math.round((r.bottom - containerRect.top) * scaleY);
+        return { top, bottom, height: bottom - top };
+      })
+      .filter((b) => b.height > 10 && b.height < maxPageHeightPx * 0.95);
+
+    // 4. Cortar el canvas en páginas inteligentes respetando los límites de las tarjetas
+    let currentY = 0;
+    let pageIndex = 0;
+
+    while (currentY < canvas.height) {
+      let sliceHeightPx = Math.min(maxPageHeightPx, canvas.height - currentY);
+      const targetBottom = currentY + sliceHeightPx;
+
+      if (targetBottom < canvas.height) {
+        // Verificar si la línea de corte targetBottom parte por la mitad alguna tarjeta de evidencia o bloque
+        for (const box of avoidBoxes) {
+          if (targetBottom > box.top && targetBottom < box.bottom) {
+            // Cortar justo antes de este elemento si la página ya tiene al menos el 30% lleno
+            if (box.top - currentY > maxPageHeightPx * 0.3) {
+              sliceHeightPx = Math.floor(box.top - currentY);
+            }
+            break;
+          }
+        }
+      }
+
+      if (sliceHeightPx <= 0) {
+        sliceHeightPx = Math.min(maxPageHeightPx, canvas.height - currentY);
+      }
 
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
@@ -157,7 +191,7 @@ export async function generateAndOpenWarrantyPdf({
         ctx.drawImage(
           canvas,
           0,
-          sourceY,
+          currentY,
           canvas.width,
           sliceHeightPx,
           0,
@@ -170,7 +204,7 @@ export async function generateAndOpenWarrantyPdf({
       const sliceDataUrl = sliceCanvas.toDataURL('image/jpeg', 0.94);
       const sliceHeightMm = (sliceHeightPx * printWidthMm) / canvas.width;
 
-      if (page > 0) {
+      if (pageIndex > 0) {
         pdf.addPage('letter', 'portrait');
       }
 
@@ -184,6 +218,12 @@ export async function generateAndOpenWarrantyPdf({
         undefined,
         'FAST'
       );
+
+      currentY += sliceHeightPx;
+      pageIndex++;
+
+      // Salvaguarda para evitar cualquier posible bucle infinito
+      if (pageIndex > 25) break;
     }
 
     // 5. Metadatos del PDF

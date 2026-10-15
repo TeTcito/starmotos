@@ -305,16 +305,19 @@ export const PrintableWarrantySheet: React.FC<Props> = ({ warranty }) => {
                 className="break-inside-avoid printable-photo-card"
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
-                <div className="flex items-center justify-between text-[9.5px] font-bold text-zinc-800">
-                  <span className="truncate pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
-                  <span className="font-mono text-zinc-500 shrink-0">#{idx + 1}</span>
+                <div
+                  className="flex items-center justify-between text-[9.5px] font-bold text-zinc-900"
+                  style={{ position: 'relative', zIndex: 10, paddingBottom: '6px' }}
+                >
+                  <span className="pr-1">{PHOTO_GUIDE_LABELS[idx] || `Foto ${idx + 1}`}</span>
+                  <span className="font-mono text-zinc-600 shrink-0 text-[9px]">#{idx + 1}</span>
                 </div>
                 <img
                   src={photoUrl}
                   alt={`Evidencia ${idx + 1}`}
                   loading="eager"
-                  className="w-full h-[185px] object-contain rounded block"
-                  style={{ marginTop: '10px' }}
+                  className="w-full h-[185px] object-cover rounded-md block"
+                  style={{ marginTop: '4px' }}
                 />
               </div>
             ))}

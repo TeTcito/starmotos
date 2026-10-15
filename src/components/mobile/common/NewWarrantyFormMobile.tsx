@@ -563,7 +563,6 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
       estimatedCost: 0,
     };
 
-    confetti({ particleCount: 50, spread: 60, origin: { y: 0.65 } });
     onSubmit(newReq);
   };
 

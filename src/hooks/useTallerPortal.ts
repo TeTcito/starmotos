@@ -518,11 +518,6 @@ export function useTallerPortal() {
 
     addStoredAlerts(alertsToPush);
 
-    confetti({
-      particleCount: 60,
-      spread: 65,
-      origin: { y: 0.6 },
-    });
 
     showToast(`Solicitud ${newReq.requestNumber} enviada a Matriz Central (En Revisión).`, 'success');
 

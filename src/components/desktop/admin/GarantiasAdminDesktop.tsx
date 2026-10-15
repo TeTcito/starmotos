@@ -24,6 +24,7 @@ import {
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
 import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
+import { WarrantySubmittedSuccessModal } from '../../common/WarrantySubmittedSuccessModal';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -57,6 +58,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
 
   // Estado para emisión de garantías desde Matriz
   const [isEmittingWarranty, setIsEmittingWarranty] = useState(false);
+  const [submittedWarrantySuccess, setSubmittedWarrantySuccess] = useState<WarrantyRequest | null>(null);
 
   // Estado para confirmación de eliminación con ventana emergente
   const [warrantyToDelete, setWarrantyToDelete] = useState<WarrantyRequest | null>(null);
@@ -69,17 +71,34 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
   // Si está en modo emisión de nueva garantía
   if (isEmittingWarranty) {
     return (
-      <NewWarrantyFormView
-        onCancel={() => setIsEmittingWarranty(false)}
-        onSubmit={(newReq) => {
-          if (onCreateWarranty) onCreateWarranty(newReq);
-          setIsEmittingWarranty(false);
-        }}
-        clients={clients}
-        defaultTallerOrigin="StarMotos Sede Matriz"
-        defaultTallerOriginId="sede-matriz"
-        viewerRole="admin"
-      />
+      <>
+        <NewWarrantyFormView
+          onCancel={() => setIsEmittingWarranty(false)}
+          onSubmit={(newReq) => {
+            if (onCreateWarranty) onCreateWarranty(newReq);
+            setSubmittedWarrantySuccess(newReq);
+          }}
+          clients={clients}
+          defaultTallerOrigin="StarMotos Sede Matriz"
+          defaultTallerOriginId="sede-matriz"
+          viewerRole="admin"
+        />
+
+        {/* Ventana de éxito y confeti al enviar la solicitud */}
+        <WarrantySubmittedSuccessModal
+          isOpen={Boolean(submittedWarrantySuccess)}
+          warranty={submittedWarrantySuccess}
+          onClose={() => {
+            setSubmittedWarrantySuccess(null);
+            setIsEmittingWarranty(false);
+          }}
+          onViewDetail={(w) => {
+            setSubmittedWarrantySuccess(null);
+            setIsEmittingWarranty(false);
+            setSelectedWarranty(w);
+          }}
+        />
+      </>
     );
   }
 
@@ -127,6 +146,7 @@ export const GarantiasAdminDesktop: React.FC<Props> = ({
       {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
       <AutoPendingWarrantiesAlert
         warranties={warranties}
+        disabled={Boolean(submittedWarrantySuccess)}
         onSelectWarranty={(w) => setSelectedWarranty(w)}
         role="admin"
       />

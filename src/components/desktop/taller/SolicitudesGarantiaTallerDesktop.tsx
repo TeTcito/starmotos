@@ -15,6 +15,7 @@ import {
   getWarrantyStatusInfo,
 } from '../../common/WarrantyModule';
 import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
+import { WarrantySubmittedSuccessModal } from '../../common/WarrantySubmittedSuccessModal';
 import { isWarrantyExpiredForTaller } from '../../../data/mockMultiRoleData';
 
 interface Props {
@@ -36,6 +37,7 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'list' | 'new' | 'detail'>('list');
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyRequest | null>(null);
+  const [submittedWarrantySuccess, setSubmittedWarrantySuccess] = useState<WarrantyRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'en_revision' | 'en_proceso' | 'aceptada' | 'denegada'>('all');
 
@@ -71,11 +73,27 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
       {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
       <AutoPendingWarrantiesAlert
         warranties={warranties}
+        disabled={Boolean(submittedWarrantySuccess)}
         onSelectWarranty={(w) => {
           setSelectedWarranty(w);
           setViewMode('detail');
         }}
         role="taller"
+      />
+
+      {/* Ventana de éxito y confeti al enviar la solicitud */}
+      <WarrantySubmittedSuccessModal
+        isOpen={Boolean(submittedWarrantySuccess)}
+        warranty={submittedWarrantySuccess}
+        onClose={() => {
+          setSubmittedWarrantySuccess(null);
+          setViewMode('list');
+        }}
+        onViewDetail={(w) => {
+          setSubmittedWarrantySuccess(null);
+          setSelectedWarranty(w);
+          setViewMode('detail');
+        }}
       />
 
       {/* 1. MODO: CREAR NUEVA SOLICITUD EN FORMATO FORMULARIO */}
@@ -84,7 +102,7 @@ export const SolicitudesGarantiaTallerDesktop: React.FC<Props> = ({
           onCancel={() => setViewMode('list')}
           onSubmit={(newReq) => {
             onCreateRequest(newReq);
-            setViewMode('list');
+            setSubmittedWarrantySuccess(newReq);
           }}
           clients={clients}
           defaultTallerOrigin={currentWorkshop?.name || 'StarMotos Taller'}

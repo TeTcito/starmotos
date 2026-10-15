@@ -263,6 +263,20 @@ export const PendingWarrantiesAlertModal: React.FC<Props> = ({
   );
 };
 
+// Control global de supresión temporal (ej: cuando se muestra el modal de éxito de envío)
+let globalSuppressedUntil = 0;
+const suppressionListeners = new Set<() => void>();
+
+export function suppressPendingWarrantiesAlert(ms = 60000): void {
+  globalSuppressedUntil = Date.now() + ms;
+  suppressionListeners.forEach((fn) => fn());
+}
+
+export function releasePendingWarrantiesAlert(): void {
+  globalSuppressedUntil = 0;
+  suppressionListeners.forEach((fn) => fn());
+}
+
 /**
  * Componente autónomo que se monta en los módulos de garantías.
  * Evalúa automáticamente si hay garantías pendientes sin aceptar con más de 2 horas
@@ -272,9 +286,19 @@ export const AutoPendingWarrantiesAlert: React.FC<{
   warranties: WarrantyRequest[];
   onSelectWarranty?: (w: WarrantyRequest) => void;
   role?: 'taller' | 'admin' | 'garante';
-}> = ({ warranties, onSelectWarranty, role = 'taller' }) => {
+  disabled?: boolean;
+}> = ({ warranties, onSelectWarranty, role = 'taller', disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [dismissedUntil, setDismissedUntil] = useState<number>(0);
+  const [, setSuppressionTick] = useState(0);
+
+  useEffect(() => {
+    const onSuppressionChange = () => setSuppressionTick((t) => t + 1);
+    suppressionListeners.add(onSuppressionChange);
+    return () => {
+      suppressionListeners.delete(onSuppressionChange);
+    };
+  }, []);
 
   const overdueWarranties = useMemo(() => {
     if (!warranties || !Array.isArray(warranties)) return [];
@@ -284,11 +308,22 @@ export const AutoPendingWarrantiesAlert: React.FC<{
     });
   }, [warranties, role]);
 
+  const isSuppressed = disabled || Date.now() < globalSuppressedUntil;
+
   useEffect(() => {
-    if (overdueWarranties.length > 0 && Date.now() > dismissedUntil) {
-      setIsOpen(true);
+    if (isSuppressed) {
+      setIsOpen(false);
+      return;
     }
-  }, [overdueWarranties, dismissedUntil]);
+    if (overdueWarranties.length > 0 && Date.now() > dismissedUntil) {
+      const timer = setTimeout(() => {
+        if (!disabled && Date.now() >= globalSuppressedUntil) {
+          setIsOpen(true);
+        }
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [overdueWarranties, dismissedUntil, isSuppressed, disabled]);
 
   const handleClose = () => {
     setIsOpen(false);

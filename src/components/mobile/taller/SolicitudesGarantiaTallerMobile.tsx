@@ -37,6 +37,7 @@ import {
 import { WarrantyDetailViewMobile } from '../common/WarrantyDetailViewMobile';
 import { NewWarrantyFormMobile } from '../common/NewWarrantyFormMobile';
 import { AutoPendingWarrantiesAlert } from '../../common/PendingWarrantiesAlertModal';
+import { WarrantySubmittedSuccessModal } from '../../common/WarrantySubmittedSuccessModal';
 
 interface Props {
   warranties: WarrantyRequest[];
@@ -72,6 +73,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
 
   // Modal para nueva solicitud
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [submittedWarrantySuccess, setSubmittedWarrantySuccess] = useState<WarrantyRequest | null>(null);
   const [newRequestData, setNewRequestData] = useState({
     clientName: '',
     clientIdNumber: '',
@@ -270,8 +272,20 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
       {/* Alerta emergente de garantías pendientes sin aceptar > 2 horas */}
       <AutoPendingWarrantiesAlert
         warranties={localWarranties}
+        disabled={Boolean(submittedWarrantySuccess)}
         onSelectWarranty={(w) => setSelectedWarrantyForDetail(w)}
         role="taller"
+      />
+
+      {/* Ventana de éxito y confeti al enviar la solicitud */}
+      <WarrantySubmittedSuccessModal
+        isOpen={Boolean(submittedWarrantySuccess)}
+        warranty={submittedWarrantySuccess}
+        onClose={() => setSubmittedWarrantySuccess(null)}
+        onViewDetail={(w) => {
+          setSubmittedWarrantySuccess(null);
+          setSelectedWarrantyForDetail(w);
+        }}
       />
 
       {/* ========================================================================= */}
@@ -332,6 +346,7 @@ export const SolicitudesGarantiaTallerMobile: React.FC<Props> = ({
               onCreateRequest(reqWithOrigin);
             }
 
+            setSubmittedWarrantySuccess(reqWithOrigin);
             setShowCreateModal(false);
           }}
           clients={clients}

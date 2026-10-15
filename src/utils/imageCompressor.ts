@@ -119,6 +119,9 @@ export async function compressVideoBase64(
 
     const video = document.createElement('video');
     video.muted = true;
+    video.volume = 0;
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
     video.playsInline = true;
     video.preload = 'metadata';
 

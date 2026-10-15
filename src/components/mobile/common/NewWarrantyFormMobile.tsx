@@ -409,16 +409,22 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
     const active = activeSlotRef.current;
     if (!file || !active || active.type !== 'video') return;
 
+    if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|mov|webm|m4v|quicktime)$/i)) {
+      alert('Por favor seleccione un archivo de video válido (MP4, WEBM, MOV).');
+      e.target.value = '';
+      return;
+    }
+
     const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB max
     if (file.size > MAX_VIDEO_SIZE_BYTES) {
-      alert('El video supera el límite de 50 MB. Por favor seleccione o grabe un clip técnico de menor tamaño.');
+      alert('El video supera el límite de 50 MB permitido para almacenamiento en la nube. Por favor seleccione o grabe un clip técnico de menor tamaño.');
       e.target.value = '';
       return;
     }
 
     setUploadingSlot({ type: 'video', index: active.index });
     try {
-      // Previsualización local inmediata
+      // 1. Previsualización local inmediata
       const previewUrl = URL.createObjectURL(file);
       setVideoSlots((prev) => {
         const next = [...prev];
@@ -426,21 +432,8 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
         return next;
       });
 
-      // Optimizar video si supera 1.5 MB y hasta 20 MB; si es mayor a 20 MB se sube el archivo original directamente a Storage
-      let videoToUpload: File | Blob | string = file;
-      if (file.size > 1.5 * 1024 * 1024 && file.size <= 20 * 1024 * 1024) {
-        try {
-          const compressed = await compressVideoBase64(file, 640, 480, 45);
-          if (compressed && compressed.length > 50) {
-            videoToUpload = compressed;
-          }
-        } catch (compErr) {
-          console.warn('Compresión móvil de video falló, usando archivo original:', compErr);
-        }
-      }
-
-      // Subida del video optimizado a Supabase Storage
-      const cloudUrl = await uploadWarrantyMedia(videoToUpload, `video_movil_${active.index + 1}`);
+      // 2. Subida directa del archivo original a Supabase Storage (mantiene audio íntegro y carga rápida)
+      const cloudUrl = await uploadWarrantyMedia(file, `video_movil_${active.index + 1}`);
       if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
         setVideoSlots((prev) => {
           const next = [...prev];
@@ -448,14 +441,9 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
           return next;
         });
       } else {
-        if (typeof videoToUpload === 'string') {
-          setVideoSlots((prev) => {
-            const next = [...prev];
-            next[active.index] = videoToUpload as string;
-            return next;
-          });
-        } else {
-          const compressed = await compressVideoBase64(file, 640, 480, 20);
+        // Fallback local en caso de falla de conectividad
+        try {
+          const compressed = await compressVideoBase64(file, 640, 480, 45);
           if (compressed) {
             setVideoSlots((prev) => {
               const next = [...prev];
@@ -463,11 +451,11 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
               return next;
             });
           }
-        }
+        } catch (_) {}
       }
     } catch (err) {
       console.error('Error al procesar video móvil:', err);
-      alert('Error al procesar y comprimir el video.');
+      alert('Ocurrió un error al subir el video.');
     } finally {
       setUploadingSlot(null);
       e.target.value = '';
@@ -1322,7 +1310,7 @@ export const NewWarrantyFormMobile: React.FC<Props> = ({
                       {isUploading ? (
                         <div className="flex flex-col items-center justify-center p-2 text-center">
                           <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-1" />
-                          <span className="text-[10px] font-bold text-purple-300">Optimizando video...</span>
+                          <span className="text-[10px] font-bold text-purple-300">Subiendo video a la nube...</span>
                         </div>
                       ) : video ? (
                         <>

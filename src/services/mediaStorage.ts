@@ -70,16 +70,20 @@ export async function getMediaFromIndexedDB(id: string): Promise<string | null> 
 }
 
 /**
- * Valida si una cadena es un DataURL válido con contenido suficiente y sin caracteres corruptos
+ * Valida si una cadena es un DataURL válido con contenido suficiente y sin caracteres corruptos.
+ * Soporta tanto imágenes (data:image/) como videos diagnósticos (data:video/).
  */
 export function isValidDataUrl(dataUrl: string): boolean {
   if (!dataUrl || typeof dataUrl !== 'string') return false;
-  if (!dataUrl.startsWith('data:image/')) return false;
+  const isImage = dataUrl.startsWith('data:image/');
+  const isVideo = dataUrl.startsWith('data:video/');
+  if (!isImage && !isVideo) return false;
+
   const commaIdx = dataUrl.indexOf(',');
   if (commaIdx === -1) return false;
 
   let b64Data = dataUrl.slice(commaIdx + 1).trim().replace(/\s+/g, '');
-  // Las imágenes truncadas con puntos suspensivos son incompletas y dan ERR_INVALID_URL
+  // Los medios truncados con puntos suspensivos son incompletos y dan ERR_INVALID_URL
   if (b64Data.length < 50) return false;
   if (b64Data.includes('…') || b64Data.includes('...')) return false;
 
@@ -92,14 +96,17 @@ export function isValidDataUrl(dataUrl: string): boolean {
     b64Data += '='.repeat(padLen);
   }
 
-  if (!/^[A-Za-z0-9+/=]+$/.test(b64Data)) {
+  // Comprobar muestra inicial para evitar expresiones regulares pesadas en buffers grandes
+  const sampleToCheck = b64Data.slice(0, 500);
+  if (!/^[A-Za-z0-9+/=]+$/.test(sampleToCheck)) {
     return false;
   }
 
   try {
-    const decoded = atob(b64Data);
+    // Validar decodificación sobre muestra inicial (evita desbordar memoria con videos de varios MB)
+    const decodedSample = atob(sampleToCheck.slice(0, 120));
     if (dataUrl.includes('image/webp')) {
-      if (!decoded.startsWith('RIFF') || !decoded.includes('WEBP')) {
+      if (!decodedSample.startsWith('RIFF') || !decodedSample.includes('WEBP')) {
         return false;
       }
     }
@@ -110,7 +117,7 @@ export function isValidDataUrl(dataUrl: string): boolean {
 }
 
 /**
- * Valida si una URL de medio es segura y válida para renderizar en etiquetas <img> sin provocar ERR_INVALID_URL
+ * Valida si una URL de medio es segura y válida para renderizar en etiquetas <img> o <video> sin provocar ERR_INVALID_URL
  */
 export function isValidMediaUrl(url: unknown): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -118,7 +125,7 @@ export function isValidMediaUrl(url: unknown): boolean {
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) {
     return true;
   }
-  if (trimmed.startsWith('data:image/')) {
+  if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:video/')) {
     return isValidDataUrl(trimmed);
   }
   return false;
@@ -137,13 +144,13 @@ export function cleanCorruptedMediaFromLocalStorage(): void {
       if (!key) continue;
 
       const raw = localStorage.getItem(key);
-      if (!raw || (!raw.includes('data:image/') && !raw.includes('idb:'))) continue;
+      if (!raw || (!raw.includes('data:image/') && !raw.includes('data:video/') && !raw.includes('idb:'))) continue;
 
       try {
         let changed = false;
         const cleanValue = (val: any): any => {
           if (typeof val === 'string') {
-            if (val.startsWith('data:image/')) {
+            if (val.startsWith('data:image/') || val.startsWith('data:video/')) {
               if (!isValidDataUrl(val)) {
                 changed = true;
                 return '';
@@ -204,7 +211,7 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
 
     // Extraer mimeType del header
     const mimeMatch = header.match(/^data:([^;]+)/);
-    const mimeType = mimeMatch ? mimeMatch[1] : 'image/webp';
+    const mimeType = mimeMatch ? mimeMatch[1] : (header.includes('video') ? 'video/mp4' : 'image/webp');
 
     // Limpieza estricta de b64Data
     b64Data = b64Data.trim().replace(/\s+/g, '');
@@ -239,7 +246,7 @@ export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string }
 }
 
 /**
- * Sube un archivo o cadena base64 a Supabase Storage (bucket warranty-media)
+ * Sube un archivo, blob o cadena base64 a Supabase Storage (bucket warranty-media)
  * y devuelve la URL pública HTTPS permanente.
  * Si falla o está offline, guarda en IndexedDB y devuelve el contenido de respaldo.
  */
@@ -254,11 +261,11 @@ export async function uploadWarrantyMedia(
     }
   }
 
-  try {
-    let blob: Blob;
-    let mimeType: string;
-    let ext = 'webp';
+  let blob: Blob;
+  let mimeType: string;
+  let ext = 'webp';
 
+  try {
     if (typeof input === 'string') {
       if (input.startsWith('data:')) {
         const parsed = dataUrlToBlob(input);
@@ -268,6 +275,15 @@ export async function uploadWarrantyMedia(
         }
         blob = parsed.blob;
         mimeType = parsed.mimeType;
+      } else if (input.startsWith('blob:')) {
+        // Resolver URL de Blob local del navegador
+        try {
+          const res = await fetch(input);
+          blob = await res.blob();
+          mimeType = blob.type || 'video/mp4';
+        } catch (_) {
+          return '';
+        }
       } else {
         return input;
       }
@@ -282,6 +298,12 @@ export async function uploadWarrantyMedia(
     else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
     else if (mimeType.includes('png')) ext = 'png';
     else if (mimeType.includes('webp')) ext = 'webp';
+    else if (input instanceof File && input.name) {
+      const parts = input.name.split('.');
+      if (parts.length > 1) {
+        ext = parts.pop()?.toLowerCase() || ext;
+      }
+    }
 
     const cleanPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
@@ -305,8 +327,8 @@ export async function uploadWarrantyMedia(
 
       if (publicUrlData?.publicUrl) {
         const publicUrl = publicUrlData.publicUrl;
-        // Guardar copia local en IndexedDB indexada por URL
-        if (typeof input === 'string') {
+        // Guardar copia local en IndexedDB indexada por URL si vino en base64
+        if (typeof input === 'string' && input.startsWith('data:')) {
           saveMediaToIndexedDB(publicUrl, input);
         }
         return publicUrl;
@@ -319,10 +341,25 @@ export async function uploadWarrantyMedia(
   }
 
   // Fallback: si falló la subida a Supabase, respaldar en IndexedDB y devolver el dataUrl
-  if (typeof input === 'string') {
+  if (typeof input === 'string' && input.startsWith('data:')) {
     const localId = `local_media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     await saveMediaToIndexedDB(localId, input);
     return input;
+  } else if (typeof input !== 'string') {
+    // Si era un File o Blob y la nube falló, generar DataURL de respaldo para IndexedDB
+    try {
+      const fallbackDataUrl = await new Promise<string>((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve((r.result as string) || '');
+        r.onerror = () => resolve('');
+        r.readAsDataURL(blob);
+      });
+      if (fallbackDataUrl && isValidDataUrl(fallbackDataUrl)) {
+        const localId = `local_media_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        await saveMediaToIndexedDB(localId, fallbackDataUrl);
+        return fallbackDataUrl;
+      }
+    } catch (_) {}
   }
 
   return '';

@@ -264,7 +264,7 @@ export function safeSaveWarrantiesToLocalStorage(warranties: WarrantyRequest[]):
         copy.diagnosticPhotos = normalizedPhotos.filter((item: any) => {
           if (typeof item === 'string') {
             if (item.startsWith('http://') || item.startsWith('https://')) return true;
-            if (item.startsWith('data:image/')) return isValidDataUrl(item);
+            if (item.startsWith('data:image/') || item.startsWith('data:video/')) return isValidDataUrl(item);
             return false;
           }
           return false;
@@ -885,18 +885,20 @@ export async function cloudSaveWarranty(w: WarrantyRequest) {
             if (typeof item === 'string') {
               if (item.startsWith('http://') || item.startsWith('https://')) return item;
               if (item.startsWith('idb:')) return '';
-              if (item.startsWith('data:')) {
-                if (!isValidDataUrl(item)) return '';
-              }
+              if (item.startsWith('data:') && !isValidDataUrl(item)) return '';
               if (item.startsWith('data:') || item.startsWith('blob:') || item.length > 2000) {
                 try {
                   const cloudUrl = await uploadWarrantyMedia(item, `gar_${w.id}_${idx}`);
                   if (cloudUrl && (cloudUrl.startsWith('http://') || cloudUrl.startsWith('https://'))) {
                     return cloudUrl;
                   }
+                  // Si falló la subida pero es un DataURL válido localmente, conservarlo para no perder la evidencia
+                  if (item.startsWith('data:') && isValidDataUrl(item)) {
+                    return item;
+                  }
                   return '';
                 } catch (_) {
-                  return '';
+                  return item.startsWith('data:') && isValidDataUrl(item) ? item : '';
                 }
               }
             }

@@ -179,7 +179,7 @@ function App() {
     localStorage.setItem('starmotos_auth', 'true');
 
     // Sincronizar inmediatamente al iniciar sesión para cargar todos los datos de las sedes
-    syncAllFromSupabase();
+    syncAllFromSupabase(true);
 
     // Limpiar hash o redirigir según el rol para evitar colisiones de rutas previas
     if (selectedRole === 'admin') {

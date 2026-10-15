@@ -294,16 +294,26 @@ export function safeSaveWarrantiesToLocalStorage(warranties: WarrantyRequest[]):
 // 1. SINCRONIZACIÓN BIDIRECCIONAL INTELIGENTE (NUBE <-> LOCAL)
 // =========================================================================
 
-export async function syncAllFromSupabase(): Promise<{
+let lastSyncTimestamp = 0;
+// Cooldown de 3 minutos para sincronizaciones automáticas en segundo plano (focus, visibilitychange y dobles montajes)
+const BACKGROUND_SYNC_COOLDOWN_MS = 3 * 60 * 1000;
+
+export async function syncAllFromSupabase(force = false): Promise<{
   warrantiesCount: number;
   alistamientosCount: number;
   clientsCount: number;
   alertsCount: number;
 }> {
+  const now = Date.now();
+  if (!force && now - lastSyncTimestamp < BACKGROUND_SYNC_COOLDOWN_MS) {
+    return { warrantiesCount: 0, alistamientosCount: 0, clientsCount: 0, alertsCount: 0 };
+  }
+
   if (isSyncing) {
     return { warrantiesCount: 0, alistamientosCount: 0, clientsCount: 0, alertsCount: 0 };
   }
   isSyncing = true;
+  lastSyncTimestamp = now;
 
   try {
     // 0. Sincronizar registros eliminados (tombstones) globales desde Supabase primero
@@ -1734,14 +1744,20 @@ export function initSupabaseRealtime() {
   // Realizar primera sincronización de arranque
   syncAllFromSupabase();
 
-  // Sincronizar automáticamente cuando el usuario regresa a la pestaña
+  // Sincronizar automáticamente cuando el usuario regresa a la pestaña (con debounce y cooldown)
   if (typeof window !== 'undefined') {
-    window.addEventListener('focus', () => {
-      syncAllFromSupabase();
-    });
+    let focusDebounceTimer: any = null;
+    const triggerBackgroundSync = () => {
+      clearTimeout(focusDebounceTimer);
+      focusDebounceTimer = setTimeout(() => {
+        syncAllFromSupabase(false);
+      }, 500);
+    };
+
+    window.addEventListener('focus', triggerBackgroundSync);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        syncAllFromSupabase();
+        triggerBackgroundSync();
       }
     });
   }
